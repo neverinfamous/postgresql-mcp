@@ -458,7 +458,8 @@ export type ToolGroup =
     | 'vector'         // pgvector extension
     | 'postgis'        // PostGIS extension
     | 'partitioning'   // Partition management
-    | 'stats';         // Statistical analysis
+    | 'stats'          // Statistical analysis
+    | 'cron';          // pg_cron extension - job scheduling
 
 /**
  * Tool filter rule

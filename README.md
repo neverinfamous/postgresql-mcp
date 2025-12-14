@@ -4,9 +4,9 @@
 
 *Last updated December 14, 2025 - Initial Implementation Complete*
 
-*Enterprise-grade PostgreSQL MCP Server with OAuth 2.0 authentication, connection pooling, tool filtering, plus support for pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
+*Enterprise-grade PostgreSQL MCP Server with OAuth 2.0 authentication, connection pooling, tool filtering, plus support for pg_cron, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
 
-> **✅ Initial Implementation Complete** - 146 tools, 14 resources, and 13 prompts. Thorough testing before release in progress.
+> **✅ Initial Implementation Complete** - 154 tools, 14 resources, and 13 prompts. Thorough testing before release in progress.
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -14,7 +14,7 @@
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 ![Status](https://img.shields.io/badge/status-Testing-blue)
 
-A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **146 specialized tools**, **14 resources**, and **13 AI-powered prompts**.
+A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **154 specialized tools**, **14 resources**, and **13 AI-powered prompts**.
 
 ---
 
@@ -102,7 +102,7 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
 
 ## 🛠️ Tool Categories
 
-This server provides **146 tools** across 13 categories:
+This server provides **154 tools** across 14 categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
@@ -119,13 +119,14 @@ This server provides **146 tools** across 13 categories:
 | Vector | 14 | pgvector extension - similarity search, clustering, hybrid search |
 | PostGIS | 12 | Geospatial operations - distance, transform, clustering, index optimization |
 | Partitioning | 6 | Range/list/hash partitioning management |
+| Cron | 8 | pg_cron extension - job scheduling, monitoring, cleanup |
 
 ---
 
 ## 🎛️ Tool Filtering
 
 > [!IMPORTANT]
-> **AI-enabled IDEs like Cursor have tool limits.** With 146 tools, you should use tool filtering to stay within limits.
+> **AI-enabled IDEs like Cursor have tool limits.** With 154 tools, you should use tool filtering to stay within limits.
 
 ### Tool Groups
 
@@ -144,6 +145,7 @@ This server provides **146 tools** across 13 categories:
 | `vector` | 14 | pgvector extension |
 | `postgis` | 12 | PostGIS extension |
 | `partitioning` | 6 | Partition management |
+| `cron` | 8 | pg_cron job scheduling |
 
 ### Filter Presets
 
@@ -159,7 +161,7 @@ This server provides **146 tools** across 13 categories:
 
 **DBA (~75 tools):**
 ```json
-"--tool-filter", "-vector,-postgis"
+"--tool-filter", "-vector,-postgis,-cron"
 ```
 
 ### Custom Filtering Syntax
@@ -226,6 +228,7 @@ This server provides **14 resources** for structured data access:
 | `hypopg` | Hypothetical indexes | `pg_index_recommendations` |
 | `pgvector` | Vector similarity search | 14 vector tools |
 | `PostGIS` | Geospatial operations | 12 postgis tools |
+| `pg_cron` | Job scheduling | 8 cron tools |
 
 > Extension tools gracefully handle cases where extensions are not installed.
 
@@ -252,9 +255,9 @@ This server provides **14 resources** for structured data access:
 ## 🏆 Why Choose postgres-mcp?
 
 ✅ **TypeScript Native** - Full type safety with strict mode  
-✅ **146 Specialized Tools** - Comprehensive PostgreSQL coverage  
+✅ **154 Specialized Tools** - Comprehensive PostgreSQL coverage  
 ✅ **Connection Pooling** - Efficient PostgreSQL connection management  
-✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements  
+✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements, pg_cron  
 ✅ **Tool Filtering** - Stay within AI IDE tool limits  
 ✅ **Modern Architecture** - Built on MCP SDK  
 

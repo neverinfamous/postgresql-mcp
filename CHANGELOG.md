@@ -25,12 +25,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_extension_setup` — Extension installation guides
   - `pg_setup_pgvector` — Complete pgvector setup for semantic search
   - `pg_setup_postgis` — Complete PostGIS setup for geospatial operations
+- **8 pg_cron tools** — Job scheduling extension support
+  - `pg_cron_create_extension` — Enable pg_cron
+  - `pg_cron_schedule` — Schedule cron jobs
+  - `pg_cron_schedule_in_database` — Cross-database scheduling
+  - `pg_cron_unschedule` — Remove jobs
+  - `pg_cron_alter_job` — Modify existing jobs
+  - `pg_cron_list_jobs` — List scheduled jobs
+  - `pg_cron_job_run_details` — View execution history
+  - `pg_cron_cleanup_history` — Clean old history records
+- New `cron` tool-filtering group for pg_cron tools
 
 ### Changed
 - Restructured resources into modular files for maintainability
 - Resource count from 6 to 14
 - Prompt count from 7 to 13
 - Restructured prompts into modular files for maintainability
+- Tool count from 146 to 154 (added pg_cron tools)
 
 ### Planned
 - Verify prompts and resources from old Python server are ported

@@ -193,6 +193,16 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_stats_distribution',
         'pg_stats_hypothesis',
         'pg_stats_sampling'
+    ],
+    cron: [
+        'pg_cron_create_extension',
+        'pg_cron_schedule',
+        'pg_cron_schedule_in_database',
+        'pg_cron_unschedule',
+        'pg_cron_alter_job',
+        'pg_cron_list_jobs',
+        'pg_cron_job_run_details',
+        'pg_cron_cleanup_history'
     ]
 };
 

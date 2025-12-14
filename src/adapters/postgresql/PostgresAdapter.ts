@@ -39,6 +39,7 @@ import { getVectorTools } from './tools/vector.js';
 import { getPostgisTools } from './tools/postgis.js';
 import { getPartitioningTools } from './tools/partitioning.js';
 import { getStatsTools } from './tools/stats.js';
+import { getCronTools } from './tools/cron.js';
 import { getPostgresResources } from './resources/index.js';
 import { getPostgresPrompts } from './prompts/index.js';
 
@@ -535,7 +536,8 @@ export class PostgresAdapter extends DatabaseAdapter {
             'vector',
             'postgis',
             'partitioning',
-            'stats'
+            'stats',
+            'cron'
         ];
     }
 
@@ -557,7 +559,8 @@ export class PostgresAdapter extends DatabaseAdapter {
             ...getVectorTools(this),
             ...getPostgisTools(this),
             ...getPartitioningTools(this),
-            ...getStatsTools(this)
+            ...getStatsTools(this),
+            ...getCronTools(this)
         ];
     }
 

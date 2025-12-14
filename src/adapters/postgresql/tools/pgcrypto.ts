@@ -446,16 +446,17 @@ Example workflow:
             const hash = result.rows?.[0]?.['hash'] as string;
 
             // Detect algorithm from salt prefix
-            let algorithm = 'unknown';
-            if (salt.startsWith('$2a$') || salt.startsWith('$2b$')) {
-                algorithm = 'bcrypt';
-            } else if (salt.startsWith('$1$')) {
-                algorithm = 'md5';
-            } else if (salt.startsWith('_')) {
-                algorithm = 'xdes';
-            } else {
-                algorithm = 'des';
-            }
+            const algorithm = (() => {
+                if (salt.startsWith('$2a$') || salt.startsWith('$2b$')) {
+                    return 'bcrypt';
+                } else if (salt.startsWith('$1$')) {
+                    return 'md5';
+                } else if (salt.startsWith('_')) {
+                    return 'xdes';
+                } else {
+                    return 'des';
+                }
+            })();
 
             return {
                 success: true,

@@ -26,7 +26,11 @@ export function getPerformanceTools(adapter: PostgresAdapter): ToolDefinition[] 
         createBloatCheckTool(adapter),
         createCacheHitRatioTool(adapter),
         createSeqScanTablesTool(adapter),
-        createIndexRecommendationsTool(adapter)
+        createIndexRecommendationsTool(adapter),
+        createQueryPlanCompareTool(adapter),
+        createPerformanceBaselineTool(adapter),
+        createConnectionPoolOptimizeTool(adapter),
+        createPartitionStrategySuggestTool(adapter)
     ];
 }
 
@@ -338,3 +342,337 @@ function createIndexRecommendationsTool(adapter: PostgresAdapter): ToolDefinitio
         }
     };
 }
+
+/**
+ * Compare two query execution plans
+ */
+function createQueryPlanCompareTool(adapter: PostgresAdapter): ToolDefinition {
+    return {
+        name: 'pg_query_plan_compare',
+        description: 'Compare execution plans of two SQL queries to identify performance differences.',
+        group: 'performance',
+        inputSchema: z.object({
+            query1: z.string().describe('First SQL query'),
+            query2: z.string().describe('Second SQL query'),
+            analyze: z.boolean().optional().describe('Run EXPLAIN ANALYZE (executes queries)')
+        }),
+        handler: async (params: unknown, _context: RequestContext) => {
+            const parsed = (params as { query1: string; query2: string; analyze?: boolean });
+            const explainType = parsed.analyze ? 'EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)' : 'EXPLAIN (FORMAT JSON)';
+
+            const [result1, result2] = await Promise.all([
+                adapter.executeQuery(`${explainType} ${parsed.query1}`),
+                adapter.executeQuery(`${explainType} ${parsed.query2}`)
+            ]);
+
+            const row1 = result1.rows?.[0];
+            const row2 = result2.rows?.[0];
+            const queryPlan1 = row1?.['QUERY PLAN'] as unknown[] | undefined;
+            const queryPlan2 = row2?.['QUERY PLAN'] as unknown[] | undefined;
+            const plan1 = queryPlan1?.[0] as Record<string, unknown> | undefined;
+            const plan2 = queryPlan2?.[0] as Record<string, unknown> | undefined;
+
+            const comparison = {
+                query1: {
+                    planningTime: plan1?.['Planning Time'],
+                    executionTime: plan1?.['Execution Time'],
+                    totalCost: (plan1?.['Plan'] as Record<string, unknown> | undefined)?.['Total Cost'],
+                    sharedBuffersHit: plan1?.['Shared Hit Blocks'],
+                    sharedBuffersRead: plan1?.['Shared Read Blocks']
+                },
+                query2: {
+                    planningTime: plan2?.['Planning Time'],
+                    executionTime: plan2?.['Execution Time'],
+                    totalCost: (plan2?.['Plan'] as Record<string, unknown> | undefined)?.['Total Cost'],
+                    sharedBuffersHit: plan2?.['Shared Hit Blocks'],
+                    sharedBuffersRead: plan2?.['Shared Read Blocks']
+                },
+                analysis: {
+                    costDifference: plan1 && plan2
+                        ? Number((plan1['Plan'] as Record<string, unknown>)?.['Total Cost']) -
+                        Number((plan2['Plan'] as Record<string, unknown>)?.['Total Cost'])
+                        : null,
+                    recommendation: ''
+                },
+                fullPlans: { plan1, plan2 }
+            };
+
+            // Add recommendation
+            if (comparison.analysis.costDifference !== null) {
+                if (comparison.analysis.costDifference > 0) {
+                    comparison.analysis.recommendation = 'Query 2 has lower estimated cost';
+                } else if (comparison.analysis.costDifference < 0) {
+                    comparison.analysis.recommendation = 'Query 1 has lower estimated cost';
+                } else {
+                    comparison.analysis.recommendation = 'Both queries have similar estimated cost';
+                }
+            }
+
+            return comparison;
+        }
+    };
+}
+
+/**
+ * Establish performance baseline
+ */
+function createPerformanceBaselineTool(adapter: PostgresAdapter): ToolDefinition {
+    return {
+        name: 'pg_performance_baseline',
+        description: 'Capture current database performance metrics as a baseline for comparison.',
+        group: 'performance',
+        inputSchema: z.object({
+            name: z.string().optional().describe('Baseline name for reference')
+        }),
+        handler: async (params: unknown, _context: RequestContext) => {
+            const parsed = (params as { name?: string });
+            const baselineName = parsed.name ?? `baseline_${new Date().toISOString()}`;
+
+            // Gather comprehensive performance metrics
+            const [cacheHit, tableStats, indexStats, connections, dbSize] = await Promise.all([
+                adapter.executeQuery(`
+                    SELECT 
+                        sum(heap_blks_hit) as heap_hits,
+                        sum(heap_blks_read) as heap_reads,
+                        round(100.0 * sum(heap_blks_hit) / NULLIF(sum(heap_blks_hit) + sum(heap_blks_read), 0), 2) as cache_hit_ratio
+                    FROM pg_statio_user_tables
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        sum(seq_scan) as total_seq_scans,
+                        sum(idx_scan) as total_idx_scans,
+                        sum(n_tup_ins) as total_inserts,
+                        sum(n_tup_upd) as total_updates,
+                        sum(n_tup_del) as total_deletes,
+                        sum(n_live_tup) as total_live_tuples,
+                        sum(n_dead_tup) as total_dead_tuples
+                    FROM pg_stat_user_tables
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        count(*) as total_indexes,
+                        sum(idx_scan) as total_index_scans
+                    FROM pg_stat_user_indexes
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        count(*) as total_connections,
+                        count(*) FILTER (WHERE state = 'active') as active_connections,
+                        count(*) FILTER (WHERE state = 'idle') as idle_connections
+                    FROM pg_stat_activity
+                    WHERE backend_type = 'client backend'
+                `),
+                adapter.executeQuery(`SELECT pg_database_size(current_database()) as size_bytes`)
+            ]);
+
+            return {
+                name: baselineName,
+                timestamp: new Date().toISOString(),
+                metrics: {
+                    cache: cacheHit.rows?.[0],
+                    tables: tableStats.rows?.[0],
+                    indexes: indexStats.rows?.[0],
+                    connections: connections.rows?.[0],
+                    databaseSize: dbSize.rows?.[0]
+                }
+            };
+        }
+    };
+}
+
+/**
+ * Connection pool optimization recommendations
+ */
+function createConnectionPoolOptimizeTool(adapter: PostgresAdapter): ToolDefinition {
+    return {
+        name: 'pg_connection_pool_optimize',
+        description: 'Analyze connection usage and provide pool optimization recommendations.',
+        group: 'performance',
+        inputSchema: z.object({}),
+        handler: async (_params: unknown, _context: RequestContext) => {
+            // Get connection statistics
+            const [connStats, settings, waitEvents] = await Promise.all([
+                adapter.executeQuery(`
+                    SELECT 
+                        count(*) as total_connections,
+                        count(*) FILTER (WHERE state = 'active') as active,
+                        count(*) FILTER (WHERE state = 'idle') as idle,
+                        count(*) FILTER (WHERE state = 'idle in transaction') as idle_in_transaction,
+                        count(*) FILTER (WHERE wait_event_type IS NOT NULL) as waiting,
+                        max(EXTRACT(EPOCH FROM (now() - backend_start))) as max_connection_age_seconds,
+                        avg(EXTRACT(EPOCH FROM (now() - backend_start))) as avg_connection_age_seconds
+                    FROM pg_stat_activity
+                    WHERE backend_type = 'client backend'
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        current_setting('max_connections')::int as max_connections,
+                        current_setting('superuser_reserved_connections')::int as reserved_connections
+                `),
+                adapter.executeQuery(`
+                    SELECT wait_event_type, wait_event, count(*) as count
+                    FROM pg_stat_activity
+                    WHERE wait_event IS NOT NULL AND backend_type = 'client backend'
+                    GROUP BY wait_event_type, wait_event
+                    ORDER BY count DESC
+                    LIMIT 10
+                `)
+            ]);
+
+            const conn = connStats.rows?.[0];
+            const config = settings.rows?.[0];
+
+            const recommendations: string[] = [];
+
+            if (conn && config) {
+                const totalConnections = Number(conn['total_connections'] ?? 0);
+                const maxConnections = Number(config['max_connections'] ?? 1);
+                const idleInTransaction = Number(conn['idle_in_transaction'] ?? 0);
+                const active = Number(conn['active'] ?? 0);
+                const idle = Number(conn['idle'] ?? 0);
+                const maxConnectionAge = Number(conn['max_connection_age_seconds'] ?? 0);
+
+                const utilization = (totalConnections / maxConnections) * 100;
+
+                if (utilization > 80) {
+                    recommendations.push('Connection utilization is high (>80%). Consider increasing max_connections or using a connection pooler like PgBouncer.');
+                }
+                if (idleInTransaction > active) {
+                    recommendations.push('Many idle-in-transaction connections. Check for uncommitted transactions or application issues.');
+                }
+                if (idle > active * 3) {
+                    recommendations.push('High ratio of idle to active connections. Consider reducing pool size or idle timeout.');
+                }
+                if (maxConnectionAge > 3600) {
+                    recommendations.push('Long-lived connections detected. Consider connection recycling.');
+                }
+            }
+
+            return {
+                current: conn,
+                config,
+                waitEvents: waitEvents.rows,
+                recommendations: recommendations.length > 0 ? recommendations : ['Connection pool appears healthy']
+            };
+        }
+    };
+}
+
+/**
+ * Partition strategy suggestions
+ */
+function createPartitionStrategySuggestTool(adapter: PostgresAdapter): ToolDefinition {
+    return {
+        name: 'pg_partition_strategy_suggest',
+        description: 'Analyze a table and suggest optimal partitioning strategy.',
+        group: 'performance',
+        inputSchema: z.object({
+            table: z.string().describe('Table to analyze'),
+            schema: z.string().optional().describe('Schema name')
+        }),
+        handler: async (params: unknown, _context: RequestContext) => {
+            const parsed = (params as { table: string; schema?: string });
+            const schemaName = parsed.schema ?? 'public';
+
+            // Get table info
+            const [tableInfo, columnInfo, tableSize] = await Promise.all([
+                adapter.executeQuery(`
+                    SELECT 
+                        relname, n_live_tup, n_dead_tup,
+                        seq_scan, idx_scan
+                    FROM pg_stat_user_tables
+                    WHERE relname = $1 AND schemaname = $2
+                `, [parsed.table, schemaName]),
+                adapter.executeQuery(`
+                    SELECT 
+                        a.attname as column_name,
+                        t.typname as data_type,
+                        s.n_distinct,
+                        s.null_frac
+                    FROM pg_attribute a
+                    JOIN pg_class c ON a.attrelid = c.oid
+                    JOIN pg_namespace n ON c.relnamespace = n.oid
+                    JOIN pg_type t ON a.atttypid = t.oid
+                    LEFT JOIN pg_stats s ON s.tablename = c.relname 
+                        AND s.attname = a.attname 
+                        AND s.schemaname = n.nspname
+                    WHERE c.relname = $1 AND n.nspname = $2
+                        AND a.attnum > 0 AND NOT a.attisdropped
+                    ORDER BY a.attnum
+                `, [parsed.table, schemaName]),
+                adapter.executeQuery(`
+                    SELECT pg_size_pretty(pg_table_size($1::regclass)) as table_size,
+                           pg_table_size($1::regclass) as size_bytes
+                `, [`"${schemaName}"."${parsed.table}"`])
+            ]);
+
+            const table = tableInfo.rows?.[0];
+            const columns = columnInfo.rows;
+            const size = tableSize.rows?.[0];
+
+            const suggestions: { strategy: string; column: string; reason: string }[] = [];
+
+            // Analyze columns for partitioning candidates
+            if (columns) {
+                for (const col of columns) {
+                    const colName = col['column_name'] as string;
+                    const dataType = col['data_type'] as string;
+                    const nDistinct = col['n_distinct'] as number;
+
+                    // Date/timestamp columns are good for range partitioning
+                    if (['date', 'timestamp', 'timestamptz'].includes(dataType)) {
+                        suggestions.push({
+                            strategy: 'RANGE',
+                            column: colName,
+                            reason: `${dataType} column ideal for time-based range partitioning (monthly/yearly)`
+                        });
+                    }
+
+                    // Low cardinality columns good for LIST partitioning
+                    if (nDistinct > 0 && nDistinct < 20) {
+                        suggestions.push({
+                            strategy: 'LIST',
+                            column: colName,
+                            reason: `Low cardinality (${String(nDistinct)} distinct values) - good for list partitioning`
+                        });
+                    }
+
+                    // High cardinality integer columns good for HASH
+                    if (['int4', 'int8', 'integer', 'bigint'].includes(dataType) && (nDistinct < 0 || nDistinct > 100)) {
+                        suggestions.push({
+                            strategy: 'HASH',
+                            column: colName,
+                            reason: 'High cardinality integer - suitable for hash partitioning to distribute load'
+                        });
+                    }
+                }
+            }
+
+            // General recommendations
+            const rowCount = Number(table?.['n_live_tup'] ?? 0);
+            const sizeBytes = Number(size?.['size_bytes'] ?? 0);
+
+            let partitioningRecommended = false;
+            let reason = '';
+
+            if (rowCount > 10_000_000) {
+                partitioningRecommended = true;
+                reason = `Table has ${String(rowCount)} rows - partitioning recommended for manageability`;
+            } else if (sizeBytes > 1_000_000_000) {
+                partitioningRecommended = true;
+                reason = 'Table is over 1GB - partitioning can improve query performance and maintenance';
+            }
+
+            return {
+                table: `${schemaName}.${parsed.table}`,
+                tableStats: table,
+                tableSize: size,
+                partitioningRecommended,
+                reason,
+                suggestions: suggestions.slice(0, 5), // Top 5 suggestions
+                note: 'Consider your query patterns when choosing partition key. Range partitioning on date columns is most common.'
+            };
+        }
+    };
+}
+

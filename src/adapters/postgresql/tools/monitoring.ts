@@ -22,7 +22,10 @@ export function getMonitoringTools(adapter: PostgresAdapter): ToolDefinition[] {
         createServerVersionTool(adapter),
         createShowSettingsTool(adapter),
         createUptimeTool(adapter),
-        createRecoveryStatusTool(adapter)
+        createRecoveryStatusTool(adapter),
+        createCapacityPlanningTool(adapter),
+        createResourceUsageAnalyzeTool(adapter),
+        createAlertThresholdSetTool(adapter)
     ];
 }
 
@@ -205,3 +208,246 @@ function createRecoveryStatusTool(adapter: PostgresAdapter): ToolDefinition {
         }
     };
 }
+
+/**
+ * Capacity planning analysis
+ */
+function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
+    return {
+        name: 'pg_capacity_planning',
+        description: 'Analyze database growth trends and provide capacity planning forecasts.',
+        group: 'monitoring',
+        inputSchema: z.object({
+            projectionDays: z.number().optional().describe('Days to project growth (default: 90)')
+        }),
+        handler: async (params: unknown, _context: RequestContext) => {
+            const parsed = (params as { projectionDays?: number });
+            const projectionDays = parsed.projectionDays ?? 90;
+
+            // Get current database size
+            const [dbSize, tableStats, connStats] = await Promise.all([
+                adapter.executeQuery(`
+                    SELECT 
+                        pg_database_size(current_database()) as current_size_bytes,
+                        pg_size_pretty(pg_database_size(current_database())) as current_size
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        count(*) as table_count,
+                        sum(n_live_tup) as total_rows,
+                        sum(n_tup_ins) as total_inserts,
+                        sum(n_tup_del) as total_deletes
+                    FROM pg_stat_user_tables
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        current_setting('max_connections')::int as max_connections,
+                        count(*) as current_connections
+                    FROM pg_stat_activity
+                    WHERE backend_type = 'client backend'
+                `)
+            ]);
+
+            const currentBytes = Number(dbSize.rows?.[0]?.['current_size_bytes'] ?? 0);
+            const tableData = tableStats.rows?.[0];
+            const connData = connStats.rows?.[0];
+
+            // Estimate daily growth (simplified - would need historical data for accuracy)
+            const totalInserts = Number(tableData?.['total_inserts'] ?? 0);
+            const totalDeletes = Number(tableData?.['total_deletes'] ?? 0);
+            const netRowGrowth = totalInserts - totalDeletes;
+
+            // Assume average row size based on current data
+            const totalRows = Number(tableData?.['total_rows'] ?? 1);
+            const avgRowSize = currentBytes / Math.max(totalRows, 1);
+
+            // Project growth (very rough estimate)
+            const dailyGrowthEstimate = (netRowGrowth * avgRowSize) / 30; // Assume stats accumulated over ~30 days
+            const projectedGrowthBytes = dailyGrowthEstimate * projectionDays;
+            const projectedTotalBytes = currentBytes + projectedGrowthBytes;
+
+            return {
+                current: {
+                    databaseSize: dbSize.rows?.[0],
+                    tableCount: tableData?.['table_count'],
+                    totalRows: tableData?.['total_rows'],
+                    connections: `${String(Number(connData?.['current_connections'] ?? 0))}/${String(Number(connData?.['max_connections'] ?? 0))}`
+                },
+                growth: {
+                    totalInserts: tableData?.['total_inserts'],
+                    totalDeletes: tableData?.['total_deletes'],
+                    netRowGrowth,
+                    estimatedDailyGrowthBytes: Math.round(dailyGrowthEstimate)
+                },
+                projection: {
+                    days: projectionDays,
+                    projectedSizeBytes: Math.round(projectedTotalBytes),
+                    projectedSizePretty: `${(projectedTotalBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`,
+                    growthPercentage: ((projectedGrowthBytes / currentBytes) * 100).toFixed(1)
+                },
+                recommendations: [
+                    projectedTotalBytes > 100 * 1024 * 1024 * 1024 ? 'Consider archiving old data or implementing table partitioning' : null,
+                    (Number(connData?.['current_connections'] ?? 0)) > (Number(connData?.['max_connections'] ?? 100)) * 0.7 ? 'Connection usage is high, consider increasing max_connections' : null
+                ].filter(Boolean)
+            };
+        }
+    };
+}
+
+/**
+ * Resource usage analysis
+ */
+function createResourceUsageAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
+    return {
+        name: 'pg_resource_usage_analyze',
+        description: 'Analyze current resource usage including CPU, memory, and I/O patterns.',
+        group: 'monitoring',
+        inputSchema: z.object({}),
+        handler: async (_params: unknown, _context: RequestContext) => {
+            // Get comprehensive resource usage metrics
+            const [bgWriter, checkpoints, connections, buffers, activity] = await Promise.all([
+                adapter.executeQuery(`
+                    SELECT 
+                        buffers_checkpoint, buffers_clean, buffers_backend,
+                        maxwritten_clean, buffers_alloc
+                    FROM pg_stat_bgwriter
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        checkpoints_timed, checkpoints_req,
+                        checkpoint_write_time, checkpoint_sync_time
+                    FROM pg_stat_bgwriter
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        state, wait_event_type, wait_event,
+                        count(*) as count
+                    FROM pg_stat_activity
+                    WHERE backend_type = 'client backend'
+                    GROUP BY state, wait_event_type, wait_event
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        sum(heap_blks_read) as heap_reads,
+                        sum(heap_blks_hit) as heap_hits,
+                        sum(idx_blks_read) as index_reads,
+                        sum(idx_blks_hit) as index_hits
+                    FROM pg_statio_user_tables
+                `),
+                adapter.executeQuery(`
+                    SELECT 
+                        count(*) FILTER (WHERE state = 'active') as active_queries,
+                        count(*) FILTER (WHERE state = 'idle') as idle_connections,
+                        count(*) FILTER (WHERE wait_event_type = 'Lock') as lock_waiting,
+                        count(*) FILTER (WHERE wait_event_type = 'IO') as io_waiting
+                    FROM pg_stat_activity
+                    WHERE backend_type = 'client backend'
+                `)
+            ]);
+
+            const bufferData = buffers.rows?.[0];
+            const heapHits = Number(bufferData?.['heap_hits'] ?? 0);
+            const heapReads = Number(bufferData?.['heap_reads'] ?? 0);
+            const indexHits = Number(bufferData?.['index_hits'] ?? 0);
+            const indexReads = Number(bufferData?.['index_reads'] ?? 0);
+
+            return {
+                backgroundWriter: bgWriter.rows?.[0],
+                checkpoints: checkpoints.rows?.[0],
+                connectionDistribution: connections.rows,
+                bufferUsage: {
+                    ...bufferData,
+                    heapHitRate: heapHits + heapReads > 0
+                        ? ((heapHits / (heapHits + heapReads)) * 100).toFixed(2) + '%'
+                        : 'N/A',
+                    indexHitRate: indexHits + indexReads > 0
+                        ? ((indexHits / (indexHits + indexReads)) * 100).toFixed(2) + '%'
+                        : 'N/A'
+                },
+                activity: activity.rows?.[0],
+                analysis: {
+                    checkpointPressure: Number(checkpoints.rows?.[0]?.['checkpoints_req'] ?? 0) > Number(checkpoints.rows?.[0]?.['checkpoints_timed'] ?? 0)
+                        ? 'HIGH - More forced checkpoints than scheduled'
+                        : 'Normal',
+                    ioPattern: Number(activity.rows?.[0]?.['io_waiting'] ?? 0) > 0
+                        ? 'Some queries waiting on I/O'
+                        : 'No I/O wait bottlenecks detected',
+                    lockContention: Number(activity.rows?.[0]?.['lock_waiting'] ?? 0) > 0
+                        ? `${String(Number(activity.rows?.[0]?.['lock_waiting'] ?? 0))} queries waiting on locks`
+                        : 'No lock contention'
+                }
+            };
+        }
+    };
+}
+
+/**
+ * Alert threshold configuration
+ */
+function createAlertThresholdSetTool(_adapter: PostgresAdapter): ToolDefinition {
+    return {
+        name: 'pg_alert_threshold_set',
+        description: 'Get recommended alert thresholds for monitoring key database metrics.',
+        group: 'monitoring',
+        inputSchema: z.object({
+            metric: z.enum([
+                'connection_usage',
+                'cache_hit_ratio',
+                'replication_lag',
+                'dead_tuples',
+                'long_running_queries',
+                'lock_wait_time'
+            ]).optional().describe('Specific metric to get thresholds for, or all if not specified')
+        }),
+        // eslint-disable-next-line @typescript-eslint/require-await
+        handler: async (params: unknown, _context: RequestContext) => {
+            const parsed = (params as { metric?: string });
+
+            const thresholds: Record<string, { warning: string; critical: string; description: string }> = {
+                connection_usage: {
+                    warning: '70%',
+                    critical: '90%',
+                    description: 'Percentage of max_connections in use'
+                },
+                cache_hit_ratio: {
+                    warning: '< 95%',
+                    critical: '< 80%',
+                    description: 'Buffer cache hit ratio - lower is worse'
+                },
+                replication_lag: {
+                    warning: '> 1 minute',
+                    critical: '> 5 minutes',
+                    description: 'Replication lag from primary to replica'
+                },
+                dead_tuples: {
+                    warning: '> 10% of live tuples',
+                    critical: '> 25% of live tuples',
+                    description: 'Dead tuples indicating need for VACUUM'
+                },
+                long_running_queries: {
+                    warning: '> 5 minutes',
+                    critical: '> 30 minutes',
+                    description: 'Queries running longer than threshold'
+                },
+                lock_wait_time: {
+                    warning: '> 30 seconds',
+                    critical: '> 5 minutes',
+                    description: 'Time spent waiting for locks'
+                }
+            };
+
+            if (parsed.metric && thresholds[parsed.metric]) {
+                return {
+                    metric: parsed.metric,
+                    threshold: thresholds[parsed.metric]
+                };
+            }
+
+            return {
+                thresholds,
+                note: 'These are recommended starting thresholds. Adjust based on your specific workload and requirements.'
+            };
+        }
+    };
+}
+

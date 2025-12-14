@@ -77,7 +77,8 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_similarity_search',
         'pg_text_headline',
         'pg_create_fts_index',
-        'pg_text_normalize'
+        'pg_text_normalize',
+        'pg_text_sentiment'
     ],
     performance: [
         'pg_explain',
@@ -91,7 +92,11 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_bloat_check',
         'pg_cache_hit_ratio',
         'pg_seq_scan_tables',
-        'pg_index_recommendations'
+        'pg_index_recommendations',
+        'pg_query_plan_compare',
+        'pg_performance_baseline',
+        'pg_connection_pool_optimize',
+        'pg_partition_strategy_suggest'
     ],
     admin: [
         'pg_vacuum',
@@ -113,7 +118,10 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_server_version',
         'pg_show_settings',
         'pg_uptime',
-        'pg_recovery_status'
+        'pg_recovery_status',
+        'pg_capacity_planning',
+        'pg_resource_usage_analyze',
+        'pg_alert_threshold_set'
     ],
     backup: [
         'pg_dump_table',
@@ -121,7 +129,10 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_copy_export',
         'pg_copy_import',
         'pg_create_backup_plan',
-        'pg_restore_command'
+        'pg_restore_command',
+        'pg_backup_physical',
+        'pg_restore_validate',
+        'pg_backup_schedule_optimize'
     ],
     schema: [
         'pg_list_schemas',
@@ -160,7 +171,10 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_intersection',
         'pg_bounding_box',
         'pg_spatial_index',
-        'pg_geocode'
+        'pg_geocode',
+        'pg_geo_transform',
+        'pg_geo_index_optimize',
+        'pg_geo_cluster'
     ],
     partitioning: [
         'pg_list_partitions',

@@ -28,7 +28,8 @@ export function getTextTools(adapter: PostgresAdapter): ToolDefinition[] {
         createSimilaritySearchTool(adapter),
         createTextHeadlineTool(adapter),
         createFtsIndexTool(adapter),
-        createTextNormalizeTool(adapter)
+        createTextNormalizeTool(adapter),
+        createTextSentimentTool(adapter)
     ];
 }
 
@@ -281,3 +282,77 @@ function createTextNormalizeTool(adapter: PostgresAdapter): ToolDefinition {
         }
     };
 }
+
+/**
+ * Basic sentiment analysis using word matching
+ */
+function createTextSentimentTool(_adapter: PostgresAdapter): ToolDefinition {
+    return {
+        name: 'pg_text_sentiment',
+        description: 'Perform basic sentiment analysis on text using keyword matching.',
+        group: 'text',
+        inputSchema: z.object({
+            text: z.string().describe('Text to analyze'),
+            returnWords: z.boolean().optional().describe('Return matched sentiment words')
+        }),
+        // eslint-disable-next-line @typescript-eslint/require-await
+        handler: async (params: unknown, _context: RequestContext) => {
+            const parsed = (params as { text: string; returnWords?: boolean });
+            const text = parsed.text.toLowerCase();
+
+            // Basic sentiment word lists
+            const positiveWords = [
+                'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic',
+                'love', 'happy', 'positive', 'best', 'beautiful', 'awesome',
+                'perfect', 'nice', 'helpful', 'thank', 'thanks', 'pleased',
+                'satisfied', 'recommend', 'enjoy', 'impressive', 'brilliant'
+            ];
+
+            const negativeWords = [
+                'bad', 'terrible', 'awful', 'horrible', 'worst', 'hate',
+                'angry', 'disappointed', 'poor', 'wrong', 'problem', 'issue',
+                'fail', 'failed', 'broken', 'useless', 'waste', 'frustrating',
+                'annoyed', 'unhappy', 'negative', 'complaint', 'slow'
+            ];
+
+            const words = text.split(/\s+/);
+            const matchedPositive = words.filter(w => positiveWords.includes(w.replace(/[^a-z]/g, '')));
+            const matchedNegative = words.filter(w => negativeWords.includes(w.replace(/[^a-z]/g, '')));
+
+            const positiveScore = matchedPositive.length;
+            const negativeScore = matchedNegative.length;
+            const totalScore = positiveScore - negativeScore;
+
+            let sentiment: string;
+            if (totalScore > 2) sentiment = 'very_positive';
+            else if (totalScore > 0) sentiment = 'positive';
+            else if (totalScore < -2) sentiment = 'very_negative';
+            else if (totalScore < 0) sentiment = 'negative';
+            else sentiment = 'neutral';
+
+            const result: {
+                sentiment: string;
+                score: number;
+                positiveCount: number;
+                negativeCount: number;
+                confidence: string;
+                matchedPositive?: string[];
+                matchedNegative?: string[];
+            } = {
+                sentiment,
+                score: totalScore,
+                positiveCount: positiveScore,
+                negativeCount: negativeScore,
+                confidence: (positiveScore + negativeScore) > 3 ? 'high' : (positiveScore + negativeScore) > 1 ? 'medium' : 'low'
+            };
+
+            if (parsed.returnWords) {
+                result.matchedPositive = matchedPositive;
+                result.matchedNegative = matchedNegative;
+            }
+
+            return result;
+        }
+    };
+}
+

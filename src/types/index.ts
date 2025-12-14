@@ -462,7 +462,8 @@ export type ToolGroup =
     | 'cron'           // pg_cron extension - job scheduling
     | 'partman'        // pg_partman extension - partition lifecycle
     | 'kcache'         // pg_stat_kcache extension - OS-level performance stats
-    | 'citext';        // citext extension - case-insensitive text
+    | 'citext'         // citext extension - case-insensitive text
+    | 'ltree';         // ltree extension - hierarchical tree labels
 
 /**
  * Tool filter rule

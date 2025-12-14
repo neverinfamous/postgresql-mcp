@@ -43,6 +43,7 @@ import { getCronTools } from './tools/cron.js';
 import { getPartmanTools } from './tools/partman.js';
 import { getKcacheTools } from './tools/kcache.js';
 import { getCitextTools } from './tools/citext.js';
+import { getLtreeTools } from './tools/ltree.js';
 import { getPostgresResources } from './resources/index.js';
 import { getPostgresPrompts } from './prompts/index.js';
 
@@ -543,7 +544,8 @@ export class PostgresAdapter extends DatabaseAdapter {
             'cron',
             'partman',
             'kcache',
-            'citext'
+            'citext',
+            'ltree'
         ];
     }
 
@@ -569,7 +571,8 @@ export class PostgresAdapter extends DatabaseAdapter {
             ...getCronTools(this),
             ...getPartmanTools(this),
             ...getKcacheTools(this),
-            ...getCitextTools(this)
+            ...getCitextTools(this),
+            ...getLtreeTools(this)
         ];
     }
 

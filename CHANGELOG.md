@@ -64,13 +64,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_citext_compare` — Case-insensitive comparison
   - `pg_citext_schema_advisor` — Schema design recommendations
 - New `citext` tool-filtering group for citext schema intelligence tools
+- **8 ltree tools** — Hierarchical tree label support
+  - `pg_ltree_create_extension` — Enable ltree
+  - `pg_ltree_query` — Query ancestors/descendants with @> and <@ operators
+  - `pg_ltree_subpath` — Extract path segments
+  - `pg_ltree_lca` — Find longest common ancestor
+  - `pg_ltree_match` — Pattern matching with lquery syntax
+  - `pg_ltree_list_columns` — List ltree columns
+  - `pg_ltree_convert_column` — Convert text to ltree
+  - `pg_ltree_create_index` — Create GiST index for tree queries
+- New `ltree` tool-filtering group for hierarchical tree operations
 
 ### Changed
 - Restructured resources into modular files for maintainability
 - Resource count from 6 to 14
 - Prompt count from 7 to 13
 - Restructured prompts into modular files for maintainability
-- Tool count from 146 to 177 (added pg_cron, pg_partman, pg_stat_kcache, and citext tools)
+- Tool count from 146 to 185 (added pg_cron, pg_partman, pg_stat_kcache, citext, and ltree tools)
 
 ### Planned
 - Verify prompts and resources from old Python server are ported

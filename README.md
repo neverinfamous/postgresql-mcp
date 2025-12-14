@@ -4,9 +4,9 @@
 
 *Last updated December 14, 2025 - Initial Implementation Complete*
 
-*Enterprise-grade PostgreSQL MCP Server with OAuth 2.0 authentication, connection pooling, tool filtering, plus support for citext, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
+*Enterprise-grade PostgreSQL MCP Server with OAuth 2.0 authentication, connection pooling, tool filtering, plus support for citext, ltree, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
 
-> **✅ Initial Implementation Complete** - 177 tools, 14 resources, and 13 prompts. Thorough testing before release in progress.
+> **✅ Initial Implementation Complete** - 185 tools, 14 resources, and 13 prompts. Thorough testing before release in progress.
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -14,7 +14,7 @@
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 ![Status](https://img.shields.io/badge/status-Testing-blue)
 
-A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **177 specialized tools**, **14 resources**, and **13 AI-powered prompts**.
+A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **185 specialized tools**, **14 resources**, and **13 AI-powered prompts**.
 
 ---
 
@@ -102,7 +102,7 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
 
 ## 🛠️ Tool Categories
 
-This server provides **177 tools** across 17 categories:
+This server provides **185 tools** across 18 categories:
 
 | Category | Tools | Description |
 |----------|-------|-------------|
@@ -123,6 +123,7 @@ This server provides **177 tools** across 17 categories:
 | Partman | 10 | pg_partman extension - automated partition lifecycle management |
 | Kcache | 7 | pg_stat_kcache extension - OS-level CPU/memory/I/O stats per query |
 | Citext | 6 | citext extension - case-insensitive text for emails, usernames |
+| Ltree | 8 | ltree extension - hierarchical tree labels for taxonomies, org charts |
 
 ---
 
@@ -152,6 +153,7 @@ This server provides **177 tools** across 17 categories:
 | `partman` | 10 | pg_partman partition lifecycle |
 | `kcache` | 7 | pg_stat_kcache OS-level stats |
 | `citext` | 6 | citext case-insensitive text |
+| `ltree` | 8 | ltree hierarchical tree labels |
 
 ### Filter Presets
 
@@ -167,7 +169,7 @@ This server provides **177 tools** across 17 categories:
 
 **DBA (~75 tools):**
 ```json
-"--tool-filter", "-vector,-postgis,-cron,-partman,-kcache,-citext"
+"--tool-filter", "-vector,-postgis,-cron,-partman,-kcache,-citext,-ltree"
 ```
 
 ### Custom Filtering Syntax
@@ -238,6 +240,7 @@ This server provides **14 resources** for structured data access:
 | `pg_partman` | Automated partition management | 10 partman tools |
 | `pg_stat_kcache` | OS-level CPU/memory/I/O stats | 7 kcache tools |
 | `citext` | Case-insensitive text | 6 citext tools |
+| `ltree` | Hierarchical tree labels | 8 ltree tools |
 
 > Extension tools gracefully handle cases where extensions are not installed.
 

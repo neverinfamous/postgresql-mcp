@@ -232,6 +232,16 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_citext_analyze_candidates',
         'pg_citext_compare',
         'pg_citext_schema_advisor'
+    ],
+    ltree: [
+        'pg_ltree_create_extension',
+        'pg_ltree_query',
+        'pg_ltree_subpath',
+        'pg_ltree_lca',
+        'pg_ltree_match',
+        'pg_ltree_list_columns',
+        'pg_ltree_convert_column',
+        'pg_ltree_create_index'
     ]
 };
 

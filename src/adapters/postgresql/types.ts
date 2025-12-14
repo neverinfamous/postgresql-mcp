@@ -600,3 +600,73 @@ export const CitextSchemaAdvisorSchema = z.object({
     table: z.string().describe('Table name to analyze'),
     schema: z.string().optional().describe('Schema name (default: public)')
 });
+
+// =============================================================================
+// ltree Schemas
+// =============================================================================
+
+/**
+ * Schema for querying ltree hierarchies (ancestors/descendants).
+ */
+export const LtreeQuerySchema = z.object({
+    table: z.string().describe('Table name'),
+    column: z.string().describe('ltree column name'),
+    path: z.string().describe('ltree path to query (e.g., "Top.Science.Astronomy")'),
+    mode: z.enum(['ancestors', 'descendants', 'exact']).optional()
+        .describe('Query mode: ancestors (@>), descendants (<@), or exact (default: descendants)'),
+    schema: z.string().optional().describe('Schema name (default: public)'),
+    limit: z.number().optional().describe('Maximum results')
+});
+
+/**
+ * Schema for extracting subpath from ltree.
+ */
+export const LtreeSubpathSchema = z.object({
+    path: z.string().describe('ltree path (e.g., "Top.Science.Astronomy.Stars")'),
+    offset: z.number().describe('Starting position (0-indexed, negative counts from end)'),
+    length: z.number().optional().describe('Number of labels (omit for rest of path)')
+});
+
+/**
+ * Schema for finding longest common ancestor.
+ */
+export const LtreeLcaSchema = z.object({
+    paths: z.array(z.string()).min(2).describe('Array of ltree paths to find common ancestor')
+});
+
+/**
+ * Schema for pattern matching with lquery.
+ */
+export const LtreeMatchSchema = z.object({
+    table: z.string().describe('Table name'),
+    column: z.string().describe('ltree column name'),
+    pattern: z.string().describe('lquery pattern (e.g., "*.Science.*" or "Top.*{1,3}.Stars")'),
+    schema: z.string().optional().describe('Schema name (default: public)'),
+    limit: z.number().optional().describe('Maximum results')
+});
+
+/**
+ * Schema for listing ltree columns in the database.
+ */
+export const LtreeListColumnsSchema = z.object({
+    schema: z.string().optional().describe('Schema name to filter (all schemas if omitted)')
+});
+
+/**
+ * Schema for converting a text column to ltree.
+ */
+export const LtreeConvertColumnSchema = z.object({
+    table: z.string().describe('Table name'),
+    column: z.string().describe('Text column to convert to ltree'),
+    schema: z.string().optional().describe('Schema name (default: public)')
+});
+
+/**
+ * Schema for creating a GiST index on ltree column.
+ */
+export const LtreeIndexSchema = z.object({
+    table: z.string().describe('Table name'),
+    column: z.string().describe('ltree column name'),
+    indexName: z.string().optional().describe('Custom index name (auto-generated if omitted)'),
+    schema: z.string().optional().describe('Schema name (default: public)')
+});

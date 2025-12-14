@@ -18,10 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `postgres://vacuum` — Vacuum stats and wraparound warnings
   - `postgres://locks` — Lock contention detection
 - Enhanced `postgres://stats` with stale statistics detection and recommendations
+- **6 new prompts** — migrated from legacy postgres-mcp-server
+  - `pg_database_health_check` — Comprehensive health assessment workflow
+  - `pg_backup_strategy` — Enterprise backup planning (logical/physical/PITR)
+  - `pg_index_tuning` — Index usage analysis and optimization
+  - `pg_extension_setup` — Extension installation guides
+  - `pg_setup_pgvector` — Complete pgvector setup for semantic search
+  - `pg_setup_postgis` — Complete PostGIS setup for geospatial operations
 
 ### Changed
 - Restructured resources into modular files for maintainability
 - Resource count from 6 to 14
+- Prompt count from 7 to 13
+- Restructured prompts into modular files for maintainability
 
 ### Planned
 - Verify prompts and resources from old Python server are ported

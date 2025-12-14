@@ -2,11 +2,19 @@
  * PostgreSQL MCP Prompts
  * 
  * AI-powered prompts for query building, schema design, and optimization.
- * 7 prompts total.
+ * 13 prompts total.
  */
 
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { PromptDefinition, RequestContext, ToolDefinition } from '../../../types/index.js';
+
+// Import modular prompts
+import { createDatabaseHealthCheckPrompt } from './health.js';
+import { createBackupStrategyPrompt } from './backup.js';
+import { createIndexTuningPrompt } from './indexTuning.js';
+import { createExtensionSetupPrompt } from './extensionSetup.js';
+import { createSetupPgvectorPrompt } from './pgvector.js';
+import { createSetupPostgisPrompt } from './postgis.js';
 
 /**
  * Get all PostgreSQL prompts
@@ -14,13 +22,21 @@ import type { PromptDefinition, RequestContext, ToolDefinition } from '../../../
 export function getPostgresPrompts(adapter: PostgresAdapter): PromptDefinition[] {
     const allToolDefinitions = adapter.getToolDefinitions();
     return [
+        // Original prompts
         createQueryBuilderPrompt(),
         createSchemaDesignPrompt(),
         createPerformanceAnalysisPrompt(),
         createMigrationPrompt(),
         createToolIndexPrompt(allToolDefinitions),
         createQuickQueryPrompt(),
-        createQuickSchemaPrompt()
+        createQuickSchemaPrompt(),
+        // Migrated prompts from legacy postgres-mcp-server
+        createDatabaseHealthCheckPrompt(),
+        createBackupStrategyPrompt(),
+        createIndexTuningPrompt(),
+        createExtensionSetupPrompt(),
+        createSetupPgvectorPrompt(),
+        createSetupPostgisPrompt()
     ];
 }
 

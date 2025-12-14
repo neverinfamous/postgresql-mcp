@@ -6,7 +6,7 @@
 
 *Enterprise-grade PostgreSQL MCP Server with OAuth 2.0 authentication, connection pooling, tool filtering, plus support for pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
 
-> **✅ Initial Implementation Complete** - 146 tools, 14 resources, and 7 prompts. Thorough testing before release in progress.
+> **✅ Initial Implementation Complete** - 146 tools, 14 resources, and 13 prompts. Thorough testing before release in progress.
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -14,7 +14,7 @@
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 ![Status](https://img.shields.io/badge/status-Testing-blue)
 
-A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **146 specialized tools**, **14 resources**, and **7 AI-powered prompts**.
+A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **146 specialized tools**, **14 resources**, and **13 AI-powered prompts**.
 
 ---
 
@@ -173,7 +173,7 @@ This server provides **146 tools** across 13 categories:
 
 ## 🤖 AI-Powered Prompts
 
-This server includes **7 intelligent prompts** for guided workflows:
+This server includes **13 intelligent prompts** for guided workflows:
 
 | Prompt | Description |
 |--------|-------------|
@@ -181,9 +181,15 @@ This server includes **7 intelligent prompts** for guided workflows:
 | `pg_schema_design` | Design normalized schemas with constraints and indexes |
 | `pg_performance_analysis` | Analyze queries with EXPLAIN and optimization tips |
 | `pg_migration` | Generate migration scripts with rollback support |
-| `pg_full_text_search` | Build full-text search with tsvector/tsquery |
-| `pg_security_audit` | Review roles, permissions, and RLS policies |
-| `pg_tool_discovery` | Lazy hydration - find tools by description |
+| `pg_tool_index` | Lazy hydration - compact index of all tools |
+| `pg_quick_query` | Quick SQL query guidance for common operations |
+| `pg_quick_schema` | Quick reference for exploring database schema |
+| `pg_database_health_check` | Comprehensive database health assessment |
+| `pg_backup_strategy` | Enterprise backup planning with RTO/RPO |
+| `pg_index_tuning` | Index analysis and optimization workflow |
+| `pg_extension_setup` | Extension installation and configuration guide |
+| `pg_setup_pgvector` | Complete pgvector setup for semantic search |
+| `pg_setup_postgis` | Complete PostGIS setup for geospatial operations |
 
 ---
 

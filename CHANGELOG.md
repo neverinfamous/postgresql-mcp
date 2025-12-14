@@ -97,6 +97,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_pgcrypto_gen_salt` — Generate salt for password hashing
   - `pg_pgcrypto_crypt` — Hash passwords with crypt()
 - New `pgcrypto` tool-filtering group for cryptographic operations
+- **7 tool-filtering shortcuts** — Meta-groups for easier filtering
+  - `starter` (49 tools) — **Recommended default**: core, transactions, jsonb, schema
+  - `essential` (39 tools) — Minimal footprint: core, transactions, jsonb
+  - `dev` (68 tools) — Application development: adds text search and stats
+  - `ai` (80 tools) — AI/ML workloads: adds pgvector and performance
+  - `dba` (90 tools) — Database administration: monitoring, backup, maintenance
+  - `base` (120 tools) — All core PostgreSQL tools without extensions
+  - `extensions` (74 tools) — All extension tools
 
 ### Changed
 - Restructured resources into modular files for maintainability

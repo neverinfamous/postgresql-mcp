@@ -49,13 +49,16 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
       "command": "node",
       "args": [
         "C:/path/to/postgres-mcp/dist/cli.js",
-        "--transport", "stdio",
-        "--postgres", "postgres://user:password@localhost:5432/database"
+        "--postgres", "postgres://user:password@localhost:5432/database",
+        "--tool-filter", "-base,-extensions,+starter"
       ]
     }
   }
 }
 ```
+
+> [!TIP]
+> The `starter` shortcut provides 49 essential tools that work well with all AI IDEs. See [Tool Filtering](#-tool-filtering) to add more tools as needed.
 
 ### Using Environment Variables (Recommended)
 
@@ -66,7 +69,7 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
       "command": "node",
       "args": [
         "C:/path/to/postgres-mcp/dist/cli.js",
-        "--transport", "stdio"
+        "--tool-filter", "-base,-extensions,+starter"
       ],
       "env": {
         "POSTGRES_HOST": "localhost",
@@ -131,59 +134,107 @@ This server provides **194 tools** across 19 categories:
 ## 🎛️ Tool Filtering
 
 > [!IMPORTANT]
-> **AI-enabled IDEs have tool limits.** With 194 tools, you **MUST** use tool filtering to stay within limits.
+> **AI-enabled IDEs have tool limits.** With 194 tools, you MUST use tool filtering to stay within your IDE's limits.
 
-### Tool Groups
+### Quick Start: Use Shortcuts
+
+The easiest way to filter tools is with **shortcuts** — predefined groups for common use cases:
+
+| Shortcut | Tools | Includes |
+|----------|-------|----------|
+| `starter` | **49** | **Recommended default** — queries, tables, JSONB, schema |
+| `essential` | 39 | Minimal — queries, tables, JSONB only |
+| `dev` | 68 | Development — adds text search and stats |
+| `ai` | 80 | AI/ML — adds pgvector and performance tools |
+| `dba` | 90 | Administration — monitoring, backup, maintenance |
+| `base` | 120 | Everything except extensions |
+| `extensions` | 74 | All PostgreSQL extensions |
+
+**Recommended Configuration (~49 tools)**
+```json
+{
+  "mcpServers": {
+    "postgres-mcp": {
+      "command": "node",
+      "args": [
+        "C:/path/to/postgres-mcp/dist/cli.js",
+        "--postgres", "postgres://user:pass@localhost:5432/db",
+        "--tool-filter", "-base,-extensions,+starter"
+      ]
+    }
+  }
+}
+```
+
+### Need More Tools?
+
+Start with `starter` and add individual groups as needed:
+
+**Add text search:**
+```json
+"--tool-filter", "-base,-extensions,+starter,+text"
+```
+
+**Add performance analysis (EXPLAIN, query stats):**
+```json
+"--tool-filter", "-base,-extensions,+starter,+performance"
+```
+
+**Add admin tools (VACUUM, ANALYZE, REINDEX):**
+```json
+"--tool-filter", "-base,-extensions,+starter,+admin"
+```
+
+**Use a larger shortcut instead:**
+```json
+"--tool-filter", "-base,-extensions,+dev"
+```
+
+### How Filtering Works
+
+1. **All 194 tools start enabled** by default
+2. Use `-` to exclude, `+` to include
+3. Rules apply left-to-right, so order matters
+
+**Syntax:**
+- `-shortcut` — Exclude all tools in a shortcut
+- `+shortcut` — Include all tools in a shortcut
+- `-group` — Exclude a specific group
+- `+group` — Include a specific group
+- `-pg_tool_name` — Exclude one tool
+- `+pg_tool_name` — Include one tool
+
+### All Tool Groups (19 groups)
+
+If you need fine-grained control, use individual groups:
 
 | Group | Tools | Description |
 |-------|-------|-------------|
-| `core` | 13 | Basic CRUD and schema operations |
-| `transactions` | 7 | Transaction control with savepoints |
+| `core` | 13 | Read/write queries, tables, indexes |
+| `transactions` | 7 | BEGIN, COMMIT, ROLLBACK, savepoints |
 | `jsonb` | 19 | JSONB manipulation and queries |
-| `text` | 11 | Text search and similarity |
+| `text` | 11 | Full-text search, fuzzy matching |
+| `performance` | 16 | EXPLAIN, query analysis, optimization |
+| `admin` | 10 | VACUUM, ANALYZE, REINDEX |
+| `monitoring` | 11 | Database sizes, connections, status |
+| `backup` | 9 | pg_dump, COPY, restore |
+| `schema` | 10 | Schemas, views, functions, triggers |
+| `partitioning` | 6 | Native partition management |
 | `stats` | 8 | Statistical analysis |
-| `performance` | 16 | Query analysis and optimization |
-| `admin` | 10 | Database maintenance |
-| `monitoring` | 11 | Health and status monitoring |
-| `backup` | 9 | Export and backup commands |
-| `schema` | 10 | DDL operations |
-| `vector` | 14 | pgvector extension |
-| `postgis` | 12 | PostGIS extension |
-| `partitioning` | 6 | Partition management |
-| `cron` | 8 | pg_cron job scheduling |
-| `partman` | 10 | pg_partman partition lifecycle |
-| `kcache` | 7 | pg_stat_kcache OS-level stats |
-| `citext` | 6 | citext case-insensitive text |
-| `ltree` | 8 | ltree hierarchical tree labels |
-| `pgcrypto` | 9 | pgcrypto hashing, encryption, UUIDs |
-
-### Filter Presets
-
-**Minimal (~25 tools):**
-```json
-"--tool-filter", "-performance,-admin,-backup,-schema,-vector,-postgis,-partitioning"
-```
-
-**Development (~50 tools):**
-```json
-"--tool-filter", "-admin,-monitoring,-backup,-partitioning"
-```
-
-**DBA (~75 tools):**
-```json
-"--tool-filter", "-vector,-postgis,-cron,-partman,-kcache,-citext,-ltree,-pgcrypto"
-```
-
-### Custom Filtering Syntax
-
-- `-group` — Exclude all tools in group
-- `+group` — Include all tools in group
-- `-pg_tool_name` — Exclude specific tool
-- `+pg_tool_name` — Include specific tool
+| `vector` | 14 | pgvector (AI/ML similarity search) |
+| `postgis` | 12 | PostGIS (geospatial) |
+| `cron` | 8 | pg_cron (job scheduling) |
+| `partman` | 10 | pg_partman (auto-partitioning) |
+| `kcache` | 7 | pg_stat_kcache (OS-level stats) |
+| `citext` | 6 | citext (case-insensitive text) |
+| `ltree` | 8 | ltree (hierarchical data) |
+| `pgcrypto` | 9 | pgcrypto (encryption, UUIDs) |
 
 ---
 
 ## 🤖 AI-Powered Prompts
+
+Prompts provide step-by-step guidance for complex database tasks. Instead of figuring out which tools to use and in what order, simply invoke a prompt and follow its workflow — great for learning PostgreSQL best practices or automating repetitive DBA tasks.
 
 This server includes **19 intelligent prompts** for guided workflows:
 
@@ -212,6 +263,8 @@ This server includes **19 intelligent prompts** for guided workflows:
 ---
 
 ## 📦 Resources
+
+Resources give you instant snapshots of database state without writing queries. Perfect for quickly checking schema, health, or performance metrics — the AI can read these to understand your database context before suggesting changes.
 
 This server provides **20 resources** for structured data access:
 

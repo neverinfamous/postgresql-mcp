@@ -13,6 +13,7 @@
 
 import type {
     ToolGroup,
+    MetaGroup,
     ToolFilterConfig,
     ToolDefinition
 } from '../types/index.js';
@@ -257,6 +258,33 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
 };
 
 /**
+ * Meta-groups that expand to multiple tool groups.
+ * These provide shortcuts for common use cases.
+ */
+export const META_GROUPS: Record<MetaGroup, ToolGroup[]> = {
+    // Recommended default - what most developers need daily
+    starter: ['core', 'transactions', 'jsonb', 'schema'],
+
+    // Minimal footprint - just the basics
+    essential: ['core', 'transactions', 'jsonb'],
+
+    // Application development (adds text search and stats)
+    dev: ['core', 'transactions', 'jsonb', 'text', 'schema', 'stats'],
+
+    // AI/ML workloads with pgvector
+    ai: ['core', 'transactions', 'jsonb', 'text', 'vector', 'performance'],
+
+    // Database administration
+    dba: ['core', 'transactions', 'admin', 'monitoring', 'backup', 'schema', 'partitioning', 'performance', 'stats'],
+
+    // All core PostgreSQL without extensions
+    base: ['core', 'transactions', 'jsonb', 'text', 'performance', 'admin', 'monitoring', 'backup', 'schema', 'partitioning', 'stats'],
+
+    // All extension groups
+    extensions: ['vector', 'postgis', 'cron', 'partman', 'kcache', 'citext', 'ltree', 'pgcrypto']
+};
+
+/**
  * Get all tool names from all groups
  */
 export function getAllToolNames(): string[] {
@@ -284,6 +312,24 @@ export function getToolGroup(toolName: string): ToolGroup | undefined {
  */
 export function isToolGroup(name: string): name is ToolGroup {
     return name in TOOL_GROUPS;
+}
+
+/**
+ * Check if a name is a valid meta-group
+ */
+export function isMetaGroup(name: string): name is MetaGroup {
+    return name in META_GROUPS;
+}
+
+/**
+ * Get all tool names from a meta-group
+ */
+export function getMetaGroupTools(metaGroup: MetaGroup): string[] {
+    const tools: string[] = [];
+    for (const group of META_GROUPS[metaGroup]) {
+        tools.push(...TOOL_GROUPS[group]);
+    }
+    return tools;
 }
 
 /**
@@ -319,16 +365,29 @@ export function parseToolFilter(filterString: string | undefined): ToolFilterCon
         }
 
         const target = part.substring(1);
-        const isGroup = isToolGroup(target);
+        const targetIsMetaGroup = isMetaGroup(target);
+        const targetIsGroup = isToolGroup(target);
 
         rules.push({
             type: isInclude ? 'include' : 'exclude',
             target,
-            isGroup
+            isGroup: targetIsGroup || targetIsMetaGroup
         });
 
-        // Apply rule
-        if (isGroup) {
+        // Apply rule - check meta-groups first, then regular groups, then individual tools
+        if (targetIsMetaGroup) {
+            // Expand meta-group to all its underlying groups' tools
+            const metaGroupTools = getMetaGroupTools(target);
+            if (isExclude) {
+                for (const tool of metaGroupTools) {
+                    enabledTools.delete(tool);
+                }
+            } else {
+                for (const tool of metaGroupTools) {
+                    enabledTools.add(tool);
+                }
+            }
+        } else if (targetIsGroup) {
             const groupTools = TOOL_GROUPS[target];
             if (isExclude) {
                 for (const tool of groupTools) {
@@ -420,7 +479,15 @@ export function getFilterSummary(config: ToolFilterConfig): string {
         lines.push(`  Rules applied:`);
         for (const rule of config.rules) {
             const prefix = rule.type === 'include' ? '+' : '-';
-            const type = rule.isGroup ? 'group' : 'tool';
+            // Determine type: meta-group, group, or tool
+            let type: string;
+            if (isMetaGroup(rule.target)) {
+                type = 'meta-group';
+            } else if (rule.isGroup) {
+                type = 'group';
+            } else {
+                type = 'tool';
+            }
             lines.push(`    ${prefix}${rule.target} (${type})`);
         }
     }
@@ -443,5 +510,16 @@ export function getToolGroupInfo(): { group: ToolGroup; count: number; tools: st
         group: group as ToolGroup,
         count: tools.length,
         tools
+    }));
+}
+
+/**
+ * Get a list of all meta-groups with their expanded tool counts
+ */
+export function getMetaGroupInfo(): { metaGroup: MetaGroup; groups: ToolGroup[]; count: number }[] {
+    return Object.entries(META_GROUPS).map(([metaGroup, groups]) => ({
+        metaGroup: metaGroup as MetaGroup,
+        groups,
+        count: getMetaGroupTools(metaGroup as MetaGroup).length
     }));
 }

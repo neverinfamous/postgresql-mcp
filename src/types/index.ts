@@ -467,6 +467,19 @@ export type ToolGroup =
     | 'pgcrypto';      // pgcrypto extension - cryptographic functions
 
 /**
+ * Meta-group identifiers for common multi-group selections
+ * These are shortcuts that expand to multiple ToolGroups
+ */
+export type MetaGroup =
+    | 'starter'        // Recommended default (core, transactions, jsonb, schema) ~49 tools
+    | 'essential'      // Minimal footprint (core, transactions, jsonb) ~39 tools
+    | 'dev'            // Application development ~68 tools
+    | 'ai'             // AI/ML workloads with pgvector ~80 tools
+    | 'dba'            // Database administration ~90 tools
+    | 'base'           // All core PostgreSQL without extensions ~120 tools
+    | 'extensions';    // All extension groups ~74 tools
+
+/**
  * Tool filter rule
  */
 export interface ToolFilterRule {

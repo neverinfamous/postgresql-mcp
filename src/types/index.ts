@@ -457,7 +457,8 @@ export type ToolGroup =
     | 'schema'         // DDL operations
     | 'vector'         // pgvector extension
     | 'postgis'        // PostGIS extension
-    | 'partitioning';  // Partition management
+    | 'partitioning'   // Partition management
+    | 'stats';         // Statistical analysis
 
 /**
  * Tool filter rule

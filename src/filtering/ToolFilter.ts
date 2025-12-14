@@ -30,7 +30,12 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_create_table',
         'pg_drop_table',
         'pg_get_indexes',
-        'pg_create_index'
+        'pg_create_index',
+        'pg_list_objects',
+        'pg_object_details',
+        'pg_analyze_db_health',
+        'pg_analyze_workload_indexes',
+        'pg_analyze_query_indexes'
     ],
     transactions: [
         'pg_transaction_begin',
@@ -53,7 +58,14 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_jsonb_array',
         'pg_jsonb_keys',
         'pg_jsonb_strip_nulls',
-        'pg_jsonb_typeof'
+        'pg_jsonb_typeof',
+        'pg_jsonb_validate_path',
+        'pg_jsonb_stats',
+        'pg_jsonb_merge',
+        'pg_jsonb_normalize',
+        'pg_jsonb_diff',
+        'pg_jsonb_index_suggest',
+        'pg_jsonb_security_scan'
     ],
     text: [
         'pg_text_search',
@@ -131,7 +143,13 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_vector_create_index',
         'pg_vector_distance',
         'pg_vector_normalize',
-        'pg_vector_aggregate'
+        'pg_vector_aggregate',
+        'pg_vector_cluster',
+        'pg_vector_index_optimize',
+        'pg_hybrid_search',
+        'pg_vector_performance',
+        'pg_vector_dimension_reduce',
+        'pg_vector_embed'
     ],
     postgis: [
         'pg_postgis_create_extension',
@@ -151,6 +169,16 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_detach_partition',
         'pg_partition_info',
         'pg_create_partitioned_table'
+    ],
+    stats: [
+        'pg_stats_descriptive',
+        'pg_stats_percentiles',
+        'pg_stats_correlation',
+        'pg_stats_regression',
+        'pg_stats_time_series',
+        'pg_stats_distribution',
+        'pg_stats_hypothesis',
+        'pg_stats_sampling'
     ]
 };
 

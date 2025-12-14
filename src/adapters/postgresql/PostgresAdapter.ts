@@ -38,6 +38,7 @@ import { getSchemaTools } from './tools/schema.js';
 import { getVectorTools } from './tools/vector.js';
 import { getPostgisTools } from './tools/postgis.js';
 import { getPartitioningTools } from './tools/partitioning.js';
+import { getStatsTools } from './tools/stats.js';
 import { getPostgresResources } from './resources/index.js';
 import { getPostgresPrompts } from './prompts/index.js';
 
@@ -533,7 +534,8 @@ export class PostgresAdapter extends DatabaseAdapter {
             'schema',
             'vector',
             'postgis',
-            'partitioning'
+            'partitioning',
+            'stats'
         ];
     }
 
@@ -554,7 +556,8 @@ export class PostgresAdapter extends DatabaseAdapter {
             ...getSchemaTools(this),
             ...getVectorTools(this),
             ...getPostgisTools(this),
-            ...getPartitioningTools(this)
+            ...getPartitioningTools(this),
+            ...getStatsTools(this)
         ];
     }
 

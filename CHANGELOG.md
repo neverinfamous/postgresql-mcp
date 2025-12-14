@@ -56,13 +56,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_kcache_resource_analysis` — CPU-bound vs I/O-bound classification
   - `pg_kcache_reset` — Reset statistics
 - New `kcache` tool-filtering group for pg_stat_kcache tools
+- **6 citext tools** — Case-insensitive text type support
+  - `pg_citext_create_extension` — Enable citext
+  - `pg_citext_convert_column` — Convert text columns to citext
+  - `pg_citext_list_columns` — List citext columns
+  - `pg_citext_analyze_candidates` — Find columns that could benefit from citext
+  - `pg_citext_compare` — Case-insensitive comparison
+  - `pg_citext_schema_advisor` — Schema design recommendations
+- New `citext` tool-filtering group for citext schema intelligence tools
 
 ### Changed
 - Restructured resources into modular files for maintainability
 - Resource count from 6 to 14
 - Prompt count from 7 to 13
 - Restructured prompts into modular files for maintainability
-- Tool count from 146 to 171 (added pg_cron, pg_partman, and pg_stat_kcache tools)
+- Tool count from 146 to 177 (added pg_cron, pg_partman, pg_stat_kcache, and citext tools)
 
 ### Planned
 - Verify prompts and resources from old Python server are ported

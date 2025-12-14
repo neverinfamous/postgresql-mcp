@@ -563,3 +563,40 @@ export const KcacheResourceAnalysisSchema = z.object({
     queryId: z.string().optional().describe('Specific query ID to analyze (all if omitted)'),
     threshold: z.number().optional().describe('CPU/IO ratio threshold for classification (default: 0.5)')
 });
+
+// =============================================================================
+// citext Schemas
+// =============================================================================
+
+/**
+ * Schema for converting a text column to citext.
+ */
+export const CitextConvertColumnSchema = z.object({
+    table: z.string().describe('Table name'),
+    column: z.string().describe('Text column to convert to citext'),
+    schema: z.string().optional().describe('Schema name (default: public)')
+});
+
+/**
+ * Schema for listing citext columns.
+ */
+export const CitextListColumnsSchema = z.object({
+    schema: z.string().optional().describe('Schema name to filter (all schemas if omitted)')
+});
+
+/**
+ * Schema for analyzing candidate columns for citext conversion.
+ */
+export const CitextAnalyzeCandidatesSchema = z.object({
+    patterns: z.array(z.string()).optional()
+        .describe('Column name patterns to match (default: email, username, name, etc.)'),
+    schema: z.string().optional().describe('Schema name to filter')
+});
+
+/**
+ * Schema for citext schema advisor tool.
+ */
+export const CitextSchemaAdvisorSchema = z.object({
+    table: z.string().describe('Table name to analyze'),
+    schema: z.string().optional().describe('Schema name (default: public)')
+});

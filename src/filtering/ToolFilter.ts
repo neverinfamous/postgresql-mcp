@@ -224,6 +224,14 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_kcache_database_stats',
         'pg_kcache_resource_analysis',
         'pg_kcache_reset'
+    ],
+    citext: [
+        'pg_citext_create_extension',
+        'pg_citext_convert_column',
+        'pg_citext_list_columns',
+        'pg_citext_analyze_candidates',
+        'pg_citext_compare',
+        'pg_citext_schema_advisor'
     ]
 };
 

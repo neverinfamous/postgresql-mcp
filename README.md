@@ -231,6 +231,59 @@ If you need fine-grained control, use individual groups:
 
 ---
 
+## 🔐 OAuth 2.1 Authentication
+
+When using HTTP/SSE transport, oauth 2.1 authentication can protect your MCP endpoints.
+
+### Configuration
+
+**CLI Options:**
+```bash
+node dist/cli.js \
+  --transport http \
+  --port 3000 \
+  --oauth-enabled \
+  --oauth-issuer http://localhost:8080/realms/db-mcp \
+  --oauth-audience postgres-mcp
+```
+
+**Environment Variables:**
+```bash
+# Required
+OAUTH_ENABLED=true
+OAUTH_ISSUER=http://localhost:8080/realms/db-mcp
+OAUTH_AUDIENCE=postgres-mcp
+
+# Optional (auto-discovered from issuer)
+OAUTH_JWKS_URI=http://localhost:8080/realms/db-mcp/protocol/openid-connect/certs
+OAUTH_CLOCK_TOLERANCE=60
+```
+
+### OAuth Scopes
+
+Access control is managed through OAuth scopes:
+
+| Scope | Access Level |
+|-------|--------------|
+| `read` | Read-only queries (SELECT, EXPLAIN) |
+| `write` | Read + write operations |
+| `admin` | Full administrative access |
+| `full` | Grants all access |
+| `db:{name}` | Access to specific database |
+| `schema:{name}` | Access to specific schema |
+| `table:{schema}:{table}` | Access to specific table |
+
+### RFC Compliance
+
+This implementation follows:
+- **RFC 9728** — OAuth 2.0 Protected Resource Metadata
+- **RFC 8414** — OAuth 2.0 Authorization Server Metadata
+- **RFC 7591** — OAuth 2.0 Dynamic Client Registration
+
+The server exposes metadata at `/.well-known/oauth-protected-resource`.
+
+---
+
 ## 🤖 AI-Powered Prompts
 
 Prompts provide step-by-step guidance for complex database tasks. Instead of figuring out which tools to use and in what order, simply invoke a prompt and follow its workflow — great for learning PostgreSQL best practices or automating repetitive DBA tasks.

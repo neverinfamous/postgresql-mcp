@@ -3,7 +3,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-    { ignores: ['dist', 'node_modules'] },
+    { ignores: ['dist', 'node_modules', 'src/**/*.test.ts', 'src/**/*.spec.ts'] },
     {
         extends: [
             js.configs.recommended,
@@ -48,6 +48,25 @@ export default tseslint.config(
             }],
             '@typescript-eslint/consistent-type-exports': 'error',
             'no-console': 'off',
+        },
+    },
+    // Test files configuration - use simpler parsing without projectService
+    {
+        files: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            globals: { ...globals.node },
+            parserOptions: {
+                project: null, // Disable project service for test files
+            },
+        },
+        rules: {
+            // Relax some rules for tests
+            '@typescript-eslint/no-explicit-any': 'off',
+            '@typescript-eslint/no-unsafe-assignment': 'off',
+            '@typescript-eslint/no-unsafe-member-access': 'off',
+            '@typescript-eslint/no-unsafe-call': 'off',
+            '@typescript-eslint/no-unsafe-argument': 'off',
         },
     },
 )

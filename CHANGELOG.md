@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full backwards compatibility with existing stdio transport
 
 ### Added
+- **OAuth 2.1 Authentication** — Full RFC-compliant OAuth for HTTP/SSE transports
+  - RFC 9728 Protected Resource Metadata at `/.well-known/oauth-protected-resource`
+  - RFC 8414 Authorization Server Metadata discovery
+  - JWT token validation with JWKS caching
+  - PostgreSQL-specific scopes: `read`, `write`, `admin`, `full`, `db:{name}`, `schema:{name}`, `table:{schema}:{table}`
+  - Configurable via CLI (`--oauth-enabled`, `--oauth-issuer`, etc.) or environment variables
+  - Compatible with Keycloak and other OAuth 2.0/2.1 providers
+- **HTTP/SSE Transport** — New transport mode for web clients
+  - Streamable HTTP server transport using MCP SDK 1.25+
+  - SSE endpoints at `/sse` and `/messages`
+  - Security headers (X-Content-Type-Options, X-Frame-Options, CSP)
+  - CORS support for cross-origin requests
+  - Health check endpoint at `/health`
 - **Tool Annotations** — All 194 tools now include MCP Tool Annotations (SDK 1.25+)
   - `title` — Human-readable tool names for UX display
   - `readOnlyHint` — Identifies read-only tools (SELECT, EXPLAIN, list operations)

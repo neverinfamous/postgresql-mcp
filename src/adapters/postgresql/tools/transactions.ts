@@ -7,6 +7,7 @@
 
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
+import { write } from '../../../utils/annotations.js';
 import {
     BeginTransactionSchema,
     TransactionIdSchema,
@@ -35,6 +36,7 @@ function createBeginTransactionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Begin a new transaction. Returns a transaction ID for subsequent operations.',
         group: 'transactions',
         inputSchema: BeginTransactionSchema,
+        annotations: write('Begin Transaction'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { isolationLevel } = BeginTransactionSchema.parse(params);
             const transactionId = await adapter.beginTransaction(isolationLevel);
@@ -53,6 +55,7 @@ function createCommitTransactionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Commit a transaction, making all changes permanent.',
         group: 'transactions',
         inputSchema: TransactionIdSchema,
+        annotations: write('Commit Transaction'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { transactionId } = TransactionIdSchema.parse(params);
             await adapter.commitTransaction(transactionId);
@@ -71,6 +74,7 @@ function createRollbackTransactionTool(adapter: PostgresAdapter): ToolDefinition
         description: 'Rollback a transaction, undoing all changes.',
         group: 'transactions',
         inputSchema: TransactionIdSchema,
+        annotations: write('Rollback Transaction'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { transactionId } = TransactionIdSchema.parse(params);
             await adapter.rollbackTransaction(transactionId);
@@ -89,6 +93,7 @@ function createSavepointTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Create a savepoint within a transaction for partial rollback.',
         group: 'transactions',
         inputSchema: SavepointSchema,
+        annotations: write('Create Savepoint'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { transactionId, name } = SavepointSchema.parse(params);
             await adapter.createSavepoint(transactionId, name);
@@ -108,6 +113,7 @@ function createReleaseSavepointTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Release a savepoint, keeping all changes since it was created.',
         group: 'transactions',
         inputSchema: SavepointSchema,
+        annotations: write('Release Savepoint'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { transactionId, name } = SavepointSchema.parse(params);
             await adapter.releaseSavepoint(transactionId, name);
@@ -127,6 +133,7 @@ function createRollbackToSavepointTool(adapter: PostgresAdapter): ToolDefinition
         description: 'Rollback to a savepoint, undoing changes made after it.',
         group: 'transactions',
         inputSchema: SavepointSchema,
+        annotations: write('Rollback to Savepoint'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { transactionId, name } = SavepointSchema.parse(params);
             await adapter.rollbackToSavepoint(transactionId, name);
@@ -146,6 +153,7 @@ function createTransactionExecuteTool(adapter: PostgresAdapter): ToolDefinition 
         description: 'Execute multiple statements atomically in a single transaction.',
         group: 'transactions',
         inputSchema: TransactionExecuteSchema,
+        annotations: write('Transaction Execute'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { statements, isolationLevel } = TransactionExecuteSchema.parse(params);
 

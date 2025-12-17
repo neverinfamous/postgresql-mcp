@@ -13,6 +13,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write } from '../../../utils/annotations.js';
 import {
     CitextConvertColumnSchema,
     CitextListColumnsSchema,
@@ -44,6 +45,7 @@ function createCitextExtensionTool(adapter: PostgresAdapter): ToolDefinition {
 citext is ideal for emails, usernames, and other identifiers where case shouldn't matter.`,
         group: 'citext',
         inputSchema: z.object({}),
+        annotations: write('Create Citext Extension'),
         handler: async (_params: unknown, _context: RequestContext) => {
             await adapter.executeQuery('CREATE EXTENSION IF NOT EXISTS citext');
             return {
@@ -65,12 +67,12 @@ function createCitextConvertColumnTool(adapter: PostgresAdapter): ToolDefinition
 This is useful for retrofitting case-insensitivity to existing columns like email or username.`,
         group: 'citext',
         inputSchema: CitextConvertColumnSchema,
+        annotations: write('Convert to Citext'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, schema } = CitextConvertColumnSchema.parse(params);
             const schemaName = schema ?? 'public';
             const qualifiedTable = `"${schemaName}"."${table}"`;
 
-            // Check if citext extension is installed
             const extCheck = await adapter.executeQuery(`
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'citext'
@@ -86,7 +88,6 @@ This is useful for retrofitting case-insensitivity to existing columns like emai
                 };
             }
 
-            // Get current column type
             const colCheck = await adapter.executeQuery(`
                 SELECT data_type 
                 FROM information_schema.columns 
@@ -111,7 +112,6 @@ This is useful for retrofitting case-insensitivity to existing columns like emai
                 };
             }
 
-            // Convert the column
             await adapter.executeQuery(`
                 ALTER TABLE ${qualifiedTable}
                 ALTER COLUMN "${column}" TYPE citext
@@ -137,6 +137,7 @@ function createCitextListColumnsTool(adapter: PostgresAdapter): ToolDefinition {
 Useful for auditing case-insensitive columns.`,
         group: 'citext',
         inputSchema: CitextListColumnsSchema,
+        annotations: readOnly('List Citext Columns'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { schema } = CitextListColumnsSchema.parse(params);
 
@@ -183,10 +184,10 @@ function createCitextAnalyzeCandidatesTool(adapter: PostgresAdapter): ToolDefini
 Looks for common patterns like email, username, name, slug, etc.`,
         group: 'citext',
         inputSchema: CitextAnalyzeCandidatesSchema,
+        annotations: readOnly('Analyze Citext Candidates'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { patterns, schema } = CitextAnalyzeCandidatesSchema.parse(params);
 
-            // Default patterns for case-insensitive candidates
             const searchPatterns = patterns ?? [
                 'email', 'e_mail', 'mail',
                 'username', 'user_name', 'login',
@@ -207,7 +208,6 @@ Looks for common patterns like email, username, name, slug, etc.`,
                 queryParams.push(schema);
             }
 
-            // Build pattern matching condition
             const patternConditions = searchPatterns.map(p => {
                 const idx = paramIndex++;
                 queryParams.push(`%${p}%`);
@@ -231,7 +231,6 @@ Looks for common patterns like email, username, name, slug, etc.`,
             const result = await adapter.executeQuery(sql, queryParams);
             const candidates = result.rows ?? [];
 
-            // Categorize candidates by confidence
             const highConfidence: Record<string, unknown>[] = [];
             const mediumConfidence: Record<string, unknown>[] = [];
 
@@ -274,10 +273,10 @@ Useful for testing citext behavior before converting columns.`,
             value1: z.string().describe('First value to compare'),
             value2: z.string().describe('Second value to compare')
         }),
+        annotations: readOnly('Compare Citext Values'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { value1, value2 } = (params as { value1: string; value2: string });
 
-            // Check if citext extension is installed
             const extCheck = await adapter.executeQuery(`
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'citext'
@@ -287,7 +286,6 @@ Useful for testing citext behavior before converting columns.`,
             const hasExt = extCheck.rows?.[0]?.['installed'] as boolean ?? false;
 
             if (hasExt) {
-                // Use citext comparison
                 const result = await adapter.executeQuery(`
                     SELECT 
                         $1::citext = $2::citext as citext_equal,
@@ -305,7 +303,6 @@ Useful for testing citext behavior before converting columns.`,
                     extensionInstalled: true
                 };
             } else {
-                // Fallback without citext
                 const result = await adapter.executeQuery(`
                     SELECT 
                         $1::text = $2::text as text_equal,
@@ -336,11 +333,11 @@ function createCitextSchemaAdvisorTool(adapter: PostgresAdapter): ToolDefinition
 Provides schema design recommendations based on column names and existing data patterns.`,
         group: 'citext',
         inputSchema: CitextSchemaAdvisorSchema,
+        annotations: readOnly('Citext Schema Advisor'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, schema } = CitextSchemaAdvisorSchema.parse(params);
             const schemaName = schema ?? 'public';
 
-            // Get all text columns
             const colResult = await adapter.executeQuery(`
                 SELECT 
                     column_name,
@@ -364,7 +361,6 @@ Provides schema design recommendations based on column names and existing data p
                 reason: string;
             }[] = [];
 
-            // Keywords that suggest case-insensitivity
             const highConfidencePatterns = ['email', 'username', 'login', 'user_name'];
             const mediumConfidencePatterns = ['name', 'slug', 'handle', 'code', 'sku', 'identifier', 'nickname'];
 
@@ -384,7 +380,6 @@ Provides schema design recommendations based on column names and existing data p
                     continue;
                 }
 
-                // Check patterns
                 const isHighConfidence = highConfidencePatterns.some(p => colName.includes(p));
                 const isMediumConfidence = mediumConfidencePatterns.some(p => colName.includes(p));
 

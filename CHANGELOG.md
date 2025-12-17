@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full backwards compatibility with existing stdio transport
 
 ### Added
+- **Tool Annotations** — All 194 tools now include MCP Tool Annotations (SDK 1.25+)
+  - `title` — Human-readable tool names for UX display
+  - `readOnlyHint` — Identifies read-only tools (SELECT, EXPLAIN, list operations)
+  - `destructiveHint` — Marks destructive operations (DROP, DELETE, TRUNCATE)
+  - `idempotentHint` — Identifies safe-to-retry operations (IF NOT EXISTS patterns)
+  - `openWorldHint` — Set to `false` for all tools (no external system interaction)
+  - Centralized annotation helpers: `readOnly()`, `write()`, `destructive()`, `admin()`
 - **20 resources** — migrated + new extension resources
   - `postgres://capabilities` — Server version, extensions, tool categories
   - `postgres://performance` — pg_stat_statements query metrics

@@ -313,6 +313,32 @@ This server provides **20 resources** for structured data access:
 
 ---
 
+## 🏷️ Tool Annotations
+
+All 194 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints to MCP clients about tool behavior:
+
+| Annotation | Description | Example |
+|------------|-------------|---------|
+| `title` | Human-readable tool name | "Execute Query", "Create Index" |
+| `readOnlyHint` | Tool doesn't modify data | `true` for SELECT queries |
+| `destructiveHint` | Tool may delete/modify data | `true` for DROP, DELETE |
+| `idempotentHint` | Safe to retry without side effects | `true` for IF NOT EXISTS |
+| `openWorldHint` | Tool interacts with external systems | `false` for all tools |
+
+### Annotation Categories
+
+Tools are categorized by their behavior:
+
+- **Read-Only** — Query tools that don't modify state (SELECT, EXPLAIN, list operations)
+- **Write** — Tools that create or modify data (INSERT, UPDATE, CREATE)
+- **Destructive** — Tools that delete data or objects (DROP, DELETE, TRUNCATE)
+- **Admin** — Administrative tools requiring elevated privileges (VACUUM, REINDEX)
+
+> [!TIP]
+> MCP clients can use these annotations to display appropriate icons, require confirmation for destructive operations, or filter tools by capability.
+
+---
+
 ## 🔥 Core Capabilities
 
 - 📊 **Full SQL Support** - Execute any PostgreSQL query with parameter binding
@@ -334,11 +360,12 @@ This server provides **20 resources** for structured data access:
 ## 🏆 Why Choose postgres-mcp?
 
 ✅ **TypeScript Native** - Full type safety with strict mode  
-✅ **154 Specialized Tools** - Comprehensive PostgreSQL coverage  
+✅ **194 Specialized Tools** - Comprehensive PostgreSQL coverage  
+✅ **Tool Annotations** - UX hints for read-only, destructive, and idempotent operations  
 ✅ **Connection Pooling** - Efficient PostgreSQL connection management  
 ✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements, pg_cron  
 ✅ **Tool Filtering** - Stay within AI IDE tool limits  
-✅ **Modern Architecture** - Built on MCP SDK  
+✅ **Modern Architecture** - Built on MCP SDK 1.25+  
 
 ---
 

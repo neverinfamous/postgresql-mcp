@@ -2,12 +2,13 @@
  * PostgreSQL Monitoring Tools
  * 
  * Database health, sizes, connections, and replication status.
- * 8 tools total.
+ * 11 tools total.
  */
 
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write } from '../../../utils/annotations.js';
 import { DatabaseSizeSchema, TableSizesSchema, ShowSettingsSchema } from '../types.js';
 
 /**
@@ -35,9 +36,9 @@ function createDatabaseSizeTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get the size of a database.',
         group: 'monitoring',
         inputSchema: DatabaseSizeSchema,
+        annotations: readOnly('Database Size'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { database } = DatabaseSizeSchema.parse(params);
-            // Database size query - using database param directly
             const sql = database
                 ? `SELECT pg_database_size($1) as bytes, pg_size_pretty(pg_database_size($1)) as size`
                 : `SELECT pg_database_size(current_database()) as bytes, pg_size_pretty(pg_database_size(current_database())) as size`;
@@ -53,6 +54,7 @@ function createTableSizesTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get sizes of all tables with indexes and total.',
         group: 'monitoring',
         inputSchema: TableSizesSchema,
+        annotations: readOnly('Table Sizes'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { schema, limit } = TableSizesSchema.parse(params);
             const schemaClause = schema ? `AND n.nspname = '${schema}'` : '';
@@ -82,6 +84,7 @@ function createConnectionStatsTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get connection statistics by database and state.',
         group: 'monitoring',
         inputSchema: z.object({}),
+        annotations: readOnly('Connection Stats'),
         handler: async (_params: unknown, _context: RequestContext) => {
             const sql = `SELECT datname, state, count(*) as connections
                         FROM pg_stat_activity
@@ -91,7 +94,6 @@ function createConnectionStatsTool(adapter: PostgresAdapter): ToolDefinition {
 
             const result = await adapter.executeQuery(sql);
 
-            // Also get max connections
             const maxResult = await adapter.executeQuery(`SHOW max_connections`);
             const maxConnections = maxResult.rows?.[0]?.['max_connections'];
 
@@ -114,13 +116,12 @@ function createReplicationStatusTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Check replication status and lag.',
         group: 'monitoring',
         inputSchema: z.object({}),
+        annotations: readOnly('Replication Status'),
         handler: async (_params: unknown, _context: RequestContext) => {
-            // Check if this is a replica
             const recoveryResult = await adapter.executeQuery(`SELECT pg_is_in_recovery() as is_replica`);
             const isReplica = recoveryResult.rows?.[0]?.['is_replica'];
 
             if (isReplica === true) {
-                // Get replica lag info
                 const sql = `SELECT 
                             now() - pg_last_xact_replay_timestamp() as replay_lag,
                             pg_last_wal_receive_lsn() as receive_lsn,
@@ -128,7 +129,6 @@ function createReplicationStatusTool(adapter: PostgresAdapter): ToolDefinition {
                 const result = await adapter.executeQuery(sql);
                 return { role: 'replica', ...result.rows?.[0] };
             } else {
-                // Get primary replication info
                 const sql = `SELECT client_addr, state, sent_lsn, write_lsn, flush_lsn, replay_lsn,
                             now() - backend_start as connection_duration
                             FROM pg_stat_replication`;
@@ -145,6 +145,7 @@ function createServerVersionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get PostgreSQL server version information.',
         group: 'monitoring',
         inputSchema: z.object({}),
+        annotations: readOnly('Server Version'),
         handler: async (_params: unknown, _context: RequestContext) => {
             const sql = `SELECT version() as full_version,
                         current_setting('server_version') as version,
@@ -161,6 +162,7 @@ function createShowSettingsTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Show current PostgreSQL configuration settings.',
         group: 'monitoring',
         inputSchema: ShowSettingsSchema,
+        annotations: readOnly('Show Settings'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { pattern } = ShowSettingsSchema.parse(params);
             const whereClause = pattern ? `WHERE name LIKE $1` : '';
@@ -182,6 +184,7 @@ function createUptimeTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get server uptime and startup time.',
         group: 'monitoring',
         inputSchema: z.object({}),
+        annotations: readOnly('Server Uptime'),
         handler: async (_params: unknown, _context: RequestContext) => {
             const sql = `SELECT pg_postmaster_start_time() as start_time,
                         now() - pg_postmaster_start_time() as uptime`;
@@ -197,6 +200,7 @@ function createRecoveryStatusTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Check if server is in recovery mode (replica).',
         group: 'monitoring',
         inputSchema: z.object({}),
+        annotations: readOnly('Recovery Status'),
         handler: async (_params: unknown, _context: RequestContext) => {
             const sql = `SELECT pg_is_in_recovery() as in_recovery,
                         CASE WHEN pg_is_in_recovery() 
@@ -220,11 +224,11 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             projectionDays: z.number().optional().describe('Days to project growth (default: 90)')
         }),
+        annotations: readOnly('Capacity Planning'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { projectionDays?: number });
             const projectionDays = parsed.projectionDays ?? 90;
 
-            // Get current database size
             const [dbSize, tableStats, connStats] = await Promise.all([
                 adapter.executeQuery(`
                     SELECT 
@@ -252,17 +256,14 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
             const tableData = tableStats.rows?.[0];
             const connData = connStats.rows?.[0];
 
-            // Estimate daily growth (simplified - would need historical data for accuracy)
             const totalInserts = Number(tableData?.['total_inserts'] ?? 0);
             const totalDeletes = Number(tableData?.['total_deletes'] ?? 0);
             const netRowGrowth = totalInserts - totalDeletes;
 
-            // Assume average row size based on current data
             const totalRows = Number(tableData?.['total_rows'] ?? 1);
             const avgRowSize = currentBytes / Math.max(totalRows, 1);
 
-            // Project growth (very rough estimate)
-            const dailyGrowthEstimate = (netRowGrowth * avgRowSize) / 30; // Assume stats accumulated over ~30 days
+            const dailyGrowthEstimate = (netRowGrowth * avgRowSize) / 30;
             const projectedGrowthBytes = dailyGrowthEstimate * projectionDays;
             const projectedTotalBytes = currentBytes + projectedGrowthBytes;
 
@@ -303,8 +304,8 @@ function createResourceUsageAnalyzeTool(adapter: PostgresAdapter): ToolDefinitio
         description: 'Analyze current resource usage including CPU, memory, and I/O patterns.',
         group: 'monitoring',
         inputSchema: z.object({}),
+        annotations: readOnly('Resource Usage Analysis'),
         handler: async (_params: unknown, _context: RequestContext) => {
-            // Get comprehensive resource usage metrics
             const [bgWriter, checkpoints, connections, buffers, activity] = await Promise.all([
                 adapter.executeQuery(`
                     SELECT 
@@ -399,6 +400,7 @@ function createAlertThresholdSetTool(_adapter: PostgresAdapter): ToolDefinition 
                 'lock_wait_time'
             ]).optional().describe('Specific metric to get thresholds for, or all if not specified')
         }),
+        annotations: write('Set Alert Threshold'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { metric?: string });
@@ -450,4 +452,3 @@ function createAlertThresholdSetTool(_adapter: PostgresAdapter): ToolDefinition 
         }
     };
 }
-

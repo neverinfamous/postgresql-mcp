@@ -2,12 +2,13 @@
  * PostgreSQL PostGIS Extension Tools
  * 
  * Geospatial operations and spatial queries.
- * 9 tools total.
+ * 12 tools total.
  */
 
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write } from '../../../utils/annotations.js';
 import { GeometryDistanceSchema, PointInPolygonSchema, SpatialIndexSchema } from '../types.js';
 
 /**
@@ -36,6 +37,7 @@ function createPostgisExtensionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Enable the PostGIS extension for geospatial operations.',
         group: 'postgis',
         inputSchema: z.object({}),
+        annotations: write('Create PostGIS Extension'),
         handler: async (_params: unknown, _context: RequestContext) => {
             await adapter.executeQuery('CREATE EXTENSION IF NOT EXISTS postgis');
             return { success: true, message: 'PostGIS extension enabled' };
@@ -55,6 +57,7 @@ function createGeometryColumnTool(adapter: PostgresAdapter): ToolDefinition {
             type: z.enum(['POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT', 'MULTILINESTRING', 'MULTIPOLYGON', 'GEOMETRY']).optional(),
             schema: z.string().optional()
         }),
+        annotations: write('Add Geometry Column'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
                 table: string;
@@ -82,6 +85,7 @@ function createPointInPolygonTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Check if a point is within any polygon in a table.',
         group: 'postgis',
         inputSchema: PointInPolygonSchema,
+        annotations: readOnly('Point in Polygon'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, point } = PointInPolygonSchema.parse(params);
 
@@ -101,6 +105,7 @@ function createDistanceTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Find nearby geometries within a distance from a point.',
         group: 'postgis',
         inputSchema: GeometryDistanceSchema,
+        annotations: readOnly('Distance Search'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, point, limit, maxDistance } = GeometryDistanceSchema.parse(params);
 
@@ -131,6 +136,7 @@ function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
             distance: z.number().describe('Buffer distance in meters'),
             where: z.string().optional()
         }),
+        annotations: readOnly('Buffer Zone'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; distance: number; where?: string });
             const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
@@ -155,11 +161,11 @@ function createIntersectionTool(adapter: PostgresAdapter): ToolDefinition {
             geometry: z.string().describe('GeoJSON or WKT geometry to check intersection'),
             select: z.array(z.string()).optional()
         }),
+        annotations: readOnly('Intersection Search'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; geometry: string; select?: string[] });
             const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? parsed.select.map(c => `"${c}"`).join(', ') : '*';
 
-            // Detect if geometry is GeoJSON or WKT
             const isGeoJson = parsed.geometry.trim().startsWith('{');
             const geomExpr = isGeoJson
                 ? `ST_GeomFromGeoJSON($1)`
@@ -189,6 +195,7 @@ function createBoundingBoxTool(adapter: PostgresAdapter): ToolDefinition {
             maxLat: z.number(),
             select: z.array(z.string()).optional()
         }),
+        annotations: readOnly('Bounding Box Search'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
                 table: string;
@@ -220,6 +227,7 @@ function createSpatialIndexTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Create a GiST spatial index for geometry column.',
         group: 'postgis',
         inputSchema: SpatialIndexSchema,
+        annotations: write('Create Spatial Index'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, name } = SpatialIndexSchema.parse(params);
             const indexName = name ?? `idx_${table}_${column}_gist`;
@@ -241,6 +249,7 @@ function createGeocodeTool(adapter: PostgresAdapter): ToolDefinition {
             lng: z.number(),
             srid: z.number().optional()
         }),
+        annotations: readOnly('Geocode'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { lat: number; lng: number; srid?: number });
             const srid = parsed.srid ?? 4326;
@@ -271,6 +280,7 @@ function createGeoTransformTool(adapter: PostgresAdapter): ToolDefinition {
             where: z.string().optional().describe('Filter condition'),
             limit: z.number().optional().describe('Maximum rows to return')
         }),
+        annotations: readOnly('Transform Geometry'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
                 table: string;
@@ -318,11 +328,11 @@ function createGeoIndexOptimizeTool(adapter: PostgresAdapter): ToolDefinition {
             table: z.string().optional().describe('Specific table to analyze (or all spatial tables)'),
             schema: z.string().optional().describe('Schema name')
         }),
+        annotations: readOnly('Geo Index Optimize'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table?: string; schema?: string });
             const schemaName = parsed.schema ?? 'public';
 
-            // Get spatial indexes info
             const indexQuery = `
                 SELECT 
                     c.relname as table_name,
@@ -362,7 +372,6 @@ function createGeoIndexOptimizeTool(adapter: PostgresAdapter): ToolDefinition {
 
             const recommendations: string[] = [];
 
-            // Analyze index usage
             for (const idx of (indexes.rows ?? [])) {
                 const scans = Number(idx['index_scans'] ?? 0);
                 const sizeBytes = Number(idx['index_size_bytes'] ?? 0);
@@ -375,7 +384,6 @@ function createGeoIndexOptimizeTool(adapter: PostgresAdapter): ToolDefinition {
                 }
             }
 
-            // Check for missing indexes
             for (const table of (tableStats.rows ?? [])) {
                 const rowCount = Number(table['row_count'] ?? 0);
                 const hasIndex = (indexes.rows ?? []).some(idx => idx['table_name'] === table['table_name']);
@@ -419,6 +427,7 @@ function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
             where: z.string().optional().describe('WHERE clause filter'),
             limit: z.number().optional()
         }),
+        annotations: readOnly('Geo Cluster'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
                 table: string;
@@ -442,7 +451,7 @@ function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
                 const numClusters = parsed.numClusters ?? 5;
                 clusterFunction = `ST_ClusterKMeans("${parsed.column}", ${String(numClusters)}) OVER ()`;
             } else {
-                const eps = parsed.eps ?? 100; // Default 100 units
+                const eps = parsed.eps ?? 100;
                 const minPoints = parsed.minPoints ?? 3;
                 clusterFunction = `ST_ClusterDBSCAN("${parsed.column}", ${String(eps)}, ${String(minPoints)}) OVER ()`;
             }
@@ -497,4 +506,3 @@ function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
         }
     };
 }
-

@@ -8,6 +8,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write } from '../../../utils/annotations.js';
 import {
     JsonbExtractSchema,
     JsonbSetSchema,
@@ -32,7 +33,6 @@ export function getJsonbTools(adapter: PostgresAdapter): ToolDefinition[] {
         createJsonbKeysTool(adapter),
         createJsonbStripNullsTool(adapter),
         createJsonbTypeofTool(adapter),
-        // New advanced tools from old server
         createJsonbValidatePathTool(adapter),
         createJsonbMergeTool(adapter),
         createJsonbNormalizeTool(adapter),
@@ -50,6 +50,7 @@ function createJsonbExtractTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Extract a value from a JSONB column using a path expression.',
         group: 'jsonb',
         inputSchema: JsonbExtractSchema,
+        annotations: readOnly('JSONB Extract'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, path, where } = JsonbExtractSchema.parse(params);
             const whereClause = where ? ` WHERE ${where}` : '';
@@ -69,6 +70,7 @@ function createJsonbSetTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Set a value in a JSONB column at a specified path.',
         group: 'jsonb',
         inputSchema: JsonbSetSchema,
+        annotations: write('JSONB Set'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, path, value, where, createMissing } = JsonbSetSchema.parse(params);
             const createFlag = createMissing !== false;
@@ -92,6 +94,7 @@ function createJsonbInsertTool(adapter: PostgresAdapter): ToolDefinition {
             where: z.string(),
             insertAfter: z.boolean().optional()
         }),
+        annotations: write('JSONB Insert'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; path: string[]; value: unknown; where: string; insertAfter?: boolean });
             const sql = `UPDATE "${parsed.table}" SET "${parsed.column}" = jsonb_insert("${parsed.column}", $1, $2::jsonb, $3) WHERE ${parsed.where}`;
@@ -112,6 +115,7 @@ function createJsonbDeleteTool(adapter: PostgresAdapter): ToolDefinition {
             path: z.union([z.string(), z.array(z.string())]),
             where: z.string()
         }),
+        annotations: write('JSONB Delete'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; path: string | string[]; where: string });
             const pathExpr = Array.isArray(parsed.path) ? `#- $1` : `- $1`;
@@ -128,6 +132,7 @@ function createJsonbContainsTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Find rows where JSONB column contains the specified value.',
         group: 'jsonb',
         inputSchema: JsonbContainsSchema,
+        annotations: readOnly('JSONB Contains'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, value, select } = JsonbContainsSchema.parse(params);
             const selectCols = select !== undefined && select.length > 0 ? select.map(c => `"${c}"`).join(', ') : '*';
@@ -144,6 +149,7 @@ function createJsonbPathQueryTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Query JSONB using SQL/JSON path expressions (PostgreSQL 12+).',
         group: 'jsonb',
         inputSchema: JsonbPathQuerySchema,
+        annotations: readOnly('JSONB Path Query'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, path, vars, where } = JsonbPathQuerySchema.parse(params);
             const whereClause = where ? ` WHERE ${where}` : '';
@@ -166,6 +172,7 @@ function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
             where: z.string().optional(),
             groupBy: z.string().optional()
         }),
+        annotations: readOnly('JSONB Aggregate'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; select?: string[]; where?: string; groupBy?: string });
             const selectExpr = parsed.select !== undefined && parsed.select.length > 0
@@ -188,6 +195,7 @@ function createJsonbObjectTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             pairs: z.record(z.string(), z.unknown())
         }),
+        annotations: readOnly('JSONB Object'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { pairs: Record<string, unknown> });
             const entries = Object.entries(parsed.pairs);
@@ -208,6 +216,7 @@ function createJsonbArrayTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             values: z.array(z.unknown())
         }),
+        annotations: readOnly('JSONB Array'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { values: unknown[] });
             const placeholders = parsed.values.map((_, i) => `$${String(i + 1)}::jsonb`).join(', ');
@@ -228,6 +237,7 @@ function createJsonbKeysTool(adapter: PostgresAdapter): ToolDefinition {
             column: z.string(),
             where: z.string().optional()
         }),
+        annotations: readOnly('JSONB Keys'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; where?: string });
             const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
@@ -248,6 +258,7 @@ function createJsonbStripNullsTool(adapter: PostgresAdapter): ToolDefinition {
             column: z.string(),
             where: z.string()
         }),
+        annotations: write('JSONB Strip Nulls'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; where: string });
             const sql = `UPDATE "${parsed.table}" SET "${parsed.column}" = jsonb_strip_nulls("${parsed.column}") WHERE ${parsed.where}`;
@@ -268,6 +279,7 @@ function createJsonbTypeofTool(adapter: PostgresAdapter): ToolDefinition {
             path: z.array(z.string()).optional(),
             where: z.string().optional()
         }),
+        annotations: readOnly('JSONB Typeof'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; path?: string[]; where?: string });
             const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
@@ -281,7 +293,7 @@ function createJsonbTypeofTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 // =============================================================================
-// Advanced JSONB Tools (ported from old server)
+// Advanced JSONB Tools
 // =============================================================================
 
 /**
@@ -296,6 +308,7 @@ function createJsonbValidatePathTool(adapter: PostgresAdapter): ToolDefinition {
             path: z.string().describe('JSONPath expression to validate'),
             testValue: z.unknown().optional().describe('Optional JSONB value to test against')
         }),
+        annotations: readOnly('JSONB Validate Path'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { path: string; testValue?: unknown });
 
@@ -312,7 +325,6 @@ function createJsonbValidatePathTool(adapter: PostgresAdapter): ToolDefinition {
                         results: result.rows?.map(r => r['result'])
                     };
                 } else {
-                    // Just validate the path syntax
                     const sql = `SELECT $1::jsonpath as path`;
                     await adapter.executeQuery(sql, [parsed.path]);
                     return { valid: true, path: parsed.path };
@@ -341,12 +353,12 @@ function createJsonbMergeTool(adapter: PostgresAdapter): ToolDefinition {
             overlay: z.unknown().describe('JSONB to merge on top'),
             deep: z.boolean().optional().describe('Deep merge objects (default: true)')
         }),
+        annotations: readOnly('JSONB Merge'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { base: unknown; overlay: unknown; deep?: boolean });
             const useDeep = parsed.deep !== false;
 
             if (useDeep) {
-                // Deep merge using recursive function
                 const sql = `
                     WITH RECURSIVE merged AS (
                         SELECT $1::jsonb || $2::jsonb as result
@@ -359,7 +371,6 @@ function createJsonbMergeTool(adapter: PostgresAdapter): ToolDefinition {
                 ]);
                 return { merged: result.rows?.[0]?.['result'] };
             } else {
-                // Shallow merge
                 const sql = `SELECT $1::jsonb || $2::jsonb as result`;
                 const result = await adapter.executeQuery(sql, [
                     JSON.stringify(parsed.base),
@@ -385,6 +396,7 @@ function createJsonbNormalizeTool(adapter: PostgresAdapter): ToolDefinition {
             mode: z.enum(['keys', 'array', 'flatten']).optional().describe('Normalization mode'),
             where: z.string().optional()
         }),
+        annotations: readOnly('JSONB Normalize'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; mode?: string; where?: string });
             const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
@@ -417,10 +429,10 @@ function createJsonbDiffTool(adapter: PostgresAdapter): ToolDefinition {
             doc1: z.unknown().describe('First JSONB document'),
             doc2: z.unknown().describe('Second JSONB document')
         }),
+        annotations: readOnly('JSONB Diff'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { doc1: unknown; doc2: unknown });
 
-            // Get keys that differ
             const sql = `
                 WITH 
                     j1 AS (SELECT key, value FROM jsonb_each($1::jsonb)),
@@ -465,11 +477,11 @@ function createJsonbIndexSuggestTool(adapter: PostgresAdapter): ToolDefinition {
             column: z.string().describe('JSONB column'),
             sampleSize: z.number().optional().describe('Sample rows to analyze')
         }),
+        annotations: readOnly('JSONB Index Suggest'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; sampleSize?: number });
             const sample = parsed.sampleSize ?? 1000;
 
-            // Analyze key distribution
             const keySql = `
                 SELECT key, COUNT(*) as frequency, 
                        jsonb_typeof(value) as value_type
@@ -482,7 +494,6 @@ function createJsonbIndexSuggestTool(adapter: PostgresAdapter): ToolDefinition {
 
             const keyResult = await adapter.executeQuery(keySql);
 
-            // Check existing indexes
             const indexSql = `
                 SELECT indexname, indexdef
                 FROM pg_indexes
@@ -495,7 +506,6 @@ function createJsonbIndexSuggestTool(adapter: PostgresAdapter): ToolDefinition {
             const recommendations: string[] = [];
             const keys = keyResult.rows as { key: string; frequency: number; value_type: string }[];
 
-            // Generate recommendations
             if ((indexResult.rows?.length ?? 0) === 0) {
                 recommendations.push(`CREATE INDEX ON "${parsed.table}" USING GIN ("${parsed.column}")`);
             }
@@ -530,13 +540,13 @@ function createJsonbSecurityScanTool(adapter: PostgresAdapter): ToolDefinition {
             column: z.string().describe('JSONB column'),
             sampleSize: z.number().optional().describe('Sample rows to scan')
         }),
+        annotations: readOnly('JSONB Security Scan'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; sampleSize?: number });
             const sample = parsed.sampleSize ?? 100;
 
             const issues: { type: string; key: string; count: number }[] = [];
 
-            // Check for sensitive key names
             const sensitiveKeysSql = `
                 SELECT key, COUNT(*) as count
                 FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t,
@@ -551,7 +561,6 @@ function createJsonbSecurityScanTool(adapter: PostgresAdapter): ToolDefinition {
                 issues.push({ type: 'sensitive_key', key: row.key, count: Number(row.count) });
             }
 
-            // Check for potential SQL injection patterns
             const injectionSql = `
                 SELECT key, COUNT(*) as count
                 FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t,
@@ -587,11 +596,11 @@ function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
             column: z.string().describe('JSONB column'),
             sampleSize: z.number().optional().describe('Sample rows to analyze')
         }),
+        annotations: readOnly('JSONB Stats'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; sampleSize?: number });
             const sample = parsed.sampleSize ?? 1000;
 
-            // Basic stats
             const basicSql = `
                 SELECT 
                     COUNT(*) as total_rows,
@@ -603,7 +612,6 @@ function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
 
             const basicResult = await adapter.executeQuery(basicSql);
 
-            // Key frequency
             const keySql = `
                 SELECT key, COUNT(*) as frequency
                 FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t,
@@ -615,7 +623,6 @@ function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
 
             const keyResult = await adapter.executeQuery(keySql);
 
-            // Type distribution
             const typeSql = `
                 SELECT jsonb_typeof("${parsed.column}") as type, COUNT(*) as count
                 FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t
@@ -632,4 +639,3 @@ function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
         }
     };
 }
-

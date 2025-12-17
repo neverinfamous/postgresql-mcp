@@ -553,6 +553,24 @@ export interface AdapterCapabilities {
 }
 
 /**
+ * MCP Tool Annotations (SDK 1.25+)
+ * Provides metadata hints about tool behavior to help clients
+ * present and manage tools appropriately.
+ */
+export interface ToolAnnotations {
+    /** Human-readable title for display */
+    title?: string;
+    /** Tool does not modify its environment (default: false) */
+    readOnlyHint?: boolean;
+    /** Tool may perform destructive updates (default: true) */
+    destructiveHint?: boolean;
+    /** Repeated calls with same args have no additional effect */
+    idempotentHint?: boolean;
+    /** Tool may interact with external systems (default: false) */
+    openWorldHint?: boolean;
+}
+
+/**
  * Tool definition for registration
  */
 export interface ToolDefinition {
@@ -573,6 +591,9 @@ export interface ToolDefinition {
 
     /** Required OAuth scopes */
     requiredScopes?: OAuthScope[];
+
+    /** MCP Tool Annotations for behavior hints */
+    annotations?: ToolAnnotations;
 
     /** Tool handler function */
     handler: (params: unknown, context: RequestContext) => Promise<unknown>;

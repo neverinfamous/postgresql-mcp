@@ -11,6 +11,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write, destructive } from '../../../utils/annotations.js';
 import {
     CronScheduleSchema,
     CronScheduleInDatabaseSchema,
@@ -44,6 +45,7 @@ function createCronExtensionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Enable the pg_cron extension for job scheduling. Requires superuser privileges.',
         group: 'cron',
         inputSchema: z.object({}),
+        annotations: write('Create Cron Extension'),
         handler: async (_params: unknown, _context: RequestContext) => {
             await adapter.executeQuery('CREATE EXTENSION IF NOT EXISTS pg_cron');
             return { success: true, message: 'pg_cron extension enabled' };
@@ -61,6 +63,7 @@ function createCronScheduleTool(adapter: PostgresAdapter): ToolDefinition {
 or interval syntax (e.g., "30 seconds"). Returns the job ID.`,
         group: 'cron',
         inputSchema: CronScheduleSchema,
+        annotations: write('Schedule Cron Job'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { schedule, command, jobName } = CronScheduleSchema.parse(params);
 
@@ -100,6 +103,7 @@ function createCronScheduleInDatabaseTool(adapter: PostgresAdapter): ToolDefinit
 maintenance tasks. Returns the job ID.`,
         group: 'cron',
         inputSchema: CronScheduleInDatabaseSchema,
+        annotations: write('Schedule Cron in Database'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { jobName, schedule, command, database, username, active } =
                 CronScheduleInDatabaseSchema.parse(params);
@@ -138,6 +142,7 @@ function createCronUnscheduleTool(adapter: PostgresAdapter): ToolDefinition {
             jobId: z.number().optional().describe('Job ID to remove'),
             jobName: z.string().optional().describe('Job name to remove')
         }),
+        annotations: destructive('Unschedule Cron Job'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = params as { jobId?: number; jobName?: string };
 
@@ -179,11 +184,11 @@ function createCronAlterJobTool(adapter: PostgresAdapter): ToolDefinition {
 or active status. Only specify the parameters you want to change.`,
         group: 'cron',
         inputSchema: CronAlterJobSchema,
+        annotations: write('Alter Cron Job'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { jobId, schedule, command, database, username, active } =
                 CronAlterJobSchema.parse(params);
 
-            // Build the function call with named parameters for non-null values
             const sql = `SELECT cron.alter_job($1, $2, $3, $4, $5, $6)`;
             const queryParams = [
                 jobId,
@@ -223,6 +228,7 @@ function createCronListJobsTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             active: z.boolean().optional().describe('Filter by active status')
         }),
+        annotations: readOnly('List Cron Jobs'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = params as { active?: boolean };
 
@@ -268,6 +274,7 @@ function createCronJobRunDetailsTool(adapter: PostgresAdapter): ToolDefinition {
 Useful for monitoring and debugging scheduled jobs.`,
         group: 'cron',
         inputSchema: CronJobRunDetailsSchema,
+        annotations: readOnly('Cron Job Run Details'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { jobId, status, limit } = CronJobRunDetailsSchema.parse(params);
 
@@ -311,7 +318,6 @@ Useful for monitoring and debugging scheduled jobs.`,
 
             const result = await adapter.executeQuery(sql, queryParams);
 
-            // Calculate summary stats
             const rows = result.rows ?? [];
             const succeeded = rows.filter((r: Record<string, unknown>) => r['status'] === 'succeeded').length;
             const failed = rows.filter((r: Record<string, unknown>) => r['status'] === 'failed').length;
@@ -340,6 +346,7 @@ function createCronCleanupHistoryTool(adapter: PostgresAdapter): ToolDefinition 
 from growing too large. By default, removes records older than 7 days.`,
         group: 'cron',
         inputSchema: CronCleanupHistorySchema,
+        annotations: destructive('Cleanup Cron History'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { olderThanDays, jobId } = CronCleanupHistorySchema.parse(params);
 

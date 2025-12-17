@@ -2,12 +2,13 @@
  * PostgreSQL Backup Tools
  * 
  * COPY operations, dump commands, and backup planning.
- * 6 tools total.
+ * 9 tools total.
  */
 
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write } from '../../../utils/annotations.js';
 import { CopyExportSchema, DumpSchemaSchema } from '../types.js';
 
 /**
@@ -37,14 +38,13 @@ function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
             schema: z.string().optional(),
             includeData: z.boolean().optional()
         }),
+        annotations: readOnly('Dump Table'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; schema?: string; includeData?: boolean });
             const schemaName = parsed.schema ?? 'public';
 
-            // Get table DDL using pg_get_tabledef function or reconstruct
             const tableInfo = await adapter.describeTable(parsed.table, schemaName);
 
-            // Build CREATE TABLE statement
             const columns = tableInfo.columns?.map(col => {
                 let def = `    "${col.name}" ${col.type}`;
                 if (col.defaultValue !== undefined && col.defaultValue !== null) {
@@ -79,7 +79,6 @@ function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
                             if (value === null) return 'NULL';
                             if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
                             if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-                            // For objects, arrays, and any other types
                             return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
                         }).join(', ');
                         return `INSERT INTO "${schemaName}"."${parsed.table}" (${cols}) VALUES (${vals});`;
@@ -99,12 +98,13 @@ function createDumpSchemaTool(_adapter: PostgresAdapter): ToolDefinition {
         description: 'Get the pg_dump command for a schema or database.',
         group: 'backup',
         inputSchema: DumpSchemaSchema,
+        annotations: readOnly('Dump Schema'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, schema } = DumpSchemaSchema.parse(params);
 
             let command = 'pg_dump';
-            command += ' --format=custom';  // Custom format for pg_restore
+            command += ' --format=custom';
             command += ' --verbose';
 
             if (schema) {
@@ -136,6 +136,7 @@ function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Export query results using COPY TO (returns data as text).',
         group: 'backup',
         inputSchema: CopyExportSchema,
+        annotations: readOnly('Copy Export'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { query, format, header, delimiter } = CopyExportSchema.parse(params);
 
@@ -144,13 +145,9 @@ function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
             if (header !== false) options.push('HEADER');
             if (delimiter) options.push(`DELIMITER '${delimiter}'`);
 
-            // Note: The sql variable would be used with COPY TO STDOUT command
-            // but requires special handling - using regular query instead
             const copyCommand = `COPY (${query}) TO STDOUT WITH (${options.join(', ')})`;
-            void copyCommand; // Reference to show the intended command
+            void copyCommand;
 
-            // Note: Actual COPY TO STDOUT requires special handling
-            // This returns the equivalent data via a regular query
             const result = await adapter.executeQuery(query);
 
             if (format === 'csv' || format === undefined) {
@@ -202,6 +199,7 @@ function createCopyImportTool(_adapter: PostgresAdapter): ToolDefinition {
             delimiter: z.string().optional(),
             columns: z.array(z.string()).optional()
         }),
+        annotations: write('Copy Import'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
@@ -244,12 +242,12 @@ function createBackupPlanTool(adapter: PostgresAdapter): ToolDefinition {
             frequency: z.enum(['hourly', 'daily', 'weekly']).optional(),
             retention: z.number().optional()
         }),
+        annotations: readOnly('Create Backup Plan'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { frequency?: string; retention?: number });
             const freq = parsed.frequency ?? 'daily';
             const retention = parsed.retention ?? 7;
 
-            // Get database size for estimation
             const sizeResult = await adapter.executeQuery(
                 `SELECT pg_database_size(current_database()) as bytes`
             );
@@ -294,6 +292,7 @@ function createRestoreCommandTool(_adapter: PostgresAdapter): ToolDefinition {
             dataOnly: z.boolean().optional(),
             schemaOnly: z.boolean().optional()
         }),
+        annotations: readOnly('Restore Command'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
@@ -342,6 +341,7 @@ function createPhysicalBackupTool(_adapter: PostgresAdapter): ToolDefinition {
             checkpoint: z.enum(['fast', 'spread']).optional().describe('Checkpoint mode'),
             compress: z.number().optional().describe('Compression level 0-9')
         }),
+        annotations: readOnly('Physical Backup'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
@@ -353,10 +353,10 @@ function createPhysicalBackupTool(_adapter: PostgresAdapter): ToolDefinition {
 
             let command = 'pg_basebackup';
             command += ` -D "${parsed.targetDir}"`;
-            command += ` -Ft`; // tar format by default
+            command += ` -Ft`;
             if (parsed.format === 'plain') command = command.replace('-Ft', '-Fp');
-            command += ' -Xs'; // stream WAL during backup
-            command += ' -P'; // progress reporting
+            command += ' -Xs';
+            command += ' -P';
 
             if (parsed.checkpoint === 'fast') {
                 command += ' -c fast';
@@ -398,6 +398,7 @@ function createRestoreValidateTool(_adapter: PostgresAdapter): ToolDefinition {
             backupFile: z.string().describe('Path to backup file'),
             backupType: z.enum(['pg_dump', 'pg_basebackup']).optional()
         }),
+        annotations: readOnly('Restore Validate'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { backupFile: string; backupType?: string });
@@ -472,8 +473,8 @@ function createBackupScheduleOptimizeTool(adapter: PostgresAdapter): ToolDefinit
         description: 'Analyze database activity patterns and recommend optimal backup schedule.',
         group: 'backup',
         inputSchema: z.object({}),
+        annotations: readOnly('Backup Schedule Optimize'),
         handler: async (_params: unknown, _context: RequestContext) => {
-            // Analyze database activity
             const [dbSize, changeRate, connActivity] = await Promise.all([
                 adapter.executeQuery(`
                     SELECT 
@@ -502,12 +503,11 @@ function createBackupScheduleOptimizeTool(adapter: PostgresAdapter): ToolDefinit
             const totalRows = Number(changeRate.rows?.[0]?.['total_rows'] ?? 1);
             const changePercent = (totalChanges / Math.max(totalRows, 1)) * 100;
 
-            // Determine backup strategy based on data
             let strategy: string;
             let fullBackupFrequency: string;
             let incrementalFrequency: string;
 
-            if (sizeBytes > 100 * 1024 * 1024 * 1024) { // > 100GB
+            if (sizeBytes > 100 * 1024 * 1024 * 1024) {
                 strategy = 'Large database - use incremental/WAL-based backups';
                 fullBackupFrequency = 'Weekly';
                 incrementalFrequency = 'Continuous WAL archiving';
@@ -547,4 +547,3 @@ function createBackupScheduleOptimizeTool(adapter: PostgresAdapter): ToolDefinit
         }
     };
 }
-

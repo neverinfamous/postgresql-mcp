@@ -2,12 +2,13 @@
  * PostgreSQL Performance Tools
  * 
  * Query analysis, statistics, and performance monitoring.
- * 12 tools total.
+ * 16 tools total.
  */
 
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly } from '../../../utils/annotations.js';
 import { ExplainSchema, IndexStatsSchema, TableStatsSchema } from '../types.js';
 
 /**
@@ -40,6 +41,7 @@ function createExplainTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Show query execution plan without running the query.',
         group: 'performance',
         inputSchema: ExplainSchema,
+        annotations: readOnly('Explain Query'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { sql, format } = ExplainSchema.parse(params);
             const fmt = format ?? 'text';
@@ -60,6 +62,7 @@ function createExplainAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Run query and show actual execution plan with timing.',
         group: 'performance',
         inputSchema: ExplainSchema,
+        annotations: readOnly('Explain Analyze'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { sql, format } = ExplainSchema.parse(params);
             const fmt = format ?? 'text';
@@ -80,6 +83,7 @@ function createExplainBuffersTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Show query plan with buffer usage statistics.',
         group: 'performance',
         inputSchema: ExplainSchema,
+        annotations: readOnly('Explain Buffers'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { sql, format } = ExplainSchema.parse(params);
             const fmt = format ?? 'json';
@@ -100,6 +104,7 @@ function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get index usage statistics.',
         group: 'performance',
         inputSchema: IndexStatsSchema,
+        annotations: readOnly('Index Stats'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, schema } = IndexStatsSchema.parse(params);
             let whereClause = "schemaname NOT IN ('pg_catalog', 'information_schema')";
@@ -125,6 +130,7 @@ function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get table access statistics.',
         group: 'performance',
         inputSchema: TableStatsSchema,
+        annotations: readOnly('Table Stats'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, schema } = TableStatsSchema.parse(params);
             let whereClause = "schemaname NOT IN ('pg_catalog', 'information_schema')";
@@ -155,6 +161,7 @@ function createStatStatementsTool(adapter: PostgresAdapter): ToolDefinition {
             limit: z.number().optional(),
             orderBy: z.enum(['total_time', 'calls', 'mean_time', 'rows']).optional()
         }),
+        annotations: readOnly('Query Statistics'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { limit?: number; orderBy?: string });
             const limit = parsed.limit ?? 20;
@@ -181,6 +188,7 @@ function createStatActivityTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             includeIdle: z.boolean().optional()
         }),
+        annotations: readOnly('Activity Stats'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { includeIdle?: boolean });
             const idleClause = parsed.includeIdle ? '' : "AND state != 'idle'";
@@ -207,6 +215,7 @@ function createLocksTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             showBlocked: z.boolean().optional()
         }),
+        annotations: readOnly('Lock Information'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { showBlocked?: boolean });
 
@@ -244,6 +253,7 @@ function createBloatCheckTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             schema: z.string().optional()
         }),
+        annotations: readOnly('Bloat Check'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { schema?: string });
             const schemaClause = parsed.schema ? `AND schemaname = '${parsed.schema}'` : '';
@@ -269,6 +279,7 @@ function createCacheHitRatioTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get buffer cache hit ratio statistics.',
         group: 'performance',
         inputSchema: z.object({}),
+        annotations: readOnly('Cache Hit Ratio'),
         handler: async (_params: unknown, _context: RequestContext) => {
             const sql = `SELECT 
                         sum(heap_blks_read) as heap_read,
@@ -292,6 +303,7 @@ function createSeqScanTablesTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             minScans: z.number().optional()
         }),
+        annotations: readOnly('Sequential Scan Tables'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { minScans?: number });
             const minScans = parsed.minScans ?? 100;
@@ -318,11 +330,11 @@ function createIndexRecommendationsTool(adapter: PostgresAdapter): ToolDefinitio
         inputSchema: z.object({
             table: z.string().optional()
         }),
+        annotations: readOnly('Index Recommendations'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table?: string });
             const tableClause = parsed.table ? `AND relname = '${parsed.table}'` : '';
 
-            // Find tables with high seq_scan and low idx_scan
             const sql = `SELECT schemaname, relname as table_name,
                         seq_scan, idx_scan,
                         n_live_tup as row_count,
@@ -356,6 +368,7 @@ function createQueryPlanCompareTool(adapter: PostgresAdapter): ToolDefinition {
             query2: z.string().describe('Second SQL query'),
             analyze: z.boolean().optional().describe('Run EXPLAIN ANALYZE (executes queries)')
         }),
+        annotations: readOnly('Query Plan Compare'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { query1: string; query2: string; analyze?: boolean });
             const explainType = parsed.analyze ? 'EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)' : 'EXPLAIN (FORMAT JSON)';
@@ -397,7 +410,6 @@ function createQueryPlanCompareTool(adapter: PostgresAdapter): ToolDefinition {
                 fullPlans: { plan1, plan2 }
             };
 
-            // Add recommendation
             if (comparison.analysis.costDifference !== null) {
                 if (comparison.analysis.costDifference > 0) {
                     comparison.analysis.recommendation = 'Query 2 has lower estimated cost';
@@ -424,11 +436,11 @@ function createPerformanceBaselineTool(adapter: PostgresAdapter): ToolDefinition
         inputSchema: z.object({
             name: z.string().optional().describe('Baseline name for reference')
         }),
+        annotations: readOnly('Performance Baseline'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { name?: string });
             const baselineName = parsed.name ?? `baseline_${new Date().toISOString()}`;
 
-            // Gather comprehensive performance metrics
             const [cacheHit, tableStats, indexStats, connections, dbSize] = await Promise.all([
                 adapter.executeQuery(`
                     SELECT 
@@ -489,8 +501,8 @@ function createConnectionPoolOptimizeTool(adapter: PostgresAdapter): ToolDefinit
         description: 'Analyze connection usage and provide pool optimization recommendations.',
         group: 'performance',
         inputSchema: z.object({}),
+        annotations: readOnly('Connection Pool Optimize'),
         handler: async (_params: unknown, _context: RequestContext) => {
-            // Get connection statistics
             const [connStats, settings, waitEvents] = await Promise.all([
                 adapter.executeQuery(`
                     SELECT 
@@ -570,11 +582,11 @@ function createPartitionStrategySuggestTool(adapter: PostgresAdapter): ToolDefin
             table: z.string().describe('Table to analyze'),
             schema: z.string().optional().describe('Schema name')
         }),
+        annotations: readOnly('Partition Strategy Suggest'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; schema?: string });
             const schemaName = parsed.schema ?? 'public';
 
-            // Get table info
             const [tableInfo, columnInfo, tableSize] = await Promise.all([
                 adapter.executeQuery(`
                     SELECT 
@@ -612,14 +624,12 @@ function createPartitionStrategySuggestTool(adapter: PostgresAdapter): ToolDefin
 
             const suggestions: { strategy: string; column: string; reason: string }[] = [];
 
-            // Analyze columns for partitioning candidates
             if (columns) {
                 for (const col of columns) {
                     const colName = col['column_name'] as string;
                     const dataType = col['data_type'] as string;
                     const nDistinct = col['n_distinct'] as number;
 
-                    // Date/timestamp columns are good for range partitioning
                     if (['date', 'timestamp', 'timestamptz'].includes(dataType)) {
                         suggestions.push({
                             strategy: 'RANGE',
@@ -628,7 +638,6 @@ function createPartitionStrategySuggestTool(adapter: PostgresAdapter): ToolDefin
                         });
                     }
 
-                    // Low cardinality columns good for LIST partitioning
                     if (nDistinct > 0 && nDistinct < 20) {
                         suggestions.push({
                             strategy: 'LIST',
@@ -637,7 +646,6 @@ function createPartitionStrategySuggestTool(adapter: PostgresAdapter): ToolDefin
                         });
                     }
 
-                    // High cardinality integer columns good for HASH
                     if (['int4', 'int8', 'integer', 'bigint'].includes(dataType) && (nDistinct < 0 || nDistinct > 100)) {
                         suggestions.push({
                             strategy: 'HASH',
@@ -648,7 +656,6 @@ function createPartitionStrategySuggestTool(adapter: PostgresAdapter): ToolDefin
                 }
             }
 
-            // General recommendations
             const rowCount = Number(table?.['n_live_tup'] ?? 0);
             const sizeBytes = Number(size?.['size_bytes'] ?? 0);
 
@@ -669,10 +676,9 @@ function createPartitionStrategySuggestTool(adapter: PostgresAdapter): ToolDefin
                 tableSize: size,
                 partitioningRecommended,
                 reason,
-                suggestions: suggestions.slice(0, 5), // Top 5 suggestions
+                suggestions: suggestions.slice(0, 5),
                 note: 'Consider your query patterns when choosing partition key. Range partitioning on date columns is most common.'
             };
         }
     };
 }
-

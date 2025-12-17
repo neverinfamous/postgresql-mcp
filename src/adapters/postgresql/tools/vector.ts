@@ -8,6 +8,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write } from '../../../utils/annotations.js';
 import { VectorSearchSchema, VectorCreateIndexSchema } from '../types.js';
 
 /**
@@ -23,7 +24,6 @@ export function getVectorTools(adapter: PostgresAdapter): ToolDefinition[] {
         createVectorDistanceTool(adapter),
         createVectorNormalizeTool(),
         createVectorAggregateTool(adapter),
-        // New advanced tools from old server
         createVectorClusterTool(adapter),
         createVectorIndexOptimizeTool(adapter),
         createHybridSearchTool(adapter),
@@ -39,6 +39,7 @@ function createVectorExtensionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Enable the pgvector extension for vector similarity search.',
         group: 'vector',
         inputSchema: z.object({}),
+        annotations: write('Create Vector Extension'),
         handler: async (_params: unknown, _context: RequestContext) => {
             await adapter.executeQuery('CREATE EXTENSION IF NOT EXISTS vector');
             return { success: true, message: 'pgvector extension enabled' };
@@ -57,6 +58,7 @@ function createVectorAddColumnTool(adapter: PostgresAdapter): ToolDefinition {
             dimensions: z.number().describe('Vector dimensions (e.g., 1536 for OpenAI)'),
             schema: z.string().optional()
         }),
+        annotations: write('Add Vector Column'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; dimensions: number; schema?: string });
             const tableName = parsed.schema ? `"${parsed.schema}"."${parsed.table}"` : `"${parsed.table}"`;
@@ -80,6 +82,7 @@ function createVectorInsertTool(adapter: PostgresAdapter): ToolDefinition {
             additionalColumns: z.record(z.string(), z.unknown()).optional(),
             schema: z.string().optional()
         }),
+        annotations: write('Insert Vector'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
                 table: string;
@@ -118,6 +121,7 @@ function createVectorSearchTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Search for similar vectors using L2, cosine, or inner product distance.',
         group: 'vector',
         inputSchema: VectorSearchSchema,
+        annotations: readOnly('Vector Search'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, vector, metric, limit, select, where } = VectorSearchSchema.parse(params);
 
@@ -156,6 +160,7 @@ function createVectorCreateIndexTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Create an IVFFlat or HNSW index for vector similarity search.',
         group: 'vector',
         inputSchema: VectorCreateIndexSchema,
+        annotations: write('Create Vector Index'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, type, lists, m, efConstruction } = VectorCreateIndexSchema.parse(params);
 
@@ -188,6 +193,7 @@ function createVectorDistanceTool(adapter: PostgresAdapter): ToolDefinition {
             vector2: z.array(z.number()),
             metric: z.enum(['l2', 'cosine', 'inner_product']).optional()
         }),
+        annotations: readOnly('Vector Distance'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { vector1: number[]; vector2: number[]; metric?: string });
             const v1 = `[${parsed.vector1.join(',')}]`;
@@ -215,11 +221,11 @@ function createVectorNormalizeTool(): ToolDefinition {
         inputSchema: z.object({
             vector: z.array(z.number())
         }),
+        annotations: readOnly('Normalize Vector'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { vector: number[] });
 
-            // Calculate magnitude and divide
             const magnitude = Math.sqrt(parsed.vector.reduce((sum, x) => sum + x * x, 0));
             const normalized = parsed.vector.map(x => x / magnitude);
 
@@ -238,6 +244,7 @@ function createVectorAggregateTool(adapter: PostgresAdapter): ToolDefinition {
             column: z.string(),
             where: z.string().optional()
         }),
+        annotations: readOnly('Vector Aggregate'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; where?: string });
             const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
@@ -252,7 +259,7 @@ function createVectorAggregateTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 // =============================================================================
-// Advanced Vector Tools (ported from old server)
+// Advanced Vector Tools
 // =============================================================================
 
 /**
@@ -270,6 +277,7 @@ function createVectorClusterTool(adapter: PostgresAdapter): ToolDefinition {
             iterations: z.number().optional().describe('Max iterations (default: 10)'),
             sampleSize: z.number().optional().describe('Sample size for large tables')
         }),
+        annotations: readOnly('Vector Cluster'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
                 table: string;
@@ -281,7 +289,6 @@ function createVectorClusterTool(adapter: PostgresAdapter): ToolDefinition {
             const maxIter = parsed.iterations ?? 10;
             const sample = parsed.sampleSize ?? 10000;
 
-            // Get sample vectors
             const sampleSql = `
                 SELECT "${parsed.column}" as vec 
                 FROM "${parsed.table}" 
@@ -296,10 +303,8 @@ function createVectorClusterTool(adapter: PostgresAdapter): ToolDefinition {
                 return { error: `Not enough vectors (${String(vectors.length)}) for ${String(parsed.k)} clusters` };
             }
 
-            // Initialize centroids randomly from sample
             const initialCentroids = vectors.slice(0, parsed.k).map(v => v.vec);
 
-            // Run k-means using PostgreSQL
             const clusterSql = `
                 WITH sample_vectors AS (
                     SELECT ROW_NUMBER() OVER () as id, "${parsed.column}" as vec
@@ -329,7 +334,7 @@ function createVectorClusterTool(adapter: PostgresAdapter): ToolDefinition {
                     const result = await adapter.executeQuery(clusterSql, [centroids]);
                     centroids = (result.rows ?? []).map((r: Record<string, unknown>) => r['new_centroid'] as string);
                 } catch {
-                    break; // Stop if query fails
+                    break;
                 }
             }
 
@@ -356,10 +361,10 @@ function createVectorIndexOptimizeTool(adapter: PostgresAdapter): ToolDefinition
             table: z.string().describe('Table name'),
             column: z.string().describe('Vector column')
         }),
+        annotations: readOnly('Vector Index Optimize'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string });
 
-            // Get table stats
             const statsSql = `
                 SELECT 
                     reltuples::bigint as estimated_rows,
@@ -369,7 +374,6 @@ function createVectorIndexOptimizeTool(adapter: PostgresAdapter): ToolDefinition
             const statsResult = await adapter.executeQuery(statsSql, [parsed.table]);
             const stats = (statsResult.rows?.[0] ?? {}) as { estimated_rows: number; table_size: string };
 
-            // Get vector dimensions
             const dimSql = `
                 SELECT vector_dims("${parsed.column}") as dimensions
                 FROM "${parsed.table}"
@@ -379,7 +383,6 @@ function createVectorIndexOptimizeTool(adapter: PostgresAdapter): ToolDefinition
             const dimResult = await adapter.executeQuery(dimSql);
             const dimensions = (dimResult.rows?.[0] as { dimensions: number } | undefined)?.dimensions;
 
-            // Get existing indexes
             const indexSql = `
                 SELECT indexname, indexdef
                 FROM pg_indexes
@@ -388,7 +391,6 @@ function createVectorIndexOptimizeTool(adapter: PostgresAdapter): ToolDefinition
             `;
             const indexResult = await adapter.executeQuery(indexSql, [parsed.table]);
 
-            // Calculate recommendations
             const rows = stats.estimated_rows ?? 0;
             const recommendations = [];
 
@@ -447,6 +449,7 @@ function createHybridSearchTool(adapter: PostgresAdapter): ToolDefinition {
             vectorWeight: z.number().optional().describe('Weight for vector score (0-1, default: 0.5)'),
             limit: z.number().optional().describe('Max results')
         }),
+        annotations: readOnly('Hybrid Search'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as {
                 table: string;
@@ -518,10 +521,10 @@ function createVectorPerformanceTool(adapter: PostgresAdapter): ToolDefinition {
             column: z.string().describe('Vector column'),
             testVector: z.array(z.number()).optional().describe('Test vector for benchmarking')
         }),
+        annotations: readOnly('Vector Performance'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; testVector?: number[] });
 
-            // Get index info
             const indexSql = `
                 SELECT 
                     i.indexname,
@@ -536,7 +539,6 @@ function createVectorPerformanceTool(adapter: PostgresAdapter): ToolDefinition {
             `;
             const indexResult = await adapter.executeQuery(indexSql, [parsed.table]);
 
-            // Get table stats
             const statsSql = `
                 SELECT 
                     reltuples::bigint as estimated_rows,
@@ -545,7 +547,6 @@ function createVectorPerformanceTool(adapter: PostgresAdapter): ToolDefinition {
             `;
             const statsResult = await adapter.executeQuery(statsSql, [parsed.table]);
 
-            // Benchmark if test vector provided
             let benchmark = null;
             if (parsed.testVector) {
                 const vectorStr = `[${parsed.testVector.join(',')}]`;
@@ -586,6 +587,7 @@ function createVectorDimensionReduceTool(_adapter: PostgresAdapter): ToolDefinit
             targetDimensions: z.number().describe('Target number of dimensions'),
             seed: z.number().optional().describe('Random seed for reproducibility')
         }),
+        annotations: readOnly('Vector Dimension Reduce'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { vector: number[]; targetDimensions: number; seed?: number });
@@ -600,14 +602,12 @@ function createVectorDimensionReduceTool(_adapter: PostgresAdapter): ToolDefinit
                 };
             }
 
-            // Simple random projection using seeded random
             const seed = parsed.seed ?? 42;
             const seededRandom = (s: number): number => {
                 const x = Math.sin(s) * 10000;
                 return x - Math.floor(x);
             };
 
-            // Generate random projection matrix
             const reduced: number[] = [];
             const scaleFactor = Math.sqrt(originalDim / targetDim);
 
@@ -644,13 +644,12 @@ function createVectorEmbedTool(): ToolDefinition {
             text: z.string().describe('Text to embed'),
             dimensions: z.number().optional().describe('Vector dimensions (default: 384)')
         }),
+        annotations: readOnly('Vector Embed'),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { text: string; dimensions?: number });
             const dims = parsed.dimensions ?? 384;
 
-            // Generate deterministic pseudo-embedding from text
-            // This is NOT a real embedding - just for testing/demos
             const vector: number[] = [];
 
             for (let i = 0; i < dims; i++) {
@@ -658,11 +657,9 @@ function createVectorEmbedTool(): ToolDefinition {
                 for (let j = 0; j < parsed.text.length; j++) {
                     hash = ((hash << 5) - hash + parsed.text.charCodeAt(j) + i) | 0;
                 }
-                // Normalize to [-1, 1] range
                 vector.push(Math.sin(hash) * 0.5);
             }
 
-            // Normalize vector
             const magnitude = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
             const normalized = vector.map(x => x / magnitude);
 
@@ -675,4 +672,3 @@ function createVectorEmbedTool(): ToolDefinition {
         }
     };
 }
-

@@ -11,6 +11,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write, destructive } from '../../../utils/annotations.js';
 import {
     PartmanCreateParentSchema,
     PartmanRunMaintenanceSchema,
@@ -48,6 +49,7 @@ function createPartmanExtensionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Enable the pg_partman extension for automated partition management. Requires superuser privileges.',
         group: 'partman',
         inputSchema: z.object({}),
+        annotations: write('Create Partman Extension'),
         handler: async (_params: unknown, _context: RequestContext) => {
             await adapter.executeQuery('CREATE EXTENSION IF NOT EXISTS pg_partman');
             return { success: true, message: 'pg_partman extension enabled' };
@@ -66,6 +68,7 @@ Supports time-based and integer-based partitioning with automatic child partitio
 The parent table must already exist before calling this function.`,
         group: 'partman',
         inputSchema: PartmanCreateParentSchema,
+        annotations: write('Create Partition Parent'),
         handler: async (params: unknown, _context: RequestContext) => {
             const {
                 parentTable,
@@ -78,7 +81,6 @@ The parent table must already exist before calling this function.`,
                 defaultPartition
             } = PartmanCreateParentSchema.parse(params);
 
-            // Build the function call with named parameters
             const args: string[] = [
                 `p_parent_table := '${parentTable}'`,
                 `p_control := '${controlColumn}'`,
@@ -128,6 +130,7 @@ Should be executed regularly (e.g., via pg_cron) to keep partitions current.
 Maintains all partition sets if no specific parent table is specified.`,
         group: 'partman',
         inputSchema: PartmanRunMaintenanceSchema,
+        annotations: write('Run Partition Maintenance'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parentTable, analyze } = PartmanRunMaintenanceSchema.parse(params);
 
@@ -166,13 +169,13 @@ function createPartmanShowPartitionsTool(adapter: PostgresAdapter): ToolDefiniti
         description: 'List all child partitions for a partition set managed by pg_partman.',
         group: 'partman',
         inputSchema: PartmanShowPartitionsSchema,
+        annotations: readOnly('Show Partman Partitions'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parentTable, includeDefault, order } = PartmanShowPartitionsSchema.parse(params);
 
             const orderDir = order === 'desc' ? 'DESC' : 'ASC';
             const includeDefaultVal = includeDefault ?? false;
 
-            // Use show_partitions function
             const sql = `
                 SELECT * FROM partman.show_partitions(
                     p_parent_table := '${parentTable}',
@@ -203,6 +206,7 @@ function createPartmanShowConfigTool(adapter: PostgresAdapter): ToolDefinition {
         inputSchema: z.object({
             parentTable: z.string().optional().describe('Parent table name (all configs if omitted)')
         }),
+        annotations: readOnly('Show Partman Config'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = params as { parentTable?: string };
 
@@ -251,10 +255,10 @@ function createPartmanCheckDefaultTool(adapter: PostgresAdapter): ToolDefinition
 Data in default indicates partitions may be missing for certain time/value ranges.`,
         group: 'partman',
         inputSchema: PartmanCheckDefaultSchema,
+        annotations: readOnly('Check Partman Default'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parentTable } = PartmanCheckDefaultSchema.parse(params);
 
-            // Get default partition info and row count
             const sql = `
                 SELECT 
                     c.relname as default_partition,
@@ -306,6 +310,7 @@ function createPartmanPartitionDataTool(adapter: PostgresAdapter): ToolDefinitio
 Creates new partitions if needed for the data being moved.`,
         group: 'partman',
         inputSchema: PartmanPartitionDataSchema,
+        annotations: write('Partition Data'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parentTable, batchSize, lockWaitSeconds } = PartmanPartitionDataSchema.parse(params);
 
@@ -320,8 +325,6 @@ Creates new partitions if needed for the data being moved.`,
                 args.push(`p_lock_wait := ${String(lockWaitSeconds)}`);
             }
 
-            // Use partition_data_time or partition_data_id based on control type
-            // First check the control type
             const configResult = await adapter.executeQuery(`
                 SELECT control, epoch 
                 FROM partman.part_config 
@@ -336,7 +339,6 @@ Creates new partitions if needed for the data being moved.`,
                 };
             }
 
-            // Run the appropriate partition_data function
             const sql = `SELECT partman.partition_data_proc(${args.join(', ')})`;
             const result = await adapter.executeQuery(sql);
             const rowsMoved = result.rows?.[0]?.['partition_data_proc'] as number ?? 0;
@@ -363,6 +365,7 @@ function createPartmanSetRetentionTool(adapter: PostgresAdapter): ToolDefinition
 Partitions older than the retention period will be dropped or detached during maintenance.`,
         group: 'partman',
         inputSchema: PartmanRetentionSchema,
+        annotations: write('Set Partition Retention'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parentTable, retention, retentionKeepTable } = PartmanRetentionSchema.parse(params);
 
@@ -407,6 +410,7 @@ function createPartmanUndoPartitionTool(adapter: PostgresAdapter): ToolDefinitio
 from child partitions to the parent (or a target table) and removing partition configuration.`,
         group: 'partman',
         inputSchema: PartmanUndoPartitionSchema,
+        annotations: destructive('Undo Partitioning'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parentTable, targetTable, batchSize, keepTable } =
                 PartmanUndoPartitionSchema.parse(params);
@@ -453,10 +457,10 @@ stale maintenance, and retention configuration.`,
         inputSchema: z.object({
             parentTable: z.string().optional().describe('Specific parent table to analyze (all if omitted)')
         }),
+        annotations: readOnly('Analyze Partition Health'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = params as { parentTable?: string };
 
-            // Get all partition configs
             let configSql = `
                 SELECT 
                     parent_table,
@@ -494,7 +498,6 @@ stale maintenance, and retention configuration.`,
                 const warnings: string[] = [];
                 const recommendations: string[] = [];
 
-                // Check partition count
                 const partCountResult = await adapter.executeQuery(`
                     SELECT COUNT(*) as count 
                     FROM partman.show_partitions(p_parent_table := $1)
@@ -507,7 +510,6 @@ stale maintenance, and retention configuration.`,
                     recommendations.push('Run pg_partman_run_maintenance to create premake partitions');
                 }
 
-                // Check for data in default
                 const defaultCheckResult = await adapter.executeQuery(`
                     SELECT c.reltuples::bigint as rows
                     FROM pg_inherits i
@@ -526,14 +528,12 @@ stale maintenance, and retention configuration.`,
                     recommendations.push('Run pg_partman_partition_data to move data to child partitions');
                 }
 
-                // Check retention configuration
                 const retention = config['retention'] as string | null;
                 if (!retention) {
                     warnings.push('No retention policy configured');
                     recommendations.push('Consider setting retention with pg_partman_set_retention');
                 }
 
-                // Check automatic maintenance
                 const autoMaint = config['automatic_maintenance'] as string;
                 if (autoMaint !== 'on') {
                     warnings.push('Automatic maintenance is not enabled');

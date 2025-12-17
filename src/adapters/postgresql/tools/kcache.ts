@@ -15,6 +15,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write, destructive } from '../../../utils/annotations.js';
 import {
     KcacheQueryStatsSchema,
     KcacheDatabaseStatsSchema,
@@ -46,8 +47,8 @@ function createKcacheExtensionTool(adapter: PostgresAdapter): ToolDefinition {
 Requires pg_stat_statements to be installed first. Both extensions must be in shared_preload_libraries.`,
         group: 'kcache',
         inputSchema: z.object({}),
+        annotations: write('Create Kcache Extension'),
         handler: async (_params: unknown, _context: RequestContext) => {
-            // Check if pg_stat_statements is installed first
             const statementsCheck = await adapter.executeQuery(`
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'
@@ -83,6 +84,7 @@ function createKcacheQueryStatsTool(adapter: PostgresAdapter): ToolDefinition {
 Joins pg_stat_statements with pg_stat_kcache to show what SQL did AND what system resources it consumed.`,
         group: 'kcache',
         inputSchema: KcacheQueryStatsSchema,
+        annotations: readOnly('Kcache Query Stats'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { limit, orderBy, minCalls } = KcacheQueryStatsSchema.parse(params);
 
@@ -156,6 +158,7 @@ in user CPU (application code) vs system CPU (kernel operations).`,
         inputSchema: z.object({
             limit: z.number().optional().describe('Number of top queries to return (default: 10)')
         }),
+        annotations: readOnly('Kcache Top CPU'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = params as { limit?: number };
             const limitVal = parsed.limit ?? 10;
@@ -213,6 +216,7 @@ which represent actual disk access (not just shared buffer hits).`,
                 .describe('I/O type to rank by (default: both)'),
             limit: z.number().optional().describe('Number of top queries to return (default: 10)')
         }),
+        annotations: readOnly('Kcache Top IO'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = params as { type?: 'reads' | 'writes' | 'both'; limit?: number };
             const ioType = parsed.type ?? 'both';
@@ -268,6 +272,7 @@ function createKcacheDatabaseStatsTool(adapter: PostgresAdapter): ToolDefinition
 Shows total CPU time, I/O, and page faults across all queries.`,
         group: 'kcache',
         inputSchema: KcacheDatabaseStatsSchema,
+        annotations: readOnly('Kcache Database Stats'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { database } = KcacheDatabaseStatsSchema.parse(params);
 
@@ -334,6 +339,7 @@ function createKcacheResourceAnalysisTool(adapter: PostgresAdapter): ToolDefinit
 Helps identify the root cause of performance issues - is the query computation-heavy or disk-heavy?`,
         group: 'kcache',
         inputSchema: KcacheResourceAnalysisSchema,
+        annotations: readOnly('Kcache Resource Analysis'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { queryId, threshold } = KcacheResourceAnalysisSchema.parse(params);
             const thresholdVal = threshold ?? 0.5;
@@ -347,7 +353,6 @@ Helps identify the root cause of performance issues - is the query computation-h
                 queryParams.push(queryId);
             }
 
-            // Only analyze queries with meaningful resource usage
             conditions.push('(k.user_time + k.system_time + k.reads + k.writes) > 0');
 
             const whereClause = conditions.length > 0
@@ -404,7 +409,6 @@ Helps identify the root cause of performance issues - is the query computation-h
             const result = await adapter.executeQuery(sql, queryParams);
             const rows = result.rows ?? [];
 
-            // Compute summary
             const cpuBound = rows.filter((r: Record<string, unknown>) =>
                 r['resource_classification'] === 'CPU-bound').length;
             const ioBound = rows.filter((r: Record<string, unknown>) =>
@@ -443,6 +447,7 @@ function createKcacheResetTool(adapter: PostgresAdapter): ToolDefinition {
 Note: This also resets pg_stat_statements statistics.`,
         group: 'kcache',
         inputSchema: z.object({}),
+        annotations: destructive('Reset Kcache Stats'),
         handler: async (_params: unknown, _context: RequestContext) => {
             await adapter.executeQuery('SELECT pg_stat_kcache_reset()');
             return {

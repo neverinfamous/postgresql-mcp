@@ -8,6 +8,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly, write, destructive } from '../../../utils/annotations.js';
 import {
     CreatePartitionedTableSchema,
     CreatePartitionSchema,
@@ -38,6 +39,7 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
             table: z.string(),
             schema: z.string().optional()
         }),
+        annotations: readOnly('List Partitions'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; schema?: string });
             const schemaName = parsed.schema ?? 'public';
@@ -65,6 +67,7 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Create a partitioned table with RANGE, LIST, or HASH partitioning.',
         group: 'partitioning',
         inputSchema: CreatePartitionedTableSchema,
+        annotations: write('Create Partitioned Table'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { name, schema, columns, partitionBy, partitionKey } = CreatePartitionedTableSchema.parse(params);
 
@@ -92,6 +95,7 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Create a new partition for a partitioned table.',
         group: 'partitioning',
         inputSchema: CreatePartitionSchema,
+        annotations: write('Create Partition'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parent, name, schema, forValues } = CreatePartitionSchema.parse(params);
 
@@ -112,6 +116,7 @@ function createAttachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Attach an existing table as a partition.',
         group: 'partitioning',
         inputSchema: AttachPartitionSchema,
+        annotations: write('Attach Partition'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parent, partition, forValues } = AttachPartitionSchema.parse(params);
 
@@ -129,6 +134,7 @@ function createDetachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Detach a partition from a partitioned table.',
         group: 'partitioning',
         inputSchema: DetachPartitionSchema,
+        annotations: destructive('Detach Partition'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { parent, partition, concurrently } = DetachPartitionSchema.parse(params);
 
@@ -150,11 +156,11 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
             table: z.string(),
             schema: z.string().optional()
         }),
+        annotations: readOnly('Partition Info'),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; schema?: string });
             const schemaName = parsed.schema ?? 'public';
 
-            // Get partition strategy
             const partInfoSql = `SELECT 
                         c.relname as table_name,
                         CASE pt.partstrat 
@@ -171,7 +177,6 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
 
             const partInfo = await adapter.executeQuery(partInfoSql, [parsed.table, schemaName]);
 
-            // Get partitions with sizes
             const partitionsSql = `SELECT 
                         c.relname as partition_name,
                         pg_get_expr(c.relpartbound, c.oid) as bounds,

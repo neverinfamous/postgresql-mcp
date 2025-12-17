@@ -182,6 +182,8 @@ export abstract class DatabaseAdapter {
             tool.description,
             // eslint-disable-next-line @typescript-eslint/no-deprecated
             zodShape as Parameters<typeof server.tool>[2],
+            // Pass annotations if present (SDK 1.25+)
+            tool.annotations ?? {},
             async (params: unknown) => {
                 const context = this.createContext();
                 const result = await tool.handler(params, context);

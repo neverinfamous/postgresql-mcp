@@ -8,6 +8,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
+import { readOnly } from '../../../utils/annotations.js';
 
 // =============================================================================
 // Statistics Schemas
@@ -112,6 +113,7 @@ function createStatsDescriptiveTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Calculate descriptive statistics (count, min, max, avg, stddev, variance, sum) for a numeric column.',
         group: 'stats',
         inputSchema: StatsDescriptiveSchema,
+        annotations: readOnly('Descriptive Statistics'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, schema, where } = StatsDescriptiveSchema.parse(params);
 
@@ -173,6 +175,7 @@ function createStatsPercentilesTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Calculate percentiles (quartiles, custom percentiles) for a numeric column.',
         group: 'stats',
         inputSchema: StatsPercentilesSchema,
+        annotations: readOnly('Percentiles'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, percentiles, schema, where } = StatsPercentilesSchema.parse(params);
 
@@ -218,6 +221,7 @@ function createStatsCorrelationTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Calculate Pearson correlation coefficient between two numeric columns.',
         group: 'stats',
         inputSchema: StatsCorrelationSchema,
+        annotations: readOnly('Correlation Analysis'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column1, column2, schema, where } = StatsCorrelationSchema.parse(params);
 
@@ -279,6 +283,7 @@ function createStatsRegressionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Perform linear regression analysis (y = mx + b) between two columns.',
         group: 'stats',
         inputSchema: StatsRegressionSchema,
+        annotations: readOnly('Linear Regression'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, xColumn, yColumn, schema, where } = StatsRegressionSchema.parse(params);
 
@@ -349,6 +354,7 @@ function createStatsTimeSeriesTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Aggregate data into time buckets for time series analysis.',
         group: 'stats',
         inputSchema: StatsTimeSeriesSchema,
+        annotations: readOnly('Time Series Analysis'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, valueColumn, timeColumn, interval, aggregation, schema, where, limit } =
                 StatsTimeSeriesSchema.parse(params);
@@ -397,6 +403,7 @@ function createStatsDistributionTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Analyze data distribution with histogram buckets, skewness, and kurtosis.',
         group: 'stats',
         inputSchema: StatsDistributionSchema,
+        annotations: readOnly('Distribution Analysis'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, buckets, schema, where } = StatsDistributionSchema.parse(params);
 
@@ -404,7 +411,6 @@ function createStatsDistributionTool(adapter: PostgresAdapter): ToolDefinition {
             const whereClause = where ? `WHERE ${where}` : '';
             const numBuckets = buckets ?? 10;
 
-            // First get min/max to calculate bucket width
             const rangeQuery = `
                 SELECT MIN("${column}") as min_val, MAX("${column}") as max_val
                 FROM ${schemaPrefix}"${table}" ${whereClause}
@@ -420,7 +426,6 @@ function createStatsDistributionTool(adapter: PostgresAdapter): ToolDefinition {
             const maxVal = range.max_val;
             const bucketWidth = (maxVal - minVal) / numBuckets;
 
-            // Create histogram
             const histogramQuery = `
                 SELECT 
                     WIDTH_BUCKET("${column}", ${String(minVal)}, ${String(maxVal + 0.0001)}, ${String(numBuckets)}) as bucket,
@@ -460,6 +465,7 @@ function createStatsHypothesisTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Perform one-sample t-test or z-test against a hypothesized mean.',
         group: 'stats',
         inputSchema: StatsHypothesisSchema,
+        annotations: readOnly('Hypothesis Testing'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, testType, hypothesizedMean, schema, where } =
                 StatsHypothesisSchema.parse(params);
@@ -467,7 +473,6 @@ function createStatsHypothesisTool(adapter: PostgresAdapter): ToolDefinition {
             const schemaPrefix = schema ? `"${schema}".` : '';
             const whereClause = where ? `WHERE ${where}` : '';
 
-            // Get sample statistics
             const sql = `
                 SELECT 
                     COUNT("${column}") as n,
@@ -492,14 +497,9 @@ function createStatsHypothesisTool(adapter: PostgresAdapter): ToolDefinition {
                 };
             }
 
-            // Calculate test statistic
             const standardError = stddev / Math.sqrt(n);
             const testStatistic = (sampleMean - hypothesizedMean) / standardError;
             const degreesOfFreedom = n - 1;
-
-            // For t-test, we can provide the test statistic
-            // Full p-value calculation would require t-distribution CDF
-            // which PostgreSQL doesn't have natively
 
             return {
                 table: `${schema ?? 'public'}.${table}`,
@@ -532,6 +532,7 @@ function createStatsSamplingTool(adapter: PostgresAdapter): ToolDefinition {
         description: 'Get a random sample of rows using PostgreSQL sampling methods.',
         group: 'stats',
         inputSchema: StatsSamplingSchema,
+        annotations: readOnly('Random Sampling'),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, method, sampleSize, percentage, schema, select, where } =
                 StatsSamplingSchema.parse(params);
@@ -544,7 +545,6 @@ function createStatsSamplingTool(adapter: PostgresAdapter): ToolDefinition {
             let sql: string;
 
             if (samplingMethod === 'random') {
-                // Use ORDER BY RANDOM() for simple random sampling
                 const limit = sampleSize ?? 100;
                 sql = `
                     SELECT ${columns}
@@ -554,7 +554,6 @@ function createStatsSamplingTool(adapter: PostgresAdapter): ToolDefinition {
                     LIMIT ${String(limit)}
                 `;
             } else {
-                // Use TABLESAMPLE for bernoulli or system sampling
                 const pct = percentage ?? 10;
                 sql = `
                     SELECT ${columns}

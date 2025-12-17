@@ -2,9 +2,9 @@
 
 <!-- mcp-name: io.github.neverinfamous/postgres-mcp -->
 
-*Last updated December 14, 2025 - Initial Implementation Complete*
+*Last updated December 17, 2025 - Initial Implementation Complete*
 
-*Enterprise-grade PostgreSQL MCP Server with OAuth 2.0 authentication, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
+*Enterprise-grade PostgreSQL MCP Server with OAuth 2.0 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
 
 > **✅ Initial Implementation Complete** - 194 tools, 20 resources, and 19 prompts. Thorough testing before release in progress.
 

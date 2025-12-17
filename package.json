@@ -43,7 +43,7 @@
         "node": ">=18.0.0"
     },
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.0.0",
+        "@modelcontextprotocol/sdk": "^1.25.1",
         "commander": "^14.0.0",
         "jose": "^6.0.0",
         "pg": "^8.13.0",

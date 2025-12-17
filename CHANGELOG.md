@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **@modelcontextprotocol/sdk** upgraded from 1.0.0 to 1.25.1
+  - Aligned with MCP spec 2025-11-25
+  - Enables: Streamable HTTP transport, OAuth 2.1 framework, Tasks API, tool annotations, elicitation, and JSON-RPC batching
+  - Full backwards compatibility with existing stdio transport
+
 ### Added
 - **20 resources** — migrated + new extension resources
   - `postgres://capabilities` — Server version, extensions, tool categories

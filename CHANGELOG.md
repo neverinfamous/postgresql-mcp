@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `idempotentHint` — Identifies safe-to-retry operations (IF NOT EXISTS patterns)
   - `openWorldHint` — Set to `false` for all tools (no external system interaction)
   - Centralized annotation helpers: `readOnly()`, `write()`, `destructive()`, `admin()`
-- **20 resources** — migrated + new extension resources
+- **21 resources** — migrated + new extension resources
   - `postgres://capabilities` — Server version, extensions, tool categories
   - `postgres://performance` — pg_stat_statements query metrics
   - `postgres://health` — Comprehensive database health status
@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `postgres://vector` — pgvector columns, indexes, and recommendations
   - `postgres://postgis` — PostGIS spatial columns and index status
   - `postgres://crypto` — pgcrypto availability and security recommendations
+  - `postgres://annotations` — Tool behavior hints categorized by type (read-only, write, destructive)
 - Enhanced `postgres://stats` with stale statistics detection and recommendations
 - **12 prompts** (6 migrated + 6 new extension-specific)
   - `pg_database_health_check` — Comprehensive health assessment workflow
@@ -121,7 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Restructured resources into modular files for maintainability
-- Resource count from 6 to 14
+- Resource count from 6 to 21
 - Prompt count from 7 to 13
 - Restructured prompts into modular files for maintainability
 - Tool count from 146 to 194 (added pg_cron, pg_partman, pg_stat_kcache, citext, ltree, and pgcrypto tools)

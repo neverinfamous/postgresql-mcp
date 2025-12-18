@@ -469,15 +469,31 @@ export type ToolGroup =
 /**
  * Meta-group identifiers for common multi-group selections
  * These are shortcuts that expand to multiple ToolGroups
+ * 
+ * STRICT LIMIT: All shortcuts must stay ≤50 tools
  */
 export type MetaGroup =
-    | 'starter'        // Recommended default (core, transactions, jsonb, schema) ~49 tools
+    // General Use
+    | 'starter'        // 🌟 Recommended default (core, transactions, jsonb, schema) ~49 tools
     | 'essential'      // Minimal footprint (core, transactions, jsonb) ~39 tools
-    | 'dev'            // Application development ~68 tools
-    | 'ai'             // AI/ML workloads with pgvector ~80 tools
-    | 'dba'            // Database administration ~90 tools
-    | 'base'           // All core PostgreSQL without extensions ~120 tools
-    | 'extensions';    // All extension groups ~74 tools
+    | 'dev-power'      // Power Developer (core, trans, schema, stats, part, backup) ~48 tools
+    // AI Workloads
+    | 'ai-data'        // AI Data Analyst (core, jsonb, text, transactions) ~50 tools
+    | 'ai-vector'      // AI/ML with pgvector (core, vector, trans, schema, part) ~46 tools
+    // DBA Workloads
+    | 'dba-monitor'    // DBA Monitoring (core, monitoring, performance, trans) ~47 tools
+    | 'dba-manage'     // DBA Management (core, admin, backup, part, schema) ~48 tools
+    | 'dba-stats'      // DBA Stats/Security (core, admin, monitoring, trans, stats) ~49 tools
+    // Specialty
+    | 'geo'            // Geospatial Workloads (core, postgis, transactions) ~32 tools
+    // Building Blocks
+    | 'base-core'      // Base Core (core, jsonb, transactions, schema) ~49 tools
+    | 'base-ops'       // Base Ops (admin, monitoring, backup, part, perf) ~50 tools
+    // Extension Bundles
+    | 'ext-ai'         // Extension: AI/Security (vector, pgcrypto) ~23 tools
+    | 'ext-geo'        // Extension: Spatial/Hierarchical (postgis, ltree) ~20 tools
+    | 'ext-schedule'   // Extension: Scheduling (cron, partman) ~18 tools
+    | 'ext-perf';      // Extension: Performance/Types (kcache, citext) ~13 tools
 
 /**
  * Tool filter rule

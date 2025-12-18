@@ -49,7 +49,7 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
       "args": [
         "C:/path/to/postgres-mcp/dist/cli.js",
         "--postgres", "postgres://user:password@localhost:5432/database",
-        "--tool-filter", "-base,-extensions,+starter"
+        "--tool-filter", "starter"
       ]
     }
   }
@@ -68,7 +68,7 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
       "command": "node",
       "args": [
         "C:/path/to/postgres-mcp/dist/cli.js",
-        "--tool-filter", "-base,-extensions,+starter"
+        "--tool-filter", "starter"
       ],
       "env": {
         "POSTGRES_HOST": "localhost",
@@ -81,6 +81,7 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
   }
 }
 ```
+
 
 ---
 
@@ -130,82 +131,43 @@ This server provides **194 tools** across 19 categories:
 
 ---
 
-## 🎛️ Tool Filtering
+## 🛠️ Tool Filtering
 
 > [!IMPORTANT]
-> **AI-enabled IDEs have tool limits.** With 194 tools, you MUST use tool filtering to stay within your IDE's limits.
+> **AI IDEs like Cursor have tool limits (typically 40-50 tools).** With 194 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (49 tools) as a starting point.
 
-### Quick Start: Use Shortcuts
+### What Can You Filter?
 
-The easiest way to filter tools is with **shortcuts** — predefined groups for common use cases:
+The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names** — mix and match freely:
 
-| Shortcut | Tools | Includes |
-|----------|-------|----------|
-| `starter` | **49** | **Recommended default** — queries, tables, JSONB, schema |
-| `essential` | 39 | Minimal — queries, tables, JSONB only |
-| `dev` | 68 | Development — adds text search and stats |
-| `ai` | 80 | AI/ML — adds pgvector and performance tools |
-| `dba` | 90 | Administration — monitoring, backup, maintenance |
-| `base` | 120 | Everything except extensions |
-| `extensions` | 74 | All PostgreSQL extensions |
+| Filter Pattern | Example | Tools | Description |
+|----------------|---------|-------|-------------|
+| Shortcut only | `starter` | 49 | Use a predefined bundle |
+| Groups only | `core,jsonb,transactions` | 39 | Combine individual groups |
+| Shortcut + Group | `starter,+text` | 60 | Extend a shortcut |
+| Shortcut - Tool | `starter,-pg_drop_table` | 48 | Remove specific tools |
 
-**Recommended Configuration (~49 tools)**
-```json
-{
-  "mcpServers": {
-    "postgres-mcp": {
-      "command": "node",
-      "args": [
-        "C:/path/to/postgres-mcp/dist/cli.js",
-        "--postgres", "postgres://user:pass@localhost:5432/db",
-        "--tool-filter", "-base,-extensions,+starter"
-      ]
-    }
-  }
-}
-```
+### Shortcuts (Predefined Bundles)
 
-### Need More Tools?
+| Shortcut | Tools | Use Case | What's Included |
+|----------|-------|----------|-----------------|
+| `starter` | **49** | 🌟 **Recommended** | Core, trans, JSONB, schema |
+| `essential` | 39 | Minimal footprint | Core, trans, JSONB |
+| `dev-power` | 44 | Power Developer | Core, trans, schema, stats, part |
+| `ai-data` | 50 | AI Data Analyst | Core, JSONB, text, trans |
+| `ai-vector` | 40 | AI/ML with pgvector | Core, vector, trans, part |
+| `dba-monitor` | 47 | DBA Monitoring | Core, monitoring, perf, trans |
+| `dba-manage` | 48 | DBA Management | Core, admin, backup, part, schema |
+| `dba-stats` | 49 | DBA Stats/Security | Core, admin, monitoring, trans, stats |
+| `geo` | 32 | Geospatial Workloads | Core, PostGIS, trans |
+| `base-core` | 49 | Base Building Block | Core, JSONB, trans, schema |
+| `base-ops` | 50 | Operations Block | Admin, monitoring, backup, part, stats, citext |
+| `ext-ai` | 23 | Extension: AI/Security | pgvector, pgcrypto |
+| `ext-geo` | 20 | Extension: Spatial | PostGIS, ltree |
+| `ext-schedule` | 18 | Extension: Scheduling | pg_cron, pg_partman |
+| `ext-perf` | 23 | Extension: Perf/Analysis | pg_stat_kcache, performance |
 
-Start with `starter` and add individual groups as needed:
-
-**Add text search:**
-```json
-"--tool-filter", "-base,-extensions,+starter,+text"
-```
-
-**Add performance analysis (EXPLAIN, query stats):**
-```json
-"--tool-filter", "-base,-extensions,+starter,+performance"
-```
-
-**Add admin tools (VACUUM, ANALYZE, REINDEX):**
-```json
-"--tool-filter", "-base,-extensions,+starter,+admin"
-```
-
-**Use a larger shortcut instead:**
-```json
-"--tool-filter", "-base,-extensions,+dev"
-```
-
-### How Filtering Works
-
-1. **All 194 tools start enabled** by default
-2. Use `-` to exclude, `+` to include
-3. Rules apply left-to-right, so order matters
-
-**Syntax:**
-- `-shortcut` — Exclude all tools in a shortcut
-- `+shortcut` — Include all tools in a shortcut
-- `-group` — Exclude a specific group
-- `+group` — Include a specific group
-- `-pg_tool_name` — Exclude one tool
-- `+pg_tool_name` — Include one tool
-
-### All Tool Groups (19 groups)
-
-If you need fine-grained control, use individual groups:
+### Tool Groups (19 Available)
 
 | Group | Tools | Description |
 |-------|-------|-------------|
@@ -228,6 +190,91 @@ If you need fine-grained control, use individual groups:
 | `citext` | 6 | citext (case-insensitive text) |
 | `ltree` | 8 | ltree (hierarchical data) |
 | `pgcrypto` | 9 | pgcrypto (encryption, UUIDs) |
+
+---
+
+### Quick Start: Recommended IDE Configuration
+
+Add one of these configurations to your IDE's MCP settings file (e.g., `cline_mcp_settings.json`, `.cursorrules`, or equivalent):
+
+#### Option 1: Starter (49 Essential Tools)
+**Best for:** General PostgreSQL database work - CRUD operations, JSONB, schema management.
+
+```json
+{
+  "mcpServers": {
+    "postgres-mcp": {
+      "command": "node",
+      "args": [
+        "/path/to/postgres-mcp/dist/cli.js",
+        "--transport",
+        "stdio",
+        "--tool-filter",
+        "starter"
+      ],
+      "env": {
+        "POSTGRES_HOST": "localhost",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_USER": "your_username",
+        "POSTGRES_PASSWORD": "your_password",
+        "POSTGRES_DATABASE": "your_database"
+      }
+    }
+  }
+}
+```
+
+#### Option 2: AI Vector (46 Tools + pgvector)
+**Best for:** AI/ML workloads with semantic search and vector similarity.
+
+> **⚠️ Prerequisites:** Requires pgvector extension installed in your PostgreSQL database.
+
+```json
+{
+  "mcpServers": {
+    "postgres-mcp-ai": {
+      "command": "node",
+      "args": [
+        "/path/to/postgres-mcp/dist/cli.js",
+        "--transport",
+        "stdio",
+        "--tool-filter",
+        "ai-vector"
+      ],
+      "env": {
+        "POSTGRES_HOST": "localhost",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_USER": "your_username",
+        "POSTGRES_PASSWORD": "your_password",
+        "POSTGRES_DATABASE": "your_database"
+      }
+    }
+  }
+}
+```
+
+**Customization Notes:**
+
+- Replace `/path/to/postgres-mcp/` with your actual installation path
+- Update credentials (`your_username`, `your_password`, etc.) with your PostgreSQL credentials
+- For Windows: Use forward slashes in paths (e.g., `C:/postgres-mcp/dist/cli.js`) or escape backslashes (`C:\\postgres-mcp\\dist\\cli.js`)
+- **Extension tools** gracefully handle cases where extensions are not installed
+
+---
+
+### Syntax Reference
+
+| Prefix | Target | Example | Effect |
+|--------|--------|---------|--------|
+| *(none)* | Shortcut | `starter` | **Whitelist Mode:** Enable ONLY this shortcut |
+| *(none)* | Group | `core` | **Whitelist Mode:** Enable ONLY this group |
+| `+` | Group | `+vector` | Add tools from this group to current set |
+| `-` | Group | `-admin` | Remove tools in this group from current set |
+| `+` | Tool | `+pg_explain` | Add one specific tool |
+| `-` | Tool | `-pg_drop_table` | Remove one specific tool |
+
+**Legacy Syntax (still supported):**
+If you start with a negative filter (e.g., `-base,-extensions`), it assumes you want to start with *all* tools enabled and then subtract.
 
 ---
 

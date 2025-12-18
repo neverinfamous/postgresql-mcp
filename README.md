@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.neverinfamous/postgres-mcp -->
 
-*Last updated December 17, 2025 - Initial Implementation Complete*
+*Last updated December 18, 2025 - Initial Implementation Complete*
 
 *Enterprise-grade PostgreSQL MCP Server with OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
 
@@ -206,7 +206,10 @@ The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names*
 | `ext-schedule` | 18 | Extension: Scheduling | pg_cron, pg_partman |
 | `ext-perf` | 23 | Extension: Perf/Analysis | pg_stat_kcache, performance |
 
-### Tool Groups (19 Available)
+> [!TIP]
+> **Code Mode:** Add `+codemode` to any shortcut to enable `pg_execute_code` (+1 tool). Example: `starter,+codemode` = 50 tools.
+
+### Tool Groups (20 Available)
 
 | Group | Tools | Description |
 |-------|-------|-------------|
@@ -476,56 +479,6 @@ All 194 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints t
 | `destructiveHint` | Tool may delete/modify data | `true` for DROP, DELETE |
 | `idempotentHint` | Safe to retry without side effects | `true` for IF NOT EXISTS |
 | `openWorldHint` | Tool interacts with external systems | `false` for all tools |
-
-### Annotation Categories
-
-Tools are categorized by their behavior:
-
-- **Read-Only** — Query tools that don't modify state (SELECT, EXPLAIN, list operations)
-- **Write** — Tools that create or modify data (INSERT, UPDATE, CREATE)
-- **Destructive** — Tools that delete data or objects (DROP, DELETE, TRUNCATE)
-- **Admin** — Administrative tools requiring elevated privileges (VACUUM, REINDEX)
-
-> [!TIP]
-> MCP clients can use these annotations to display appropriate icons, require confirmation for destructive operations, or filter tools by capability.
-
-## 🎨 Tool Icons
-
-All 194 tools include **Tool Icons** (MCP SDK 1.25+), providing visual representations for MCP client UIs:
-
-| Icon Type | Description | Applied To |
-|-----------|-------------|------------|
-| **Category Icons** | 19 colored shapes for tool categories | Default for all tools |
-| **Warning Icon** | Red triangle | Destructive tools (DROP, DELETE, TRUNCATE) |
-| **Admin Icon** | Orange gear | Admin tools (VACUUM, ANALYZE, REINDEX) |
-
-Icons are embedded as **SVG data URIs** for maximum portability — no external hosting required.
-
-### Category Icon Colors
-
-| Category | Color | Icon |
-|----------|-------|------|
-| Core | Blue | Database cylinder |
-| Transactions | Purple | Circular arrows |
-| JSONB | Orange | Curly braces |
-| Text | Cyan | Search magnifier |
-| Performance | Green | Gauge |
-| Admin | Gray | Wrench |
-| Monitoring | Indigo | Eye |
-| Backup | Slate | Download arrow |
-| Schema | Teal | Table grid |
-| Vector | Violet | 3D cube |
-| PostGIS | Emerald | Globe |
-| Partitioning | Rose | Pie chart |
-| Stats | Sky | Bar chart |
-| Cron | Amber | Clock |
-| Partman | Fuchsia | Calendar |
-| Kcache | Red | CPU chip |
-| Citext | Lime | Aa letters |
-| Ltree | Green | Tree |
-| Pgcrypto | Yellow | Lock |
-
----
 
 ## 🔥 Core Capabilities
 

@@ -9,6 +9,7 @@ import type { ToolDefinition, RequestContext } from '../../../../types/index.js'
 import { z } from 'zod';
 import { readOnly, write } from '../../../../utils/annotations.js';
 import { getToolIcons } from '../../../../utils/icons.js';
+import { sanitizeIdentifier, sanitizeTableName } from '../../../../utils/identifiers.js';
 import { GeometryDistanceSchema, PointInPolygonSchema, SpatialIndexSchema } from '../../schemas/index.js';
 
 export function createPostgisExtensionTool(adapter: PostgresAdapter): ToolDefinition {
@@ -71,10 +72,12 @@ export function createPointInPolygonTool(adapter: PostgresAdapter): ToolDefiniti
         icons: getToolIcons('postgis', readOnly('Point in Polygon')),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, point } = PointInPolygonSchema.parse(params);
+            const tableName = sanitizeTableName(table);
+            const columnName = sanitizeIdentifier(column);
 
-            const sql = `SELECT *, ST_AsText("${column}") as geometry_text
-                        FROM "${table}"
-                        WHERE ST_Contains("${column}", ST_SetSRID(ST_MakePoint($1, $2), 4326))`;
+            const sql = `SELECT *, ST_AsText(${columnName}) as geometry_text
+                        FROM ${tableName}
+                        WHERE ST_Contains(${columnName}, ST_SetSRID(ST_MakePoint($1, $2), 4326))`;
 
             const result = await adapter.executeQuery(sql, [point.lng, point.lat]);
             return { containingPolygons: result.rows, count: result.rows?.length ?? 0 };
@@ -93,14 +96,16 @@ export function createDistanceTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, point, limit, maxDistance } = GeometryDistanceSchema.parse(params);
 
+            const tableName = sanitizeTableName(table);
+            const columnName = sanitizeIdentifier(column);
             const limitVal = limit ?? 10;
-            const distanceFilter = maxDistance !== undefined && maxDistance > 0 ? `AND ST_Distance(${column}::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) <= ${String(maxDistance)}` : '';
+            const distanceFilter = maxDistance !== undefined && maxDistance > 0 ? `AND ST_Distance(${columnName}::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) <= ${String(maxDistance)}` : '';
 
             const sql = `SELECT *, 
-                        ST_Distance("${column}"::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) as distance_meters
-                        FROM "${table}"
+                        ST_Distance(${columnName}::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) as distance_meters
+                        FROM ${tableName}
                         WHERE TRUE ${distanceFilter}
-                        ORDER BY "${column}" <-> ST_SetSRID(ST_MakePoint($1, $2), 4326)
+                        ORDER BY ${columnName} <-> ST_SetSRID(ST_MakePoint($1, $2), 4326)
                         LIMIT ${String(limitVal)}`;
 
             const result = await adapter.executeQuery(sql, [point.lng, point.lat]);
@@ -126,8 +131,11 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
             const parsed = (params as { table: string; column: string; distance: number; where?: string });
             const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
 
-            const sql = `SELECT *, ST_AsGeoJSON(ST_Buffer("${parsed.column}"::geography, $1)::geometry) as buffer_geojson
-                        FROM "${parsed.table}"${whereClause}`;
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
+            const sql = `SELECT *, ST_AsGeoJSON(ST_Buffer(${columnName}::geography, $1)::geometry) as buffer_geojson
+                        FROM ${tableName}${whereClause}`;
 
             const result = await adapter.executeQuery(sql, [parsed.distance]);
             return { results: result.rows };
@@ -150,7 +158,9 @@ export function createIntersectionTool(adapter: PostgresAdapter): ToolDefinition
         icons: getToolIcons('postgis', readOnly('Intersection Search')),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; geometry: string; select?: string[] });
-            const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? parsed.select.map(c => `"${c}"`).join(', ') : '*';
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+            const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? parsed.select.map(c => sanitizeIdentifier(c)).join(', ') : '*';
 
             const isGeoJson = parsed.geometry.trim().startsWith('{');
             const geomExpr = isGeoJson
@@ -158,8 +168,8 @@ export function createIntersectionTool(adapter: PostgresAdapter): ToolDefinition
                 : `ST_GeomFromText($1)`;
 
             const sql = `SELECT ${selectCols}
-                        FROM "${parsed.table}"
-                        WHERE ST_Intersects("${parsed.column}", ${geomExpr})`;
+                        FROM ${tableName}
+                        WHERE ST_Intersects(${columnName}, ${geomExpr})`;
 
             const result = await adapter.executeQuery(sql, [parsed.geometry]);
             return { intersecting: result.rows, count: result.rows?.length ?? 0 };
@@ -194,11 +204,13 @@ export function createBoundingBoxTool(adapter: PostgresAdapter): ToolDefinition 
                 select?: string[];
             });
 
-            const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? parsed.select.map(c => `"${c}"`).join(', ') : '*';
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+            const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? parsed.select.map(c => sanitizeIdentifier(c)).join(', ') : '*';
 
             const sql = `SELECT ${selectCols}
-                        FROM "${parsed.table}"
-                        WHERE "${parsed.column}" && ST_MakeEnvelope($1, $2, $3, $4, 4326)`;
+                        FROM ${tableName}
+                        WHERE ${columnName} && ST_MakeEnvelope($1, $2, $3, $4, 4326)`;
 
             const result = await adapter.executeQuery(sql, [
                 parsed.minLng, parsed.minLat, parsed.maxLng, parsed.maxLat
@@ -218,11 +230,15 @@ export function createSpatialIndexTool(adapter: PostgresAdapter): ToolDefinition
         icons: getToolIcons('postgis', write('Create Spatial Index')),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, name } = SpatialIndexSchema.parse(params);
-            const indexName = name ?? `idx_${table}_${column}_gist`;
+            const indexNameRaw = name ?? `idx_${table}_${column}_gist`;
 
-            const sql = `CREATE INDEX "${indexName}" ON "${table}" USING GIST ("${column}")`;
+            const tableName = sanitizeTableName(table);
+            const columnName = sanitizeIdentifier(column);
+            const indexName = sanitizeIdentifier(indexNameRaw);
+
+            const sql = `CREATE INDEX ${indexName} ON ${tableName} USING GIST (${columnName})`;
             await adapter.executeQuery(sql);
-            return { success: true, index: indexName, table, column };
+            return { success: true, index: indexNameRaw, table, column };
         }
     };
 }

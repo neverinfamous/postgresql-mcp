@@ -7,6 +7,7 @@ import type { ToolDefinition, RequestContext } from '../../../../types/index.js'
 import { z } from 'zod';
 import { readOnly, write } from '../../../../utils/annotations.js';
 import { getToolIcons } from '../../../../utils/icons.js';
+import { sanitizeIdentifier, sanitizeTableName } from '../../../../utils/identifiers.js';
 import { VectorSearchSchema, VectorCreateIndexSchema } from '../../schemas/index.js';
 
 export function createVectorExtensionTool(adapter: PostgresAdapter): ToolDefinition {
@@ -39,9 +40,10 @@ export function createVectorAddColumnTool(adapter: PostgresAdapter): ToolDefinit
         icons: getToolIcons('vector', write('Add Vector Column')),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; dimensions: number; schema?: string });
-            const tableName = parsed.schema ? `"${parsed.schema}"."${parsed.table}"` : `"${parsed.table}"`;
+            const tableName = sanitizeTableName(parsed.table, parsed.schema);
+            const columnName = sanitizeIdentifier(parsed.column);
 
-            const sql = `ALTER TABLE ${tableName} ADD COLUMN "${parsed.column}" vector(${String(parsed.dimensions)})`;
+            const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} vector(${String(parsed.dimensions)})`;
             await adapter.executeQuery(sql);
             return { success: true, table: parsed.table, column: parsed.column, dimensions: parsed.dimensions };
         }
@@ -71,17 +73,18 @@ export function createVectorInsertTool(adapter: PostgresAdapter): ToolDefinition
                 schema?: string;
             });
 
-            const tableName = parsed.schema ? `"${parsed.schema}"."${parsed.table}"` : `"${parsed.table}"`;
+            const tableName = sanitizeTableName(parsed.table, parsed.schema);
+            const columnName = sanitizeIdentifier(parsed.column);
             const vectorStr = `[${parsed.vector.join(',')}]`;
 
-            const columns = [`"${parsed.column}"`];
+            const columns = [columnName];
             const values = [vectorStr];
             const params_: unknown[] = [];
             let paramIndex = 1;
 
             if (parsed.additionalColumns) {
                 for (const [col, val] of Object.entries(parsed.additionalColumns)) {
-                    columns.push(`"${col}"`);
+                    columns.push(sanitizeIdentifier(col));
                     values.push(`$${String(paramIndex++)}`);
                     params_.push(val);
                 }
@@ -105,25 +108,27 @@ export function createVectorSearchTool(adapter: PostgresAdapter): ToolDefinition
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, vector, metric, limit, select, where } = VectorSearchSchema.parse(params);
 
+            const tableName = sanitizeTableName(table);
+            const columnName = sanitizeIdentifier(column);
             const vectorStr = `[${vector.join(',')}]`;
             const limitVal = limit !== undefined && limit > 0 ? limit : 10;
-            const selectCols = select !== undefined && select.length > 0 ? select.map(c => `"${c}"`).join(', ') + ', ' : '';
+            const selectCols = select !== undefined && select.length > 0 ? select.map(c => sanitizeIdentifier(c)).join(', ') + ', ' : '';
             const whereClause = where ? ` AND ${where}` : '';
 
             let distanceExpr: string;
             switch (metric) {
                 case 'cosine':
-                    distanceExpr = `"${column}" <=> '${vectorStr}'`;
+                    distanceExpr = `${columnName} <=> '${vectorStr}'`;
                     break;
                 case 'inner_product':
-                    distanceExpr = `"${column}" <#> '${vectorStr}'`;
+                    distanceExpr = `${columnName} <#> '${vectorStr}'`;
                     break;
                 default: // l2
-                    distanceExpr = `"${column}" <-> '${vectorStr}'`;
+                    distanceExpr = `${columnName} <-> '${vectorStr}'`;
             }
 
             const sql = `SELECT ${selectCols}${distanceExpr} as distance
-                        FROM "${table}"
+                        FROM ${tableName}
                         WHERE TRUE${whereClause}
                         ORDER BY ${distanceExpr}
                         LIMIT ${String(limitVal)}`;
@@ -145,7 +150,10 @@ export function createVectorCreateIndexTool(adapter: PostgresAdapter): ToolDefin
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, type, lists, m, efConstruction } = VectorCreateIndexSchema.parse(params);
 
-            const indexName = `idx_${table}_${column}_${type}`;
+            const tableName = sanitizeTableName(table);
+            const columnName = sanitizeIdentifier(column);
+            const indexNameRaw = `idx_${table}_${column}_${type}`;
+            const indexName = sanitizeIdentifier(indexNameRaw);
             let withClause = '';
 
             if (type === 'ivfflat') {
@@ -157,9 +165,9 @@ export function createVectorCreateIndexTool(adapter: PostgresAdapter): ToolDefin
                 withClause = `WITH (m = ${String(mVal)}, ef_construction = ${String(efVal)})`;
             }
 
-            const sql = `CREATE INDEX "${indexName}" ON "${table}" USING ${type} ("${column}" vector_l2_ops) ${withClause}`;
+            const sql = `CREATE INDEX ${indexName} ON ${tableName} USING ${type} (${columnName} vector_l2_ops) ${withClause}`;
             await adapter.executeQuery(sql);
-            return { success: true, index: indexName, type, table, column };
+            return { success: true, index: indexNameRaw, type, table, column };
         }
     };
 }
@@ -233,8 +241,11 @@ export function createVectorAggregateTool(adapter: PostgresAdapter): ToolDefinit
             const parsed = (params as { table: string; column: string; where?: string });
             const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
 
-            const sql = `SELECT avg("${parsed.column}") as average_vector, count(*) as count
-                        FROM "${parsed.table}"${whereClause}`;
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
+            const sql = `SELECT avg(${columnName}) as average_vector, count(*) as count
+                        FROM ${tableName}${whereClause}`;
 
             const result = await adapter.executeQuery(sql);
             return result.rows?.[0];

@@ -9,6 +9,7 @@ import type { ToolDefinition, RequestContext } from '../../../../types/index.js'
 import { z } from 'zod';
 import { readOnly } from '../../../../utils/annotations.js';
 import { getToolIcons } from '../../../../utils/icons.js';
+import { sanitizeIdentifier, sanitizeTableName } from '../../../../utils/identifiers.js';
 
 /**
  * Validate JSON path expression
@@ -119,13 +120,15 @@ export function createJsonbNormalizeTool(adapter: PostgresAdapter): ToolDefiniti
             const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
             const mode = parsed.mode ?? 'keys';
 
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
             let sql: string;
             if (mode === 'array') {
-                sql = `SELECT jsonb_array_elements("${parsed.column}") as element FROM "${parsed.table}"${whereClause}`;
+                sql = `SELECT jsonb_array_elements(${columnName}) as element FROM ${tableName}${whereClause}`;
             } else if (mode === 'flatten') {
-                sql = `SELECT key, value FROM "${parsed.table}", jsonb_each("${parsed.column}") ${whereClause}`;
+                sql = `SELECT key, value FROM ${tableName}, jsonb_each(${columnName}) ${whereClause}`;
             } else {
-                sql = `SELECT key, value FROM "${parsed.table}", jsonb_each_text("${parsed.column}") ${whereClause}`;
+                sql = `SELECT key, value FROM ${tableName}, jsonb_each_text(${columnName}) ${whereClause}`;
             }
 
             const result = await adapter.executeQuery(sql);
@@ -201,11 +204,14 @@ export function createJsonbIndexSuggestTool(adapter: PostgresAdapter): ToolDefin
             const parsed = (params as { table: string; column: string; sampleSize?: number });
             const sample = parsed.sampleSize ?? 1000;
 
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
             const keySql = `
                 SELECT key, COUNT(*) as frequency, 
                        jsonb_typeof(value) as value_type
-                FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t,
-                     jsonb_each("${parsed.column}") 
+                FROM (SELECT * FROM ${tableName} LIMIT ${String(sample)}) t,
+                     jsonb_each(${columnName}) 
                 GROUP BY key, jsonb_typeof(value)
                 ORDER BY frequency DESC
                 LIMIT 20
@@ -226,13 +232,13 @@ export function createJsonbIndexSuggestTool(adapter: PostgresAdapter): ToolDefin
             const keys = keyResult.rows as { key: string; frequency: number; value_type: string }[];
 
             if ((indexResult.rows?.length ?? 0) === 0) {
-                recommendations.push(`CREATE INDEX ON "${parsed.table}" USING GIN ("${parsed.column}")`);
+                recommendations.push(`CREATE INDEX ON ${tableName} USING GIN (${columnName})`);
             }
 
             for (const keyInfo of keys.slice(0, 5)) {
                 if (keyInfo.frequency > sample * 0.5) {
                     recommendations.push(
-                        `CREATE INDEX ON "${parsed.table}" (("${parsed.column}" ->> '${keyInfo.key}'))`
+                        `CREATE INDEX ON ${tableName} ((${columnName} ->> '${keyInfo.key.replace(/'/g, "''")}'))`
                     );
                 }
             }
@@ -267,10 +273,13 @@ export function createJsonbSecurityScanTool(adapter: PostgresAdapter): ToolDefin
 
             const issues: { type: string; key: string; count: number }[] = [];
 
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
             const sensitiveKeysSql = `
                 SELECT key, COUNT(*) as count
-                FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t,
-                     jsonb_each_text("${parsed.column}")
+                FROM (SELECT * FROM ${tableName} LIMIT ${String(sample)}) t,
+                     jsonb_each_text(${columnName})
                 WHERE lower(key) IN ('password', 'secret', 'token', 'api_key', 'apikey', 
                                      'auth', 'credential', 'ssn', 'credit_card', 'cvv')
                 GROUP BY key
@@ -283,8 +292,8 @@ export function createJsonbSecurityScanTool(adapter: PostgresAdapter): ToolDefin
 
             const injectionSql = `
                 SELECT key, COUNT(*) as count
-                FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t,
-                     jsonb_each_text("${parsed.column}")
+                FROM (SELECT * FROM ${tableName} LIMIT ${String(sample)}) t,
+                     jsonb_each_text(${columnName})
                 WHERE value ~* '(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|--)'
                 GROUP BY key
             `;
@@ -322,21 +331,24 @@ export function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
             const parsed = (params as { table: string; column: string; sampleSize?: number });
             const sample = parsed.sampleSize ?? 1000;
 
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
             const basicSql = `
                 SELECT 
                     COUNT(*) as total_rows,
-                    COUNT("${parsed.column}") as non_null_count,
-                    AVG(length("${parsed.column}"::text))::int as avg_size_bytes,
-                    MAX(length("${parsed.column}"::text)) as max_size_bytes
-                FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t
+                    COUNT(${columnName}) as non_null_count,
+                    AVG(length(${columnName}::text))::int as avg_size_bytes,
+                    MAX(length(${columnName}::text)) as max_size_bytes
+                FROM (SELECT * FROM ${tableName} LIMIT ${String(sample)}) t
             `;
 
             const basicResult = await adapter.executeQuery(basicSql);
 
             const keySql = `
                 SELECT key, COUNT(*) as frequency
-                FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t,
-                     jsonb_object_keys("${parsed.column}") key
+                FROM (SELECT * FROM ${tableName} LIMIT ${String(sample)}) t,
+                     jsonb_object_keys(${columnName}) key
                 GROUP BY key
                 ORDER BY frequency DESC
                 LIMIT 20
@@ -345,9 +357,9 @@ export function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
             const keyResult = await adapter.executeQuery(keySql);
 
             const typeSql = `
-                SELECT jsonb_typeof("${parsed.column}") as type, COUNT(*) as count
-                FROM (SELECT * FROM "${parsed.table}" LIMIT ${String(sample)}) t
-                GROUP BY jsonb_typeof("${parsed.column}")
+                SELECT jsonb_typeof(${columnName}) as type, COUNT(*) as count
+                FROM (SELECT * FROM ${tableName} LIMIT ${String(sample)}) t
+                GROUP BY jsonb_typeof(${columnName})
             `;
 
             const typeResult = await adapter.executeQuery(typeSql);

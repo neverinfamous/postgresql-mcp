@@ -331,6 +331,17 @@ The server exposes metadata at `/.well-known/oauth-protected-resource`.
 
 ---
 
+## ⚡ Performance Tuning
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `METADATA_CACHE_TTL_MS` | `30000` | Cache TTL for schema metadata (milliseconds) |
+| `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warning`, `error` |
+
+> **Tip:** Lower `METADATA_CACHE_TTL_MS` for development (e.g., `5000`), or increase it for production with stable schemas (e.g., `300000` = 5 min).
+
+---
+
 ## 🤖 AI-Powered Prompts
 
 Prompts provide step-by-step guidance for complex database tasks. Instead of figuring out which tools to use and in what order, simply invoke a prompt and follow its workflow — great for learning PostgreSQL best practices or automating repetitive DBA tasks.

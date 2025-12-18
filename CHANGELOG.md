@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Benchmark Tests** — Added performance benchmark test suite (`src/adapters/postgresql/__tests__/performance.test.ts`)
 
 ### Security
+- **Identifier Sanitization** — New utility to prevent SQL injection via identifier interpolation
+  - `sanitizeIdentifier()`, `sanitizeTableName()`, `sanitizeColumnRef()` functions
+  - PostgreSQL-compliant validation and double-quote escaping
+  - Applied to JSONB, vector, and text search tool handlers
+- **HTTP Transport Hardening** — Enhanced HTTP transport security
+  - **Rate Limiting** — 100 requests/minute per IP (configurable via `rateLimitMaxRequests`, `rateLimitWindowMs`)
+  - **Body Size Limits** — 1MB max request body (configurable via `maxBodySize`)
+  - **HSTS Support** — Optional Strict-Transport-Security header for HTTPS deployments
+  - **Enhanced CORS** — Browser MCP client support with `Vary: Origin`, credentials, and MCP-specific headers
+- **Log Injection Prevention** — Control character sanitization for log messages
+  - Strips ASCII 0x00-0x1F (except tab/newline), 0x7F, and C1 control characters
+  - Prevents log forging and escape sequence attacks
 - **CodeQL Remediation** — Fixed 4 clear-text logging vulnerabilities (js/clear-text-logging)
   - Added `sanitizeDetails()` to Logger class that redacts sensitive OAuth/security fields before console output
   - Sensitive keys redacted: password, secret, token, key, apikey, issuer, audience, jwksUri, credentials, etc.

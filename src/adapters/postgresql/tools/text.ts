@@ -10,6 +10,7 @@ import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
 import { readOnly, write } from '../../../utils/annotations.js';
 import { getToolIcons } from '../../../utils/icons.js';
+import { sanitizeIdentifier, sanitizeTableName, sanitizeIdentifiers } from '../../../utils/identifiers.js';
 import {
     TextSearchSchema,
     TrigramSimilaritySchema,
@@ -46,12 +47,15 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, columns, query, config, select, limit } = TextSearchSchema.parse(params);
             const cfg = config ?? 'english';
-            const selectCols = select !== undefined && select.length > 0 ? select.map(c => `"${c}"`).join(', ') : '*';
-            const tsvector = columns.map(c => `coalesce("${c}", '')`).join(" || ' ' || ");
+
+            const tableName = sanitizeTableName(table);
+            const sanitizedCols = sanitizeIdentifiers(columns);
+            const selectCols = select !== undefined && select.length > 0 ? sanitizeIdentifiers(select).join(', ') : '*';
+            const tsvector = sanitizedCols.map(c => `coalesce(${c}, '')`).join(" || ' ' || ");
             const limitClause = limit !== undefined && limit > 0 ? ` LIMIT ${String(limit)}` : '';
 
             const sql = `SELECT ${selectCols}, ts_rank(to_tsvector('${cfg}', ${tsvector}), plainto_tsquery('${cfg}', $1)) as rank
-                        FROM "${table}"
+                        FROM ${tableName}
                         WHERE to_tsvector('${cfg}', ${tsvector}) @@ plainto_tsquery('${cfg}', $1)
                         ORDER BY rank DESC${limitClause}`;
 
@@ -80,9 +84,12 @@ function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
             const cfg = parsed.config ?? 'english';
             const norm = parsed.normalization ?? 0;
 
-            const sql = `SELECT *, ts_rank_cd(to_tsvector('${cfg}', "${parsed.column}"), plainto_tsquery('${cfg}', $1), ${String(norm)}) as rank
-                        FROM "${parsed.table}"
-                        WHERE to_tsvector('${cfg}', "${parsed.column}") @@ plainto_tsquery('${cfg}', $1)
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
+            const sql = `SELECT *, ts_rank_cd(to_tsvector('${cfg}', ${columnName}), plainto_tsquery('${cfg}', $1), ${String(norm)}) as rank
+                        FROM ${tableName}
+                        WHERE to_tsvector('${cfg}', ${columnName}) @@ plainto_tsquery('${cfg}', $1)
                         ORDER BY rank DESC`;
 
             const result = await adapter.executeQuery(sql, [parsed.query]);
@@ -104,9 +111,12 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
             const thresh = threshold ?? 0.3;
             const limitVal = limit !== undefined && limit > 0 ? limit : 20;
 
-            const sql = `SELECT *, similarity("${column}", $1) as similarity
-                        FROM "${table}"
-                        WHERE similarity("${column}", $1) > ${String(thresh)}
+            const tableName = sanitizeTableName(table);
+            const columnName = sanitizeIdentifier(column);
+
+            const sql = `SELECT *, similarity(${columnName}, $1) as similarity
+                        FROM ${tableName}
+                        WHERE similarity(${columnName}, $1) > ${String(thresh)}
                         ORDER BY similarity DESC LIMIT ${String(limitVal)}`;
 
             const result = await adapter.executeQuery(sql, [value]);
@@ -136,13 +146,16 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
             const maxDist = parsed.maxDistance ?? 3;
             const limitVal = parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 20;
 
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
             let sql: string;
             if (method === 'soundex') {
-                sql = `SELECT *, soundex("${parsed.column}") as code FROM "${parsed.table}" WHERE soundex("${parsed.column}") = soundex($1) LIMIT ${String(limitVal)}`;
+                sql = `SELECT *, soundex(${columnName}) as code FROM ${tableName} WHERE soundex(${columnName}) = soundex($1) LIMIT ${String(limitVal)}`;
             } else if (method === 'metaphone') {
-                sql = `SELECT *, metaphone("${parsed.column}", 10) as code FROM "${parsed.table}" WHERE metaphone("${parsed.column}", 10) = metaphone($1, 10) LIMIT ${String(limitVal)}`;
+                sql = `SELECT *, metaphone(${columnName}, 10) as code FROM ${tableName} WHERE metaphone(${columnName}, 10) = metaphone($1, 10) LIMIT ${String(limitVal)}`;
             } else {
-                sql = `SELECT *, levenshtein("${parsed.column}", $1) as distance FROM "${parsed.table}" WHERE levenshtein("${parsed.column}", $1) <= ${String(maxDist)} ORDER BY distance LIMIT ${String(limitVal)}`;
+                sql = `SELECT *, levenshtein(${columnName}, $1) as distance FROM ${tableName} WHERE levenshtein(${columnName}, $1) <= ${String(maxDist)} ORDER BY distance LIMIT ${String(limitVal)}`;
             }
 
             const result = await adapter.executeQuery(sql, [parsed.value]);
@@ -161,10 +174,13 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
         icons: getToolIcons('text', readOnly('Regexp Match')),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, column, pattern, flags, select } = RegexpMatchSchema.parse(params);
-            const selectCols = select !== undefined && select.length > 0 ? select.map(c => `"${c}"`).join(', ') : '*';
+
+            const tableName = sanitizeTableName(table);
+            const columnName = sanitizeIdentifier(column);
+            const selectCols = select !== undefined && select.length > 0 ? sanitizeIdentifiers(select).join(', ') : '*';
             const op = flags?.includes('i') ? '~*' : '~';
 
-            const sql = `SELECT ${selectCols} FROM "${table}" WHERE "${column}" ${op} $1`;
+            const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1`;
             const result = await adapter.executeQuery(sql, [pattern]);
             return { rows: result.rows, count: result.rows?.length ?? 0 };
         }
@@ -188,11 +204,14 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
         icons: getToolIcons('text', readOnly('LIKE Search')),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; pattern: string; caseInsensitive?: boolean; select?: string[]; limit?: number });
-            const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? parsed.select.map(c => `"${c}"`).join(', ') : '*';
+
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+            const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? sanitizeIdentifiers(parsed.select).join(', ') : '*';
             const op = parsed.caseInsensitive === true ? 'ILIKE' : 'LIKE';
             const limitClause = parsed.limit !== undefined && parsed.limit > 0 ? ` LIMIT ${String(parsed.limit)}` : '';
 
-            const sql = `SELECT ${selectCols} FROM "${parsed.table}" WHERE "${parsed.column}" ${op} $1${limitClause}`;
+            const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${limitClause}`;
             const result = await adapter.executeQuery(sql, [parsed.pattern]);
             return { rows: result.rows, count: result.rows?.length ?? 0 };
         }
@@ -216,13 +235,16 @@ function createSimilaritySearchTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; value: string; threshold?: number; select?: string[] });
             const thresh = parsed.threshold ?? 0.3;
-            const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? parsed.select.map(c => `"${c}"`).join(', ') + ', ' : '';
+
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+            const selectCols = parsed.select !== undefined && parsed.select.length > 0 ? sanitizeIdentifiers(parsed.select).join(', ') + ', ' : '';
 
             await adapter.executeQuery(`SELECT set_limit(${String(thresh)})`);
 
-            const sql = `SELECT ${selectCols}"${parsed.column}", similarity("${parsed.column}", $1) as sim
-                        FROM "${parsed.table}"
-                        WHERE "${parsed.column}" % $1
+            const sql = `SELECT ${selectCols}${columnName}, similarity(${columnName}, $1) as sim
+                        FROM ${tableName}
+                        WHERE ${columnName} % $1
                         ORDER BY sim DESC`;
 
             const result = await adapter.executeQuery(sql, [parsed.value]);
@@ -250,9 +272,12 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
             const cfg = parsed.config ?? 'english';
             const opts = parsed.options ?? 'StartSel=<b>, StopSel=</b>, MaxWords=35, MinWords=15';
 
-            const sql = `SELECT ts_headline('${cfg}', "${parsed.column}", plainto_tsquery('${cfg}', $1), '${opts}') as headline
-                        FROM "${parsed.table}"
-                        WHERE to_tsvector('${cfg}', "${parsed.column}") @@ plainto_tsquery('${cfg}', $1)`;
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
+            const sql = `SELECT ts_headline('${cfg}', ${columnName}, plainto_tsquery('${cfg}', $1), '${opts}') as headline
+                        FROM ${tableName}
+                        WHERE to_tsvector('${cfg}', ${columnName}) @@ plainto_tsquery('${cfg}', $1)`;
 
             const result = await adapter.executeQuery(sql, [parsed.query]);
             return { headlines: result.rows?.map(r => r['headline']) };
@@ -276,12 +301,16 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; column: string; name?: string; config?: string });
             const cfg = parsed.config ?? 'english';
-            const indexName = parsed.name ?? `idx_${parsed.table}_${parsed.column}_fts`;
+            const defaultIndexName = `idx_${parsed.table}_${parsed.column}_fts`;
+            const indexName = sanitizeIdentifier(parsed.name ?? defaultIndexName);
 
-            const sql = `CREATE INDEX "${indexName}" ON "${parsed.table}" USING gin(to_tsvector('${cfg}', "${parsed.column}"))`;
+            const tableName = sanitizeTableName(parsed.table);
+            const columnName = sanitizeIdentifier(parsed.column);
+
+            const sql = `CREATE INDEX ${indexName} ON ${tableName} USING gin(to_tsvector('${cfg}', ${columnName}))`;
             await adapter.executeQuery(sql);
 
-            return { success: true, index: indexName, config: cfg };
+            return { success: true, index: parsed.name ?? defaultIndexName, config: cfg };
         }
     };
 }

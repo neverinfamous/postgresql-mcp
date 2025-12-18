@@ -10,6 +10,7 @@ import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
 import { readOnly, write, destructive } from '../../../utils/annotations.js';
 import { getToolIcons } from '../../../utils/icons.js';
+import { sanitizeIdentifier, sanitizeTableName } from '../../../utils/identifiers.js';
 import {
     CreatePartitionedTableSchema,
     CreatePartitionSchema,
@@ -74,15 +75,15 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { name, schema, columns, partitionBy, partitionKey } = CreatePartitionedTableSchema.parse(params);
 
-            const schemaPrefix = schema ? `"${schema}".` : '';
+            const tableName = sanitizeTableName(name, schema);
 
             const columnDefs = columns.map(col => {
-                let def = `"${col.name}" ${col.type}`;
+                let def = `${sanitizeIdentifier(col.name)} ${col.type}`;
                 if (col.nullable === false) def += ' NOT NULL';
                 return def;
             }).join(',\n  ');
 
-            const sql = `CREATE TABLE ${schemaPrefix}"${name}" (
+            const sql = `CREATE TABLE ${tableName} (
   ${columnDefs}
 ) PARTITION BY ${partitionBy.toUpperCase()} (${partitionKey})`;
 
@@ -103,10 +104,10 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { parent, name, schema, forValues } = CreatePartitionSchema.parse(params);
 
-            const schemaPrefix = schema ? `"${schema}".` : '';
-            const parentName = schema ? `"${schema}"."${parent}"` : `"${parent}"`;
+            const partitionName = sanitizeTableName(name, schema);
+            const parentName = sanitizeTableName(parent, schema);
 
-            const sql = `CREATE TABLE ${schemaPrefix}"${name}" PARTITION OF ${parentName} FOR VALUES ${forValues}`;
+            const sql = `CREATE TABLE ${partitionName} PARTITION OF ${parentName} FOR VALUES ${forValues}`;
             await adapter.executeQuery(sql);
 
             return { success: true, partition: `${schema ?? 'public'}.${name}`, parent, bounds: forValues };
@@ -125,7 +126,10 @@ function createAttachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { parent, partition, forValues } = AttachPartitionSchema.parse(params);
 
-            const sql = `ALTER TABLE "${parent}" ATTACH PARTITION "${partition}" FOR VALUES ${forValues}`;
+            const parentName = sanitizeTableName(parent);
+            const partitionName = sanitizeTableName(partition);
+
+            const sql = `ALTER TABLE ${parentName} ATTACH PARTITION ${partitionName} FOR VALUES ${forValues}`;
             await adapter.executeQuery(sql);
 
             return { success: true, parent, partition, bounds: forValues };
@@ -144,8 +148,11 @@ function createDetachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { parent, partition, concurrently } = DetachPartitionSchema.parse(params);
 
+            const parentName = sanitizeTableName(parent);
+            const partitionName = sanitizeTableName(partition);
             const concurrentlyClause = concurrently ? ' CONCURRENTLY' : '';
-            const sql = `ALTER TABLE "${parent}" DETACH PARTITION "${partition}"${concurrentlyClause}`;
+
+            const sql = `ALTER TABLE ${parentName} DETACH PARTITION ${partitionName}${concurrentlyClause}`;
             await adapter.executeQuery(sql);
 
             return { success: true, parent, detached: partition };

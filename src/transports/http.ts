@@ -30,8 +30,56 @@ export interface HttpTransportConfig {
     /** CORS allowed origins (default: none) */
     corsOrigins?: string[];
 
+    /** Allow credentials in CORS requests (default: false) */
+    corsAllowCredentials?: boolean;
+
     /** Paths that bypass authentication */
     publicPaths?: string[];
+
+    // =========================================================================
+    // Security Options
+    // =========================================================================
+
+    /** 
+     * Enable rate limiting (default: true)
+     * Helps prevent DoS attacks and brute-force attempts
+     */
+    enableRateLimit?: boolean;
+
+    /** 
+     * Rate limit window in milliseconds (default: 60000 = 1 minute) 
+     */
+    rateLimitWindowMs?: number;
+
+    /** 
+     * Maximum requests per window per IP (default: 100) 
+     */
+    rateLimitMaxRequests?: number;
+
+    /** 
+     * Maximum request body size in bytes (default: 1MB = 1048576)
+     * Prevents memory exhaustion from large payloads
+     */
+    maxBodySize?: number;
+
+    /**
+     * Enable HTTP Strict Transport Security header (default: false)
+     * Should only be enabled when running behind HTTPS
+     */
+    enableHSTS?: boolean;
+
+    /**
+     * HSTS max-age in seconds (default: 31536000 = 1 year)
+     */
+    hstsMaxAge?: number;
+}
+
+/**
+ * Rate limit entry for tracking request counts per IP
+ */
+interface RateLimitEntry {
+    count: number;
+    resetTime: number;
 }
 
 /**
@@ -43,11 +91,26 @@ export class HttpTransport {
     private transport: StreamableHTTPServerTransport | null = null;
     private readonly onConnect?: (transport: StreamableHTTPServerTransport) => void;
 
+    // Rate limiting state
+    private readonly rateLimitMap = new Map<string, RateLimitEntry>();
+
+    // Default configuration values
+    private static readonly DEFAULT_RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+    private static readonly DEFAULT_RATE_LIMIT_MAX_REQUESTS = 100;
+    private static readonly DEFAULT_MAX_BODY_SIZE = 1048576; // 1MB
+    private static readonly DEFAULT_HSTS_MAX_AGE = 31536000; // 1 year
+
     constructor(config: HttpTransportConfig, onConnect?: (transport: StreamableHTTPServerTransport) => void) {
         this.config = {
             ...config,
             host: config.host ?? 'localhost',
-            publicPaths: config.publicPaths ?? ['/health', '/.well-known/*']
+            publicPaths: config.publicPaths ?? ['/health', '/.well-known/*'],
+            enableRateLimit: config.enableRateLimit ?? true,
+            rateLimitWindowMs: config.rateLimitWindowMs ?? HttpTransport.DEFAULT_RATE_LIMIT_WINDOW_MS,
+            rateLimitMaxRequests: config.rateLimitMaxRequests ?? HttpTransport.DEFAULT_RATE_LIMIT_MAX_REQUESTS,
+            maxBodySize: config.maxBodySize ?? HttpTransport.DEFAULT_MAX_BODY_SIZE,
+            enableHSTS: config.enableHSTS ?? false,
+            hstsMaxAge: config.hstsMaxAge ?? HttpTransport.DEFAULT_HSTS_MAX_AGE
         };
         if (onConnect) {
             this.onConnect = onConnect;
@@ -114,6 +177,45 @@ export class HttpTransport {
     }
 
     /**
+     * Check rate limit for a request
+     * @returns true if request should be allowed, false if rate limited
+     */
+    private checkRateLimit(req: IncomingMessage): boolean {
+        if (!this.config.enableRateLimit) {
+            return true;
+        }
+
+        const clientIp = req.socket.remoteAddress ?? 'unknown';
+        const now = Date.now();
+        const windowMs = this.config.rateLimitWindowMs ?? HttpTransport.DEFAULT_RATE_LIMIT_WINDOW_MS;
+        const maxRequests = this.config.rateLimitMaxRequests ?? HttpTransport.DEFAULT_RATE_LIMIT_MAX_REQUESTS;
+
+        const entry = this.rateLimitMap.get(clientIp);
+
+        // Clean up expired entries periodically (every 100 checks)
+        if (this.rateLimitMap.size > 100 && Math.random() < 0.01) {
+            for (const [ip, e] of this.rateLimitMap) {
+                if (now > e.resetTime) {
+                    this.rateLimitMap.delete(ip);
+                }
+            }
+        }
+
+        if (!entry || now > entry.resetTime) {
+            // Start new window
+            this.rateLimitMap.set(clientIp, { count: 1, resetTime: now + windowMs });
+            return true;
+        }
+
+        if (entry.count >= maxRequests) {
+            return false;
+        }
+
+        entry.count++;
+        return true;
+    }
+
+    /**
      * Handle incoming HTTP request
      */
     private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -127,6 +229,16 @@ export class HttpTransport {
         if (req.method === 'OPTIONS') {
             res.writeHead(204);
             res.end();
+            return;
+        }
+
+        // Check rate limit
+        if (!this.checkRateLimit(req)) {
+            res.writeHead(429, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                error: 'rate_limit_exceeded',
+                error_description: 'Too many requests. Please try again later.'
+            }));
             return;
         }
 
@@ -247,10 +359,19 @@ export class HttpTransport {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         // Content Security Policy - API server has no content to load
         res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+
+        // HTTP Strict Transport Security (for HTTPS deployments)
+        if (this.config.enableHSTS) {
+            const maxAge = this.config.hstsMaxAge ?? HttpTransport.DEFAULT_HSTS_MAX_AGE;
+            res.setHeader('Strict-Transport-Security', `max-age=${String(maxAge)}; includeSubDomains`);
+        }
     }
 
     /**
-     * Set CORS headers
+     * Set CORS headers for browser-based MCP client support
+     * 
+     * This implements the MCP SDK 1.25.1 recommendation of using external middleware
+     * for origin validation rather than the deprecated built-in options.
      */
     private setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
         const origin = req.headers.origin;
@@ -258,9 +379,18 @@ export class HttpTransport {
         // Only allow configured origins
         if (origin && this.config.corsOrigins?.includes(origin)) {
             res.setHeader('Access-Control-Allow-Origin', origin);
-            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID');
+            res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
             res.setHeader('Access-Control-Max-Age', '86400');
+
+            // Vary header is important for correct caching behavior
+            res.setHeader('Vary', 'Origin');
+
+            // Allow credentials if explicitly configured (needed for browser cookies/auth)
+            if (this.config.corsAllowCredentials) {
+                res.setHeader('Access-Control-Allow-Credentials', 'true');
+            }
         }
     }
 

@@ -170,6 +170,20 @@ class Logger {
     ]);
 
     /**
+     * Sanitize log message to prevent log injection attacks
+     * Removes control characters that could be used to forge log entries or escape sequences
+     */
+    private sanitizeMessage(message: string): string {
+        // Remove control characters (ASCII 0x00-0x1F) except:
+        // - 0x09 (tab) - useful for formatting
+        // - 0x0A (newline) - useful for multi-line messages
+        // - 0x0D (carriage return) - pairs with newline
+        // Also remove 0x7F (DEL) and C1 control characters (0x80-0x9F)
+        // eslint-disable-next-line no-control-regex
+        return message.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\x80-\x9F]/g, '');
+    }
+
+    /**
      * Sanitize context object by redacting sensitive values
      * This prevents clear-text logging of OAuth config and other secrets
      */
@@ -216,8 +230,8 @@ class Logger {
             parts.push(`[${entry.code}]`);
         }
 
-        // Add message
-        parts.push(entry.message);
+        // Add message (sanitized to prevent log injection)
+        parts.push(this.sanitizeMessage(entry.message));
 
         // Add context if present (excluding module and code which are already in the format)
         if (entry.context) {

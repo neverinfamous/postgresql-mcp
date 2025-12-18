@@ -10,6 +10,7 @@ import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
 import { readOnly, write, destructive } from '../../../utils/annotations.js';
 import { getToolIcons } from '../../../utils/icons.js';
+import { sanitizeIdentifier } from '../../../utils/identifiers.js';
 import { CreateSchemaSchema, DropSchemaSchema, CreateSequenceSchema, CreateViewSchema } from '../schemas/index.js';
 
 /**
@@ -56,9 +57,10 @@ function createCreateSchemaTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { name, authorization, ifNotExists } = CreateSchemaSchema.parse(params);
             const ifNotExistsClause = ifNotExists ? 'IF NOT EXISTS ' : '';
-            const authClause = authorization ? ` AUTHORIZATION "${authorization}"` : '';
+            const schemaName = sanitizeIdentifier(name);
+            const authClause = authorization ? ` AUTHORIZATION ${sanitizeIdentifier(authorization)}` : '';
 
-            const sql = `CREATE SCHEMA ${ifNotExistsClause}"${name}"${authClause}`;
+            const sql = `CREATE SCHEMA ${ifNotExistsClause}${schemaName}${authClause}`;
             await adapter.executeQuery(sql);
             return { success: true, schema: name };
         }
@@ -77,8 +79,9 @@ function createDropSchemaTool(adapter: PostgresAdapter): ToolDefinition {
             const { name, cascade, ifExists } = DropSchemaSchema.parse(params);
             const ifExistsClause = ifExists ? 'IF EXISTS ' : '';
             const cascadeClause = cascade ? ' CASCADE' : '';
+            const schemaName = sanitizeIdentifier(name);
 
-            const sql = `DROP SCHEMA ${ifExistsClause}"${name}"${cascadeClause}`;
+            const sql = `DROP SCHEMA ${ifExistsClause}${schemaName}${cascadeClause}`;
             await adapter.executeQuery(sql);
             return { success: true, dropped: name };
         }
@@ -128,8 +131,8 @@ function createCreateSequenceTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { name, schema, start, increment, minValue, maxValue, cycle } = CreateSequenceSchema.parse(params);
 
-            const schemaPrefix = schema ? `"${schema}".` : '';
-            const parts = [`CREATE SEQUENCE ${schemaPrefix}"${name}"`];
+            const schemaPrefix = schema ? `${sanitizeIdentifier(schema)}.` : '';
+            const parts = [`CREATE SEQUENCE ${schemaPrefix}${sanitizeIdentifier(name)}`];
 
             if (start !== undefined) parts.push(`START WITH ${String(start)}`);
             if (increment !== undefined) parts.push(`INCREMENT BY ${String(increment)}`);
@@ -187,11 +190,12 @@ function createCreateViewTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { name, schema, query, materialized, orReplace } = CreateViewSchema.parse(params);
 
-            const schemaPrefix = schema ? `"${schema}".` : '';
+            const schemaPrefix = schema ? `${sanitizeIdentifier(schema)}.` : '';
             const replaceClause = orReplace && !materialized ? 'OR REPLACE ' : '';
             const matClause = materialized ? 'MATERIALIZED ' : '';
+            const viewName = sanitizeIdentifier(name);
 
-            const sql = `CREATE ${replaceClause}${matClause}VIEW ${schemaPrefix}"${name}" AS ${query}`;
+            const sql = `CREATE ${replaceClause}${matClause}VIEW ${schemaPrefix}${viewName} AS ${query}`;
             await adapter.executeQuery(sql);
             return { success: true, view: `${schema ?? 'public'}.${name}`, materialized: !!materialized };
         }

@@ -3,6 +3,9 @@
  * 
  * Centralized logging utility with RFC 5424 severity levels and structured output.
  * Supports dual-mode logging: stderr for local debugging and MCP protocol notifications.
+ * 
+ * Format: [timestamp] [LEVEL] [MODULE] [CODE] message {context}
+ * Example: [2025-12-18T01:30:00Z] [ERROR] [ADAPTER] [PG_CONNECT_FAILED] Failed to connect {"host":"localhost"}
  */
 
 // Server class is marked deprecated but McpServer.server exposes it for sendLoggingMessage()
@@ -22,21 +25,67 @@ export type LogLevel =
     | 'alert'       // 1 - Action must be taken immediately
     | 'emergency';  // 0 - System is unusable
 
+/**
+ * Module identifiers for log categorization
+ */
+export type LogModule =
+    | 'SERVER'      // MCP server lifecycle
+    | 'ADAPTER'     // Database adapter operations
+    | 'AUTH'        // OAuth/authentication
+    | 'TOOLS'       // Tool execution
+    | 'RESOURCES'   // Resource handlers
+    | 'PROMPTS'     // Prompt handlers
+    | 'TRANSPORT'   // HTTP/SSE/stdio transport
+    | 'QUERY'       // SQL query execution
+    | 'POOL'        // Connection pool
+    | 'FILTER'      // Tool filtering
+    | 'CLI';        // Command line interface
+
+/**
+ * Structured log context following MCP logging standards
+ */
+export interface LogContext {
+    /** Module identifier */
+    module?: LogModule;
+    /** Module-prefixed error/event code (e.g., PG_CONNECT_FAILED) */
+    code?: string;
+    /** Operation being performed (e.g., executeQuery, connect) */
+    operation?: string;
+    /** Entity identifier (e.g., table name, connection id) */
+    entityId?: string;
+    /** Request identifier for tracing */
+    requestId?: string;
+    /** Error stack trace */
+    stack?: string;
+    /** Additional context fields */
+    [key: string]: unknown;
+}
+
 interface LogEntry {
     level: LogLevel;
+    module?: LogModule | undefined;
+    code?: string | undefined;
     message: string;
     timestamp: string;
-    details?: Record<string, unknown> | undefined;
+    context?: LogContext | undefined;
 }
 
 /**
  * MCP-aware structured logger with dual-mode output
+ * 
+ * Follows MCP Server Logging Standards:
+ * - Centralized logger writing to stderr only (stdout reserved for MCP protocol)
+ * - Include: module, operation, entityId, context, stack traces
+ * - Module-prefixed codes (e.g., PG_CONNECT_FAILED, AUTH_TOKEN_INVALID)
+ * - Severity: RFC 5424 levels
+ * - Format: [timestamp] [LEVEL] [MODULE] [CODE] message {context}
  */
 class Logger {
     private minLevel: LogLevel = 'info';
     // eslint-disable-next-line @typescript-eslint/no-deprecated
     private mcpServer: Server | null = null;
     private loggerName = 'postgres-mcp';
+    private defaultModule: LogModule = 'SERVER';
 
     /**
      * RFC 5424 severity priority (lower number = higher severity)
@@ -82,6 +131,13 @@ class Logger {
         this.loggerName = name;
     }
 
+    /**
+     * Set the default module for logs without explicit module
+     */
+    setDefaultModule(module: LogModule): void {
+        this.defaultModule = module;
+    }
+
     private shouldLog(level: LogLevel): boolean {
         // Lower priority number = higher severity, so we log if level priority <= minLevel priority
         return this.levelPriority[level] <= this.levelPriority[this.minLevel];
@@ -114,13 +170,13 @@ class Logger {
     ]);
 
     /**
-     * Sanitize details object by redacting sensitive values
+     * Sanitize context object by redacting sensitive values
      * This prevents clear-text logging of OAuth config and other secrets
      */
-    private sanitizeDetails(details: Record<string, unknown>): Record<string, unknown> {
-        const sanitized: Record<string, unknown> = {};
+    private sanitizeContext(context: LogContext): LogContext {
+        const sanitized: LogContext = {};
 
-        for (const [key, value] of Object.entries(details)) {
+        for (const [key, value] of Object.entries(context)) {
             const lowerKey = key.toLowerCase();
 
             // Check if this key matches any sensitive pattern
@@ -131,7 +187,7 @@ class Logger {
                 sanitized[key] = '[REDACTED]';
             } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
                 // Recursively sanitize nested objects
-                sanitized[key] = this.sanitizeDetails(value as Record<string, unknown>);
+                sanitized[key] = this.sanitizeContext(value as LogContext);
             } else {
                 sanitized[key] = value;
             }
@@ -140,105 +196,198 @@ class Logger {
         return sanitized;
     }
 
+    /**
+     * Format log entry according to MCP logging standard
+     * Format: [timestamp] [LEVEL] [MODULE] [CODE] message {context}
+     */
     private formatEntry(entry: LogEntry): string {
-        const base = `[${entry.timestamp}] [${entry.level.toUpperCase()}] ${entry.message}`;
-        if (entry.details) {
-            const sanitizedDetails = this.sanitizeDetails(entry.details);
-            return `${base} ${JSON.stringify(sanitizedDetails)}`;
+        const parts: string[] = [
+            `[${entry.timestamp}]`,
+            `[${entry.level.toUpperCase()}]`
+        ];
+
+        // Add module if present
+        if (entry.module) {
+            parts.push(`[${entry.module}]`);
         }
-        return base;
+
+        // Add code if present
+        if (entry.code) {
+            parts.push(`[${entry.code}]`);
+        }
+
+        // Add message
+        parts.push(entry.message);
+
+        // Add context if present (excluding module and code which are already in the format)
+        if (entry.context) {
+            // Destructure out fields that are already in the log line format
+            const { module, code, ...restContext } = entry.context;
+            void module; void code; // Intentionally unused - already in format
+            if (Object.keys(restContext).length > 0) {
+                const sanitizedContext = this.sanitizeContext(restContext);
+                parts.push(JSON.stringify(sanitizedContext));
+            }
+        }
+
+        return parts.join(' ');
     }
 
     /**
      * Send log message to MCP client if connected
      */
-    private async sendToMcp(level: LogLevel, message: string, details?: Record<string, unknown>): Promise<void> {
+    private async sendToMcp(entry: LogEntry): Promise<void> {
         if (!this.mcpServer) {
             return;
         }
 
         try {
-            const sanitizedData = details ? this.sanitizeDetails(details) : {};
+            const data: Record<string, unknown> = {
+                message: entry.message
+            };
+            if (entry.module) data['module'] = entry.module;
+            if (entry.code) data['code'] = entry.code;
+            if (entry.context) {
+                const sanitized = this.sanitizeContext(entry.context);
+                Object.assign(data, sanitized);
+            }
+
             await this.mcpServer.sendLoggingMessage({
-                level,
+                level: entry.level,
                 logger: this.loggerName,
-                data: {
-                    message,
-                    ...sanitizedData
-                }
+                data
             });
         } catch {
             // Silently ignore MCP logging failures to avoid infinite loops
         }
     }
 
-    private log(level: LogLevel, message: string, details?: Record<string, unknown>): void {
+    /**
+     * Core logging method
+     */
+    private log(level: LogLevel, message: string, context?: LogContext): void {
         if (!this.shouldLog(level)) {
             return;
         }
 
         const entry: LogEntry = {
             level,
+            module: context?.module ?? this.defaultModule,
+            code: context?.code,
             message,
             timestamp: new Date().toISOString(),
-            details
+            context
         };
 
         const formatted = this.formatEntry(entry);
 
         // Write to stderr to avoid interfering with MCP stdio transport
-        switch (level) {
-            case 'error':
-            case 'critical':
-            case 'alert':
-            case 'emergency':
-                console.error(formatted);
-                break;
-            case 'warning':
-                console.warn(formatted);
-                break;
-            default:
-                console.error(formatted); // Use stderr for all levels
-        }
+        // All levels use console.error to write to stderr
+        console.error(formatted);
 
         // Also send to MCP client if connected (fire and forget)
-        void this.sendToMcp(level, message, details);
+        void this.sendToMcp(entry);
     }
 
-    debug(message: string, details?: Record<string, unknown>): void {
-        this.log('debug', message, details);
+    // =========================================================================
+    // Convenience methods for each log level
+    // =========================================================================
+
+    debug(message: string, context?: LogContext): void {
+        this.log('debug', message, context);
     }
 
-    info(message: string, details?: Record<string, unknown>): void {
-        this.log('info', message, details);
+    info(message: string, context?: LogContext): void {
+        this.log('info', message, context);
     }
 
-    notice(message: string, details?: Record<string, unknown>): void {
-        this.log('notice', message, details);
+    notice(message: string, context?: LogContext): void {
+        this.log('notice', message, context);
     }
 
-    warn(message: string, details?: Record<string, unknown>): void {
-        this.log('warning', message, details);
+    warn(message: string, context?: LogContext): void {
+        this.log('warning', message, context);
     }
 
-    warning(message: string, details?: Record<string, unknown>): void {
-        this.log('warning', message, details);
+    warning(message: string, context?: LogContext): void {
+        this.log('warning', message, context);
     }
 
-    error(message: string, details?: Record<string, unknown>): void {
-        this.log('error', message, details);
+    error(message: string, context?: LogContext): void {
+        this.log('error', message, context);
     }
 
-    critical(message: string, details?: Record<string, unknown>): void {
-        this.log('critical', message, details);
+    critical(message: string, context?: LogContext): void {
+        this.log('critical', message, context);
     }
 
-    alert(message: string, details?: Record<string, unknown>): void {
-        this.log('alert', message, details);
+    alert(message: string, context?: LogContext): void {
+        this.log('alert', message, context);
     }
 
-    emergency(message: string, details?: Record<string, unknown>): void {
-        this.log('emergency', message, details);
+    emergency(message: string, context?: LogContext): void {
+        this.log('emergency', message, context);
+    }
+
+    // =========================================================================
+    // Module-scoped logging helpers
+    // =========================================================================
+
+    /**
+     * Create a child logger scoped to a specific module
+     */
+    forModule(module: LogModule): ModuleLogger {
+        return new ModuleLogger(this, module);
+    }
+}
+
+/**
+ * Module-scoped logger for cleaner code in specific modules
+ */
+class ModuleLogger {
+    constructor(
+        private parent: Logger,
+        private module: LogModule
+    ) { }
+
+    private withModule(context?: LogContext): LogContext {
+        return { ...context, module: this.module };
+    }
+
+    debug(message: string, context?: LogContext): void {
+        this.parent.debug(message, this.withModule(context));
+    }
+
+    info(message: string, context?: LogContext): void {
+        this.parent.info(message, this.withModule(context));
+    }
+
+    notice(message: string, context?: LogContext): void {
+        this.parent.notice(message, this.withModule(context));
+    }
+
+    warn(message: string, context?: LogContext): void {
+        this.parent.warn(message, this.withModule(context));
+    }
+
+    warning(message: string, context?: LogContext): void {
+        this.parent.warning(message, this.withModule(context));
+    }
+
+    error(message: string, context?: LogContext): void {
+        this.parent.error(message, this.withModule(context));
+    }
+
+    critical(message: string, context?: LogContext): void {
+        this.parent.critical(message, this.withModule(context));
+    }
+
+    alert(message: string, context?: LogContext): void {
+        this.parent.alert(message, this.withModule(context));
+    }
+
+    emergency(message: string, context?: LogContext): void {
+        this.parent.emergency(message, this.withModule(context));
     }
 }
 

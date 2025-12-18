@@ -7,6 +7,7 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { logger } from '../utils/logger.js';
 import type {
     DatabaseType,
     DatabaseConfig,
@@ -164,7 +165,7 @@ export abstract class DatabaseAdapter {
             }
         }
 
-        console.error(`[postgres-mcp] Registered ${String(registered)}/${String(tools.length)} tools from ${this.name}`);
+        logger.info(`Registered ${String(registered)}/${String(tools.length)} tools from ${this.name}`, { module: 'SERVER' });
     }
 
     /**
@@ -213,7 +214,7 @@ export abstract class DatabaseAdapter {
         for (const resource of resources) {
             this.registerResource(server, resource);
         }
-        console.error(`[postgres-mcp] Registered ${String(resources.length)} resources from ${this.name}`);
+        logger.info(`Registered ${String(resources.length)} resources from ${this.name}`, { module: 'SERVER' });
     }
 
     /**
@@ -249,7 +250,7 @@ export abstract class DatabaseAdapter {
         for (const prompt of prompts) {
             this.registerPrompt(server, prompt);
         }
-        console.error(`[postgres-mcp] Registered ${String(prompts.length)} prompts from ${this.name}`);
+        logger.info(`Registered ${String(prompts.length)} prompts from ${this.name}`, { module: 'SERVER' });
     }
 
     /**

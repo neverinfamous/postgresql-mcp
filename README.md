@@ -4,7 +4,7 @@
 
 *Last updated December 17, 2025 - Initial Implementation Complete*
 
-*Enterprise-grade PostgreSQL MCP Server with OAuth 2.0 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
+*Enterprise-grade PostgreSQL MCP Server with OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
 
 > **✅ Under Development** - 194 tools, 21 resources, and 19 prompts.
 
@@ -441,7 +441,7 @@ Icons are embedded as **SVG data URIs** for maximum portability — no external 
 
 ### 🏢 Enterprise Features
 
-- 🔐 **OAuth 2.0 Authentication** - RFC 9728/8414 compliant (coming soon)
+- 🔐 **OAuth 2.1 Authentication** - RFC 9728/8414 compliant
 - 🛡️ **Tool Filtering** - Control which database operations are exposed
 - 📈 **Monitoring** - Process lists, replication lag, cache hit ratios
 

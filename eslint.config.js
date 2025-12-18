@@ -47,7 +47,9 @@ export default tseslint.config(
                 fixStyle: 'inline-type-imports',
             }],
             '@typescript-eslint/consistent-type-exports': 'error',
-            'no-console': 'off',
+            // Prevent console.log() which writes to stdout and corrupts MCP stdio transport
+            // Only stderr output (error, warn) is safe for MCP servers
+            'no-console': ['error', { allow: ['error', 'warn'] }],
         },
     },
     // Test files configuration - use simpler parsing without projectService

@@ -332,7 +332,8 @@ program
 
         filteredTools = filteredTools.filter(t => filterConfig.enabledTools.has(t.name));
 
-        console.log(`\nPostgreSQL MCP Tools (${String(filteredTools.length)}/${String(tools.length)}):\n`);
+        // Use stderr for all output - stdout is reserved for MCP protocol
+        console.error(`\nPostgreSQL MCP Tools (${String(filteredTools.length)}/${String(tools.length)}):\n`);
 
         // Group by category
         const grouped = new Map<string, typeof tools>();
@@ -343,12 +344,12 @@ program
         }
 
         for (const [group, groupTools] of grouped) {
-            console.log(`[${group}] (${String(groupTools.length)})`);
+            console.error(`[${group}] (${String(groupTools.length)})`);
             for (const tool of groupTools) {
                 const desc = tool.description.split('.')[0] ?? '';
-                console.log(`  - ${tool.name}: ${desc}`);
+                console.error(`  - ${tool.name}: ${desc}`);
             }
-            console.log('');
+            console.error('');
         }
     });
 
@@ -364,19 +365,20 @@ program
         const prompts = adapter.getPromptDefinitions();
         const groups = adapter.getSupportedToolGroups();
 
-        console.log('\nPostgreSQL MCP Server');
-        console.log('=====================');
-        console.log(`Version: ${VERSION}`);
-        console.log(`Tools: ${String(tools.length)}`);
-        console.log(`Resources: ${String(resources.length)}`);
-        console.log(`Prompts: ${String(prompts.length)}`);
-        console.log(`Tool Groups: ${groups.join(', ')}`);
-        console.log('\nTransports: stdio (default), http, sse');
-        console.log('OAuth 2.0: Supported (RFC 9728/8414)');
-        console.log('\nCapabilities:');
+        // Use stderr for all output - stdout is reserved for MCP protocol
+        console.error('\nPostgreSQL MCP Server');
+        console.error('=====================');
+        console.error(`Version: ${VERSION}`);
+        console.error(`Tools: ${String(tools.length)}`);
+        console.error(`Resources: ${String(resources.length)}`);
+        console.error(`Prompts: ${String(prompts.length)}`);
+        console.error(`Tool Groups: ${groups.join(', ')}`);
+        console.error('\nTransports: stdio (default), http, sse');
+        console.error('OAuth 2.0: Supported (RFC 9728/8414)');
+        console.error('\nCapabilities:');
         const caps = adapter.getCapabilities();
         for (const [cap, enabled] of Object.entries(caps)) {
-            console.log(`  ${cap}: ${enabled ? '✓' : '✗'}`);
+            console.error(`  ${cap}: ${enabled ? '✓' : '✗'}`);
         }
     });
 

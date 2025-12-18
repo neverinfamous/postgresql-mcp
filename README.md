@@ -175,6 +175,9 @@ Set via environment variable:
 > [!IMPORTANT]
 > **AI IDEs like Cursor have tool limits (typically 40-50 tools).** With 195 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (49 tools) as a starting point.
 
+> [!TIP]
+> **Code Mode:** Add `+codemode` to any shortcut to enable `pg_execute_code` (+1 tool). Example: `starter,+codemode` = 50 tools.
+
 ### What Can You Filter?
 
 The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names** — mix and match freely:
@@ -205,9 +208,6 @@ The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names*
 | `ext-geo` | 20 | Extension: Spatial | PostGIS, ltree |
 | `ext-schedule` | 18 | Extension: Scheduling | pg_cron, pg_partman |
 | `ext-perf` | 23 | Extension: Perf/Analysis | pg_stat_kcache, performance |
-
-> [!TIP]
-> **Code Mode:** Add `+codemode` to any shortcut to enable `pg_execute_code` (+1 tool). Example: `starter,+codemode` = 50 tools.
 
 ### Tool Groups (20 Available)
 

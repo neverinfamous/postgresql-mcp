@@ -51,6 +51,19 @@ import { getPostgresPrompts } from './prompts/index.js';
 /**
  * PostgreSQL Database Adapter
  */
+/**
+ * Metadata cache entry with TTL support
+ */
+interface CacheEntry<T> {
+    data: T;
+    timestamp: number;
+}
+
+/**
+ * Default cache TTL in milliseconds (configurable via CACHE_TTL_MS env var)
+ */
+const DEFAULT_CACHE_TTL_MS = parseInt(process.env['METADATA_CACHE_TTL_MS'] ?? '30000', 10);
+
 export class PostgresAdapter extends DatabaseAdapter {
     readonly type = 'postgresql' as const;
     readonly name = 'PostgreSQL Adapter';
@@ -58,6 +71,40 @@ export class PostgresAdapter extends DatabaseAdapter {
 
     private pool: ConnectionPool | null = null;
     private activeTransactions = new Map<string, PoolClient>();
+
+    // Performance optimization: cache tool definitions (immutable after creation)
+    private cachedToolDefinitions: ToolDefinition[] | null = null;
+
+    // Performance optimization: cache metadata with TTL
+    private metadataCache = new Map<string, CacheEntry<unknown>>();
+    private cacheTtlMs = DEFAULT_CACHE_TTL_MS;
+
+    /**
+     * Get cached value if not expired
+     */
+    private getCached(key: string): unknown {
+        const entry = this.metadataCache.get(key);
+        if (!entry) return undefined;
+        if (Date.now() - entry.timestamp > this.cacheTtlMs) {
+            this.metadataCache.delete(key);
+            return undefined;
+        }
+        return entry.data;
+    }
+
+    /**
+     * Set cache value
+     */
+    private setCache(key: string, data: unknown): void {
+        this.metadataCache.set(key, { data, timestamp: Date.now() });
+    }
+
+    /**
+     * Clear all cached metadata (useful after schema changes)
+     */
+    clearMetadataCache(): void {
+        this.metadataCache.clear();
+    }
 
     // =========================================================================
     // Connection Lifecycle
@@ -320,12 +367,8 @@ export class PostgresAdapter extends DatabaseAdapter {
         const materializedViews = tables.filter(t => t.type === 'materialized_view');
         const realTables = tables.filter(t => t.type === 'table' || t.type === 'partitioned_table');
 
-        // Get all indexes
-        const indexes: IndexInfo[] = [];
-        for (const table of realTables) {
-            const tableIndexes = await this.getTableIndexes(table.name, table.schema);
-            indexes.push(...tableIndexes);
-        }
+        // Performance optimization: fetch all indexes in a single query instead of N+1
+        const indexes = await this.getAllIndexes();
 
         return {
             tables: realTables,
@@ -333,6 +376,54 @@ export class PostgresAdapter extends DatabaseAdapter {
             materializedViews,
             indexes
         };
+    }
+
+    /**
+     * Get all indexes across all user tables in a single query
+     * Performance optimization: eliminates N+1 query pattern
+     */
+    private async getAllIndexes(): Promise<IndexInfo[]> {
+        // Check cache first
+        const cached = this.getCached('all_indexes') as IndexInfo[] | undefined;
+        if (cached) return cached;
+
+        const result = await this.executeQuery(`
+            SELECT 
+                i.relname as name,
+                t.relname as table_name,
+                n.nspname as schema_name,
+                am.amname as type,
+                ix.indisunique as is_unique,
+                pg_get_indexdef(ix.indexrelid) as definition,
+                array_agg(a.attname ORDER BY x.ordinality) as columns,
+                pg_relation_size(i.oid) as size_bytes,
+                COALESCE(pg_stat_get_numscans(i.oid), 0) as num_scans
+            FROM pg_index ix
+            JOIN pg_class t ON t.oid = ix.indrelid
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            JOIN pg_am am ON am.oid = i.relam
+            CROSS JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS x(attnum, ordinality)
+            LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = x.attnum
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND n.nspname !~ '^pg_toast'
+            GROUP BY i.relname, t.relname, n.nspname, am.amname, ix.indisunique, ix.indexrelid, i.oid
+            ORDER BY n.nspname, t.relname, i.relname
+        `);
+
+        const indexes = (result.rows ?? []).map(row => ({
+            name: row['name'] as string,
+            tableName: row['table_name'] as string,
+            schemaName: row['schema_name'] as string,
+            columns: row['columns'] as string[],
+            unique: row['is_unique'] as boolean,
+            type: row['type'] as IndexInfo['type'],
+            sizeBytes: Number(row['size_bytes']) || undefined,
+            numberOfScans: Number(row['num_scans']) || undefined
+        }));
+
+        this.setCache('all_indexes', indexes);
+        return indexes;
     }
 
     async listTables(): Promise<TableInfo[]> {
@@ -556,7 +647,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     // =========================================================================
 
     getToolDefinitions(): ToolDefinition[] {
-        return [
+        // Performance optimization: cache tool definitions (immutable after creation)
+        if (this.cachedToolDefinitions) {
+            return this.cachedToolDefinitions;
+        }
+
+        this.cachedToolDefinitions = [
             ...getCoreTools(this),
             ...getTransactionTools(this),
             ...getJsonbTools(this),
@@ -577,6 +673,8 @@ export class PostgresAdapter extends DatabaseAdapter {
             ...getLtreeTools(this),
             ...getPgcryptoTools(this)
         ];
+
+        return this.cachedToolDefinitions;
     }
 
     getResourceDefinitions(): ResourceDefinition[] {

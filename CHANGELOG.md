@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+- **Parallelized Health Queries** — Health resource now executes 5 checks concurrently using `Promise.all()`
+  - Expected ~5x latency improvement for `postgres://health` resource
+- **Batched Index Queries** — `getSchema()` now fetches all indexes in a single query
+  - Eliminates N+1 query pattern (e.g., 101 queries → 1 query for 100 tables)
+- **Tool Definition Caching** — 194 tool definitions are now cached after first generation
+  - Subsequent calls return cached array without re-creation
+- **Metadata Cache with TTL** — Added configurable TTL-based cache for expensive metadata queries
+  - Default 30s TTL, configurable via `METADATA_CACHE_TTL_MS` environment variable
+  - `clearMetadataCache()` method for invalidation after schema changes
+- **Benchmark Tests** — Added performance benchmark test suite (`src/adapters/postgresql/__tests__/performance.test.ts`)
+
 ### Security
 - **CodeQL Remediation** — Fixed 4 clear-text logging vulnerabilities (js/clear-text-logging)
   - Added `sanitizeDetails()` to Logger class that redacts sensitive OAuth/security fields before console output

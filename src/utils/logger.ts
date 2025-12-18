@@ -39,7 +39,8 @@ export type LogModule =
     | 'QUERY'       // SQL query execution
     | 'POOL'        // Connection pool
     | 'FILTER'      // Tool filtering
-    | 'CLI';        // Command line interface
+    | 'CLI'         // Command line interface
+    | 'CODEMODE';   // Code Mode sandbox
 
 /**
  * Structured log context following MCP logging standards

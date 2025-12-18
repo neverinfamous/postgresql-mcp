@@ -26,7 +26,8 @@ export type ToolGroup =
     | 'kcache'         // pg_stat_kcache extension - OS-level performance stats
     | 'citext'         // citext extension - case-insensitive text
     | 'ltree'          // ltree extension - hierarchical tree labels
-    | 'pgcrypto';      // pgcrypto extension - cryptographic functions
+    | 'pgcrypto'       // pgcrypto extension - cryptographic functions
+    | 'codemode';      // Code Mode - sandboxed code execution
 
 /**
  * Meta-group identifiers for common multi-group selections

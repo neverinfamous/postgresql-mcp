@@ -243,6 +243,9 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_pgcrypto_gen_random_bytes',
         'pg_pgcrypto_gen_salt',
         'pg_pgcrypto_crypt'
+    ],
+    codemode: [
+        'pg_execute_code'
     ]
 };
 

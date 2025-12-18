@@ -73,7 +73,10 @@ export const TOOL_GROUP_SCOPES: Record<ToolGroup, StandardScope> = {
     kcache: SCOPES.READ,
     citext: SCOPES.READ,
     ltree: SCOPES.READ,
-    pgcrypto: SCOPES.READ
+    pgcrypto: SCOPES.READ,
+
+    // Code Mode (requires admin - can execute arbitrary operations)
+    codemode: SCOPES.ADMIN
 };
 
 // =============================================================================

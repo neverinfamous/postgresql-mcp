@@ -6,14 +6,14 @@
 
 *Enterprise-grade PostgreSQL MCP Server with OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
 
-> **✅ Under Development** - 194 tools, 21 resources, and 19 prompts.
+> **✅ Under Development** - 195 tools, 21 resources, and 19 prompts.
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
-A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **194 specialized tools**, **21 resources**, and **19 AI-powered prompts**.
+A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **195 specialized tools**, **21 resources**, and **19 AI-powered prompts**.
 
 ---
 
@@ -103,38 +103,57 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
 
 ---
 
-## 🛠️ Tool Categories
+## 🧪 Code Mode
 
-This server provides **194 tools** across 19 categories:
+Code Mode lets you write JavaScript that orchestrates multiple database operations in a single call. Instead of calling tools one-by-one, write code that loops, aggregates, and transforms data.
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| Core | 13 | CRUD, schema, tables, indexes, health analysis |
-| Transactions | 7 | BEGIN, COMMIT, ROLLBACK, savepoints with isolation levels |
-| JSONB | 19 | jsonb_set, jsonb_extract, jsonb_path_query, merge, diff, security scan |
-| Text | 11 | Full-text search, trigram similarity, fuzzy matching, sentiment |
-| Stats | 8 | Descriptive stats, percentiles, correlation, regression, time series |
-| Performance | 16 | EXPLAIN ANALYZE, plan compare, baseline, connection pool, partitioning |
-| Admin | 10 | VACUUM, ANALYZE, REINDEX, configuration |
-| Monitoring | 11 | Database sizes, connections, replication, capacity planning, alerts |
-| Backup | 9 | pg_dump, COPY, physical backup, restore validation, scheduling |
-| Schema | 10 | Schemas, sequences, views, functions, triggers |
-| Vector | 14 | pgvector extension - similarity search, clustering, hybrid search |
-| PostGIS | 12 | Geospatial operations - distance, transform, clustering, index optimization |
-| Partitioning | 6 | Range/list/hash partitioning management |
-| Cron | 8 | pg_cron extension - job scheduling, monitoring, cleanup |
-| Partman | 10 | pg_partman extension - automated partition lifecycle management |
-| Kcache | 7 | pg_stat_kcache extension - OS-level CPU/memory/I/O stats per query |
-| Citext | 6 | citext extension - case-insensitive text for emails, usernames |
-| Ltree | 8 | ltree extension - hierarchical tree labels for taxonomies, org charts |
-| Pgcrypto | 9 | pgcrypto extension - hashing, encryption, password hashing, random UUIDs |
+### Quick Start
+
+**No configuration changes required.** Add `codemode` to your tool filter to access `pg_execute_code`:
+
+```json
+{
+  "args": ["--tool-filter", "starter,+codemode"]
+}
+```
+
+### Example
+
+```javascript
+// Get row counts for all tables
+const tables = await pg.core.listTables();
+return Promise.all(tables.map(async t => ({
+  table: t.name,
+  rows: (await pg.performance.tableStats({ table: t.name })).row_count
+})));
+```
+
+### Isolation Modes
+
+| Mode | Isolation | When to Use |
+|------|-----------|-------------|
+| `vm` | Same process | Default, best performance |
+| `worker` | Separate V8 thread | Enhanced security |
+
+Set via environment variable:
+```json
+{ "env": { "CODEMODE_ISOLATION": "worker" } }
+```
+
+### Security
+
+- Requires `admin` OAuth scope
+- Blocked: `require()`, `process`, `eval()`, filesystem
+- Rate limited: 60 executions/minute
+
+📖 **Full documentation:** [docs/CODE_MODE.md](docs/CODE_MODE.md)
 
 ---
 
 ## 🛠️ Tool Filtering
 
 > [!IMPORTANT]
-> **AI IDEs like Cursor have tool limits (typically 40-50 tools).** With 194 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (49 tools) as a starting point.
+> **AI IDEs like Cursor have tool limits (typically 40-50 tools).** With 195 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (49 tools) as a starting point.
 
 ### What Can You Filter?
 
@@ -190,6 +209,7 @@ The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names*
 | `citext` | 6 | citext (case-insensitive text) |
 | `ltree` | 8 | ltree (hierarchical data) |
 | `pgcrypto` | 9 | pgcrypto (encryption, UUIDs) |
+| `codemode` | 1 | Code Mode (sandboxed code execution) |
 
 ---
 

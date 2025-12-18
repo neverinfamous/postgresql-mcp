@@ -118,6 +118,11 @@ const CATEGORY_ICONS: Record<ToolGroup, { path: string; color: string }> = {
     pgcrypto: {
         path: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
         color: '#EAB308'
+    },
+    // Codemode: Terminal/code
+    codemode: {
+        path: '<polyline points="4,17 10,11 4,5"/><line x1="12" y1="19" x2="20" y2="19"/>',
+        color: '#EC4899'
     }
 };
 

@@ -283,9 +283,6 @@ class Logger {
 
         // Write to stderr to avoid interfering with MCP stdio transport
         // All levels use console.error to write to stderr
-        // Security: All sensitive OAuth/credential data has been redacted by sanitizeContext() in formatEntry()
-        // codeql[js/clear-text-logging] - False positive: sensitive data redacted by sanitizeContext()
-        // codeql[js/log-injection] - False positive: user input sanitized before logging
         console.error(formatted);
 
         // Also send to MCP client if connected (fire and forget)

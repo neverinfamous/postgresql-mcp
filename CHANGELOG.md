@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 19 category-specific colored SVG icons (one per tool group)
   - Embedded as data URIs for maximum portability — no external hosting required
   - Centralized icon utility: `getToolIcons()` in `src/utils/icons.ts`
+- **MCP Enhanced Logging** — Full MCP protocol logging support (SDK 1.25+)
+  - RFC 5424 severity levels: debug, info, notice, warning, error, critical, alert, emergency
+  - Dual-mode output: stderr for local debugging + MCP protocol notifications to clients
+  - Dynamic log level control via `logging/setLevel` request from MCP clients
+  - Structured log messages with `notifications/message` containing logger name and context
+  - Sensitive data redaction preserved for both output modes
 - **21 resources** — migrated + new extension resources
   - `postgres://capabilities` — Server version, extensions, tool categories
   - `postgres://performance` — pg_stat_statements query metrics

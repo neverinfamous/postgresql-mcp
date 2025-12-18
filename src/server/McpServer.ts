@@ -2,7 +2,7 @@
  * postgres-mcp - MCP Server Wrapper
  * 
  * Wraps the MCP SDK server with database adapter integration,
- * tool filtering, and graceful shutdown support.
+ * tool filtering, logging capabilities, and graceful shutdown support.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -23,7 +23,7 @@ export interface ServerConfig {
  * PostgreSQL MCP Server
  */
 export class PostgresMcpServer {
-    private server: McpServer;
+    private mcpServer: McpServer;
     private adapter: DatabaseAdapter;
     private filterConfig: ToolFilterConfig;
     private transport: StdioServerTransport | null = null;
@@ -32,15 +32,29 @@ export class PostgresMcpServer {
         this.adapter = config.adapter;
         this.filterConfig = parseToolFilter(config.toolFilter);
 
-        this.server = new McpServer({
-            name: config.name,
-            version: config.version
-        });
+        // Create MCP server with logging capability enabled
+        this.mcpServer = new McpServer(
+            {
+                name: config.name,
+                version: config.version
+            },
+            {
+                capabilities: {
+                    logging: {}
+                }
+            }
+        );
+
+        // Connect the logger to the underlying MCP server for protocol logging
+        // The McpServer.server property exposes the low-level Server instance
+        logger.setMcpServer(this.mcpServer.server);
+        logger.setLoggerName(config.name);
 
         logger.info('MCP Server initialized', {
             name: config.name,
             version: config.version,
-            toolFilter: config.toolFilter ?? 'none'
+            toolFilter: config.toolFilter ?? 'none',
+            capabilities: ['logging']
         });
     }
 
@@ -49,13 +63,13 @@ export class PostgresMcpServer {
      */
     private registerComponents(): void {
         // Register tools (with filtering)
-        this.adapter.registerTools(this.server, this.filterConfig.enabledTools);
+        this.adapter.registerTools(this.mcpServer, this.filterConfig.enabledTools);
 
         // Register resources
-        this.adapter.registerResources(this.server);
+        this.adapter.registerResources(this.mcpServer);
 
         // Register prompts
-        this.adapter.registerPrompts(this.server);
+        this.adapter.registerPrompts(this.mcpServer);
 
         const toolCount = this.filterConfig.enabledTools.size;
         const resourceCount = this.adapter.getResourceDefinitions().length;
@@ -78,7 +92,7 @@ export class PostgresMcpServer {
         // Create and connect transport
         this.transport = new StdioServerTransport();
 
-        await this.server.connect(this.transport);
+        await this.mcpServer.connect(this.transport);
 
         logger.info('MCP Server started with stdio transport');
     }
@@ -90,7 +104,7 @@ export class PostgresMcpServer {
         logger.info('Stopping MCP Server...');
 
         try {
-            await this.server.close();
+            await this.mcpServer.close();
             logger.info('MCP Server stopped');
         } catch (error) {
             logger.error('Error stopping server', {
@@ -103,7 +117,7 @@ export class PostgresMcpServer {
      * Get the underlying MCP server instance
      */
     getMcpServer(): McpServer {
-        return this.server;
+        return this.mcpServer;
     }
 
     /**

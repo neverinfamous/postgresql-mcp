@@ -32,7 +32,7 @@ interface CliOptions {
     ssl?: boolean;
     poolMax?: number;
     toolFilter?: string;
-    logLevel?: 'debug' | 'info' | 'warn' | 'error';
+    logLevel?: 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency';
     transport?: TransportType;
     port?: number;
     oauthEnabled?: boolean;
@@ -68,7 +68,7 @@ program
     .option('--transport, -t <type>', 'Transport type: stdio, http, sse (default: stdio)')
     .option('--port, -p <port>', 'HTTP port for http/sse transports (default: 3000)', parseInt)
     .option('--tool-filter <filter>', 'Tool filter string (e.g., "-vector,-postgis")')
-    .option('--log-level <level>', 'Log level: debug, info, warn, error (default: info)')
+    .option('--log-level <level>', 'Log level: debug, info, notice, warning, error, critical, alert, emergency (default: info)')
     // OAuth options
     .option('--oauth-enabled, -o', 'Enable OAuth 2.0 authentication')
     .option('--oauth-issuer <url>', 'Authorization server URL (issuer)')

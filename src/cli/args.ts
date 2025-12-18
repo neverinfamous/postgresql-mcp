@@ -26,7 +26,7 @@ export interface ParsedArgs {
     toolFilter?: string;
 
     /** Log level */
-    logLevel?: 'debug' | 'info' | 'warn' | 'error';
+    logLevel?: 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency';
 
     /** Whether to exit after printing help/version */
     shouldExit: boolean;
@@ -149,7 +149,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
             // Log level
             case '--log-level':
                 if (nextArg && !nextArg.startsWith('-')) {
-                    result.logLevel = nextArg as 'debug' | 'info' | 'warn' | 'error';
+                    result.logLevel = nextArg as 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency';
                     i++;
                 }
                 break;
@@ -244,7 +244,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
 
     // Check for log level in environment
     if (!result.logLevel && process.env['LOG_LEVEL']) {
-        result.logLevel = process.env['LOG_LEVEL'] as 'debug' | 'info' | 'warn' | 'error';
+        result.logLevel = process.env['LOG_LEVEL'] as 'debug' | 'info' | 'notice' | 'warning' | 'error' | 'critical' | 'alert' | 'emergency';
     }
 
     // Check OAuth environment variables
@@ -326,7 +326,7 @@ Server Options:
   --transport, -t <type>    Transport type: stdio, http, sse (default: stdio)
   --port, -p <port>         HTTP port for http/sse transports (default: 3000)
   --tool-filter, -f <str>   Tool filter string (e.g., "-base,-extensions,+starter")
-  --log-level <level>       Log level: debug, info, warn, error
+  --log-level <level>       Log level: debug, info, notice, warning, error, critical, alert, emergency
 
 OAuth Options:
   --oauth-enabled, -o       Enable OAuth 2.0 authentication
@@ -346,7 +346,7 @@ Environment Variables:
   PGPASSWORD, POSTGRES_PASSWORD  PostgreSQL password
   PGDATABASE, POSTGRES_DATABASE  PostgreSQL database
   POSTGRES_TOOL_FILTER      Tool filter string
-  LOG_LEVEL                 Log level (debug, info, warn, error)
+  LOG_LEVEL                 Log level (debug, info, notice, warning, error, critical, alert, emergency)
   OAUTH_ENABLED             Enable OAuth (true/false)
   OAUTH_ISSUER              Authorization server URL
   OAUTH_AUDIENCE            Expected token audience

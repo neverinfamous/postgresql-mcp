@@ -128,6 +128,21 @@ describe('Handler Execution', () => {
                 [42]
             );
         });
+
+        it('should return 0 rowCount when rows is undefined (line 29 branch)', async () => {
+            mockAdapter.executeReadQuery.mockResolvedValue({
+                rows: undefined as unknown as Record<string, unknown>[],
+                executionTimeMs: 5
+            });
+
+            const tool = tools.find(t => t.name === 'pg_read_query')!;
+            const result = await tool.handler({ sql: 'SELECT 1' }, mockContext) as {
+                rows: unknown;
+                rowCount: number;
+            };
+
+            expect(result.rowCount).toBe(0);
+        });
     });
 
     describe('pg_write_query', () => {

@@ -553,6 +553,57 @@ describe('pg_resource_usage_analyze', () => {
 
         expect(result.analysis.lockContention).toBe('4 queries waiting on locks');
     });
+
+    it('should return N/A for heap hit rate when no heap activity', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
+            .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [{ heap_reads: 0, heap_hits: 0, index_reads: 50, index_hits: 450 }] }) // No heap activity
+            .mockResolvedValueOnce({ rows: [{ active_queries: 1, io_waiting: 0, lock_waiting: 0 }] });
+
+        const tool = tools.find(t => t.name === 'pg_resource_usage_analyze')!;
+        const result = await tool.handler({}, mockContext) as {
+            bufferUsage: { heapHitRate: string; indexHitRate: string };
+        };
+
+        expect(result.bufferUsage.heapHitRate).toBe('N/A');
+        expect(result.bufferUsage.indexHitRate).toBe('90.00%');
+    });
+
+    it('should return N/A for index hit rate when no index activity', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
+            .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [{ heap_reads: 100, heap_hits: 900, index_reads: 0, index_hits: 0 }] }) // No index activity
+            .mockResolvedValueOnce({ rows: [{ active_queries: 1, io_waiting: 0, lock_waiting: 0 }] });
+
+        const tool = tools.find(t => t.name === 'pg_resource_usage_analyze')!;
+        const result = await tool.handler({}, mockContext) as {
+            bufferUsage: { heapHitRate: string; indexHitRate: string };
+        };
+
+        expect(result.bufferUsage.heapHitRate).toBe('90.00%');
+        expect(result.bufferUsage.indexHitRate).toBe('N/A');
+    });
+
+    it('should show no I/O bottlenecks when io_waiting is 0', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
+            .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [{ heap_reads: 100, heap_hits: 100 }] })
+            .mockResolvedValueOnce({ rows: [{ active_queries: 5, io_waiting: 0, lock_waiting: 0 }] });
+
+        const tool = tools.find(t => t.name === 'pg_resource_usage_analyze')!;
+        const result = await tool.handler({}, mockContext) as {
+            analysis: { ioPattern: string; lockContention: string };
+        };
+
+        expect(result.analysis.ioPattern).toBe('No I/O wait bottlenecks detected');
+        expect(result.analysis.lockContention).toBe('No lock contention');
+    });
 });
 
 describe('pg_alert_threshold_set', () => {

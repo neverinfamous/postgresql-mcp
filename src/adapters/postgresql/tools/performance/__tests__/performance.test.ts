@@ -192,6 +192,48 @@ describe('pg_index_stats', () => {
         );
         expect(result.indexes).toHaveLength(1);
     });
+
+    it('should filter by schema when provided', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ indexrelname: 'sales_orders_pkey', idx_scan: 500 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_index_stats')!;
+        await tool.handler({ schema: 'sales' }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("schemaname = 'sales'")
+        );
+    });
+
+    it('should filter by table when provided', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ indexrelname: 'orders_pkey', idx_scan: 300 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_index_stats')!;
+        await tool.handler({ table: 'orders' }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("relname = 'orders'")
+        );
+    });
+
+    it('should filter by both schema and table when provided', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ indexrelname: 'sales_orders_pkey', idx_scan: 200 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_index_stats')!;
+        await tool.handler({ schema: 'sales', table: 'orders' }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("schemaname = 'sales'")
+        );
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("relname = 'orders'")
+        );
+    });
 });
 
 describe('pg_table_stats', () => {
@@ -220,6 +262,48 @@ describe('pg_table_stats', () => {
             expect.stringContaining('pg_stat_user_tables')
         );
         expect(result.tables).toHaveLength(1);
+    });
+
+    it('should filter by schema when provided', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ relname: 'orders', seq_scan: 100 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_table_stats')!;
+        await tool.handler({ schema: 'sales' }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("schemaname = 'sales'")
+        );
+    });
+
+    it('should filter by table when provided', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ relname: 'orders', seq_scan: 200 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_table_stats')!;
+        await tool.handler({ table: 'orders' }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("relname = 'orders'")
+        );
+    });
+
+    it('should filter by both schema and table when provided', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ relname: 'orders', seq_scan: 150 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_table_stats')!;
+        await tool.handler({ schema: 'sales', table: 'orders' }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("schemaname = 'sales'")
+        );
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("relname = 'orders'")
+        );
     });
 });
 
@@ -874,5 +958,183 @@ describe('pg_partition_strategy_suggest', () => {
         const hashStrategy = result.suggestions.find(s => s.strategy === 'HASH' && s.column === 'user_id');
         expect(hashStrategy).toBeDefined();
     });
+
+    it('should not recommend partitioning for small tables', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ relname: 'small_table', n_live_tup: 10000 }] })
+            .mockResolvedValueOnce({ rows: [{ column_name: 'id', data_type: 'integer', n_distinct: 100 }] })
+            .mockResolvedValueOnce({ rows: [{ table_size: '10 MB', size_bytes: 10000000 }] });
+
+        const tool = tools.find(t => t.name === 'pg_partition_strategy_suggest')!;
+        const result = await tool.handler({
+            table: 'small_table'
+        }, mockContext) as {
+            partitioningRecommended: boolean;
+        };
+
+        expect(result.partitioningRecommended).toBe(false);
+    });
 });
 
+// =============================================================================
+// Phase 3: Performance Tools Edge Case Tests
+// =============================================================================
+
+describe('Performance Tools Edge Cases', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getPerformanceTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getPerformanceTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('pg_stat_statements should default to total_time ordering', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ query: 'SELECT 1', calls: 100, total_time: 1000 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_stat_statements')!;
+        await tool.handler({}, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('ORDER BY total_exec_time DESC')
+        );
+    });
+
+    it('pg_index_stats should handle empty results', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_index_stats')!;
+        const result = await tool.handler({}, mockContext) as {
+            indexes: unknown[];
+        };
+
+        expect(result.indexes).toHaveLength(0);
+    });
+
+    it('pg_bloat_check should handle tables with no bloat', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] }); // no bloated tables
+
+        const tool = tools.find(t => t.name === 'pg_bloat_check')!;
+        const result = await tool.handler({}, mockContext) as {
+            bloatedTables: unknown[];
+        };
+
+        expect(result.bloatedTables).toHaveLength(0);
+    });
+
+    it('pg_performance_baseline should use custom name when provided', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ heap_hits: 1000, heap_reads: 10 }] })
+            .mockResolvedValueOnce({ rows: [{ total_seq_scans: 50 }] })
+            .mockResolvedValueOnce({ rows: [{ total_indexes: 10 }] })
+            .mockResolvedValueOnce({ rows: [{ total_connections: 5 }] })
+            .mockResolvedValueOnce({ rows: [{ size_bytes: 1000000 }] });
+
+        const tool = tools.find(t => t.name === 'pg_performance_baseline')!;
+        const result = await tool.handler({ name: 'my-custom-baseline' }, mockContext) as {
+            name: string;
+        };
+
+        expect(result.name).toBe('my-custom-baseline');
+    });
+
+    it('pg_connection_pool_optimize should handle waiting connections', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ total_connections: 50, active: 10, idle: 15, idle_in_transaction: 2, waiting: 8, max_connection_age_seconds: 100, avg_connection_age_seconds: 50 }] })
+            .mockResolvedValueOnce({ rows: [{ max_connections: 100, reserved_connections: 3 }] })
+            .mockResolvedValueOnce({ rows: [{ wait_event_type: 'Lock', count: 5 }] });
+
+        const tool = tools.find(t => t.name === 'pg_connection_pool_optimize')!;
+        const result = await tool.handler({}, mockContext) as {
+            current: { waiting: number };
+            recommendations: string[];
+        };
+
+        expect(result.current.waiting).toBe(8);
+    });
+});
+
+// =============================================================================
+// Phase 2: EXPLAIN Tools Coverage Tests
+// =============================================================================
+
+describe('EXPLAIN Tools (Coverage)', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getPerformanceTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getPerformanceTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('pg_explain_analyze should return JSON plan when format is json (line 48)', async () => {
+        const jsonPlan = [{ Plan: { 'Node Type': 'Seq Scan', 'Actual Rows': 100 } }];
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ 'QUERY PLAN': jsonPlan }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_explain_analyze')!;
+        const result = await tool.handler({
+            sql: 'SELECT * FROM users',
+            format: 'json'
+        }, mockContext) as {
+            plan: unknown;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('FORMAT JSON')
+        );
+        expect(result.plan).toEqual(jsonPlan);
+    });
+
+    it('pg_explain_buffers should return JSON plan when format is json (line 69-70)', async () => {
+        const jsonPlan = [{ Plan: { 'Shared Hit Blocks': 50, 'Shared Read Blocks': 10 } }];
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ 'QUERY PLAN': jsonPlan }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_explain_buffers')!;
+        const result = await tool.handler({
+            sql: 'SELECT * FROM large_table',
+            format: 'json'
+        }, mockContext) as {
+            plan: unknown;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('FORMAT JSON')
+        );
+        expect(result.plan).toEqual(jsonPlan);
+    });
+
+    it('pg_explain_buffers should return text plan when format is text (line 72)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [
+                { 'QUERY PLAN': 'Seq Scan on users (cost=0.00..10.50 rows=50)' },
+                { 'QUERY PLAN': '  Buffers: shared hit=10 read=2' }
+            ]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_explain_buffers')!;
+        const result = await tool.handler({
+            sql: 'SELECT * FROM users',
+            format: 'text'
+        }, mockContext) as {
+            plan: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('FORMAT TEXT')
+        );
+        expect(result.plan).toContain('Seq Scan');
+        expect(result.plan).toContain('Buffers');
+    });
+});

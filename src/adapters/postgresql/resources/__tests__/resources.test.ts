@@ -317,6 +317,38 @@ describe('Vacuum Resource', () => {
         expect(result.warnings[0].severity).toBe('INFO');
         expect(result.warnings[0].message).toContain('healthy');
     });
+
+    it('should not generate MEDIUM warning when dead tuples <= 20%', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({
+                rows: [{
+                    schemaname: 'public',
+                    relname: 'healthy_table',
+                    last_vacuum: '2024-01-01',
+                    n_dead_tup: 1000,
+                    n_live_tup: 10000,
+                    dead_tuple_percent: 10 // below 20% threshold
+                }]
+            })
+            .mockResolvedValueOnce({
+                rows: [{
+                    datname: 'testdb',
+                    xid_age: 100000,
+                    xids_until_wraparound: 2047483648,
+                    percent_toward_wraparound: 5
+                }]
+            });
+
+        const resource = createVacuumResource(mockAdapter as unknown as PostgresAdapter);
+        const result = await resource.handler('postgres://vacuum', mockContext) as {
+            warnings: Array<{ severity: string; table?: string }>;
+        };
+
+        // Should only have INFO message, no MEDIUM warning for healthy table
+        const tableWarning = result.warnings.find(w => w.table === 'public.healthy_table');
+        expect(tableWarning).toBeUndefined();
+        expect(result.warnings[0].severity).toBe('INFO');
+    });
 });
 
 describe('Locks Resource', () => {
@@ -742,6 +774,56 @@ describe('Replication Resource', () => {
         expect(result.role).toBe('replica');
         expect(result.replicationDelay).toBe('00:00:05');
     });
+
+    it('should handle replication delay as object type', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ is_replica: true }] })
+            .mockResolvedValueOnce({ rows: [{ replication_delay: { hours: 0, minutes: 1, seconds: 30 } }] }) // object type
+            .mockRejectedValueOnce(new Error('WAL position unavailable'));
+
+        const resource = createReplicationResource(mockAdapter as unknown as PostgresAdapter);
+        const result = await resource.handler('postgres://replication', mockContext) as {
+            role: string;
+            replicationDelay?: string;
+        };
+
+        expect(result.role).toBe('replica');
+        // Object should be JSON stringified
+        expect(result.replicationDelay).toContain('hours');
+    });
+
+    it('should show Unknown when replication delay is null', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ is_replica: true }] })
+            .mockResolvedValueOnce({ rows: [{ replication_delay: null }] }) // null delay
+            .mockRejectedValueOnce(new Error('WAL position unavailable'));
+
+        const resource = createReplicationResource(mockAdapter as unknown as PostgresAdapter);
+        const result = await resource.handler('postgres://replication', mockContext) as {
+            role: string;
+            replicationDelay?: string;
+        };
+
+        expect(result.role).toBe('replica');
+        expect(result.replicationDelay).toBe('Unknown');
+    });
+
+    it('should handle non-string, non-object delay type', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ is_replica: true }] })
+            .mockResolvedValueOnce({ rows: [{ replication_delay: 12345 }] }) // number type (else branch at line 78-79)
+            .mockRejectedValueOnce(new Error('WAL position unavailable'));
+
+        const resource = createReplicationResource(mockAdapter as unknown as PostgresAdapter);
+        const result = await resource.handler('postgres://replication', mockContext) as {
+            role: string;
+            replicationDelay?: string;
+        };
+
+        expect(result.role).toBe('replica');
+        // Number should be JSON stringified
+        expect(result.replicationDelay).toBe('12345');
+    });
 });
 
 // =============================================================================
@@ -878,6 +960,40 @@ describe('Cron Resource', () => {
         expect(result.activeJobCount).toBe(1);
         expect(result.recommendations).toContainEqual(expect.stringContaining('inactive'));
     });
+
+    it('should include failed job count in recentRuns from status loop', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '1.6' }] })
+            .mockResolvedValueOnce({ rows: [{ jobid: 1, schedule: '*/5 * * * *', command: 'SELECT 1', nodename: '', nodeport: 5432, database: 'db', username: 'u', active: true }] })
+            .mockResolvedValueOnce({
+                rows: [
+                    { status: 'succeeded', count: 45 },
+                    { status: 'failed', count: 7 },
+                    { status: 'running', count: 2 } // non-succeeded/failed status
+                ]
+            })
+            .mockResolvedValueOnce({
+                rows: [
+                    { jobid: 1, command: 'SELECT problematic_function()', return_message: 'ERROR: connection reset', failure_count: 5 }
+                ]
+            })
+            .mockResolvedValueOnce({ rows: [{ old_count: 500 }] });
+
+        const resource = createCronResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://cron', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            recentRuns: { total: number; successful: number; failed: number };
+            failedJobs: { jobid: number; command: string; failureCount: number }[];
+            recommendations: string[];
+        };
+
+        expect(result.recentRuns.total).toBe(54); // 45 + 7 + 2
+        expect(result.recentRuns.successful).toBe(45);
+        expect(result.recentRuns.failed).toBe(7);
+        expect(result.failedJobs).toHaveLength(1);
+        expect(result.failedJobs[0]?.failureCount).toBe(5);
+        expect(result.recommendations).toContainEqual(expect.stringContaining('jobs have failed recently'));
+    });
 });
 
 describe('Crypto Resource', () => {
@@ -997,6 +1113,61 @@ describe('Crypto Resource', () => {
 
         expect(result.encryptedColumns).toHaveLength(1);
         expect(result.encryptedColumns[0]?.column).toBe('encrypted_data');
+    });
+
+    it('should recommend bcrypt when no password hashing is detected', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '1.3' }] })
+            .mockResolvedValueOnce({ rows: [{}] }) // uuid available
+            .mockResolvedValueOnce({ rows: [] }) // no uuid columns
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // no password hash columns
+            .mockResolvedValueOnce({ rows: [] }); // no bytea columns
+
+        const resource = createCryptoResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://crypto', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            passwordHashingDetected: boolean;
+            recommendations: string[];
+        };
+
+        expect(result.passwordHashingDetected).toBe(false);
+        expect(result.recommendations).toContainEqual(expect.stringContaining('No password hash columns detected'));
+        expect(result.recommendations).toContainEqual(expect.stringContaining('gen_salt'));
+    });
+
+    it('should include MD5/SHA-1 security warning in recommendations', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '1.3' }] })
+            .mockResolvedValueOnce({ rows: [{}] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [{ count: 1 }] }) // has password hash
+            .mockResolvedValueOnce({ rows: [] });
+
+        const resource = createCryptoResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://crypto', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            availableAlgorithms: { hashing: string[] };
+            recommendations: string[];
+        };
+
+        expect(result.availableAlgorithms.hashing).toContain('md5');
+        expect(result.recommendations).toContainEqual(expect.stringContaining('MD5 and SHA-1'));
+        expect(result.recommendations).toContainEqual(expect.stringContaining('cryptographically broken'));
+    });
+
+    it('should handle error accessing pgcrypto information', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '1.3' }] }) // extension check
+            .mockResolvedValueOnce({ rows: [{}] }) // gen_random_uuid succeeds (nested try/catch)
+            .mockRejectedValueOnce(new Error('permission denied')); // UUID columns query fails
+
+        const resource = createCryptoResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://crypto', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            recommendations: string[];
+        };
+
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pgcrypto information'));
     });
 });
 
@@ -1147,6 +1318,104 @@ describe('Kcache Resource', () => {
 
         expect(result.recommendations).toContainEqual(expect.stringContaining('very high CPU time'));
     });
+
+    it('should recommend when no queries collected yet (totalQueries === 0)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
+            .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockResolvedValueOnce({ rows: [{ total_queries: 0, total_cpu: 0, total_reads: 0, total_writes: 0 }] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
+
+        const resource = createKcacheResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://kcache', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            summary: { totalQueries: number };
+            recommendations: string[];
+        };
+
+        expect(result.summary.totalQueries).toBe(0);
+        expect(result.recommendations).toContainEqual(expect.stringContaining('No query statistics collected yet'));
+    });
+
+    it('should handle error accessing pg_stat_kcache tables', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
+            .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockRejectedValueOnce(new Error('relation does not exist'));
+
+        const resource = createKcacheResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://kcache', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            recommendations: string[];
+        };
+
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pg_stat_kcache'));
+    });
+
+    it('should handle non-string values in toStr helper (line 12 branch)', async () => {
+        // When row values are numbers/null instead of strings, toStr should return empty string
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
+            .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockResolvedValueOnce({ rows: [{ total_queries: 100, total_cpu: 50.5, total_reads: 1000000, total_writes: 500000 }] })
+            .mockResolvedValueOnce({
+                rows: [{
+                    query: 12345, // number instead of string - tests toStr returning ''
+                    calls: 50,
+                    cpu_time: 10.5,
+                    cpu_per_call: 0.21
+                }]
+            })
+            .mockResolvedValueOnce({
+                rows: [{
+                    query: null, // null instead of string - tests toStr returning ''
+                    calls: 20,
+                    reads: 500000,
+                    writes: 100000
+                }]
+            })
+            .mockResolvedValueOnce({
+                rows: [
+                    { classification: 123, count: 10 } // number classification - tests toStr
+                ]
+            });
+
+        const resource = createKcacheResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://kcache', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            topCpuQueries: { queryPreview: string }[];
+            topIoQueries: { queryPreview: string }[];
+            resourceClassification: { cpuBound: number; ioBound: number; balanced: number };
+        };
+
+        // toStr should return empty string for non-string values
+        expect(result.topCpuQueries[0]?.queryPreview).toBe('');
+        expect(result.topIoQueries[0]?.queryPreview).toBe('');
+        // Non-matching classification goes to balanced (else branch at line 200)
+        expect(result.resourceClassification.balanced).toBe(10);
+    });
+
+    it('should handle undefined summary row (lines 112-118 branch)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
+            .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockResolvedValueOnce({ rows: [] }) // empty summary rows
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
+
+        const resource = createKcacheResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://kcache', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            summary: { totalQueries: number; totalCpuTime: number; totalReads: number; totalWrites: number };
+        };
+
+        // When rows is empty, summary should have default values
+        expect(result.summary.totalQueries).toBe(0);
+        expect(result.summary.totalCpuTime).toBe(0);
+    });
 });
 
 describe('Partman Resource', () => {
@@ -1251,6 +1520,82 @@ describe('Partman Resource', () => {
 
         expect(result.partitionSetCount).toBe(0);
         expect(result.recommendations).toContainEqual(expect.stringContaining('No partition sets configured'));
+    });
+
+    it('should set warning severity when default partition has <= 10000 rows', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '5.0' }] })
+            .mockResolvedValueOnce({
+                rows: [{ parent_table: 'public.logs', control: 'ts', partition_interval: '1 day', retention: '30 days', premake: 2, datetime_string: null }]
+            })
+            .mockResolvedValueOnce({ rows: [{ partition_count: 5, total_size: '500 MB' }] })
+            .mockResolvedValueOnce({ rows: [{ has_default: true, default_rows: 5000 }] }) // <= 10000 = warning
+            .mockResolvedValueOnce({ rows: [{ count: 1 }] }); // cron job exists
+
+        const resource = createPartmanResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://partman', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            healthIssues: { table: string; issue: string; severity: string }[];
+        };
+
+        expect(result.healthIssues).toHaveLength(1);
+        expect(result.healthIssues[0]?.severity).toBe('warning'); // warning, not critical
+    });
+
+    it('should not recommend cron when maintenance job already exists', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '5.0' }] })
+            .mockResolvedValueOnce({
+                rows: [{ parent_table: 'public.events', control: 'created_at', partition_interval: '1 month', retention: '12 months', premake: 4, datetime_string: null }]
+            })
+            .mockResolvedValueOnce({ rows: [{ partition_count: 12, total_size: '2 GB' }] })
+            .mockResolvedValueOnce({ rows: [{ has_default: false, default_rows: 0 }] })
+            .mockResolvedValueOnce({ rows: [{ count: 1 }] }); // cron job exists
+
+        const resource = createPartmanResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://partman', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            recommendations: string[];
+        };
+
+        // Should not contain cron recommendation when job exists
+        expect(result.recommendations).not.toContainEqual(expect.stringContaining('No pg_cron job found'));
+        expect(result.recommendations).not.toContainEqual(expect.stringContaining('pg_cron to automate'));
+    });
+
+    it('should handle individual table info query error gracefully', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '5.0' }] })
+            .mockResolvedValueOnce({
+                rows: [{ parent_table: 'public.broken_table', control: 'ts', partition_interval: '1 day', retention: null, premake: 2, datetime_string: null }]
+            })
+            .mockRejectedValueOnce(new Error('relation does not exist')) // table info fails
+            .mockRejectedValueOnce(new Error('pg_cron not installed'));
+
+        const resource = createPartmanResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://partman', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            partitionSetCount: number;
+            partitionInfo: unknown[];
+        };
+
+        expect(result.partitionSetCount).toBe(1);
+        // Partition info should be empty due to error
+        expect(result.partitionInfo).toHaveLength(0);
+    });
+
+    it('should handle main error accessing pg_partman tables', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '5.0' }] })
+            .mockRejectedValueOnce(new Error('permission denied'));
+
+        const resource = createPartmanResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://partman', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            recommendations: string[];
+        };
+
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pg_partman tables'));
     });
 });
 
@@ -1408,6 +1753,94 @@ describe('PostGIS Resource', () => {
         expect(result.geometryCount).toBe(0);
         expect(result.spatialColumns[0]?.type).toContain('geography');
     });
+
+    it('should handle PostGIS_Full_Version() failure in older versions', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '2.5.0' }] })
+            .mockRejectedValueOnce(new Error('function PostGIS_Full_Version() does not exist')) // version fails
+            .mockResolvedValueOnce({ rows: [] }) // geometry_columns
+            .mockResolvedValueOnce({ rows: [] }) // geography_columns
+            .mockResolvedValueOnce({ rows: [] }); // indexes
+
+        const resource = createPostgisResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://postgis', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            extensionInstalled: boolean;
+            extensionVersion: string;
+            fullVersion: string | null;
+        };
+
+        expect(result.extensionInstalled).toBe(true);
+        expect(result.extensionVersion).toBe('2.5.0');
+        expect(result.fullVersion).toBeNull();
+    });
+
+    it('should handle geography_columns query failure gracefully', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '3.4.0' }] })
+            .mockResolvedValueOnce({ rows: [{ version: 'POSTGIS=3.4.0' }] })
+            .mockResolvedValueOnce({ rows: [{ f_table_schema: 'public', f_table_name: 't', f_geometry_column: 'g', type: 'POINT', srid: 4326, coord_dimension: 2, row_count: 100 }] })
+            .mockRejectedValueOnce(new Error('geography_columns does not exist')) // geography fails
+            .mockResolvedValueOnce({ rows: [] }); // indexes
+
+        const resource = createPostgisResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://postgis', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            extensionInstalled: boolean;
+            columnCount: number;
+            geographyCount: number;
+        };
+
+        expect(result.extensionInstalled).toBe(true);
+        expect(result.columnCount).toBe(1);
+        expect(result.geographyCount).toBe(0); // Failed query means no geography columns added
+    });
+
+    it('should recommend geography type when only geometry columns exist', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '3.4.0' }] })
+            .mockResolvedValueOnce({ rows: [{ version: 'POSTGIS=3.4.0' }] })
+            .mockResolvedValueOnce({
+                rows: [
+                    { f_table_schema: 'public', f_table_name: 't1', f_geometry_column: 'g1', type: 'POINT', srid: 4326, coord_dimension: 2, row_count: 100 },
+                    { f_table_schema: 'public', f_table_name: 't2', f_geometry_column: 'g2', type: 'POLYGON', srid: 4326, coord_dimension: 2, row_count: 200 }
+                ]
+            })
+            .mockResolvedValueOnce({ rows: [] }) // no geography columns
+            .mockResolvedValueOnce({
+                rows: [
+                    { schema_name: 'public', table_name: 't1', index_name: 'idx1', column_name: 'g1', index_type: 'gist', index_size: '1MB' },
+                    { schema_name: 'public', table_name: 't2', index_name: 'idx2', column_name: 'g2', index_type: 'gist', index_size: '2MB' }
+                ]
+            });
+
+        const resource = createPostgisResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://postgis', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            geometryCount: number;
+            geographyCount: number;
+            recommendations: string[];
+        };
+
+        expect(result.geometryCount).toBe(2);
+        expect(result.geographyCount).toBe(0);
+        expect(result.recommendations).toContainEqual(expect.stringContaining('geography type for global distance'));
+    });
+
+    it('should handle main error and recommend checking installation', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '3.4.0' }] })
+            .mockResolvedValueOnce({ rows: [{ version: 'POSTGIS=3.4.0' }] })
+            .mockRejectedValueOnce(new Error('permission denied')); // main query fails
+
+        const resource = createPostgisResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://postgis', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            recommendations: string[];
+        };
+
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing PostGIS information'));
+    });
 });
 
 describe('Vector Resource', () => {
@@ -1522,6 +1955,62 @@ describe('Vector Resource', () => {
         expect(result.ivfflatIndexCount).toBe(1);
         expect(result.hnswIndexCount).toBe(0);
         expect(result.recommendations).toContainEqual(expect.stringContaining('HNSW'));
+    });
+
+    it('should show ellipsis when more than 3 unindexed columns exist', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '0.7.0' }] })
+            .mockResolvedValueOnce({
+                rows: [
+                    { schema_name: 'public', table_name: 't1', column_name: 'v1', dimensions: 128, row_count: 100 },
+                    { schema_name: 'public', table_name: 't2', column_name: 'v2', dimensions: 256, row_count: 200 },
+                    { schema_name: 'public', table_name: 't3', column_name: 'v3', dimensions: 512, row_count: 300 },
+                    { schema_name: 'public', table_name: 't4', column_name: 'v4', dimensions: 768, row_count: 400 }
+                ]
+            })
+            .mockResolvedValueOnce({ rows: [] }); // no indexes
+
+        const resource = createVectorResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://vector', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            unindexedColumns: string[];
+            recommendations: string[];
+        };
+
+        expect(result.unindexedColumns).toHaveLength(4);
+        // Should show "..." when more than 3 unindexed columns
+        expect(result.recommendations).toContainEqual(expect.stringContaining('...'));
+    });
+
+    it('should recommend adding columns when none exist', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '0.7.0' }] })
+            .mockResolvedValueOnce({ rows: [] }) // no vector columns
+            .mockResolvedValueOnce({ rows: [] }); // no indexes
+
+        const resource = createVectorResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://vector', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            columnCount: number;
+            recommendations: string[];
+        };
+
+        expect(result.columnCount).toBe(0);
+        expect(result.recommendations).toContainEqual(expect.stringContaining('No vector columns found'));
+    });
+
+    it('should handle error accessing pgvector information', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '0.7.0' }] })
+            .mockRejectedValueOnce(new Error('permission denied'));
+
+        const resource = createVectorResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://vector', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            recommendations: string[];
+        };
+
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pgvector information'));
     });
 });
 
@@ -2807,3 +3296,208 @@ describe('Replication Resource (Branch Coverage)', () => {
     });
 });
 
+// =============================================================================
+// Phase 1: Partman Resource Coverage Tests
+// =============================================================================
+
+describe('Partman Resource (Coverage)', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        mockContext = createMockRequestContext();
+    });
+
+    it('should recommend pg_cron when partition sets exist but no maintenance job (line 174)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '5.0.0' }] }) // pg_partman installed
+            .mockResolvedValueOnce({ // partition configs - has data
+                rows: [{
+                    parent_table: 'public.events',
+                    control: 'created_at',
+                    partition_interval: '1 month',
+                    retention: null,
+                    premake: 4,
+                    datetime_string: 'YYYYMM'
+                }]
+            })
+            .mockResolvedValueOnce({ // partition count
+                rows: [{ partition_count: 12, total_size: '100 MB' }]
+            })
+            .mockResolvedValueOnce({ // default partition check
+                rows: [{ has_default: true, default_rows: 0 }]
+            })
+            .mockRejectedValueOnce(new Error('relation "cron.job" does not exist')); // pg_cron not installed
+
+        const resource = createPartmanResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://partman', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            extensionInstalled: boolean;
+            partitionSetCount: number;
+            recommendations: string[];
+        };
+
+        expect(result.extensionInstalled).toBe(true);
+        expect(result.partitionSetCount).toBe(1);
+        expect(result.recommendations).toContainEqual(
+            expect.stringContaining('Consider installing pg_cron')
+        );
+    });
+
+    it('should show no pg_cron recommendation when cron job count is 0 but has partitions (line 173-174)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '5.0.0' }] })
+            .mockResolvedValueOnce({
+                rows: [{
+                    parent_table: 'public.logs',
+                    control: 'log_date',
+                    partition_interval: '1 day',
+                    retention: '30 days',
+                    premake: 7,
+                    datetime_string: null
+                }]
+            })
+            .mockResolvedValueOnce({ rows: [{ partition_count: 30, total_size: '500 MB' }] })
+            .mockResolvedValueOnce({ rows: [{ has_default: false, default_rows: 0 }] })
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // pg_cron exists but no maintenance jobs
+
+        const resource = createPartmanResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://partman', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            partitionSetCount: number;
+            recommendations: string[];
+        };
+
+        expect(result.partitionSetCount).toBe(1);
+        expect(result.recommendations).toContainEqual(
+            expect.stringContaining('No pg_cron job found for partition maintenance')
+        );
+    });
+
+    it('should handle partition info query errors gracefully (line 155-157)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '5.0.0' }] })
+            .mockResolvedValueOnce({
+                rows: [{
+                    parent_table: 'public.broken_table',
+                    control: 'id',
+                    partition_interval: '1000',
+                    retention: null,
+                    premake: 2,
+                    datetime_string: null
+                }]
+            })
+            .mockRejectedValueOnce(new Error('relation does not exist')) // partition count fails
+            .mockResolvedValueOnce({ rows: [{ count: 1 }] }); // cron check
+
+        const resource = createPartmanResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://partman', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            extensionInstalled: boolean;
+            partitionInfo: unknown[];
+        };
+
+        // Should not throw, should continue gracefully
+        expect(result.extensionInstalled).toBe(true);
+        expect(result.partitionInfo).toHaveLength(0);
+    });
+});
+
+// =============================================================================
+// Phase 1: PostGIS Resource Coverage Tests
+// =============================================================================
+
+describe('PostGIS Resource (Coverage)', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        mockContext = createMockRequestContext();
+    });
+
+    it('should calculate SRID distribution correctly (line 214-220)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '3.4.0' }] }) // PostGIS installed
+            .mockResolvedValueOnce({ rows: [{ version: 'POSTGIS="3.4.0"' }] }) // full version
+            .mockResolvedValueOnce({ // geometry columns with different SRIDs
+                rows: [
+                    { f_table_schema: 'public', f_table_name: 't1', f_geometry_column: 'geom', type: 'POINT', srid: 4326, coord_dimension: 2, row_count: 100 },
+                    { f_table_schema: 'public', f_table_name: 't2', f_geometry_column: 'geom', type: 'POLYGON', srid: 4326, coord_dimension: 2, row_count: 50 },
+                    { f_table_schema: 'public', f_table_name: 't3', f_geometry_column: 'geom', type: 'LINESTRING', srid: 3857, coord_dimension: 2, row_count: 25 }
+                ]
+            })
+            .mockResolvedValueOnce({ rows: [] }) // geography columns
+            .mockResolvedValueOnce({ rows: [] }); // indexes
+
+        const resource = createPostgisResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://postgis', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            sridDistribution: { srid: number; count: number }[];
+            columnCount: number;
+        };
+
+        expect(result.columnCount).toBe(3);
+        expect(result.sridDistribution).toHaveLength(2);
+        expect(result.sridDistribution[0]).toEqual({ srid: 4326, count: 2 });
+        expect(result.sridDistribution[1]).toEqual({ srid: 3857, count: 1 });
+    });
+
+    it('should detect SRID 0 (unknown) and recommend setting proper SRID (line 242-244)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '3.4.0' }] })
+            .mockResolvedValueOnce({ rows: [{ version: 'POSTGIS="3.4.0"' }] })
+            .mockResolvedValueOnce({
+                rows: [
+                    { f_table_schema: 'public', f_table_name: 'legacy', f_geometry_column: 'geom', type: 'GEOMETRY', srid: 0, coord_dimension: 2, row_count: 500 }
+                ]
+            })
+            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] });
+
+        const resource = createPostgisResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://postgis', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            recommendations: string[];
+        };
+
+        expect(result.recommendations).toContainEqual(
+            expect.stringContaining('SRID 0 (unknown)')
+        );
+    });
+
+    it('should recommend geography type when only geometry columns exist (line 237-239)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ extversion: '3.4.0' }] })
+            .mockResolvedValueOnce({ rows: [{ version: 'POSTGIS="3.4.0"' }] })
+            .mockResolvedValueOnce({
+                rows: [
+                    { f_table_schema: 'public', f_table_name: 'locations', f_geometry_column: 'point', type: 'POINT', srid: 4326, coord_dimension: 2, row_count: 1000 }
+                ]
+            })
+            .mockResolvedValueOnce({ rows: [] }) // no geography columns
+            .mockResolvedValueOnce({ // has index
+                rows: [{
+                    schema_name: 'public', table_name: 'locations', index_name: 'idx_point',
+                    column_name: 'point', index_type: 'gist', index_size: '1 MB'
+                }]
+            });
+
+        const resource = createPostgisResource(mockAdapter as unknown as PostgresAdapter);
+        const resultStr = await resource.handler('postgres://postgis', mockContext);
+        const result = JSON.parse(resultStr as string) as {
+            geometryCount: number;
+            geographyCount: number;
+            recommendations: string[];
+        };
+
+        expect(result.geometryCount).toBe(1);
+        expect(result.geographyCount).toBe(0);
+        expect(result.recommendations).toContainEqual(
+            expect.stringContaining('geography type')
+        );
+    });
+});

@@ -283,6 +283,42 @@ describe('Extension setup prompts', () => {
         expect(result.toLowerCase()).toContain('vector');
     });
 
+    it('pg_setup_pgvector should highlight cosine distance metric when selected', async () => {
+        const prompt = prompts.find(p => p.name === 'pg_setup_pgvector')!;
+        const result = await prompt.handler({ distanceMetric: 'cosine' }, mockContext) as string;
+
+        expect(result).toContain('✓ Selected');
+        expect(result).toContain('cosine');
+    });
+
+    it('pg_setup_pgvector should highlight l2 distance metric when selected', async () => {
+        const prompt = prompts.find(p => p.name === 'pg_setup_pgvector')!;
+        const result = await prompt.handler({ distanceMetric: 'l2' }, mockContext) as string;
+
+        expect(result).toContain('L2/Euclidean (✓ Selected)');
+        expect(result).toContain('vector_l2_ops');
+    });
+
+    it('pg_setup_pgvector should highlight inner_product distance metric when selected', async () => {
+        const prompt = prompts.find(p => p.name === 'pg_setup_pgvector')!;
+        const result = await prompt.handler({ distanceMetric: 'inner_product' }, mockContext) as string;
+
+        expect(result).toContain('Inner Product (✓ Selected)');
+        expect(result).toContain('vector_inner_product_ops');
+    });
+
+    it('pg_setup_pgvector should use custom content type and dimensions', async () => {
+        const prompt = prompts.find(p => p.name === 'pg_setup_pgvector')!;
+        const result = await prompt.handler({
+            contentType: 'products',
+            dimensions: '768'
+        }, mockContext) as string;
+
+        expect(result).toContain('Products');
+        expect(result).toContain('768');
+        expect(result).toContain('CREATE TABLE products');
+    });
+
     it('pg_setup_postgis should provide PostGIS setup guidance', async () => {
         const prompt = prompts.find(p => p.name === 'pg_setup_postgis')!;
         const result = await prompt.handler({}, mockContext);

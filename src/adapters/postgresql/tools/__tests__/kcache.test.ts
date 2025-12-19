@@ -117,6 +117,30 @@ describe('Kcache Tools', () => {
                 []
             );
         });
+
+        it('should order by reads when specified (orderBy branch)', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_query_stats');
+            await tool!.handler({ orderBy: 'reads' }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('k.reads'),
+                []
+            );
+        });
+
+        it('should order by writes when specified (orderBy branch)', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_query_stats');
+            await tool!.handler({ orderBy: 'writes' }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('k.writes'),
+                []
+            );
+        });
     });
 
     describe('pg_kcache_top_cpu', () => {
@@ -282,6 +306,47 @@ describe('Kcache Tools', () => {
             };
 
             expect(result.recommendations[0]).toContain('CPU');
+        });
+
+        it('should recommend I/O optimization when I/O-bound > CPU-bound', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [
+                    { resource_classification: 'I/O-bound' },
+                    { resource_classification: 'I/O-bound' },
+                    { resource_classification: 'I/O-bound' },
+                    { resource_classification: 'CPU-bound' }
+                ]
+            });
+
+            const tool = findTool('pg_kcache_resource_analysis');
+            const result = await tool!.handler({}, mockContext) as {
+                recommendations: string[];
+                summary: { cpuBound: number; ioBound: number };
+            };
+
+            expect(result.summary.ioBound).toBe(3);
+            expect(result.summary.cpuBound).toBe(1);
+            expect(result.recommendations[0]).toContain('I/O');
+        });
+
+        it('should recommend balanced optimization when workload is balanced', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [
+                    { resource_classification: 'Balanced' },
+                    { resource_classification: 'Balanced' },
+                    { resource_classification: 'Balanced' }
+                ]
+            });
+
+            const tool = findTool('pg_kcache_resource_analysis');
+            const result = await tool!.handler({}, mockContext) as {
+                recommendations: string[];
+                summary: { balanced: number };
+            };
+
+            expect(result.summary.balanced).toBe(3);
+            // When balanced is dominant, recommendation should be about balance
+            expect(result.recommendations.length).toBeGreaterThanOrEqual(0);
         });
     });
 

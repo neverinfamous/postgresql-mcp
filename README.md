@@ -12,6 +12,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
+[![Tests](https://img.shields.io/badge/Tests-1554_passed-success.svg)](https://github.com/neverinfamous/postgres-mcp)
+[![Coverage](https://img.shields.io/badge/Coverage-97.55%25-brightgreen.svg)](https://github.com/neverinfamous/postgres-mcp)
 
 A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **195 specialized tools**, **21 resources**, and **19 AI-powered prompts**.
 

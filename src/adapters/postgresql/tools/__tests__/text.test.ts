@@ -103,6 +103,74 @@ describe('pg_text_search', () => {
             expect.any(Array)
         );
     });
+
+    it('should use custom select columns when provided (line 53 branch)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1, title: 'Test', rank: 0.9 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_text_search')!;
+        await tool.handler({
+            table: 'articles',
+            columns: ['title', 'body'],
+            query: 'postgres',
+            select: ['id', 'title']
+        }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('SELECT "id", "title"'),
+            expect.any(Array)
+        );
+    });
+
+    it('should use * when select is empty array (line 53 branch)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_text_search')!;
+        await tool.handler({
+            table: 'articles',
+            columns: ['title'],
+            query: 'test',
+            select: []
+        }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('SELECT *'),
+            expect.any(Array)
+        );
+    });
+
+    it('should add LIMIT clause when limit > 0 (line 55 branch)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_text_search')!;
+        await tool.handler({
+            table: 'articles',
+            columns: ['title'],
+            query: 'test',
+            limit: 10
+        }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('LIMIT 10'),
+            expect.any(Array)
+        );
+    });
+
+    it('should not add LIMIT clause when limit is 0 (line 55 branch)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_text_search')!;
+        await tool.handler({
+            table: 'articles',
+            columns: ['title'],
+            query: 'test',
+            limit: 0
+        }, mockContext);
+
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        expect(sql).not.toContain('LIMIT');
+    });
 });
 
 describe('pg_text_rank', () => {
@@ -306,6 +374,23 @@ describe('pg_regexp_match', () => {
             expect.any(Array)
         );
     });
+
+    it('should use custom select columns when provided (line 180 branch)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_regexp_match')!;
+        await tool.handler({
+            table: 'users',
+            column: 'email',
+            pattern: '^test',
+            select: ['id', 'name']
+        }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('SELECT "id", "name"'),
+            expect.any(Array)
+        );
+    });
 });
 
 describe('pg_like_search', () => {
@@ -358,6 +443,57 @@ describe('pg_like_search', () => {
             expect.any(Array)
         );
     });
+
+    it('should use custom select columns when provided (line 210 branch)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_like_search')!;
+        await tool.handler({
+            table: 'articles',
+            column: 'title',
+            pattern: '%test%',
+            select: ['id', 'title']
+        }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('SELECT "id", "title"'),
+            expect.any(Array)
+        );
+    });
+
+    it('should add LIMIT clause when limit > 0 (line 212 branch)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_like_search')!;
+        await tool.handler({
+            table: 'articles',
+            column: 'title',
+            pattern: '%test%',
+            limit: 25
+        }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('LIMIT 25'),
+            expect.any(Array)
+        );
+    });
+
+    it('should use select columns with limit together (combined branch)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_like_search')!;
+        await tool.handler({
+            table: 'articles',
+            column: 'title',
+            pattern: '%test%',
+            select: ['id'],
+            limit: 10
+        }, mockContext);
+
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        expect(sql).toContain('SELECT "id"');
+        expect(sql).toContain('LIMIT 10');
+    });
 });
 
 describe('pg_similarity_search', () => {
@@ -392,6 +528,24 @@ describe('pg_similarity_search', () => {
             expect.stringContaining('set_limit'),
         );
         expect(result.rows).toHaveLength(1);
+    });
+
+    it('should use custom select columns when provided (line 241 branch)', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [] }) // set_limit call
+            .mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_similarity_search')!;
+        await tool.handler({
+            table: 'products',
+            column: 'name',
+            value: 'Postgres',
+            select: ['id', 'category']
+        }, mockContext);
+
+        // Second call should have the select columns
+        const sql = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
+        expect(sql).toContain('"id", "category",');
     });
 });
 
@@ -642,6 +796,19 @@ describe('pg_text_sentiment score branches', () => {
 
         expect(result.positiveCount).toBe(1);
         expect(result.confidence).toBe('low');
+    });
+
+    it('should detect medium confidence with 2-3 matched words', async () => {
+        const tool = tools.find(t => t.name === 'pg_text_sentiment')!;
+        const result = await tool.handler({
+            text: 'This product is good and great.'
+        }, mockContext) as {
+            confidence: string;
+            positiveCount: number;
+        };
+
+        expect(result.positiveCount).toBe(2);
+        expect(result.confidence).toBe('medium');
     });
 });
 

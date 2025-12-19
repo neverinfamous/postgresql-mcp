@@ -227,6 +227,14 @@ describe('OAuth Middleware', () => {
         it('should throw when no scopes match', () => {
             expect(() => requireAnyScope(context, ['admin', 'write'])).toThrow(InsufficientScopeError);
         });
+
+        it('should throw TokenMissingError when not authenticated (line 140)', () => {
+            const unauthenticatedContext: AuthenticatedContext = {
+                authenticated: false,
+                scopes: []
+            };
+            expect(() => requireAnyScope(unauthenticatedContext, ['read'])).toThrow(TokenMissingError);
+        });
     });
 
     describe('requireToolScope', () => {
@@ -241,12 +249,55 @@ describe('OAuth Middleware', () => {
             scopes: ['read']
         };
 
+        const writeContext: AuthenticatedContext = {
+            authenticated: true,
+            claims: {
+                sub: 'user123',
+                scopes: ['write'],
+                exp: Date.now() / 1000 + 3600,
+                iat: Date.now() / 1000
+            },
+            scopes: ['write']
+        };
+
+        const customScopeContext: AuthenticatedContext = {
+            authenticated: true,
+            claims: {
+                sub: 'user123',
+                scopes: ['db:production', 'schema:public'],
+                exp: Date.now() / 1000 + 3600,
+                iat: Date.now() / 1000
+            },
+            scopes: ['db:production', 'schema:public']
+        };
+
         it('should map tool scope names to OAuth scopes', () => {
             expect(() => requireToolScope(readContext, ['read'])).not.toThrow();
         });
 
         it('should throw for missing tool scopes', () => {
             expect(() => requireToolScope(readContext, ['admin'])).toThrow(InsufficientScopeError);
+        });
+
+        it('should throw TokenMissingError when not authenticated (line 153)', () => {
+            const unauthenticatedContext: AuthenticatedContext = {
+                authenticated: false,
+                scopes: []
+            };
+            expect(() => requireToolScope(unauthenticatedContext, ['read'])).toThrow(TokenMissingError);
+        });
+
+        it('should map "write" scope correctly (line 160)', () => {
+            expect(() => requireToolScope(writeContext, ['write'])).not.toThrow();
+        });
+
+        it('should pass custom/unknown scopes through unchanged (line 162)', () => {
+            expect(() => requireToolScope(customScopeContext, ['db:production'])).not.toThrow();
+            expect(() => requireToolScope(customScopeContext, ['schema:public'])).not.toThrow();
+        });
+
+        it('should throw for custom scopes not present', () => {
+            expect(() => requireToolScope(customScopeContext, ['db:staging'])).toThrow(InsufficientScopeError);
         });
     });
 

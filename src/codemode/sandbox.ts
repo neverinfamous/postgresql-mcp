@@ -43,18 +43,20 @@ export class CodeModeSandbox {
     static create(options?: SandboxOptions): CodeModeSandbox {
         const opts = { ...DEFAULT_SANDBOX_OPTIONS, ...options };
 
+        // Create a shared log buffer that will be used by both sandbox console and instance
+        const sharedLogBuffer: string[] = [];
+
         // Create a minimal sandbox context
-        const logBuffer: string[] = [];
         const sandbox = {
             console: {
                 log: (...args: unknown[]) => {
-                    logBuffer.push(args.map(a =>
+                    sharedLogBuffer.push(args.map(a =>
                         typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)
                     ).join(' '));
                 },
-                warn: (...args: unknown[]) => logBuffer.push('[WARN] ' + args.map(a => typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)).join(' ')),
-                error: (...args: unknown[]) => logBuffer.push('[ERROR] ' + args.map(a => typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)).join(' ')),
-                info: (...args: unknown[]) => logBuffer.push('[INFO] ' + args.map(a => typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)).join(' '))
+                warn: (...args: unknown[]) => sharedLogBuffer.push('[WARN] ' + args.map(a => typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)).join(' ')),
+                error: (...args: unknown[]) => sharedLogBuffer.push('[ERROR] ' + args.map(a => typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)).join(' ')),
+                info: (...args: unknown[]) => sharedLogBuffer.push('[INFO] ' + args.map(a => typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)).join(' '))
             },
             // No access to Node.js globals
             require: undefined,
@@ -89,7 +91,9 @@ export class CodeModeSandbox {
 
         const context = vm.createContext(sandbox);
         const instance = new CodeModeSandbox(context, opts);
-        instance.logBuffer.push(...logBuffer);
+
+        // Use the shared buffer directly - replace instance's buffer with the shared one
+        (instance as unknown as { logBuffer: string[] }).logBuffer = sharedLogBuffer;
 
         return instance;
     }

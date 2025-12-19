@@ -123,6 +123,15 @@ export class ConnectionPool {
             });
 
         } catch (error) {
+            // Clean up pool on initialization failure
+            if (this.pool !== null) {
+                try {
+                    await this.pool.end();
+                } catch {
+                    // Ignore cleanup errors
+                }
+                this.pool = null;
+            }
             const message = error instanceof Error ? error.message : 'Unknown error';
             logger.error('Failed to initialize connection pool', { error: message });
             throw new ConnectionError(`Failed to connect to PostgreSQL: ${message}`);

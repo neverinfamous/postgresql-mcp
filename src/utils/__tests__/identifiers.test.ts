@@ -2,7 +2,7 @@
  * Unit tests for identifier sanitization utility
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import {
     validateIdentifier,
     sanitizeIdentifier,
@@ -167,4 +167,87 @@ describe('Identifier Sanitization', () => {
             expect(() => sanitizeIdentifier('id--')).toThrow(InvalidIdentifierError);
         });
     });
+
+    describe('needsQuoting', () => {
+        // Import the function
+        let needsQuoting: (name: string) => boolean;
+
+        beforeAll(async () => {
+            const module = await import('../../utils/identifiers.js');
+            needsQuoting = module.needsQuoting;
+        });
+
+        it('should return true for reserved keywords', () => {
+            expect(needsQuoting('select')).toBe(true);
+            expect(needsQuoting('table')).toBe(true);
+            expect(needsQuoting('from')).toBe(true);
+            expect(needsQuoting('where')).toBe(true);
+            expect(needsQuoting('order')).toBe(true);
+        });
+
+        it('should return true for mixed case identifiers', () => {
+            expect(needsQuoting('MyTable')).toBe(true);
+            expect(needsQuoting('userID')).toBe(true);
+            expect(needsQuoting('firstName')).toBe(true);
+        });
+
+        it('should return true for underscore-prefixed identifiers', () => {
+            expect(needsQuoting('_private')).toBe(true);
+            expect(needsQuoting('_internal')).toBe(true);
+        });
+
+        it('should return true for identifiers with dollar signs', () => {
+            expect(needsQuoting('pg$temp')).toBe(true);
+            expect(needsQuoting('data$1')).toBe(true);
+        });
+
+        it('should return false for simple lowercase identifiers', () => {
+            expect(needsQuoting('users')).toBe(false);
+            expect(needsQuoting('accounts')).toBe(false);
+            expect(needsQuoting('created123')).toBe(false);
+        });
+    });
+
+    describe('createColumnList', () => {
+        let createColumnList: (columns: string[]) => string;
+
+        beforeAll(async () => {
+            const module = await import('../../utils/identifiers.js');
+            createColumnList = module.createColumnList;
+        });
+
+        it('should create comma-separated list of quoted columns', () => {
+            const result = createColumnList(['id', 'name', 'email']);
+            expect(result).toBe('"id", "name", "email"');
+        });
+
+        it('should handle single column', () => {
+            const result = createColumnList(['id']);
+            expect(result).toBe('"id"');
+        });
+
+        it('should handle empty array', () => {
+            const result = createColumnList([]);
+            expect(result).toBe('');
+        });
+    });
+
+    describe('sanitizeIndexName', () => {
+        let sanitizeIndexName: (name: string) => string;
+
+        beforeAll(async () => {
+            const module = await import('../../utils/identifiers.js');
+            sanitizeIndexName = module.sanitizeIndexName;
+        });
+
+        it('should quote valid index names', () => {
+            expect(sanitizeIndexName('idx_users_email')).toBe('"idx_users_email"');
+            expect(sanitizeIndexName('pk_users')).toBe('"pk_users"');
+        });
+
+        it('should throw for invalid index names', () => {
+            expect(() => sanitizeIndexName('bad;index')).toThrow(InvalidIdentifierError);
+        });
+    });
 });
+

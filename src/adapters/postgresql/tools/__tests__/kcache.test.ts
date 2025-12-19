@@ -1,0 +1,319 @@
+/**
+ * postgres-mcp - pg_stat_kcache Extension Tools Unit Tests
+ * 
+ * Tests for OS-level performance monitoring tools.
+ */
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { PostgresAdapter } from '../../PostgresAdapter.js';
+import { createMockPostgresAdapter, createMockRequestContext } from '../../../../__tests__/mocks/index.js';
+import { getKcacheTools } from '../kcache.js';
+
+describe('Kcache Tools', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+    let tools: ReturnType<typeof getKcacheTools>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        mockContext = createMockRequestContext();
+        tools = getKcacheTools(mockAdapter as unknown as PostgresAdapter);
+    });
+
+    const findTool = (name: string) => tools.find(t => t.name === name);
+
+    describe('pg_kcache_create_extension', () => {
+        it('should fail if pg_stat_statements not installed', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ installed: false }]
+            });
+
+            const tool = findTool('pg_kcache_create_extension');
+            const result = await tool!.handler({}, mockContext) as { success: boolean; error?: string };
+
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('pg_stat_statements');
+        });
+
+        it('should create extension when pg_stat_statements exists', async () => {
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ installed: true }] })
+                .mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_create_extension');
+            const result = await tool!.handler({}, mockContext) as { success: boolean; message: string };
+
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('pg_stat_kcache');
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+                expect.stringContaining('CREATE EXTENSION IF NOT EXISTS pg_stat_kcache')
+            );
+        });
+    });
+
+    describe('pg_kcache_query_stats', () => {
+        it('should return query stats with CPU/IO metrics', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{
+                    queryid: '12345',
+                    query_preview: 'SELECT * FROM users',
+                    calls: 100,
+                    total_time_ms: 5000,
+                    user_time: 2.5,
+                    system_time: 0.5,
+                    reads: 1024000,
+                    writes: 512000
+                }]
+            });
+
+            const tool = findTool('pg_kcache_query_stats');
+            const result = await tool!.handler({}, mockContext) as {
+                queries: unknown[];
+                count: number;
+                orderBy: string;
+            };
+
+            expect(result.count).toBe(1);
+            expect(result.orderBy).toBe('total_time');
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('pg_stat_kcache()'),
+                []
+            );
+        });
+
+        it('should order by CPU time when specified', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_query_stats');
+            await tool!.handler({ orderBy: 'cpu_time' }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('(k.user_time + k.system_time)'),
+                []
+            );
+        });
+
+        it('should filter by minimum calls', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_query_stats');
+            await tool!.handler({ minCalls: 10 }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('s.calls >='),
+                [10]
+            );
+        });
+
+        it('should apply limit', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_query_stats');
+            await tool!.handler({ limit: 5 }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('LIMIT 5'),
+                []
+            );
+        });
+    });
+
+    describe('pg_kcache_top_cpu', () => {
+        it('should return top CPU-consuming queries', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{
+                    queryid: '12345',
+                    query_preview: 'SELECT complex_function()',
+                    user_time: 10.5,
+                    system_time: 2.5,
+                    total_cpu_time: 13
+                }]
+            });
+
+            const tool = findTool('pg_kcache_top_cpu');
+            const result = await tool!.handler({}, mockContext) as {
+                topCpuQueries: unknown[];
+                description: string;
+            };
+
+            expect(result.topCpuQueries).toHaveLength(1);
+            expect(result.description).toContain('CPU');
+        });
+
+        it('should apply custom limit', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_top_cpu');
+            await tool!.handler({ limit: 5 }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('LIMIT 5')
+            );
+        });
+    });
+
+    describe('pg_kcache_top_io', () => {
+        it('should return top I/O queries by default (both)', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{
+                    queryid: '12345',
+                    read_bytes: 1024000,
+                    write_bytes: 512000,
+                    total_io_bytes: 1536000
+                }]
+            });
+
+            const tool = findTool('pg_kcache_top_io');
+            const result = await tool!.handler({}, mockContext) as {
+                topIoQueries: unknown[];
+                ioType: string;
+            };
+
+            expect(result.topIoQueries).toHaveLength(1);
+            expect(result.ioType).toBe('both');
+        });
+
+        it('should filter by reads only', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_top_io');
+            await tool!.handler({ type: 'reads' }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('ORDER BY k.reads DESC')
+            );
+        });
+
+        it('should filter by writes only', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_top_io');
+            await tool!.handler({ type: 'writes' }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('ORDER BY k.writes DESC')
+            );
+        });
+    });
+
+    describe('pg_kcache_database_stats', () => {
+        it('should return aggregated stats for all databases', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [
+                    { database: 'testdb', total_cpu_time: 100.5, total_reads: 1024000 },
+                    { database: 'proddb', total_cpu_time: 500.2, total_reads: 5120000 }
+                ]
+            });
+
+            const tool = findTool('pg_kcache_database_stats');
+            const result = await tool!.handler({}, mockContext) as {
+                databaseStats: unknown[];
+                count: number;
+            };
+
+            expect(result.count).toBe(2);
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('GROUP BY datname'),
+                []
+            );
+        });
+
+        it('should filter by specific database', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ database: 'testdb', total_cpu_time: 100.5 }]
+            });
+
+            const tool = findTool('pg_kcache_database_stats');
+            await tool!.handler({ database: 'testdb' }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('d.datname = $1'),
+                ['testdb']
+            );
+        });
+    });
+
+    describe('pg_kcache_resource_analysis', () => {
+        it('should classify queries as CPU-bound or I/O-bound', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [
+                    { queryid: '1', resource_classification: 'CPU-bound', cpu_time: 10, io_bytes: 1000 },
+                    { queryid: '2', resource_classification: 'I/O-bound', cpu_time: 1, io_bytes: 10000000 },
+                    { queryid: '3', resource_classification: 'Balanced', cpu_time: 5, io_bytes: 5000000 }
+                ]
+            });
+
+            const tool = findTool('pg_kcache_resource_analysis');
+            const result = await tool!.handler({}, mockContext) as {
+                queries: unknown[];
+                summary: { cpuBound: number; ioBound: number; balanced: number };
+            };
+
+            expect(result.summary.cpuBound).toBe(1);
+            expect(result.summary.ioBound).toBe(1);
+            expect(result.summary.balanced).toBe(1);
+        });
+
+        it('should filter by specific queryId', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_resource_analysis');
+            await tool!.handler({ queryId: '12345' }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining("s.queryid::text = $1"),
+                ['12345']
+            );
+        });
+
+        it('should provide recommendations based on analysis', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [
+                    { resource_classification: 'CPU-bound' },
+                    { resource_classification: 'CPU-bound' },
+                    { resource_classification: 'I/O-bound' }
+                ]
+            });
+
+            const tool = findTool('pg_kcache_resource_analysis');
+            const result = await tool!.handler({}, mockContext) as {
+                recommendations: string[];
+            };
+
+            expect(result.recommendations[0]).toContain('CPU');
+        });
+    });
+
+    describe('pg_kcache_reset', () => {
+        it('should reset kcache statistics', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_reset');
+            const result = await tool!.handler({}, mockContext) as {
+                success: boolean;
+                message: string;
+                note: string;
+            };
+
+            expect(result.success).toBe(true);
+            expect(result.message).toContain('reset');
+            expect(result.note).toContain('pg_stat_statements');
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('pg_stat_kcache_reset()')
+            );
+        });
+    });
+
+    it('should export all 7 kcache tools', () => {
+        expect(tools).toHaveLength(7);
+        const toolNames = tools.map(t => t.name);
+        expect(toolNames).toContain('pg_kcache_create_extension');
+        expect(toolNames).toContain('pg_kcache_query_stats');
+        expect(toolNames).toContain('pg_kcache_top_cpu');
+        expect(toolNames).toContain('pg_kcache_top_io');
+        expect(toolNames).toContain('pg_kcache_database_stats');
+        expect(toolNames).toContain('pg_kcache_resource_analysis');
+        expect(toolNames).toContain('pg_kcache_reset');
+    });
+});

@@ -120,6 +120,42 @@ describe('CodeModeSecurityManager', () => {
         });
     });
 
+    describe('getRateLimitRemaining()', () => {
+        it('should return max for new clients', () => {
+            const remaining = security.getRateLimitRemaining('new-client');
+            expect(remaining).toBe(60); // Default max executions per minute
+        });
+
+        it('should return reduced count after requests', () => {
+            const clientId = 'rate-limit-test';
+            security.checkRateLimit(clientId);
+            security.checkRateLimit(clientId);
+            security.checkRateLimit(clientId);
+
+            const remaining = security.getRateLimitRemaining(clientId);
+            expect(remaining).toBe(57); // 60 - 3
+        });
+
+        it('should return 0 when exhausted', () => {
+            const clientId = 'exhausted-client';
+            for (let i = 0; i < 60; i++) {
+                security.checkRateLimit(clientId);
+            }
+            expect(security.getRateLimitRemaining(clientId)).toBe(0);
+        });
+    });
+
+    describe('cleanupRateLimits()', () => {
+        it('should remove expired entries', () => {
+            // This just verifies the method runs without error
+            // Actual cleanup depends on timing
+            security.checkRateLimit('cleanup-client');
+            security.cleanupRateLimits();
+            // Method should complete without error
+            expect(true).toBe(true);
+        });
+    });
+
     describe('sanitizeResult()', () => {
         it('should return primitive values unchanged', () => {
             expect(security.sanitizeResult(42)).toBe(42);

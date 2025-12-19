@@ -15,20 +15,20 @@ vi.mock('jose', () => ({
     }),
     errors: {
         JWTExpired: class JWTExpired extends Error {
-            constructor() {
-                super('jwt expired');
+            constructor(message = 'jwt expired', _claim?: string, _reason?: string) {
+                super(message);
                 this.name = 'JWTExpired';
             }
         },
         JWSSignatureVerificationFailed: class JWSSignatureVerificationFailed extends Error {
-            constructor() {
-                super('signature verification failed');
+            constructor(message = 'signature verification failed', _cause?: Error) {
+                super(message);
                 this.name = 'JWSSignatureVerificationFailed';
             }
         },
         JWTClaimValidationFailed: class JWTClaimValidationFailed extends Error {
-            constructor() {
-                super('claim validation failed');
+            constructor(message = 'claim validation failed', _claim?: string, _reason?: string) {
+                super(message);
                 this.name = 'JWTClaimValidationFailed';
             }
         }
@@ -106,7 +106,7 @@ describe('TokenValidator', () => {
         });
 
         it('should return TOKEN_EXPIRED error for expired tokens', async () => {
-            vi.mocked(jose.jwtVerify).mockRejectedValueOnce(new jose.errors.JWTExpired());
+            vi.mocked(jose.jwtVerify).mockRejectedValueOnce(new jose.errors.JWTExpired('jwt expired', { exp: 0 }, 'exp'));
 
             const validator = new TokenValidator(defaultConfig);
             const result = await validator.validate('expired.jwt.token');
@@ -117,7 +117,7 @@ describe('TokenValidator', () => {
 
         it('should return INVALID_SIGNATURE for bad signatures', async () => {
             vi.mocked(jose.jwtVerify).mockRejectedValueOnce(
-                new jose.errors.JWSSignatureVerificationFailed()
+                new jose.errors.JWSSignatureVerificationFailed('signature verification failed')
             );
 
             const validator = new TokenValidator(defaultConfig);
@@ -129,7 +129,7 @@ describe('TokenValidator', () => {
 
         it('should return INVALID_CLAIMS for claim validation failures', async () => {
             vi.mocked(jose.jwtVerify).mockRejectedValueOnce(
-                new jose.errors.JWTClaimValidationFailed()
+                new jose.errors.JWTClaimValidationFailed('claim validation failed', { aud: 'wrong' }, 'aud')
             );
 
             const validator = new TokenValidator(defaultConfig);
@@ -183,3 +183,97 @@ describe('TokenValidator', () => {
         });
     });
 });
+
+// =============================================================================
+// Phase 4: TokenValidator Branch Coverage
+// =============================================================================
+
+describe('TokenValidator (Branch Coverage)', () => {
+    const defaultConfig = {
+        jwksUri: 'http://localhost:8080/realms/postgres-mcp/protocol/openid-connect/certs',
+        issuer: 'http://localhost:8080/realms/postgres-mcp',
+        audience: 'postgres-mcp'
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('should use cached JWKS on second validation (line 81 cache hit)', async () => {
+        // First validation - creates cache
+        vi.mocked(jose.jwtVerify).mockResolvedValue({
+            payload: {
+                sub: 'user1',
+                exp: Math.floor(Date.now() / 1000) + 3600,
+                iat: Math.floor(Date.now() / 1000)
+            },
+            protectedHeader: { alg: 'RS256' }
+        } as unknown as Awaited<ReturnType<typeof jose.jwtVerify>>);
+
+        const validator = new TokenValidator(defaultConfig);
+
+        // First call creates the cache
+        await validator.validate('first.jwt.token');
+
+        // Second call should hit the cache (line 81)
+        await validator.validate('second.jwt.token');
+
+        // createRemoteJWKSet should only be called once (cached on second call)
+        expect(jose.createRemoteJWKSet).toHaveBeenCalledTimes(1);
+    });
+
+    it('should refresh JWKS cache after TTL expires (lines 80-87)', async () => {
+        vi.mocked(jose.jwtVerify).mockResolvedValue({
+            payload: {
+                sub: 'user1',
+                exp: Math.floor(Date.now() / 1000) + 3600,
+                iat: Math.floor(Date.now() / 1000)
+            },
+            protectedHeader: { alg: 'RS256' }
+        } as unknown as Awaited<ReturnType<typeof jose.jwtVerify>>);
+
+        // Create validator with very short TTL
+        const validator = new TokenValidator({
+            ...defaultConfig,
+            jwksCacheTtl: 0 // 0 seconds - always expires
+        });
+
+        await validator.validate('token1');
+        await validator.validate('token2');
+
+        // With 0 TTL, cache always expires, so should create new JWKS set each time
+        expect(jose.createRemoteJWKSet).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle non-Error exception in handleValidationError (line 129)', async () => {
+        // Reject with a non-Error value (string)
+        vi.mocked(jose.jwtVerify).mockRejectedValueOnce('string error' as unknown);
+
+        const validator = new TokenValidator(defaultConfig);
+        const result = await validator.validate('weird.error.token');
+
+        expect(result.valid).toBe(false);
+        expect(result.errorCode).toBe('INVALID_TOKEN');
+        expect(result.error).toBe('Token validation failed'); // fallback message
+    });
+
+    it('should handle tokens with array scope claim', async () => {
+        vi.mocked(jose.jwtVerify).mockResolvedValueOnce({
+            payload: {
+                sub: 'user123',
+                scope: 'admin write read', // space-separated scopes
+                exp: Math.floor(Date.now() / 1000) + 3600,
+                iat: Math.floor(Date.now() / 1000)
+            },
+            protectedHeader: { alg: 'RS256' }
+        } as unknown as Awaited<ReturnType<typeof jose.jwtVerify>>);
+
+        const validator = new TokenValidator(defaultConfig);
+        const result = await validator.validate('token.with.scopes');
+
+        expect(result.claims?.scopes).toContain('admin');
+        expect(result.claims?.scopes).toContain('write');
+        expect(result.claims?.scopes).toContain('read');
+    });
+});
+

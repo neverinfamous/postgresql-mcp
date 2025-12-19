@@ -284,4 +284,166 @@ describe('Logger', () => {
             }
         });
     });
+
+    describe('Logger Configuration', () => {
+        it('setLevel should change minimum log level', () => {
+            logger.setLevel('critical');
+
+            logger.error('Should not log');
+            expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+            logger.critical('Should log');
+            expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('getLevel should return current minimum level', () => {
+            logger.setLevel('warning');
+            expect(logger.getLevel()).toBe('warning');
+
+            logger.setLevel('debug');
+            expect(logger.getLevel()).toBe('debug');
+        });
+
+        it('setDefaultModule should change default module for logs', () => {
+            logger.setDefaultModule('TOOLS');
+            logger.info('test message');
+
+            const output = consoleErrorSpy.mock.calls[0]?.[0] as string;
+            expect(output).toContain('[TOOLS]');
+
+            // Reset to default
+            logger.setDefaultModule('SERVER');
+        });
+
+        it('setLoggerName should configure the logger name', () => {
+            // This is used for MCP logging, just verify it doesn't throw
+            expect(() => logger.setLoggerName('custom-logger')).not.toThrow();
+
+            // Reset
+            logger.setLoggerName('postgres-mcp');
+        });
+
+        it('setMcpServer should accept server reference', () => {
+            // Create a mock MCP server
+            const mockServer = {
+                sendLoggingMessage: vi.fn().mockResolvedValue(undefined)
+            };
+
+            // Should not throw
+            expect(() => logger.setMcpServer(mockServer as unknown as Parameters<typeof logger.setMcpServer>[0])).not.toThrow();
+        });
+    });
+
+    describe('MCP Logging Integration', () => {
+        it('should send log messages to MCP server when connected', async () => {
+            const mockServer = {
+                sendLoggingMessage: vi.fn().mockResolvedValue(undefined)
+            };
+
+            logger.setMcpServer(mockServer as unknown as Parameters<typeof logger.setMcpServer>[0]);
+
+            logger.info('test message');
+
+            // Wait a tick for async sendLoggingMessage to be called
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    level: 'info',
+                    logger: expect.any(String),
+                    data: expect.objectContaining({
+                        message: expect.stringContaining('test message')
+                    })
+                })
+            );
+
+            // Reset
+            logger.setMcpServer(null as unknown as Parameters<typeof logger.setMcpServer>[0]);
+        });
+
+        it('should include module in MCP log data', async () => {
+            const mockServer = {
+                sendLoggingMessage: vi.fn().mockResolvedValue(undefined)
+            };
+
+            logger.setMcpServer(mockServer as unknown as Parameters<typeof logger.setMcpServer>[0]);
+
+            logger.info('test', { module: 'ADAPTER' });
+
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        module: 'ADAPTER'
+                    })
+                })
+            );
+
+            logger.setMcpServer(null as unknown as Parameters<typeof logger.setMcpServer>[0]);
+        });
+
+        it('should include code in MCP log data', async () => {
+            const mockServer = {
+                sendLoggingMessage: vi.fn().mockResolvedValue(undefined)
+            };
+
+            logger.setMcpServer(mockServer as unknown as Parameters<typeof logger.setMcpServer>[0]);
+
+            logger.error('failed', { code: 'PG_CONNECT_FAILED' });
+
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            expect(mockServer.sendLoggingMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        code: 'PG_CONNECT_FAILED'
+                    })
+                })
+            );
+
+            logger.setMcpServer(null as unknown as Parameters<typeof logger.setMcpServer>[0]);
+        });
+
+        it('should sanitize context in MCP log data', async () => {
+            const mockServer = {
+                sendLoggingMessage: vi.fn().mockResolvedValue(undefined)
+            };
+
+            logger.setMcpServer(mockServer as unknown as Parameters<typeof logger.setMcpServer>[0]);
+
+            logger.info('test', {
+                password: 'secret',
+                operation: 'query'
+            } as LogContext);
+
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            const call = mockServer.sendLoggingMessage.mock.calls[0]?.[0] as { data?: Record<string, unknown> };
+            expect(call?.data?.['operation']).toBe('query');
+            // Password should be redacted
+            expect(call?.data?.['password']).toBe('[REDACTED]');
+
+            logger.setMcpServer(null as unknown as Parameters<typeof logger.setMcpServer>[0]);
+        });
+
+        it('should silently handle MCP logging failures', async () => {
+            const mockServer = {
+                sendLoggingMessage: vi.fn().mockRejectedValue(new Error('MCP send failed'))
+            };
+
+            logger.setMcpServer(mockServer as unknown as Parameters<typeof logger.setMcpServer>[0]);
+
+            // Should not throw
+            logger.info('test message');
+
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            // The error should be silently caught
+            expect(mockServer.sendLoggingMessage).toHaveBeenCalled();
+
+            logger.setMcpServer(null as unknown as Parameters<typeof logger.setMcpServer>[0]);
+        });
+    });
 });
+

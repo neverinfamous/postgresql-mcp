@@ -48,7 +48,7 @@
         "commander": "^14.0.0",
         "jose": "^6.0.0",
         "pg": "^8.13.0",
-        "zod": "^4.2.0"
+        "zod": "^4.2.1"
     },
     "devDependencies": {
         "@eslint/js": "^9.28.0",

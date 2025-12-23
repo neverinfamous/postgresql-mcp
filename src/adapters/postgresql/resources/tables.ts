@@ -11,7 +11,7 @@ export function createTablesResource(adapter: PostgresAdapter): ResourceDefiniti
     return {
         uri: 'postgres://tables',
         name: 'Tables List',
-        description: 'List of all tables with metadata (sizes, row counts, etc.)',
+        description: 'Lightweight table listing with sizes and row counts. Use postgres://schema for full DDL structure with columns, constraints, and indexes.',
         mimeType: 'application/json',
         handler: async (_uri: string, _context: RequestContext) => {
             const tables = await adapter.listTables();

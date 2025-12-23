@@ -63,21 +63,28 @@ export function createCronResource(adapter: PostgresAdapter): ResourceDefinition
                 recommendations: []
             };
 
-            try {
-                // Check if pg_cron is installed
-                const extCheck = await adapter.executeQuery(
-                    `SELECT extversion FROM pg_extension WHERE extname = 'pg_cron'`
+            // Check if pg_cron is installed (outside try-catch for correct error messaging)
+            const extCheck = await adapter.executeQuery(
+                `SELECT extversion FROM pg_extension WHERE extname = 'pg_cron'`
+            );
+
+            if (!extCheck.rows || extCheck.rows.length === 0) {
+                result.recommendations.push(
+                    'pg_cron is not installed. Installation steps:',
+                    '1. Add to postgresql.conf: shared_preload_libraries = \'pg_cron\'',
+                    '2. Add to postgresql.conf: cron.database_name = \'your_database\'',
+                    '3. Restart PostgreSQL (required for shared_preload_libraries)',
+                    '4. Run: CREATE EXTENSION pg_cron;',
+                    'Note: pg_cron requires superuser privileges and a PostgreSQL restart to enable.'
                 );
+                return JSON.stringify(result, null, 2);
+            }
 
-                if (!extCheck.rows || extCheck.rows.length === 0) {
-                    result.recommendations.push('pg_cron extension is not installed. Use pg_cron_create_extension to enable job scheduling.');
-                    return JSON.stringify(result, null, 2);
-                }
+            result.extensionInstalled = true;
+            const extVersion = extCheck.rows[0]?.['extversion'];
+            result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
 
-                result.extensionInstalled = true;
-                const extVersion = extCheck.rows[0]?.['extversion'];
-                result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
-
+            try {
                 // Get all jobs
                 const jobsResult = await adapter.executeQuery(
                     `SELECT jobid, schedule, command, nodename, nodeport, database, username, active
@@ -101,11 +108,11 @@ export function createCronResource(adapter: PostgresAdapter): ResourceDefinition
                     result.activeJobCount = result.jobs.filter(j => j.active).length;
                 }
 
-                // Get recent run statistics (last 24 hours)
+                // Get recent run statistics (last 7 days)
                 const runsResult = await adapter.executeQuery(
                     `SELECT status, COUNT(*)::int as count
                      FROM cron.job_run_details
-                     WHERE start_time > NOW() - INTERVAL '24 hours'
+                     WHERE start_time > NOW() - INTERVAL '7 days'
                      GROUP BY status`
                 );
 
@@ -119,6 +126,37 @@ export function createCronResource(adapter: PostgresAdapter): ResourceDefinition
                         } else if (status === 'failed') {
                             result.recentRuns.failed += count;
                         }
+                    }
+                }
+
+                // Get last run time per job
+                const lastRunResult = await adapter.executeQuery(
+                    `SELECT DISTINCT ON (jobid) 
+                            jobid,
+                            status as last_status,
+                            start_time as last_run_time,
+                            end_time as last_end_time
+                     FROM cron.job_run_details
+                     ORDER BY jobid, start_time DESC`
+                );
+
+                // Attach last run info to each job
+                const lastRunMap = new Map<number, { status: string; time: string }>();
+                if (lastRunResult.rows) {
+                    for (const row of lastRunResult.rows) {
+                        lastRunMap.set(Number(row['jobid']), {
+                            status: toStr(row['last_status']),
+                            time: toStr(row['last_run_time'])
+                        });
+                    }
+                }
+
+                // Enhance jobs with last run info
+                for (const job of result.jobs) {
+                    const lastRun = lastRunMap.get(job.jobid);
+                    if (lastRun) {
+                        (job as Record<string, unknown>)['lastRunTime'] = lastRun.time;
+                        (job as Record<string, unknown>)['lastRunStatus'] = lastRun.status;
                     }
                 }
 
@@ -174,8 +212,8 @@ export function createCronResource(adapter: PostgresAdapter): ResourceDefinition
                 }
 
             } catch {
-                // pg_cron tables might not exist
-                result.recommendations.push('Error accessing pg_cron tables. Ensure extension is properly installed.');
+                // Extension is installed but data queries failed (permissions, schema visibility, etc.)
+                result.recommendations.push('Error querying pg_cron data. Check permissions on cron schema tables.');
             }
 
             return JSON.stringify(result, null, 2);

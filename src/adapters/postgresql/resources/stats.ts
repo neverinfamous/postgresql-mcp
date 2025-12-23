@@ -15,6 +15,7 @@ interface StatsRecommendation {
     action?: string;
     reason?: string;
     message?: string;
+    statsStale?: boolean;
 }
 
 interface TableStatsRow {
@@ -29,6 +30,22 @@ interface TableStatsRow {
     dead_tuples: number;
     n_mod_since_analyze: number;
     percent_modified_since_analyze: number;
+    statsStale: boolean;
+}
+
+/** Safely convert unknown value to string */
+function toStr(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'number') return value.toString();
+    return '';
+}
+
+/** Safely convert unknown value to number */
+function toNum(value: unknown): number {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return Number(value) || 0;
+    return 0;
 }
 
 export function createStatsResource(adapter: PostgresAdapter): ResourceDefinition {
@@ -38,7 +55,7 @@ export function createStatsResource(adapter: PostgresAdapter): ResourceDefinitio
         description: 'Table and index statistics, cache hit ratios, and stale statistics detection',
         mimeType: 'application/json',
         handler: async (_uri: string, _context: RequestContext) => {
-            // Table stats
+            // Table stats with statsStale calculation
             const tableStats = await adapter.executeQuery(`
                 SELECT schemaname, relname as table_name,
                        seq_scan, idx_scan, n_tup_ins as inserts,
@@ -49,7 +66,12 @@ export function createStatsResource(adapter: PostgresAdapter): ResourceDefinitio
                            WHEN n_live_tup > 0
                            THEN round(100.0 * n_mod_since_analyze / n_live_tup, 2)
                            ELSE 0
-                       END as percent_modified_since_analyze
+                       END as percent_modified_since_analyze,
+                       CASE
+                           WHEN n_live_tup > 100 AND (100.0 * n_mod_since_analyze / n_live_tup) > 10
+                           THEN true
+                           ELSE false
+                       END as stats_stale
                 FROM pg_stat_user_tables
                 ORDER BY n_live_tup DESC
                 LIMIT 50
@@ -67,17 +89,37 @@ export function createStatsResource(adapter: PostgresAdapter): ResourceDefinitio
                 FROM pg_statio_user_tables
             `);
 
+            // Process tables with statsStale field
+            const rawTables = tableStats.rows ?? [];
+            const tables: TableStatsRow[] = rawTables.map(row => ({
+                schemaname: toStr(row['schemaname']),
+                table_name: toStr(row['table_name']),
+                seq_scan: toNum(row['seq_scan']),
+                idx_scan: toNum(row['idx_scan']),
+                inserts: toNum(row['inserts']),
+                updates: toNum(row['updates']),
+                deletes: toNum(row['deletes']),
+                live_tuples: toNum(row['live_tuples']),
+                dead_tuples: toNum(row['dead_tuples']),
+                n_mod_since_analyze: toNum(row['n_mod_since_analyze']),
+                percent_modified_since_analyze: toNum(row['percent_modified_since_analyze']),
+                statsStale: row['stats_stale'] === true
+            }));
+
             // Generate stale statistics recommendations
             const recommendations: StatsRecommendation[] = [];
-            const tables = (tableStats.rows ?? []) as unknown as TableStatsRow[];
 
             for (const table of tables.slice(0, 10)) {
                 const pctStale = table.percent_modified_since_analyze;
+                // Only flag tables with sufficient rows (small tables don't benefit from ANALYZE)
+                if (table.live_tuples < 100) continue;
+
                 if (pctStale > 20) {
                     recommendations.push({
                         priority: 'HIGH',
                         table: table.schemaname + '.' + table.table_name,
                         percentStale: pctStale,
+                        statsStale: true,
                         action: 'ANALYZE ' + table.schemaname + '.' + table.table_name + ';',
                         reason: 'Stale statistics may lead to poor query plans'
                     });
@@ -86,6 +128,7 @@ export function createStatsResource(adapter: PostgresAdapter): ResourceDefinitio
                         priority: 'MEDIUM',
                         table: table.schemaname + '.' + table.table_name,
                         percentStale: pctStale,
+                        statsStale: true,
                         action: 'ANALYZE ' + table.schemaname + '.' + table.table_name + ';',
                         reason: 'Statistics could be fresher for optimal query planning'
                     });

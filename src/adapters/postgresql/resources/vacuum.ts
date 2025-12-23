@@ -103,7 +103,17 @@ export function createVacuumResource(adapter: PostgresAdapter): ResourceDefiniti
             }
 
             for (const table of vacuumStats.slice(0, 5)) {
-                const deadPct = table.dead_tuple_percent;
+                // Handle edge case: empty tables (both live and dead = 0)
+                const isEmptyTable = table.n_live_tup === 0 && table.n_dead_tup === 0;
+
+                // Ensure we have a valid number, not NaN
+                const deadPct = isFinite(table.dead_tuple_percent) ? table.dead_tuple_percent : 0;
+
+                if (isEmptyTable) {
+                    // Skip empty tables in warnings - they don't need vacuum
+                    continue;
+                }
+
                 if (deadPct > 20) {
                     warnings.push({
                         severity: 'MEDIUM',
@@ -123,7 +133,15 @@ export function createVacuumResource(adapter: PostgresAdapter): ResourceDefiniti
 
             return {
                 vacuumStatistics: vacuumStats,
-                transactionIdWraparound: wraparoundInfo,
+                transactionIdWraparound: {
+                    ...wraparoundInfo,
+                    thresholdExplanation: {
+                        limit: 'PostgreSQL uses 32-bit transaction IDs with a 2 billion XID horizon. Approaching this limit requires aggressive vacuuming.',
+                        critical75: '>75%: CRITICAL - Database will shut down to prevent corruption if wraparound occurs. Run VACUUM FREEZE immediately.',
+                        warning50: '>50%: HIGH - Schedule VACUUM FREEZE during maintenance window. Still safe but needs attention.',
+                        healthy: '<50%: Normal operation. Autovacuum should handle routine cleanup.'
+                    }
+                },
                 warnings
             };
         }

@@ -61,6 +61,14 @@ export function createLocksResource(adapter: PostgresAdapter): ResourceDefinitio
             `);
             const locks = (locksResult.rows ?? []) as unknown as LockRow[];
 
+            // Get active session count for context
+            const sessionResult = await adapter.executeQuery(`
+                SELECT COUNT(*) as count FROM pg_stat_activity 
+                WHERE pid != pg_backend_pid() 
+                  AND state = 'active'
+            `);
+            const activeSessions = Number(sessionResult.rows?.[0]?.['count'] ?? 0);
+
             // Analyze locks
             const blockingLocks = locks.filter((lock: LockRow) => !lock.granted);
             const activeLocks = locks.filter((lock: LockRow) => lock.granted);
@@ -91,12 +99,19 @@ export function createLocksResource(adapter: PostgresAdapter): ResourceDefinitio
                 });
             }
 
+            // Generate summary message
+            const summary = locks.length === 0
+                ? `No locks detected. ${String(activeSessions)} active sessions. Empty result is normal when queries complete quickly.`
+                : `${String(locks.length)} locks held by ${String(new Set(locks.map(l => l.pid)).size)} processes. ${String(activeSessions)} active sessions.`;
+
             return {
                 totalLocks: locks.length,
                 activeLocks: activeLocks.length,
                 blockingLocks: blockingLocks.length,
+                activeSessions,
                 lockDetails: locks,
-                warnings
+                warnings,
+                summary
             };
         }
     };

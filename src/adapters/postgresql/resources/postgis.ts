@@ -31,6 +31,11 @@ interface SpatialIndex {
     size: string;
 }
 
+interface UnindexedSpatialColumn {
+    column: string;
+    suggestedGistSql: string;
+}
+
 interface PostgisResourceData {
     extensionInstalled: boolean;
     extensionVersion: string | null;
@@ -41,8 +46,13 @@ interface PostgisResourceData {
     geographyCount: number;
     indexes: SpatialIndex[];
     indexCount: number;
-    unindexedColumns: string[];
+    unindexedColumns: UnindexedSpatialColumn[];
     sridDistribution: { srid: number; count: number }[];
+    typeGuidance?: {
+        geometry: string;
+        geography: string;
+        recommendation: string;
+    };
     recommendations: string[];
 }
 
@@ -68,21 +78,21 @@ export function createPostgisResource(adapter: PostgresAdapter): ResourceDefinit
                 recommendations: []
             };
 
+            // Check if PostGIS is installed (outside try-catch for correct error messaging)
+            const extCheck = await adapter.executeQuery(
+                `SELECT extversion FROM pg_extension WHERE extname = 'postgis'`
+            );
+
+            if (!extCheck.rows || extCheck.rows.length === 0) {
+                result.recommendations.push('PostGIS extension is not installed. Use pg_postgis_create_extension to enable geospatial operations.');
+                return JSON.stringify(result, null, 2);
+            }
+
+            result.extensionInstalled = true;
+            const extVersion = extCheck.rows[0]?.['extversion'];
+            result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
+
             try {
-                // Check if PostGIS is installed
-                const extCheck = await adapter.executeQuery(
-                    `SELECT extversion FROM pg_extension WHERE extname = 'postgis'`
-                );
-
-                if (!extCheck.rows || extCheck.rows.length === 0) {
-                    result.recommendations.push('PostGIS extension is not installed. Use pg_postgis_create_extension to enable geospatial operations.');
-                    return JSON.stringify(result, null, 2);
-                }
-
-                result.extensionInstalled = true;
-                const extVersion = extCheck.rows[0]?.['extversion'];
-                result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
-
                 // Get full PostGIS version info
                 try {
                     const versionResult = await adapter.executeQuery(
@@ -201,14 +211,43 @@ export function createPostgisResource(adapter: PostgresAdapter): ResourceDefinit
                 }
                 result.indexCount = result.indexes.length;
 
-                // Find unindexed spatial columns
+                // Find unindexed spatial columns and generate actionable SQL
+                // Skip small tables where GiST indexes provide minimal benefit
+                const SMALL_TABLE_THRESHOLD = 1000;
                 const indexedColumns = new Set(
                     result.indexes.map(i => `${i.schema}.${i.table}.${i.column}`)
                 );
 
-                result.unindexedColumns = result.spatialColumns
-                    .filter(c => !indexedColumns.has(`${c.schema}.${c.table}.${c.column}`))
-                    .map(c => `${c.schema}.${c.table}.${c.column}`);
+                // Get existing index names to avoid conflicts
+                const existingIndexResult = await adapter.executeQuery(`
+                    SELECT indexname FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+                `);
+                const existingIndexNames = new Set(
+                    (existingIndexResult.rows ?? []).map((r: Record<string, unknown>) => r['indexname'] as string)
+                );
+
+                const unindexedCols = result.spatialColumns
+                    .filter(c => !indexedColumns.has(`${c.schema}.${c.table}.${c.column}`) && c.rowCount >= SMALL_TABLE_THRESHOLD);
+
+                const smallTableCount = result.spatialColumns
+                    .filter(c => !indexedColumns.has(`${c.schema}.${c.table}.${c.column}`) && c.rowCount < SMALL_TABLE_THRESHOLD).length;
+
+                result.unindexedColumns = unindexedCols.map(c => {
+                    // Generate unique index name
+                    let gistName = `idx_${c.table}_${c.column}_gist`;
+
+                    // Add suffix if name already exists
+                    let suffix = 1;
+                    while (existingIndexNames.has(gistName)) {
+                        gistName = `idx_${c.table}_${c.column}_gist_${String(suffix)}`;
+                        suffix++;
+                    }
+
+                    return {
+                        column: `${c.schema}.${c.table}.${c.column}`,
+                        suggestedGistSql: `CREATE INDEX IF NOT EXISTS "${gistName}" ON "${c.schema}"."${c.table}" USING GIST ("${c.column}");`
+                    };
+                });
 
                 // SRID distribution
                 const sridCounts = new Map<number, number>();
@@ -225,18 +264,36 @@ export function createPostgisResource(adapter: PostgresAdapter): ResourceDefinit
                 }
 
                 if (result.unindexedColumns.length > 0) {
-                    result.recommendations.push(`${String(result.unindexedColumns.length)} spatial columns without GiST indexes. Use pg_spatial_index for better query performance.`);
+                    const columnNames = result.unindexedColumns.slice(0, 3).map(c => c.column).join(', ');
+                    result.recommendations.push(`${String(result.unindexedColumns.length)} spatial column(s) on larger tables without GiST indexes: ${columnNames}${result.unindexedColumns.length > 3 ? '...' : ''}. See unindexedColumns for ready-to-use CREATE INDEX SQL.`);
+                }
+
+                // Note about small tables that were skipped
+                if (smallTableCount > 0 && result.unindexedColumns.length === 0) {
+                    result.recommendations.push(`${String(smallTableCount)} unindexed spatial column(s) on small tables (<${String(SMALL_TABLE_THRESHOLD)} rows). Indexes optional for small tables.`);
                 }
 
                 for (const col of result.spatialColumns) {
-                    if (col.rowCount > 10000 && result.unindexedColumns.includes(`${col.schema}.${col.table}.${col.column}`)) {
+                    const isUnindexed = result.unindexedColumns.some(u => u.column === `${col.schema}.${col.table}.${col.column}`);
+                    if (col.rowCount > 10000 && isUnindexed) {
                         result.recommendations.push(`Large unindexed spatial column: ${col.table}.${col.column} (${String(col.rowCount)} rows). GiST index strongly recommended.`);
                     }
                 }
 
                 if (result.geometryCount > 0 && result.geographyCount === 0) {
-                    result.recommendations.push('Only geometry columns found. Consider geography type for global distance calculations.');
+                    result.recommendations.push('Only geometry columns found. Consider geography type for global distance calculations over large areas.');
                 }
+
+                // Add type guidance
+                result.typeGuidance = {
+                    geometry: 'Geometry type: Planar (flat-earth) calculations. Faster computations. Best for: local areas, projected data, city/region level. Uses cartesian math.',
+                    geography: 'Geography type: Spherical (round-earth) calculations. Accurate for global distances. Best for: global datasets, long-distance queries, GPS coordinates. Uses geodetic math.',
+                    recommendation: result.geographyCount > 0 && result.geometryCount > 0
+                        ? 'Using both types appropriately. Geometry for local operations, geography for global calculations.'
+                        : result.geographyCount > 0
+                            ? 'Using geography type - correct for global distance calculations.'
+                            : 'Using geometry only. If calculating distances across continents or between far-apart cities, geography type provides more accurate results.'
+                };
 
                 // Check for SRID 0 (unknown)
                 const unknownSrid = result.spatialColumns.filter(c => c.srid === 0);
@@ -245,7 +302,8 @@ export function createPostgisResource(adapter: PostgresAdapter): ResourceDefinit
                 }
 
             } catch {
-                result.recommendations.push('Error accessing PostGIS information. Ensure extension is properly installed.');
+                // Extension is installed but data queries failed
+                result.recommendations.push('Error querying PostGIS data. Check permissions on geometry_columns view.');
             }
 
             return JSON.stringify(result, null, 2);

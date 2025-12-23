@@ -13,6 +13,7 @@ interface ReplicationInfo {
     replicationStats: Record<string, unknown>[];
     walStatus: Record<string, unknown>;
     replicationDelay?: string;
+    statusMessage: string;
 }
 
 export function createReplicationResource(adapter: PostgresAdapter): ResourceDefinition {
@@ -26,15 +27,17 @@ export function createReplicationResource(adapter: PostgresAdapter): ResourceDef
             const roleResult = await adapter.executeQuery('SELECT pg_is_in_recovery() as is_replica');
             const isReplica = roleResult.rows?.[0]?.['is_replica'] === true;
 
-            const replicationInfo: ReplicationInfo = {
-                role: isReplica ? 'replica' : 'primary',
-                replicationSlots: [],
-                replicationStats: [],
-                walStatus: {}
-            };
+            // Determine if this is a standalone server (not a replica and no replicas connected)
+            let role: string;
+            let statusMessage: string;
+            let replicationSlots: Record<string, unknown>[] = [];
+            let replicationStats: Record<string, unknown>[] = [];
 
-            if (!isReplica) {
-                // Primary server - get replication slots
+            if (isReplica) {
+                role = 'replica';
+                statusMessage = 'This server is a replica receiving data from a primary server.';
+            } else {
+                // Primary server - check for replication activity
                 const slotsResult = await adapter.executeQuery(`
                     SELECT
                         slot_name,
@@ -47,7 +50,7 @@ export function createReplicationResource(adapter: PostgresAdapter): ResourceDef
                         safe_wal_size
                     FROM pg_replication_slots
                 `);
-                replicationInfo.replicationSlots = slotsResult.rows ?? [];
+                replicationSlots = slotsResult.rows ?? [];
 
                 // Get replication statistics
                 const statsResult = await adapter.executeQuery(`
@@ -62,8 +65,37 @@ export function createReplicationResource(adapter: PostgresAdapter): ResourceDef
                         replay_lag
                     FROM pg_stat_replication
                 `);
-                replicationInfo.replicationStats = statsResult.rows ?? [];
-            } else {
+                replicationStats = statsResult.rows ?? [];
+
+                // Determine if standalone (not a replica and no replication activity)
+                const hasReplicationSlots = replicationSlots.length > 0;
+                const hasConnectedReplicas = replicationStats.length > 0;
+
+                if (hasReplicationSlots || hasConnectedReplicas) {
+                    role = 'primary';
+                    const activeSlots = replicationSlots.filter(s => s['active'] === true).length;
+                    if (hasConnectedReplicas) {
+                        statusMessage = `Primary server with ${replicationStats.length.toString()} connected replica(s).`;
+                    } else if (activeSlots === 0 && hasReplicationSlots) {
+                        statusMessage = `Primary server with ${replicationSlots.length.toString()} replication slot(s) but no connected replicas. Check replica connectivity.`;
+                    } else {
+                        statusMessage = 'Primary server configured for replication.';
+                    }
+                } else {
+                    role = 'standalone';
+                    statusMessage = 'Standalone PostgreSQL server with no replication configured. This is expected if you do not require high availability or read replicas.';
+                }
+            }
+
+            const replicationInfo: ReplicationInfo = {
+                role,
+                replicationSlots,
+                replicationStats,
+                walStatus: {},
+                statusMessage
+            };
+
+            if (isReplica) {
                 // Replica server - get replication delay
                 const lagResult = await adapter.executeQuery(`
                     SELECT

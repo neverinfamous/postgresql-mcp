@@ -40,6 +40,9 @@ interface PartmanResourceData {
         issue: string;
         severity: 'warning' | 'critical';
     }[];
+    maintenanceScheduled: boolean;
+    maintenanceJobCount: number;
+    maintenanceMethod?: 'pg_cron' | 'external_or_none' | 'unknown';
     recommendations: string[];
 }
 
@@ -57,29 +60,38 @@ export function createPartmanResource(adapter: PostgresAdapter): ResourceDefinit
                 partitionSetCount: 0,
                 partitionInfo: [],
                 healthIssues: [],
+                maintenanceScheduled: false,
+                maintenanceJobCount: 0,
                 recommendations: []
             };
 
+            // Check if pg_partman is installed and get its schema (outside try-catch for correct error messaging)
+            const extCheck = await adapter.executeQuery(
+                `SELECT e.extversion, n.nspname as schema_name
+                 FROM pg_extension e
+                 JOIN pg_namespace n ON e.extnamespace = n.oid
+                 WHERE e.extname = 'pg_partman'`
+            );
+
+            if (!extCheck.rows || extCheck.rows.length === 0) {
+                result.recommendations.push('pg_partman extension is not installed. Use pg_partman_create_extension to enable automated partition management.');
+                return JSON.stringify(result, null, 2);
+            }
+
+            result.extensionInstalled = true;
+            const extVersion = extCheck.rows[0]?.['extversion'];
+            result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
+
+            // Get the schema where pg_partman is installed (defaults to 'partman' for compatibility)
+            const partmanSchemaRaw = extCheck.rows[0]?.['schema_name'];
+            const partmanSchema = typeof partmanSchemaRaw === 'string' ? partmanSchemaRaw : 'partman';
+
             try {
-                // Check if pg_partman is installed
-                const extCheck = await adapter.executeQuery(
-                    `SELECT extversion FROM pg_extension WHERE extname = 'pg_partman'`
-                );
-
-                if (!extCheck.rows || extCheck.rows.length === 0) {
-                    result.recommendations.push('pg_partman extension is not installed. Use pg_partman_create_extension to enable automated partition management.');
-                    return JSON.stringify(result, null, 2);
-                }
-
-                result.extensionInstalled = true;
-                const extVersion = extCheck.rows[0]?.['extversion'];
-                result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
-
-                // Get partition configurations
+                // Get partition configurations using dynamically detected schema
                 const configResult = await adapter.executeQuery(
                     `SELECT parent_table, control, partition_interval::text, 
                             retention::text, premake, datetime_string
-                     FROM partman.part_config
+                     FROM "${partmanSchema}".part_config
                      ORDER BY parent_table`
                 );
 
@@ -148,9 +160,10 @@ export function createPartmanResource(adapter: PostgresAdapter): ResourceDefinit
                             });
                         }
 
-                        // Check retention configuration
-                        if (config.retention === null) {
-                            result.recommendations.push(`${config.parent_table}: No retention policy set. Consider using pg_partman_set_retention.`);
+                        // Check retention configuration - only warn for tables with many partitions
+                        // where unlimited retention is more likely to be an oversight
+                        if (config.retention === null && partitionCount > 12) {
+                            result.recommendations.push(`${config.parent_table}: No retention policy configured (${String(partitionCount)} partitions). Consider pg_partman_set_retention for cleanup, or ignore if unlimited retention is intended.`);
                         }
                     } catch {
                         // Individual table error, continue
@@ -162,26 +175,44 @@ export function createPartmanResource(adapter: PostgresAdapter): ResourceDefinit
                     result.recommendations.push('No partition sets configured. Use pg_partman_create_parent to create managed partitions.');
                 }
 
-                // Check for maintenance scheduling
+                // Check for maintenance scheduling with broader pattern matching
                 try {
                     const cronCheck = await adapter.executeQuery(
                         `SELECT COUNT(*)::int as count FROM cron.job 
-                         WHERE command ILIKE '%partman%maintenance%'`
+                         WHERE command ILIKE '%partman%' 
+                            OR command ILIKE '%run_maintenance%'
+                            OR command ILIKE '%partition%maintenance%'`
                     );
 
                     const cronCount = Number(cronCheck.rows?.[0]?.['count'] ?? 0);
+                    result.maintenanceScheduled = cronCount > 0;
+                    result.maintenanceJobCount = cronCount;
+                    result.maintenanceMethod = cronCount > 0 ? 'pg_cron' : 'unknown';
+
                     if (cronCount === 0 && result.partitionSetCount > 0) {
-                        result.recommendations.push('No pg_cron job found for partition maintenance. Schedule partman.run_maintenance_proc() to run regularly.');
+                        result.recommendations.push(
+                            'No pg_cron job found for partition maintenance. Setup options:',
+                            'Option 1 - pg_cron (recommended): SELECT cron.schedule(\'partman-maintenance\', \'*/30 * * * *\', $$CALL partman.run_maintenance_proc()$$);',
+                            'Option 2 - External: Add to system cron: */30 * * * * psql -c "CALL partman.run_maintenance_proc()"',
+                            'Run frequency: Every 30 minutes is typical. Adjust based on partition interval (faster intervals need more frequent runs).'
+                        );
                     }
                 } catch {
                     // pg_cron not installed
+                    result.maintenanceMethod = 'external_or_none';
                     if (result.partitionSetCount > 0) {
-                        result.recommendations.push('Consider installing pg_cron to automate partition maintenance.');
+                        result.recommendations.push(
+                            'pg_cron not detected. Use external scheduling for maintenance:',
+                            'System cron example: */30 * * * * psql -d your_database -c "CALL partman.run_maintenance_proc()"',
+                            'Windows Task Scheduler: Run psql command every 30 minutes',
+                            'Alternatively, install pg_cron: shared_preload_libraries = \'pg_cron\' in postgresql.conf then restart'
+                        );
                     }
                 }
 
             } catch {
-                result.recommendations.push('Error accessing pg_partman tables. Ensure extension is properly installed.');
+                // Extension is installed but data queries failed
+                result.recommendations.push('Error querying pg_partman data. Check permissions on partman schema tables.');
             }
 
             return JSON.stringify(result, null, 2);

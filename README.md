@@ -225,7 +225,7 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 
 ### Quick Start: Recommended IDE Configuration
 
-Add one of these configurations to your IDE's MCP settings file (e.g., `cline_mcp_settings.json`, `.cursorrules`, or equivalent):
+Add one of these configurations to your IDE's MCP settings file:
 
 #### Option 1: Starter (49 Essential Tools)
 **Best for:** General PostgreSQL database work - CRUD operations, JSONB, schema management.

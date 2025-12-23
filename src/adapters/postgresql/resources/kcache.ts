@@ -39,7 +39,50 @@ interface KcacheResourceData {
         ioBound: number;
         balanced: number;
     };
+    classificationThresholds?: {
+        formula: string;
+        cpuBound: string;
+        ioBound: string;
+        balanced: string;
+    };
     recommendations: string[];
+}
+
+/**
+ * Column naming in pg_stat_kcache changed in version 2.2:
+ * - Old (< 2.2): user_time, system_time, reads, writes
+ * - New (>= 2.2): exec_user_time, exec_system_time, exec_reads, exec_writes
+ * 
+ * The pg_stat_kcache() FUNCTION returns columns like exec_reads (bytes).
+ */
+interface KcacheColumns {
+    userTime: string;
+    systemTime: string;
+    reads: string;
+    writes: string;
+}
+
+async function getKcacheColumnNames(adapter: PostgresAdapter): Promise<KcacheColumns> {
+    const result = await adapter.executeQuery(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'pg_stat_kcache' AND column_name = 'exec_user_time'
+    `);
+    const isNewVersion = (result.rows?.length ?? 0) > 0;
+
+    if (isNewVersion) {
+        return {
+            userTime: 'exec_user_time',
+            systemTime: 'exec_system_time',
+            reads: 'exec_reads',
+            writes: 'exec_writes'
+        };
+    }
+    return {
+        userTime: 'user_time',
+        systemTime: 'system_time',
+        reads: 'reads',
+        writes: 'writes'
+    };
 }
 
 export function createKcacheResource(adapter: PostgresAdapter): ResourceDefinition {
@@ -69,44 +112,47 @@ export function createKcacheResource(adapter: PostgresAdapter): ResourceDefiniti
                 recommendations: []
             };
 
-            try {
-                // Check for pg_stat_statements first (required)
-                const stmtCheck = await adapter.executeQuery(
-                    `SELECT extversion FROM pg_extension WHERE extname = 'pg_stat_statements'`
-                );
+            // Check for pg_stat_statements first (required) - outside try-catch for correct error messaging
+            const stmtCheck = await adapter.executeQuery(
+                `SELECT extversion FROM pg_extension WHERE extname = 'pg_stat_statements'`
+            );
 
-                result.pgStatStatementsInstalled = (stmtCheck.rows?.length ?? 0) > 0;
+            result.pgStatStatementsInstalled = (stmtCheck.rows?.length ?? 0) > 0;
 
-                // Check if pg_stat_kcache is installed
-                const extCheck = await adapter.executeQuery(
-                    `SELECT extversion FROM pg_extension WHERE extname = 'pg_stat_kcache'`
-                );
+            // Check if pg_stat_kcache is installed
+            const extCheck = await adapter.executeQuery(
+                `SELECT extversion FROM pg_extension WHERE extname = 'pg_stat_kcache'`
+            );
 
-                if (!extCheck.rows || extCheck.rows.length === 0) {
-                    result.recommendations.push('pg_stat_kcache extension is not installed. Use pg_kcache_create_extension to enable OS-level performance monitoring.');
-                    if (!result.pgStatStatementsInstalled) {
-                        result.recommendations.push('pg_stat_statements is also required and not installed.');
-                    }
-                    return JSON.stringify(result, null, 2);
-                }
-
-                result.extensionInstalled = true;
-                const extVersion = extCheck.rows[0]?.['extversion'];
-                result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
-
+            if (!extCheck.rows || extCheck.rows.length === 0) {
+                result.recommendations.push('pg_stat_kcache extension is not installed. Use pg_kcache_create_extension to enable OS-level performance monitoring.');
                 if (!result.pgStatStatementsInstalled) {
-                    result.recommendations.push('pg_stat_statements is required but not installed. pg_stat_kcache will not function properly.');
-                    return JSON.stringify(result, null, 2);
+                    result.recommendations.push('pg_stat_statements is also required and not installed.');
                 }
+                return JSON.stringify(result, null, 2);
+            }
 
-                // Get summary statistics
+            result.extensionInstalled = true;
+            const extVersion = extCheck.rows[0]?.['extversion'];
+            result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
+
+            if (!result.pgStatStatementsInstalled) {
+                result.recommendations.push('pg_stat_statements is required but not installed. pg_stat_kcache will not function properly.');
+                return JSON.stringify(result, null, 2);
+            }
+
+            try {
+                // Get version-aware column names
+                const cols = await getKcacheColumnNames(adapter);
+
+                // Get summary statistics using the FUNCTION (not the VIEW)
                 const summaryResult = await adapter.executeQuery(
                     `SELECT 
                         COUNT(*)::int as total_queries,
-                        COALESCE(SUM(user_time + system_time), 0)::float as total_cpu,
-                        COALESCE(SUM(reads), 0)::bigint as total_reads,
-                        COALESCE(SUM(writes), 0)::bigint as total_writes
-                     FROM pg_stat_kcache`
+                        COALESCE(SUM(${cols.userTime} + ${cols.systemTime}), 0)::float as total_cpu,
+                        COALESCE(SUM(${cols.reads}), 0)::bigint as total_reads,
+                        COALESCE(SUM(${cols.writes}), 0)::bigint as total_writes
+                     FROM pg_stat_kcache()`
                 );
 
                 if (summaryResult.rows && summaryResult.rows.length > 0) {
@@ -117,17 +163,17 @@ export function createKcacheResource(adapter: PostgresAdapter): ResourceDefiniti
                     result.summary.totalWrites = Number(row?.['total_writes'] ?? 0);
                 }
 
-                // Get top CPU-consuming queries
+                // Get top CPU-consuming queries using FUNCTION
                 const cpuResult = await adapter.executeQuery(
                     `SELECT 
                         substring(s.query, 1, 100) as query,
                         s.calls::int,
-                        round((k.user_time + k.system_time)::numeric, 3) as cpu_time,
-                        round(((k.user_time + k.system_time) / NULLIF(s.calls, 0))::numeric, 6) as cpu_per_call
-                     FROM pg_stat_kcache k
-                     JOIN pg_stat_statements s USING (queryid, dbid, userid)
+                        round((k.${cols.userTime} + k.${cols.systemTime})::numeric, 3) as cpu_time,
+                        round(((k.${cols.userTime} + k.${cols.systemTime}) / NULLIF(s.calls, 0))::numeric, 6) as cpu_per_call
+                     FROM pg_stat_kcache() k
+                     JOIN pg_stat_statements s ON k.queryid = s.queryid AND k.dbid = s.dbid AND k.userid = s.userid
                      WHERE s.calls > 0
-                     ORDER BY (k.user_time + k.system_time) DESC
+                     ORDER BY (k.${cols.userTime} + k.${cols.systemTime}) DESC
                      LIMIT 5`
                 );
 
@@ -142,17 +188,17 @@ export function createKcacheResource(adapter: PostgresAdapter): ResourceDefiniti
                     }
                 }
 
-                // Get top I/O-consuming queries
+                // Get top I/O-consuming queries using FUNCTION
                 const ioResult = await adapter.executeQuery(
                     `SELECT 
                         substring(s.query, 1, 100) as query,
                         s.calls::int,
-                        k.reads::bigint,
-                        k.writes::bigint
-                     FROM pg_stat_kcache k
-                     JOIN pg_stat_statements s USING (queryid, dbid, userid)
+                        k.${cols.reads}::bigint as reads,
+                        k.${cols.writes}::bigint as writes
+                     FROM pg_stat_kcache() k
+                     JOIN pg_stat_statements s ON k.queryid = s.queryid AND k.dbid = s.dbid AND k.userid = s.userid
                      WHERE s.calls > 0
-                     ORDER BY k.reads DESC
+                     ORDER BY k.${cols.reads} DESC
                      LIMIT 5`
                 );
 
@@ -167,15 +213,15 @@ export function createKcacheResource(adapter: PostgresAdapter): ResourceDefiniti
                     }
                 }
 
-                // Resource classification
+                // Resource classification using FUNCTION
                 const classResult = await adapter.executeQuery(
                     `WITH metrics AS (
                         SELECT 
                             queryid,
-                            (user_time + system_time) as cpu_time,
-                            reads + writes as io_bytes
-                        FROM pg_stat_kcache
-                        WHERE user_time + system_time > 0 OR reads + writes > 0
+                            (${cols.userTime} + ${cols.systemTime}) as cpu_time,
+                            ${cols.reads} + ${cols.writes} as io_bytes
+                        FROM pg_stat_kcache()
+                        WHERE ${cols.userTime} + ${cols.systemTime} > 0 OR ${cols.reads} + ${cols.writes} > 0
                     )
                     SELECT 
                         CASE 
@@ -205,13 +251,24 @@ export function createKcacheResource(adapter: PostgresAdapter): ResourceDefiniti
                 // Generate recommendations
                 if (result.summary.totalQueries === 0) {
                     result.recommendations.push('No query statistics collected yet. Run some queries and check again.');
+                } else if (result.summary.totalReads === 0 && result.summary.totalWrites === 0 && result.summary.totalCpuTime === 0) {
+                    result.recommendations.push('All pg_stat_kcache metrics are zero. Possible causes: (1) No query activity since last reset, (2) pg_stat_kcache not in shared_preload_libraries (requires server restart), (3) Stats recently reset with pg_stat_kcache_reset(). Check postgresql.conf for: shared_preload_libraries = \'pg_stat_statements,pg_stat_kcache\'');
                 }
 
-                if (result.resourceClassification.cpuBound > result.resourceClassification.ioBound * 2) {
+                // Generate recommendations based on workload classification
+                // Only provide classification recommendations when there's meaningful activity
+                const totalClassified = result.resourceClassification.cpuBound +
+                    result.resourceClassification.ioBound +
+                    result.resourceClassification.balanced;
+                const hasSignificantActivity = totalClassified >= 5 && result.summary.totalCpuTime >= 0.1;
+
+                if (!hasSignificantActivity && totalClassified > 0) {
+                    result.recommendations.push('Insufficient query activity for meaningful workload classification. Run more queries to gather accurate metrics.');
+                } else if (result.resourceClassification.cpuBound > result.resourceClassification.ioBound * 2) {
                     result.recommendations.push('Workload is heavily CPU-bound. Consider optimizing complex calculations or using materialized views.');
                 }
 
-                if (result.resourceClassification.ioBound > result.resourceClassification.cpuBound * 2) {
+                if (hasSignificantActivity && result.resourceClassification.ioBound > result.resourceClassification.cpuBound * 2) {
                     result.recommendations.push('Workload is heavily I/O-bound. Review indexes and consider increasing shared_buffers.');
                 }
 
@@ -219,8 +276,17 @@ export function createKcacheResource(adapter: PostgresAdapter): ResourceDefiniti
                     result.recommendations.push('Some queries have very high CPU time. Use pg_kcache_top_cpu for detailed analysis.');
                 }
 
+                // Add classification thresholds explanation
+                result.classificationThresholds = {
+                    formula: 'Compares (user_time + system_time) vs (reads + writes in MB). cpu_time > io_MB * 2 = CPU-bound; io_MB > cpu_time * 2 = I/O-bound; else balanced.',
+                    cpuBound: 'Query spends 2x more time on CPU than on I/O operations. Optimize calculations, use materialized views, or simplify queries.',
+                    ioBound: 'Query spends 2x more time on I/O than CPU. Add indexes, increase shared_buffers, or optimize disk access patterns.',
+                    balanced: 'Query has relatively equal CPU and I/O usage. Standard optimization techniques apply.'
+                };
+
             } catch {
-                result.recommendations.push('Error accessing pg_stat_kcache. Ensure both pg_stat_statements and pg_stat_kcache are in shared_preload_libraries.');
+                // Extension is installed but data queries failed
+                result.recommendations.push('Error querying pg_stat_kcache data. Check permissions on pg_stat_kcache() function.');
             }
 
             return JSON.stringify(result, null, 2);

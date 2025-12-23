@@ -83,22 +83,62 @@ export function createHealthResource(adapter: PostgresAdapter): ResourceDefiniti
                 details: { active: activeConns, max: maxConns, percentage: connPct }
             };
 
-            // Process cache health
-            const cacheRatio = Number(cacheResult.rows?.[0]?.['cache_hit_ratio'] ?? 100);
+            // Process cache health with cold cache detection
+            const cacheRow = cacheResult.rows?.[0];
+            const cacheRatio = Number(cacheRow?.['cache_hit_ratio'] ?? 100);
+            const totalBlocks = Number(cacheRow?.['heap_read'] ?? 0) + Number(cacheRow?.['heap_hit'] ?? 0);
+            const isColdCache = totalBlocks < 1000; // Very little I/O activity indicates cold cache
+
+            // Don't warn about cache ratio for cold caches - insufficient data for meaningful metric
+            const cacheStatus = isColdCache
+                ? 'healthy'
+                : (cacheRatio < 90 ? 'critical' : cacheRatio < 95 ? 'warning' : 'healthy');
+
             checks['cache'] = {
-                status: cacheRatio < 90 ? 'critical' : cacheRatio < 95 ? 'warning' : 'healthy',
-                message: cacheRatio.toString() + '% cache hit ratio',
-                details: { cacheHitRatio: cacheRatio }
+                status: cacheStatus,
+                message: isColdCache
+                    ? `${cacheRatio.toString()}% cache hit ratio (cold cache - limited data)`
+                    : `${cacheRatio.toString()}% cache hit ratio`,
+                details: {
+                    cacheHitRatio: cacheRatio,
+                    totalBlocks,
+                    context: isColdCache
+                        ? 'Cold cache - insufficient I/O activity for meaningful ratio. Normal for new/test databases.'
+                        : undefined
+                }
             };
 
-            // Process vacuum health
+            // Process vacuum health - check both aggregate AND per-table stats
             const deadPct = Number(vacuumResult.rows?.[0]?.['dead_pct'] ?? 0);
+
+            // Query individual tables needing attention (>20% dead tuples)
+            let tablesNeedingAttention = 0;
+            try {
+                const perTableResult = await adapter.executeQuery(`
+                    SELECT COUNT(*) as count
+                    FROM pg_stat_user_tables
+                    WHERE n_live_tup > 0 
+                      AND (100.0 * n_dead_tup / n_live_tup) > 20
+                `);
+                tablesNeedingAttention = Number(perTableResult.rows?.[0]?.['count'] ?? 0);
+            } catch {
+                // Query failed, continue with aggregate check only
+            }
+
+            // Status is warning if aggregate > 10% OR any individual table > 20%
+            const vacuumStatus = deadPct > 20 || tablesNeedingAttention > 0
+                ? (deadPct > 20 ? 'critical' : 'warning')
+                : deadPct > 10 ? 'warning' : 'healthy';
+
             checks['vacuum'] = {
-                status: deadPct > 20 ? 'critical' : deadPct > 10 ? 'warning' : 'healthy',
-                message: deadPct.toString() + '% dead tuples',
+                status: vacuumStatus,
+                message: tablesNeedingAttention > 0
+                    ? `${deadPct.toString()}% dead tuples overall, ${tablesNeedingAttention.toString()} tables need attention`
+                    : `${deadPct.toString()}% dead tuples`,
                 details: {
                     deadTuples: Number(vacuumResult.rows?.[0]?.['total_dead'] ?? 0),
-                    liveTuples: Number(vacuumResult.rows?.[0]?.['total_live'] ?? 0)
+                    liveTuples: Number(vacuumResult.rows?.[0]?.['total_live'] ?? 0),
+                    tablesNeedingAttention
                 }
             };
 

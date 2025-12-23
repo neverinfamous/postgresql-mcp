@@ -30,6 +30,12 @@ interface VectorIndex {
     options: string | null;
 }
 
+interface UnindexedVectorColumn {
+    column: string;
+    suggestedHnswSql: string;
+    suggestedIvfflatSql: string;
+}
+
 interface VectorResourceData {
     extensionInstalled: boolean;
     extensionVersion: string | null;
@@ -39,7 +45,12 @@ interface VectorResourceData {
     indexCount: number;
     hnswIndexCount: number;
     ivfflatIndexCount: number;
-    unindexedColumns: string[];
+    unindexedColumns: UnindexedVectorColumn[];
+    indexTypeGuidance?: {
+        hnsw: string;
+        ivfflat: string;
+        recommendation: string;
+    };
     recommendations: string[];
 }
 
@@ -63,21 +74,21 @@ export function createVectorResource(adapter: PostgresAdapter): ResourceDefiniti
                 recommendations: []
             };
 
+            // Check if pgvector is installed (outside try-catch for correct error messaging)
+            const extCheck = await adapter.executeQuery(
+                `SELECT extversion FROM pg_extension WHERE extname = 'vector'`
+            );
+
+            if (!extCheck.rows || extCheck.rows.length === 0) {
+                result.recommendations.push('pgvector extension is not installed. Use pg_vector_create_extension to enable vector similarity search.');
+                return JSON.stringify(result, null, 2);
+            }
+
+            result.extensionInstalled = true;
+            const extVersion = extCheck.rows[0]?.['extversion'];
+            result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
+
             try {
-                // Check if pgvector is installed
-                const extCheck = await adapter.executeQuery(
-                    `SELECT extversion FROM pg_extension WHERE extname = 'vector'`
-                );
-
-                if (!extCheck.rows || extCheck.rows.length === 0) {
-                    result.recommendations.push('pgvector extension is not installed. Use pg_vector_create_extension to enable vector similarity search.');
-                    return JSON.stringify(result, null, 2);
-                }
-
-                result.extensionInstalled = true;
-                const extVersion = extCheck.rows[0]?.['extversion'];
-                result.extensionVersion = typeof extVersion === 'string' ? extVersion : null;
-
                 // Get all vector columns
                 const columnsResult = await adapter.executeQuery(
                     `SELECT 
@@ -152,14 +163,50 @@ export function createVectorResource(adapter: PostgresAdapter): ResourceDefiniti
                 result.hnswIndexCount = result.indexes.filter(i => i.indexType === 'hnsw').length;
                 result.ivfflatIndexCount = result.indexes.filter(i => i.indexType === 'ivfflat').length;
 
-                // Find unindexed vector columns
+                // Find unindexed vector columns and generate actionable SQL
+                // Skip small tables where indexes provide minimal benefit
+                const SMALL_TABLE_THRESHOLD = 1000;
                 const indexedColumns = new Set(
                     result.indexes.map(i => `${i.schema}.${i.table}.${i.column}`)
                 );
 
-                result.unindexedColumns = result.vectorColumns
-                    .filter(c => !indexedColumns.has(`${c.schema}.${c.table}.${c.column}`))
-                    .map(c => `${c.schema}.${c.table}.${c.column}`);
+                // Get existing index names to avoid conflicts
+                const existingIndexResult = await adapter.executeQuery(`
+                    SELECT indexname FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+                `);
+                const existingIndexNames = new Set(
+                    (existingIndexResult.rows ?? []).map((r: Record<string, unknown>) => r['indexname'] as string)
+                );
+
+                const unindexedCols = result.vectorColumns
+                    .filter(c => !indexedColumns.has(`${c.schema}.${c.table}.${c.column}`) && c.rowCount >= SMALL_TABLE_THRESHOLD);
+
+                const smallTableCount = result.vectorColumns
+                    .filter(c => !indexedColumns.has(`${c.schema}.${c.table}.${c.column}`) && c.rowCount < SMALL_TABLE_THRESHOLD).length;
+
+                result.unindexedColumns = unindexedCols.map(c => {
+                    // Generate unique index names
+                    let hnswName = `idx_${c.table}_${c.column}_hnsw`;
+                    let ivfflatName = `idx_${c.table}_${c.column}_ivfflat`;
+
+                    // Add suffix if name already exists
+                    let suffix = 1;
+                    while (existingIndexNames.has(hnswName)) {
+                        hnswName = `idx_${c.table}_${c.column}_hnsw_${String(suffix)}`;
+                        suffix++;
+                    }
+                    suffix = 1;
+                    while (existingIndexNames.has(ivfflatName)) {
+                        ivfflatName = `idx_${c.table}_${c.column}_ivfflat_${String(suffix)}`;
+                        suffix++;
+                    }
+
+                    return {
+                        column: `${c.schema}.${c.table}.${c.column}`,
+                        suggestedHnswSql: `CREATE INDEX IF NOT EXISTS "${hnswName}" ON "${c.schema}"."${c.table}" USING hnsw ("${c.column}" vector_cosine_ops);`,
+                        suggestedIvfflatSql: `CREATE INDEX IF NOT EXISTS "${ivfflatName}" ON "${c.schema}"."${c.table}" USING ivfflat ("${c.column}" vector_l2_ops) WITH (lists = 100);`
+                    };
+                });
 
                 // Generate recommendations
                 if (result.columnCount === 0) {
@@ -167,11 +214,18 @@ export function createVectorResource(adapter: PostgresAdapter): ResourceDefiniti
                 }
 
                 if (result.unindexedColumns.length > 0) {
-                    result.recommendations.push(`${String(result.unindexedColumns.length)} vector columns without indexes: ${result.unindexedColumns.slice(0, 3).join(', ')}${result.unindexedColumns.length > 3 ? '...' : ''}. Use pg_vector_create_index.`);
+                    const columnNames = result.unindexedColumns.slice(0, 3).map(c => c.column).join(', ');
+                    result.recommendations.push(`${String(result.unindexedColumns.length)} vector column(s) on larger tables without indexes: ${columnNames}${result.unindexedColumns.length > 3 ? '...' : ''}. See unindexedColumns for ready-to-use CREATE INDEX SQL.`);
+                }
+
+                // Note about small tables that were skipped
+                if (smallTableCount > 0 && result.unindexedColumns.length === 0) {
+                    result.recommendations.push(`${String(smallTableCount)} unindexed vector column(s) on small tables (<${String(SMALL_TABLE_THRESHOLD)} rows). Indexes optional for small tables.`);
                 }
 
                 for (const col of result.vectorColumns) {
-                    if (col.rowCount > 100000 && result.unindexedColumns.includes(`${col.schema}.${col.table}.${col.column}`)) {
+                    const isUnindexed = result.unindexedColumns.some(u => u.column === `${col.schema}.${col.table}.${col.column}`);
+                    if (col.rowCount > 100000 && isUnindexed) {
                         result.recommendations.push(`Large unindexed vector column: ${col.table}.${col.column} (${String(col.rowCount)} rows). HNSW index strongly recommended.`);
                     }
                 }
@@ -180,8 +234,20 @@ export function createVectorResource(adapter: PostgresAdapter): ResourceDefiniti
                     result.recommendations.push('Using IVFFlat indexes only. Consider HNSW for better query performance (higher build cost).');
                 }
 
+                // Add index type guidance
+                result.indexTypeGuidance = {
+                    hnsw: 'HNSW (Hierarchical Navigating Small Worlds): Higher recall, faster queries. Best for most use cases. Higher memory and build time. Recommended for production.',
+                    ivfflat: 'IVFFlat (Inverted File with Flat compression): Faster to build, lower memory. Requires tuning "lists" parameter (sqrt(rows) recommended). Better for prototyping or resource-constrained environments.',
+                    recommendation: result.indexCount === 0
+                        ? 'Start with HNSW for best query performance. Use IVFFlat if build time or memory is a constraint.'
+                        : result.hnswIndexCount > 0 && result.ivfflatIndexCount === 0
+                            ? 'Using HNSW indexes - optimal for query performance.'
+                            : 'Mixed index types detected. Consider migrating IVFFlat to HNSW for consistent performance.'
+                };
+
             } catch {
-                result.recommendations.push('Error accessing pgvector information. Ensure extension is properly installed.');
+                // Extension is installed but data queries failed
+                result.recommendations.push('Error querying pgvector data. Check permissions on vector columns and indexes.');
             }
 
             return JSON.stringify(result, null, 2);

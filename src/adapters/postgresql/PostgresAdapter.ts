@@ -458,28 +458,41 @@ export class PostgresAdapter extends DatabaseAdapter {
                     WHEN 'p' THEN 'partitioned_table'
                 END as type,
                 pg_catalog.pg_get_userbyid(c.relowner) as owner,
-                c.reltuples::bigint as row_count,
+                CASE WHEN c.reltuples = -1 THEN NULL ELSE c.reltuples END::bigint as row_count,
+                COALESCE(s.n_live_tup, 0)::bigint as live_row_estimate,
+                (c.reltuples = -1) as stats_stale,
                 pg_catalog.pg_table_size(c.oid) as size_bytes,
                 pg_catalog.pg_total_relation_size(c.oid) as total_size_bytes,
                 obj_description(c.oid, 'pg_class') as comment
             FROM pg_catalog.pg_class c
             LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
             WHERE c.relkind IN ('r', 'v', 'm', 'f', 'p')
               AND n.nspname NOT IN ('pg_catalog', 'information_schema')
               AND n.nspname !~ '^pg_toast'
             ORDER BY n.nspname, c.relname
         `);
 
-        return (result.rows ?? []).map(row => ({
-            name: row['name'] as string,
-            schema: row['schema'] as string,
-            type: row['type'] as TableInfo['type'],
-            owner: row['owner'] as string,
-            rowCount: Number(row['row_count']) || undefined,
-            sizeBytes: Number(row['size_bytes']) || undefined,
-            totalSizeBytes: Number(row['total_size_bytes']) || undefined,
-            comment: row['comment'] as string | undefined
-        }));
+        return (result.rows ?? []).map(row => {
+            const rowCount = row['row_count'];
+            const liveRowEstimate = Number(row['live_row_estimate']) || 0;
+            const statsStale = row['stats_stale'] === true;
+
+            // Use live_row_estimate as fallback when stats are stale
+            const effectiveRowCount = rowCount !== null ? Number(rowCount) : liveRowEstimate;
+
+            return {
+                name: row['name'] as string,
+                schema: row['schema'] as string,
+                type: row['type'] as TableInfo['type'],
+                owner: row['owner'] as string,
+                rowCount: effectiveRowCount > 0 ? effectiveRowCount : undefined,
+                sizeBytes: Number(row['size_bytes']) || undefined,
+                totalSizeBytes: Number(row['total_size_bytes']) || undefined,
+                comment: row['comment'] as string | undefined,
+                statsStale
+            };
+        });
     }
 
     async describeTable(tableName: string, schemaName = 'public'): Promise<TableInfo> {

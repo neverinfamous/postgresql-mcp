@@ -25,7 +25,6 @@ import { createKcacheResource } from '../kcache.js';
 import { createPartmanResource } from '../partman.js';
 import { createPostgisResource } from '../postgis.js';
 import { createVectorResource } from '../vector.js';
-import { createAnnotationsResource } from '../annotations.js';
 import { createActivityResource } from '../activity.js';
 import { createPoolResource } from '../pool.js';
 import { createPerformanceResource } from '../performance.js';
@@ -112,7 +111,7 @@ describe('Health Resource', () => {
     it('should return warning when cache hit ratio < 95%', async () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ active_connections: 10, max_connections: 100 }] })
-            .mockResolvedValueOnce({ rows: [{ cache_hit_ratio: 92 }] })
+            .mockResolvedValueOnce({ rows: [{ cache_hit_ratio: 92, heap_read: 500, heap_hit: 5000 }] }) // >1000 blocks = not cold cache
             .mockResolvedValueOnce({ rows: [{ total_dead: 100, total_live: 10000, dead_pct: 1 }] })
             .mockResolvedValueOnce({ rows: [{ xid_age: 100000, percent_toward_wraparound: 5 }] })
             .mockResolvedValueOnce({ rows: [{ count: 0 }] });
@@ -129,7 +128,7 @@ describe('Health Resource', () => {
     it('should return critical when cache hit ratio < 90%', async () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ active_connections: 10, max_connections: 100 }] })
-            .mockResolvedValueOnce({ rows: [{ cache_hit_ratio: 85 }] })
+            .mockResolvedValueOnce({ rows: [{ cache_hit_ratio: 85, heap_read: 500, heap_hit: 5000 }] }) // >1000 blocks = not cold cache
             .mockResolvedValueOnce({ rows: [{ total_dead: 100, total_live: 10000, dead_pct: 1 }] })
             .mockResolvedValueOnce({ rows: [{ xid_age: 100000, percent_toward_wraparound: 5 }] })
             .mockResolvedValueOnce({ rows: [{ count: 0 }] });
@@ -661,12 +660,14 @@ describe('Indexes Resource', () => {
     });
 
     it('should detect unused indexes', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({
-            rows: [
-                { schemaname: 'public', tablename: 'users', indexname: 'idx_users_old', index_scans: 0, tuples_read: 0, tuples_fetched: 0, index_size: '2 MB', size_bytes: 2097152 },
-                { schemaname: 'public', tablename: 'users', indexname: 'idx_users_active', index_scans: 1000, tuples_read: 5000, tuples_fetched: 5000, index_size: '1 MB', size_bytes: 1048576 }
-            ]
-        });
+        // First query is for indexes, second is for existing index names
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({
+                rows: [
+                    { schemaname: 'public', tablename: 'users', indexname: 'idx_users_old', index_scans: 0, tuples_read: 0, tuples_fetched: 0, index_size: '2 MB', size_bytes: 2097152, table_rows: 1000, potentially_new: false },
+                    { schemaname: 'public', tablename: 'users', indexname: 'idx_users_active', index_scans: 1000, tuples_read: 5000, tuples_fetched: 5000, index_size: '1 MB', size_bytes: 1048576, table_rows: 1000, potentially_new: false }
+                ]
+            });
 
         const resource = createIndexesResource(mockAdapter as unknown as PostgresAdapter);
         const result = await resource.handler('postgres://indexes', mockContext) as {
@@ -681,7 +682,7 @@ describe('Indexes Resource', () => {
     it('should provide recommendations for unused indexes', async () => {
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [
-                { schemaname: 'public', tablename: 'users', indexname: 'idx_users_old', index_scans: 0, tuples_read: 0, tuples_fetched: 0, index_size: '5 MB', size_bytes: 5242880 }
+                { schemaname: 'public', tablename: 'users', indexname: 'idx_users_old', index_scans: 0, tuples_read: 0, tuples_fetched: 0, index_size: '5 MB', size_bytes: 5242880, table_rows: 1000, potentially_new: false }
             ]
         });
 
@@ -741,11 +742,11 @@ describe('Replication Resource', () => {
         expect(result.replicationSlots).toHaveLength(1);
     });
 
-    it('should handle no replication configured on primary', async () => {
+    it('should handle no replication configured (standalone server)', async () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ is_replica: false }] })
             .mockResolvedValueOnce({ rows: [] }) // no replication slots
-            .mockResolvedValueOnce({ rows: [] }) // no replication stats
+            .mockResolvedValueOnce({ rows: [] }) // no replication stats (no connected replicas)
             .mockResolvedValueOnce({ rows: [{ current_wal_lsn: '0/1000000' }] });
 
         const resource = createReplicationResource(mockAdapter as unknown as PostgresAdapter);
@@ -754,7 +755,8 @@ describe('Replication Resource', () => {
             replicationSlots: unknown[];
         };
 
-        expect(result.role).toBe('primary');
+        // Server with no slots and no replicas is now correctly detected as standalone
+        expect(result.role).toBe('standalone');
         expect(result.replicationSlots).toHaveLength(0);
     });
 
@@ -857,7 +859,7 @@ describe('Cron Resource', () => {
         };
 
         expect(result.extensionInstalled).toBe(false);
-        expect(result.recommendations[0]).toContain('pg_cron extension is not installed');
+        expect(result.recommendations[0]).toContain('pg_cron is not installed');
     });
 
     it('should return jobs and statistics when pg_cron is installed', async () => {
@@ -906,8 +908,9 @@ describe('Cron Resource', () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ extversion: '1.6' }] })
             .mockResolvedValueOnce({ rows: [] }) // no jobs
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [] })
+            .mockResolvedValueOnce({ rows: [] }) // runs summary
+            .mockResolvedValueOnce({ rows: [] }) // last run per job (new query)
+            .mockResolvedValueOnce({ rows: [] }) // failed jobs
             .mockResolvedValueOnce({ rows: [{ old_count: 2000 }] }); // old history
 
         const resource = createCronResource(mockAdapter as unknown as PostgresAdapter);
@@ -931,7 +934,7 @@ describe('Cron Resource', () => {
             recommendations: string[];
         };
 
-        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pg_cron tables'));
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error querying pg_cron data'));
     });
 
     it('should detect inactive jobs', async () => {
@@ -943,9 +946,10 @@ describe('Cron Resource', () => {
                     { jobid: 2, schedule: '0 0 * * *', command: 'SELECT 2', nodename: '', nodeport: 5432, database: 'db', username: 'u', active: true }
                 ]
             })
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [{ old_count: 0 }] });
+            .mockResolvedValueOnce({ rows: [] }) // runs summary
+            .mockResolvedValueOnce({ rows: [] }) // last run per job (new query)
+            .mockResolvedValueOnce({ rows: [] }) // failed jobs
+            .mockResolvedValueOnce({ rows: [{ old_count: 0 }] }); // history
 
         const resource = createCronResource(mockAdapter as unknown as PostgresAdapter);
         const resultStr = await resource.handler('postgres://cron', mockContext);
@@ -971,6 +975,7 @@ describe('Cron Resource', () => {
                     { status: 'running', count: 2 } // non-succeeded/failed status
                 ]
             })
+            .mockResolvedValueOnce({ rows: [] }) // last run per job (new query)
             .mockResolvedValueOnce({
                 rows: [
                     { jobid: 1, command: 'SELECT problematic_function()', return_message: 'ERROR: connection reset', failure_count: 5 }
@@ -1039,13 +1044,13 @@ describe('Crypto Resource', () => {
             extensionInstalled: boolean;
             extensionVersion: string;
             uuid: { genRandomUuidAvailable: boolean };
-            availableAlgorithms: { hashing: string[]; hmac: string[]; encryption: string[] };
+            availableAlgorithms: { hashing: { secure: string[]; legacy: string[] }; hmac: string[]; encryption: string[] };
         };
 
         expect(result.extensionInstalled).toBe(true);
         expect(result.extensionVersion).toBe('1.3');
         expect(result.uuid.genRandomUuidAvailable).toBe(true);
-        expect(result.availableAlgorithms.hashing).toContain('sha256');
+        expect(result.availableAlgorithms.hashing.secure).toContain('sha256');
         expect(result.availableAlgorithms.encryption).toContain('aes256');
     });
 
@@ -1059,19 +1064,19 @@ describe('Crypto Resource', () => {
                     { schema_name: 'public', table_name: 'orders', column_name: 'id', has_default: false }
                 ]
             })
-            .mockResolvedValueOnce({ rows: [{ count: 1 }] })
+            .mockResolvedValueOnce({ rows: [{ schema_name: 'public', table_name: 'users', column_name: 'password_hash' }] }) // password hash columns
             .mockResolvedValueOnce({ rows: [] });
 
         const resource = createCryptoResource(mockAdapter as unknown as PostgresAdapter);
         const resultStr = await resource.handler('postgres://crypto', mockContext);
         const result = JSON.parse(resultStr as string) as {
             uuid: { uuidColumns: { column: string; hasDefault: boolean }[] };
-            passwordHashingDetected: boolean;
+            passwordHashing: { status: string };
             recommendations: string[];
         };
 
         expect(result.uuid.uuidColumns).toHaveLength(2);
-        expect(result.passwordHashingDetected).toBe(true);
+        expect(result.passwordHashing.status).toBe('detected');
         expect(result.recommendations).toContainEqual(expect.stringContaining('UUID columns without default'));
     });
 
@@ -1119,17 +1124,17 @@ describe('Crypto Resource', () => {
             .mockResolvedValueOnce({ rows: [{ extversion: '1.3' }] })
             .mockResolvedValueOnce({ rows: [{}] }) // uuid available
             .mockResolvedValueOnce({ rows: [] }) // no uuid columns
-            .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // no password hash columns
+            .mockResolvedValueOnce({ rows: [] }) // no password hash columns
             .mockResolvedValueOnce({ rows: [] }); // no bytea columns
 
         const resource = createCryptoResource(mockAdapter as unknown as PostgresAdapter);
         const resultStr = await resource.handler('postgres://crypto', mockContext);
         const result = JSON.parse(resultStr as string) as {
-            passwordHashingDetected: boolean;
+            passwordHashing: { status: string };
             recommendations: string[];
         };
 
-        expect(result.passwordHashingDetected).toBe(false);
+        expect(result.passwordHashing.status).toBe('none_found');
         expect(result.recommendations).toContainEqual(expect.stringContaining('No password hash columns detected'));
         expect(result.recommendations).toContainEqual(expect.stringContaining('gen_salt'));
     });
@@ -1139,19 +1144,19 @@ describe('Crypto Resource', () => {
             .mockResolvedValueOnce({ rows: [{ extversion: '1.3' }] })
             .mockResolvedValueOnce({ rows: [{}] })
             .mockResolvedValueOnce({ rows: [] })
-            .mockResolvedValueOnce({ rows: [{ count: 1 }] }) // has password hash
+            .mockResolvedValueOnce({ rows: [{ schema_name: 'public', table_name: 'users', column_name: 'password_hash' }] }) // has password hash
             .mockResolvedValueOnce({ rows: [] });
 
         const resource = createCryptoResource(mockAdapter as unknown as PostgresAdapter);
         const resultStr = await resource.handler('postgres://crypto', mockContext);
         const result = JSON.parse(resultStr as string) as {
-            availableAlgorithms: { hashing: string[] };
-            recommendations: string[];
+            availableAlgorithms: { hashing: { secure: string[]; legacy: string[] } };
+            securityNotes: { legacyAlgorithms: string };
         };
 
-        expect(result.availableAlgorithms.hashing).toContain('md5');
-        expect(result.recommendations).toContainEqual(expect.stringContaining('MD5 and SHA-1'));
-        expect(result.recommendations).toContainEqual(expect.stringContaining('cryptographically broken'));
+        // MD5 is now in the legacy category, and deprecation info is in securityNotes
+        expect(result.availableAlgorithms.hashing.legacy).toContain('md5');
+        expect(result.securityNotes.legacyAlgorithms).toContain('MD5');
     });
 
     it('should handle error accessing pgcrypto information', async () => {
@@ -1166,7 +1171,7 @@ describe('Crypto Resource', () => {
             recommendations: string[];
         };
 
-        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pgcrypto information'));
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error querying pgcrypto data'));
     });
 });
 
@@ -1227,6 +1232,7 @@ describe('Kcache Resource', () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] }) // pg_stat_statements
             .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] }) // kcache
+            .mockResolvedValueOnce({ rows: [{ column_name: 'exec_user_time' }] }) // column detection
             .mockResolvedValueOnce({ // summary
                 rows: [{ total_queries: 100, total_cpu: 50.5, total_reads: 1000000, total_writes: 500000 }]
             })
@@ -1279,6 +1285,7 @@ describe('Kcache Resource', () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
             .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockResolvedValueOnce({ rows: [{ column_name: 'exec_user_time' }] }) // column detection
             .mockResolvedValueOnce({ rows: [{ total_queries: 50, total_cpu: 10, total_reads: 0, total_writes: 0 }] })
             .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [] })
@@ -1297,6 +1304,7 @@ describe('Kcache Resource', () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
             .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockResolvedValueOnce({ rows: [{ column_name: 'exec_user_time' }] }) // column detection
             .mockResolvedValueOnce({ rows: [{ total_queries: 50, total_cpu: 200, total_reads: 0, total_writes: 0 }] })
             .mockResolvedValueOnce({
                 rows: [{
@@ -1322,6 +1330,7 @@ describe('Kcache Resource', () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
             .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockResolvedValueOnce({ rows: [{ column_name: 'exec_user_time' }] }) // column detection
             .mockResolvedValueOnce({ rows: [{ total_queries: 0, total_cpu: 0, total_reads: 0, total_writes: 0 }] })
             .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [] })
@@ -1350,7 +1359,7 @@ describe('Kcache Resource', () => {
             recommendations: string[];
         };
 
-        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pg_stat_kcache'));
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error querying pg_stat_kcache data'));
     });
 
     it('should handle non-string values in toStr helper (line 12 branch)', async () => {
@@ -1358,6 +1367,7 @@ describe('Kcache Resource', () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
             .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockResolvedValueOnce({ rows: [{ column_name: 'exec_user_time' }] }) // column detection
             .mockResolvedValueOnce({ rows: [{ total_queries: 100, total_cpu: 50.5, total_reads: 1000000, total_writes: 500000 }] })
             .mockResolvedValueOnce({
                 rows: [{
@@ -1400,6 +1410,7 @@ describe('Kcache Resource', () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ extversion: '1.10' }] })
             .mockResolvedValueOnce({ rows: [{ extversion: '2.2' }] })
+            .mockResolvedValueOnce({ rows: [{ column_name: 'exec_user_time' }] }) // column detection
             .mockResolvedValueOnce({ rows: [] }) // empty summary rows
             .mockResolvedValueOnce({ rows: [] })
             .mockResolvedValueOnce({ rows: [] })
@@ -1500,7 +1511,7 @@ describe('Partman Resource', () => {
 
         expect(result.healthIssues).toHaveLength(1);
         expect(result.healthIssues[0]?.severity).toBe('critical');
-        expect(result.recommendations).toContainEqual(expect.stringContaining('No retention policy'));
+        // partition_count=5 is below threshold (12), so no retention warning
         expect(result.recommendations).toContainEqual(expect.stringContaining('pg_cron'));
     });
 
@@ -1594,7 +1605,7 @@ describe('Partman Resource', () => {
             recommendations: string[];
         };
 
-        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pg_partman tables'));
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error querying pg_partman data'));
     });
 });
 
@@ -1694,11 +1705,11 @@ describe('PostGIS Resource', () => {
         const resource = createPostgisResource(mockAdapter as unknown as PostgresAdapter);
         const resultStr = await resource.handler('postgres://postgis', mockContext);
         const result = JSON.parse(resultStr as string) as {
-            unindexedColumns: string[];
+            unindexedColumns: { column: string }[];
             recommendations: string[];
         };
 
-        expect(result.unindexedColumns).toContain('public.areas.boundary');
+        expect(result.unindexedColumns.map(c => c.column)).toContain('public.areas.boundary');
         expect(result.recommendations).toContainEqual(expect.stringContaining('without GiST indexes'));
         expect(result.recommendations).toContainEqual(expect.stringContaining('Large unindexed spatial column'));
     });
@@ -1838,7 +1849,7 @@ describe('PostGIS Resource', () => {
             recommendations: string[];
         };
 
-        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing PostGIS information'));
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error querying PostGIS data'));
     });
 });
 
@@ -1924,11 +1935,11 @@ describe('Vector Resource', () => {
         const resource = createVectorResource(mockAdapter as unknown as PostgresAdapter);
         const resultStr = await resource.handler('postgres://vector', mockContext);
         const result = JSON.parse(resultStr as string) as {
-            unindexedColumns: string[];
+            unindexedColumns: { column: string }[];
             recommendations: string[];
         };
 
-        expect(result.unindexedColumns).toContain('public.docs.vec');
+        expect(result.unindexedColumns.map(c => c.column)).toContain('public.docs.vec');
         expect(result.recommendations).toContainEqual(expect.stringContaining('without indexes'));
         expect(result.recommendations).toContainEqual(expect.stringContaining('Large unindexed vector column'));
     });
@@ -1961,13 +1972,14 @@ describe('Vector Resource', () => {
             .mockResolvedValueOnce({ rows: [{ extversion: '0.7.0' }] })
             .mockResolvedValueOnce({
                 rows: [
-                    { schema_name: 'public', table_name: 't1', column_name: 'v1', dimensions: 128, row_count: 100 },
-                    { schema_name: 'public', table_name: 't2', column_name: 'v2', dimensions: 256, row_count: 200 },
-                    { schema_name: 'public', table_name: 't3', column_name: 'v3', dimensions: 512, row_count: 300 },
-                    { schema_name: 'public', table_name: 't4', column_name: 'v4', dimensions: 768, row_count: 400 }
+                    { schema_name: 'public', table_name: 't1', column_name: 'v1', dimensions: 128, row_count: 2000 },
+                    { schema_name: 'public', table_name: 't2', column_name: 'v2', dimensions: 256, row_count: 3000 },
+                    { schema_name: 'public', table_name: 't3', column_name: 'v3', dimensions: 512, row_count: 4000 },
+                    { schema_name: 'public', table_name: 't4', column_name: 'v4', dimensions: 768, row_count: 5000 }
                 ]
             })
-            .mockResolvedValueOnce({ rows: [] }); // no indexes
+            .mockResolvedValueOnce({ rows: [] }) // no indexes
+            .mockResolvedValueOnce({ rows: [] }); // existing index names
 
         const resource = createVectorResource(mockAdapter as unknown as PostgresAdapter);
         const resultStr = await resource.handler('postgres://vector', mockContext);
@@ -2009,99 +2021,10 @@ describe('Vector Resource', () => {
             recommendations: string[];
         };
 
-        expect(result.recommendations).toContainEqual(expect.stringContaining('Error accessing pgvector information'));
+        expect(result.recommendations).toContainEqual(expect.stringContaining('Error querying pgvector data'));
     });
 });
 
-describe('Annotations Resource', () => {
-    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
-    let mockContext: ReturnType<typeof createMockRequestContext>;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        mockAdapter = createMockPostgresAdapter();
-        mockContext = createMockRequestContext();
-    });
-
-    it('should have correct metadata', () => {
-        const resource = createAnnotationsResource(mockAdapter as unknown as PostgresAdapter);
-        expect(resource.uri).toBe('postgres://annotations');
-        expect(resource.name).toBe('Tool Annotations');
-    });
-
-    it('should categorize tools by annotation hints', async () => {
-        // Mock getToolDefinitions to return test tools
-        (mockAdapter.getToolDefinitions as ReturnType<typeof vi.fn>).mockReturnValue([
-            { name: 'pg_query', group: 'core', annotations: { title: 'Query', readOnlyHint: true } },
-            { name: 'pg_insert', group: 'core', annotations: { title: 'Insert' } },
-            { name: 'pg_drop_table', group: 'admin', annotations: { title: 'Drop Table', destructiveHint: true } },
-            { name: 'pg_create_index', group: 'core', annotations: { title: 'Create Index', idempotentHint: true } },
-            { name: 'pg_vacuum', group: 'admin', annotations: { title: 'Vacuum' } }
-        ]);
-
-        const resource = createAnnotationsResource(mockAdapter as unknown as PostgresAdapter);
-        const result = await resource.handler('postgres://annotations', mockContext) as {
-            totalTools: number;
-            counts: { readOnly: number; destructive: number; idempotent: number; write: number; admin: number };
-            byCategory: { readOnly: { name: string }[]; destructive: { name: string }[] };
-            clientHints: { safeToAutoApprove: string[]; requiresConfirmation: string[] };
-        };
-
-        expect(result.totalTools).toBe(5);
-        expect(result.counts.readOnly).toBe(1);
-        expect(result.counts.destructive).toBe(1);
-        expect(result.counts.idempotent).toBe(1);
-        expect(result.counts.admin).toBe(1); // pg_vacuum is admin
-        expect(result.byCategory.readOnly[0]?.name).toBe('pg_query');
-        expect(result.clientHints.safeToAutoApprove).toContain('pg_query');
-        expect(result.clientHints.requiresConfirmation).toContain('pg_drop_table');
-    });
-
-    it('should handle tools without annotations', async () => {
-        (mockAdapter.getToolDefinitions as ReturnType<typeof vi.fn>).mockReturnValue([
-            { name: 'pg_test', group: 'core' } // no annotations
-        ]);
-
-        const resource = createAnnotationsResource(mockAdapter as unknown as PostgresAdapter);
-        const result = await resource.handler('postgres://annotations', mockContext) as {
-            totalTools: number;
-            counts: { write: number };
-        };
-
-        expect(result.totalTools).toBe(1);
-        expect(result.counts.write).toBe(1); // defaults to write
-    });
-
-    it('should classify Vacuum/Analyze/Reindex as admin tools', async () => {
-        (mockAdapter.getToolDefinitions as ReturnType<typeof vi.fn>).mockReturnValue([
-            { name: 'pg_vacuum', group: 'admin', annotations: { title: 'Vacuum' } },
-            { name: 'pg_analyze', group: 'admin', annotations: { title: 'Analyze' } },
-            { name: 'pg_reindex', group: 'admin', annotations: { title: 'Reindex' } }
-        ]);
-
-        const resource = createAnnotationsResource(mockAdapter as unknown as PostgresAdapter);
-        const result = await resource.handler('postgres://annotations', mockContext) as {
-            counts: { admin: number };
-            byCategory: { admin: { name: string }[] };
-        };
-
-        expect(result.counts.admin).toBe(3);
-        expect(result.byCategory.admin.map(t => t.name)).toEqual(['pg_vacuum', 'pg_analyze', 'pg_reindex']);
-    });
-
-    it('should include safeToRetry for idempotent tools', async () => {
-        (mockAdapter.getToolDefinitions as ReturnType<typeof vi.fn>).mockReturnValue([
-            { name: 'pg_create_extension', group: 'admin', annotations: { title: 'Create Extension', idempotentHint: true } }
-        ]);
-
-        const resource = createAnnotationsResource(mockAdapter as unknown as PostgresAdapter);
-        const result = await resource.handler('postgres://annotations', mockContext) as {
-            clientHints: { safeToRetry: string[] };
-        };
-
-        expect(result.clientHints.safeToRetry).toContain('pg_create_extension');
-    });
-});
 
 // =============================================================================
 // Low-Coverage Resources Tests (Activity, Pool, Performance, Schema, Settings, Tables)
@@ -2273,6 +2196,8 @@ describe('Performance Resource', () => {
                     cache_hit_pct: 99
                 }]
             })
+            .mockResolvedValueOnce({ rows: [] }) // Slow queries (none)
+            .mockResolvedValueOnce({ rows: [] }) // High-cost queries (none)
             .mockResolvedValueOnce({ // Summary
                 rows: [{
                     total_queries: 50,
@@ -2287,13 +2212,17 @@ describe('Performance Resource', () => {
             extensionStatus: string;
             summary: { total_queries: number };
             topQueries: unknown[];
+            slowQueries: unknown[];
+            highCostQueries: unknown[];
             recommendations: string[];
         };
 
         expect(result.extensionStatus).toBe('installed');
         expect(result.summary.total_queries).toBe(50);
         expect(result.topQueries).toHaveLength(1);
-        expect(result.recommendations).toHaveLength(2);
+        expect(result.slowQueries).toHaveLength(0);
+        expect(result.highCostQueries).toHaveLength(0);
+        expect(result.recommendations).toHaveLength(2); // No slow/high-cost, just the 2 base recommendations
     });
 });
 
@@ -2322,12 +2251,15 @@ describe('Schema Resource', () => {
             indexes: [{ name: 'idx_users_email', tableName: 'users' }]
         };
         mockAdapter.getSchema = vi.fn().mockResolvedValue(mockSchema);
+        mockAdapter.executeQuery = vi.fn().mockResolvedValue({ rows: [] });
 
         const resource = createSchemaResource(mockAdapter as unknown as PostgresAdapter);
-        const result = await resource.handler('postgres://schema', mockContext);
+        const result = await resource.handler('postgres://schema', mockContext) as typeof mockSchema;
 
         expect(mockAdapter.getSchema).toHaveBeenCalledTimes(1);
-        expect(result).toEqual(mockSchema);
+        // Tables are enhanced with statsStale field
+        expect(result.tables).toHaveLength(1);
+        expect(result.tables[0].name).toBe('users');
     });
 });
 
@@ -2574,6 +2506,7 @@ describe('pg_cron Resource (Branch Coverage)', () => {
                     { status: 'failed', count: 2 }
                 ]
             })
+            .mockResolvedValueOnce({ rows: [] }) // last run per job (new query)
             .mockResolvedValueOnce({ // failed jobs (triggers lines 140-141)
                 rows: [{
                     jobid: 1,
@@ -2611,6 +2544,7 @@ describe('pg_cron Resource (Branch Coverage)', () => {
                 ]
             })
             .mockResolvedValueOnce({ rows: [{ status: 'succeeded', count: 10 }] }) // runs
+            .mockResolvedValueOnce({ rows: [] }) // last run per job (new query)
             .mockResolvedValueOnce({ rows: [] }) // no failed jobs
             .mockResolvedValueOnce({ rows: [{ old_count: 10 }] }); // history
 
@@ -2643,7 +2577,7 @@ describe('Indexes Resource (Branch Coverage)', () => {
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [
                 // All indexes well-used, small size - no recommendations
-                { schemaname: 'public', tablename: 'users', indexname: 'users_pkey', index_scans: 10000, tuples_read: 50000, tuples_fetched: 45000, index_size: '8 kB', size_bytes: 8192 }
+                { schemaname: 'public', tablename: 'users', indexname: 'users_pkey', index_scans: 10000, tuples_read: 50000, tuples_fetched: 45000, index_size: '8 kB', size_bytes: 8192, last_idx_scan: '2024-12-23', potentially_new: false }
             ]
         });
 
@@ -2664,7 +2598,7 @@ describe('Indexes Resource (Branch Coverage)', () => {
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [
                 // Rarely used but large index (0 < scans < 100 && size > 10MB)
-                { schemaname: 'public', tablename: 'orders', indexname: 'idx_orders_old', index_scans: 50, tuples_read: 200, tuples_fetched: 150, index_size: '15 MB', size_bytes: 15728640 }
+                { schemaname: 'public', tablename: 'orders', indexname: 'idx_orders_old', index_scans: 50, tuples_read: 200, tuples_fetched: 150, index_size: '15 MB', size_bytes: 15728640, last_idx_scan: '2024-12-23', potentially_new: false }
             ]
         });
 
@@ -2825,6 +2759,8 @@ describe('Performance Resource (Branch Coverage)', () => {
             .mockResolvedValueOnce({ // top queries
                 rows: [{ query_preview: 'SELECT * FROM users', calls: 100, total_time_ms: 500 }]
             })
+            .mockResolvedValueOnce({ rows: [] }) // slow queries (none)
+            .mockResolvedValueOnce({ rows: [] }) // high-cost queries (none)
             .mockResolvedValueOnce({ // summary
                 rows: [{ total_queries: 50, total_calls: 1000, total_time_ms: 2500, avg_time_ms: 2.5 }]
             });
@@ -2847,18 +2783,23 @@ describe('Performance Resource (Branch Coverage)', () => {
         mockAdapter.executeQuery
             .mockResolvedValueOnce({ rows: [{ count: 1 }] })
             .mockResolvedValueOnce({ rows: null }) // null rows for topQueries
-            .mockResolvedValueOnce({ rows: [{}] }); // empty summary row
+            .mockResolvedValueOnce({ rows: null }) // null rows for slowQueries
+            .mockResolvedValueOnce({ rows: null }) // null rows for highCostQueries
+            .mockResolvedValueOnce({ rows: null }); // null rows for summary
 
         const resource = createPerformanceResource(mockAdapter as unknown as PostgresAdapter);
         const result = await resource.handler('postgres://performance', mockContext) as {
             extensionStatus: string;
             summary: Record<string, unknown>;
             topQueries: unknown[];
+            slowQueries: unknown[];
+            highCostQueries: unknown[];
         };
 
         expect(result.extensionStatus).toBe('installed');
         expect(result.topQueries).toEqual([]);
-        expect(result.summary).toEqual({});
+        expect(result.slowQueries).toEqual([]);
+        expect(result.highCostQueries).toEqual([]);
     });
 });
 
@@ -3166,11 +3107,11 @@ describe('Vector Resource (Branch Coverage)', () => {
         const resource = createVectorResource(mockAdapter as unknown as PostgresAdapter);
         const resultStr = await resource.handler('postgres://vector', mockContext);
         const result = JSON.parse(resultStr as string) as {
-            unindexedColumns: string[];
+            unindexedColumns: { column: string; suggestedHnswSql: string; suggestedIvfflatSql: string }[];
             recommendations: string[];
         };
 
-        expect(result.unindexedColumns).toContain('public.embeddings.vector');
+        expect(result.unindexedColumns.map(c => c.column)).toContain('public.embeddings.vector');
         expect(result.recommendations).toContainEqual(
             expect.stringContaining('Large unindexed vector column')
         );
@@ -3341,7 +3282,7 @@ describe('Partman Resource (Coverage)', () => {
         expect(result.extensionInstalled).toBe(true);
         expect(result.partitionSetCount).toBe(1);
         expect(result.recommendations).toContainEqual(
-            expect.stringContaining('Consider installing pg_cron')
+            expect.stringContaining('pg_cron not detected')
         );
     });
 

@@ -199,4 +199,6 @@ export interface TableInfo {
     columns?: ColumnInfo[] | undefined;
     isPartitioned?: boolean | undefined;
     partitionKey?: string | undefined;
+    /** True if table statistics are stale (reltuples = -1, needs ANALYZE) */
+    statsStale?: boolean | undefined;
 }

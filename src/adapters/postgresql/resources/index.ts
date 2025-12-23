@@ -2,7 +2,7 @@
  * PostgreSQL MCP Resources
  * 
  * Provides structured data access via URI patterns.
- * 21 resources total.
+ * 20 resources total.
  */
 
 import type { PostgresAdapter } from '../PostgresAdapter.js';
@@ -34,11 +34,10 @@ import { createVectorResource } from './vector.js';
 import { createPostgisResource } from './postgis.js';
 import { createCryptoResource } from './crypto.js';
 
-// Tool metadata resources
-import { createAnnotationsResource } from './annotations.js';
+
 
 /**
- * Get all PostgreSQL resources (21 total)
+ * Get all PostgreSQL resources (20 total)
  * 
  * Core (6):
  * - postgres://schema - Full database schema
@@ -66,8 +65,6 @@ import { createAnnotationsResource } from './annotations.js';
  * - postgres://postgis - PostGIS spatial columns and indexes
  * - postgres://crypto - pgcrypto availability and recommendations
  * 
- * Tool metadata (1):
- * - postgres://annotations - Tool behavior hints categorized by type
  */
 export function getPostgresResources(adapter: PostgresAdapter): ResourceDefinition[] {
     return [
@@ -93,9 +90,7 @@ export function getPostgresResources(adapter: PostgresAdapter): ResourceDefiniti
         createKcacheResource(adapter),
         createVectorResource(adapter),
         createPostgisResource(adapter),
-        createCryptoResource(adapter),
-        // Tool metadata resources
-        createAnnotationsResource(adapter)
+        createCryptoResource(adapter)
     ];
 }
 

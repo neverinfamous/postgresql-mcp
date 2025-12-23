@@ -19,7 +19,7 @@ export function createLocksTool(adapter: PostgresAdapter): ToolDefinition {
         annotations: readOnly('Lock Information'),
         icons: getToolIcons('performance', readOnly('Lock Information')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { showBlocked?: boolean });
+            const parsed = ((params ?? {}) as { showBlocked?: boolean });
 
             let sql: string;
             if (parsed.showBlocked) {
@@ -48,30 +48,45 @@ export function createLocksTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 export function createBloatCheckTool(adapter: PostgresAdapter): ToolDefinition {
+    const BloatCheckSchema = z.preprocess(
+        (val) => val ?? {},
+        z.object({
+            table: z.string().optional().describe('Table name to check (all tables if omitted)'),
+            schema: z.string().optional().describe('Schema name to filter')
+        })
+    );
+
     return {
         name: 'pg_bloat_check',
-        description: 'Check for table and index bloat.',
+        description: 'Check for table and index bloat. Returns tables with dead tuples.',
         group: 'performance',
-        inputSchema: z.object({
-            schema: z.string().optional()
-        }),
+        inputSchema: BloatCheckSchema,
         annotations: readOnly('Bloat Check'),
         icons: getToolIcons('performance', readOnly('Bloat Check')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { schema?: string });
-            const schemaClause = parsed.schema ? `AND schemaname = '${parsed.schema}'` : '';
+            const parsed = BloatCheckSchema.parse(params);
+            let whereClause = 'n_dead_tup > 0';
+            if (parsed.schema !== undefined) {
+                whereClause += ` AND schemaname = '${parsed.schema}'`;
+            }
+            if (parsed.table !== undefined) {
+                whereClause += ` AND relname = '${parsed.table}'`;
+            }
 
             const sql = `SELECT schemaname, relname as table_name,
                         n_live_tup as live_tuples, n_dead_tup as dead_tuples,
-                        CASE WHEN n_live_tup > 0 THEN round(100.0 * n_dead_tup / n_live_tup, 2) ELSE 0 END as dead_pct,
+                        CASE WHEN n_live_tup > 0 THEN round((100.0 * n_dead_tup / n_live_tup)::numeric, 2) ELSE 0 END as dead_pct,
                         pg_size_pretty(pg_table_size(relid)) as table_size
                         FROM pg_stat_user_tables
-                        WHERE n_dead_tup > 0 ${schemaClause}
+                        WHERE ${whereClause}
                         ORDER BY n_dead_tup DESC
                         LIMIT 20`;
 
             const result = await adapter.executeQuery(sql);
-            return { bloatedTables: result.rows };
+            return {
+                bloatedTables: result.rows,
+                count: result.rows?.length ?? 0
+            };
         }
     };
 }

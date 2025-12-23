@@ -9,21 +9,25 @@ import type { ToolDefinition, RequestContext } from '../../../../types/index.js'
 import { z } from 'zod';
 import { readOnly } from '../../../../utils/annotations.js';
 import { getToolIcons } from '../../../../utils/icons.js';
+import {
+    GeocodeSchemaBase,
+    GeocodeSchema,
+    GeoTransformSchemaBase,
+    GeoTransformSchema,
+    GeoClusterSchemaBase,
+    GeoClusterSchema
+} from '../../schemas/index.js';
 
 export function createGeocodeTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_geocode',
-        description: 'Create a point geometry from latitude/longitude coordinates.',
+        description: 'Create a point geometry from latitude/longitude coordinates. The SRID parameter sets output metadata only; input coordinates are always WGS84 lat/lng.',
         group: 'postgis',
-        inputSchema: z.object({
-            lat: z.number(),
-            lng: z.number(),
-            srid: z.number().optional()
-        }),
+        inputSchema: GeocodeSchemaBase,  // Base schema for MCP visibility
         annotations: readOnly('Geocode'),
         icons: getToolIcons('postgis', readOnly('Geocode')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { lat: number; lng: number; srid?: number });
+            const parsed = GeocodeSchema.parse(params ?? {});
             const srid = parsed.srid ?? 4326;
 
             const sql = `SELECT 
@@ -31,7 +35,17 @@ export function createGeocodeTool(adapter: PostgresAdapter): ToolDefinition {
                         ST_AsText(ST_SetSRID(ST_MakePoint($1, $2), $3)) as wkt`;
 
             const result = await adapter.executeQuery(sql, [parsed.lng, parsed.lat, srid]);
-            return result.rows?.[0];
+
+            // Add note about SRID for non-4326 cases
+            const row = result.rows?.[0];
+            if (row === undefined) {
+                return {};
+            }
+            const response: Record<string, unknown> = { ...row };
+            if (srid !== 4326) {
+                response['note'] = `Coordinates are WGS84 lat/lng with SRID ${String(srid)} metadata. Use pg_geo_transform to convert to target CRS.`;
+            }
+            return response;
         }
     };
 }
@@ -44,27 +58,16 @@ export function createGeoTransformTool(adapter: PostgresAdapter): ToolDefinition
         name: 'pg_geo_transform',
         description: 'Transform geometry from one spatial reference system (SRID) to another.',
         group: 'postgis',
-        inputSchema: z.object({
-            table: z.string().describe('Table name'),
-            column: z.string().describe('Geometry column'),
-            fromSrid: z.number().describe('Source SRID'),
-            toSrid: z.number().describe('Target SRID'),
-            where: z.string().optional().describe('Filter condition'),
-            limit: z.number().optional().describe('Maximum rows to return')
-        }),
+        inputSchema: GeoTransformSchemaBase,  // Base schema for MCP visibility
         annotations: readOnly('Transform Geometry'),
         icons: getToolIcons('postgis', readOnly('Transform Geometry')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as {
-                table: string;
-                column: string;
-                fromSrid: number;
-                toSrid: number;
-                where?: string;
-                limit?: number;
-            });
+            const parsed = GeoTransformSchema.parse(params ?? {});
 
-            const whereClause = parsed.where ? `WHERE ${parsed.where}` : '';
+            const schemaName = parsed.schema ?? 'public';
+            const qualifiedTable = schemaName !== 'public' ? `"${schemaName}"."${parsed.table}"` : `"${parsed.table}"`;
+
+            const whereClause = parsed.where !== undefined ? `WHERE ${parsed.where}` : '';
             const limitClause = parsed.limit !== undefined && parsed.limit > 0 ? `LIMIT ${String(parsed.limit)}` : '';
 
             const sql = `
@@ -73,7 +76,7 @@ export function createGeoTransformTool(adapter: PostgresAdapter): ToolDefinition
                     ST_AsGeoJSON(ST_Transform(ST_SetSRID("${parsed.column}", ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_geojson,
                     ST_AsText(ST_Transform(ST_SetSRID("${parsed.column}", ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_wkt,
                     ${String(parsed.toSrid)} as output_srid
-                FROM "${parsed.table}"
+                FROM ${qualifiedTable}
                 ${whereClause}
                 ${limitClause}
             `;
@@ -122,10 +125,12 @@ export function createGeoIndexOptimizeTool(adapter: PostgresAdapter): ToolDefini
                 JOIN pg_class i ON i.oid = x.indexrelid
                 JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(x.indkey)
                 JOIN pg_namespace n ON n.oid = c.relnamespace
+                JOIN pg_type t ON t.oid = a.atttypid
                 LEFT JOIN pg_stat_user_indexes s ON s.indexrelid = i.oid
                 WHERE n.nspname = $1
                 AND (pg_get_indexdef(i.oid) LIKE '%gist%' OR pg_get_indexdef(i.oid) LIKE '%spgist%')
-                ${parsed.table ? `AND c.relname = '${parsed.table}'` : ''}
+                AND t.typname IN ('geometry', 'geography')
+                ${parsed.table !== undefined ? `AND c.relname = '${parsed.table}'` : ''}
                 ORDER BY index_size_bytes DESC
             `;
 
@@ -140,7 +145,7 @@ export function createGeoIndexOptimizeTool(adapter: PostgresAdapter): ToolDefini
                     JOIN pg_class c ON c.relname = t.relname
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE n.nspname = $1
-                    ${parsed.table ? `AND c.relname = '${parsed.table}'` : ''}
+                    ${parsed.table !== undefined ? `AND c.relname = '${parsed.table}'` : ''}
                 `, [schemaName])
             ]);
 
@@ -167,10 +172,26 @@ export function createGeoIndexOptimizeTool(adapter: PostgresAdapter): ToolDefini
                 }
             }
 
+            // Warn if table filter specified but no results found
+            if (parsed.table !== undefined && (indexes.rows?.length ?? 0) === 0 && (tableStats.rows?.length ?? 0) === 0) {
+                return {
+                    warning: `Table "${parsed.table}" not found in schema "${schemaName}" or has no spatial columns/indexes.`,
+                    table: parsed.table,
+                    schema: schemaName,
+                    spatialIndexes: [],
+                    tableStats: [],
+                    recommendations: [`Verify table "${parsed.table}" exists and has geometry/geography columns.`]
+                };
+            }
+
             return {
                 spatialIndexes: indexes.rows,
                 tableStats: tableStats.rows,
-                recommendations: recommendations.length > 0 ? recommendations : ['All spatial indexes appear optimized'],
+                recommendations: recommendations.length > 0
+                    ? recommendations
+                    : ((indexes.rows?.length ?? 0) === 0
+                        ? ['No spatial indexes found in this schema. Consider adding GiST indexes for spatial columns.']
+                        : ['All spatial indexes appear optimized']),
                 tips: [
                     'Use GiST indexes for general spatial queries',
                     'Consider SP-GiST for point-only data',
@@ -188,38 +209,60 @@ export function createGeoIndexOptimizeTool(adapter: PostgresAdapter): ToolDefini
 export function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_geo_cluster',
-        description: 'Perform spatial clustering on geometry data using DBSCAN or K-Means.',
+        description: 'Perform spatial clustering using DBSCAN or K-Means. DBSCAN defaults: eps=100m, minPoints=3. K-Means default: numClusters=5 (provide explicit value for best results).',
         group: 'postgis',
-        inputSchema: z.object({
-            table: z.string().describe('Table name'),
-            column: z.string().describe('Geometry column name'),
-            method: z.enum(['dbscan', 'kmeans']).optional().describe('Clustering method (default: dbscan)'),
-            eps: z.number().optional().describe('DBSCAN: Distance threshold'),
-            minPoints: z.number().optional().describe('DBSCAN: Minimum points per cluster'),
-            numClusters: z.number().optional().describe('K-Means: Number of clusters'),
-            schema: z.string().optional(),
-            where: z.string().optional().describe('WHERE clause filter'),
-            limit: z.number().optional()
-        }),
+        inputSchema: GeoClusterSchemaBase,  // Base schema for MCP visibility
         annotations: readOnly('Geo Cluster'),
         icons: getToolIcons('postgis', readOnly('Geo Cluster')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as {
-                table: string;
-                column: string;
-                method?: string;
-                eps?: number;
-                minPoints?: number;
-                numClusters?: number;
-                schema?: string;
-                where?: string;
-                limit?: number;
-            });
+            const parsed = GeoClusterSchema.parse(params ?? {});
 
             const method = parsed.method ?? 'dbscan';
             const schemaName = parsed.schema ?? 'public';
-            const whereClause = parsed.where ? `WHERE ${parsed.where}` : '';
+            const qualifiedTable = schemaName !== 'public' ? `"${schemaName}"."${parsed.table}"` : `"${parsed.table}"`;
+            const whereClause = parsed.where !== undefined ? `WHERE ${parsed.where}` : '';
             const limitClause = parsed.limit !== undefined && parsed.limit > 0 ? `LIMIT ${String(parsed.limit)}` : '';
+
+            // For K-Means, validate numClusters <= row count upfront
+            if (method === 'kmeans') {
+                const numClusters = parsed.numClusters ?? 5;
+
+                // Validate numClusters > 0
+                if (numClusters <= 0) {
+                    return {
+                        error: `numClusters must be greater than 0 (received: ${String(numClusters)}).`,
+                        method,
+                        table: parsed.table,
+                        numClusters,
+                        suggestion: 'Provide a positive integer for numClusters (e.g., numClusters: 3)'
+                    };
+                }
+
+                const countResult = await adapter.executeQuery(
+                    `SELECT COUNT(*) as cnt FROM ${qualifiedTable} ${whereClause}`
+                );
+                const rowCount = Number(countResult.rows?.[0]?.['cnt'] ?? 0);
+
+                if (rowCount === 0) {
+                    return {
+                        error: `No rows found in table ${parsed.table}${whereClause !== '' ? ' matching filter' : ''}. K-Means requires at least 1 row.`,
+                        method,
+                        table: parsed.table,
+                        rowCount: 0
+                    };
+                }
+
+                if (numClusters > rowCount) {
+                    return {
+                        error: `numClusters (${String(numClusters)}) exceeds available rows (${String(rowCount)}). K-Means requires numClusters ≤ row count.`,
+                        method,
+                        table: parsed.table,
+                        numClusters,
+                        rowCount,
+                        suggestion: `Try numClusters: ${String(Math.min(numClusters, rowCount))} or fewer`
+                    };
+                }
+            }
 
             let clusterFunction: string;
             if (method === 'kmeans') {
@@ -236,7 +279,7 @@ export function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
                     SELECT 
                         *,
                         ${clusterFunction} as cluster_id
-                    FROM "${schemaName}"."${parsed.table}"
+                    FROM ${qualifiedTable}
                     ${whereClause}
                 )
                 SELECT 
@@ -256,7 +299,7 @@ export function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
                 adapter.executeQuery(`
                     WITH clustered AS (
                         SELECT ${clusterFunction} as cluster_id
-                        FROM "${schemaName}"."${parsed.table}"
+                        FROM ${qualifiedTable}
                         ${whereClause}
                     )
                     SELECT 

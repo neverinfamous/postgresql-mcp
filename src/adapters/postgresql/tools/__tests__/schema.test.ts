@@ -23,8 +23,8 @@ describe('getSchemaTools', () => {
         tools = getSchemaTools(adapter);
     });
 
-    it('should return 10 schema tools', () => {
-        expect(tools).toHaveLength(10);
+    it('should return 12 schema tools', () => {
+        expect(tools).toHaveLength(12);
     });
 
     it('should have all expected tool names', () => {
@@ -133,35 +133,60 @@ describe('pg_drop_schema', () => {
     });
 
     it('should drop a schema', async () => {
+        // First call: existence check, second call: drop
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_drop_schema')!;
         const result = await tool.handler({ name: 'old_app' }, mockContext) as {
             success: boolean;
-            dropped: string;
+            dropped: string | null;
+            existed: boolean;
         };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('DROP SCHEMA "old_app"');
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(2, 'DROP SCHEMA "old_app"');
         expect(result.success).toBe(true);
         expect(result.dropped).toBe('old_app');
+        expect(result.existed).toBe(true);
     });
 
     it('should drop schema with IF EXISTS', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_drop_schema')!;
         await tool.handler({ name: 'old_app', ifExists: true }, mockContext);
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('DROP SCHEMA IF EXISTS "old_app"');
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(2, 'DROP SCHEMA IF EXISTS "old_app"');
     });
 
     it('should drop schema with CASCADE', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_drop_schema')!;
         await tool.handler({ name: 'old_app', cascade: true }, mockContext);
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('DROP SCHEMA "old_app" CASCADE');
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(2, 'DROP SCHEMA "old_app" CASCADE');
+    });
+
+    it('should indicate when schema did not exist with ifExists', async () => {
+        // First call: existence check returns no rows
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_drop_schema')!;
+        const result = await tool.handler({ name: 'nonexistent_schema', ifExists: true }, mockContext) as {
+            success: boolean;
+            dropped: string | null;
+            existed: boolean;
+            note: string;
+        };
+
+        expect(result.success).toBe(true);
+        expect(result.dropped).toBeNull();
+        expect(result.existed).toBe(false);
+        expect(result.note).toContain('did not exist');
     });
 });
 
@@ -251,6 +276,22 @@ describe('pg_create_sequence', () => {
         expect(call).toContain('MAXVALUE 10000');
         expect(call).toContain('CYCLE');
     });
+
+    it('should accept sequenceName as alias for name parameter', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_create_sequence')!;
+        const result = await tool.handler({
+            sequenceName: 'aliased_seq'  // Using alias
+        }, mockContext) as {
+            success: boolean;
+            sequence: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('CREATE SEQUENCE "aliased_seq"');
+        expect(result.success).toBe(true);
+        expect(result.sequence).toBe('public.aliased_seq');
+    });
 });
 
 describe('pg_list_views', () => {
@@ -298,6 +339,36 @@ describe('pg_list_views', () => {
         await tool.handler({ includeMaterialized: false }, mockContext);
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(expect.stringContaining("= 'v'"));
+    });
+
+    it('should include hasMatViews in response', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [
+                { schema: 'public', name: 'v1', type: 'view' },
+                { schema: 'public', name: 'mv1', type: 'materialized_view' }
+            ]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_list_views')!;
+        const result = await tool.handler({}, mockContext) as {
+            views: unknown[];
+            hasMatViews: boolean;
+        };
+
+        expect(result.hasMatViews).toBe(true);
+    });
+
+    it('should set hasMatViews to false when no materialized views exist', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ schema: 'public', name: 'v1', type: 'view' }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_list_views')!;
+        const result = await tool.handler({}, mockContext) as {
+            hasMatViews: boolean;
+        };
+
+        expect(result.hasMatViews).toBe(false);
     });
 });
 
@@ -364,6 +435,24 @@ describe('pg_create_view', () => {
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
             'CREATE OR REPLACE VIEW "my_view" AS SELECT 1'
         );
+    });
+
+    it('should accept viewName as alias for name parameter', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_create_view')!;
+        const result = await tool.handler({
+            viewName: 'aliased_view',  // Using alias
+            query: 'SELECT * FROM users'
+        }, mockContext) as {
+            success: boolean;
+            view: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'CREATE VIEW "aliased_view" AS SELECT * FROM users'
+        );
+        expect(result.success).toBe(true);
     });
 });
 
@@ -488,5 +577,148 @@ describe('pg_list_constraints', () => {
         await tool.handler({ type: 'foreign_key' }, mockContext);
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(expect.stringContaining("con.contype = 'f'"));
+    });
+});
+
+/**
+ * Parameter Smoothing Tests
+ * 
+ * Tests for code mode compatibility - tools should work when called
+ * without explicit parameters (using undefined instead of {})
+ */
+describe('Parameter Smoothing', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getSchemaTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getSchemaTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('pg_list_sequences should work without params', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_list_sequences')!;
+        // Simulate code mode: params is undefined
+        const result = await tool.handler(undefined, mockContext) as { sequences: unknown[] };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalled();
+        expect(result.sequences).toBeDefined();
+    });
+
+    it('pg_list_views should work without params', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_list_views')!;
+        const result = await tool.handler(undefined, mockContext) as { views: unknown[] };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalled();
+        expect(result.views).toBeDefined();
+    });
+
+    it('pg_list_functions should work without params', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_list_functions')!;
+        const result = await tool.handler(undefined, mockContext) as { functions: unknown[] };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalled();
+        expect(result.functions).toBeDefined();
+    });
+
+    it('pg_list_triggers should work without params', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_list_triggers')!;
+        const result = await tool.handler(undefined, mockContext) as { triggers: unknown[] };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalled();
+        expect(result.triggers).toBeDefined();
+    });
+
+    it('pg_list_constraints should work without params', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_list_constraints')!;
+        const result = await tool.handler(undefined, mockContext) as { constraints: unknown[] };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalled();
+        expect(result.constraints).toBeDefined();
+    });
+
+    it('pg_create_view should accept sql as alias for query', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_create_view')!;
+        const result = await tool.handler({
+            name: 'sql_alias_view',
+            sql: 'SELECT * FROM users WHERE active = true'  // Using sql instead of query
+        }, mockContext) as {
+            success: boolean;
+            view: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'CREATE VIEW "sql_alias_view" AS SELECT * FROM users WHERE active = true'
+        );
+        expect(result.success).toBe(true);
+    });
+
+    it('pg_create_sequence should accept schema.name format', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_create_sequence')!;
+        const result = await tool.handler({
+            name: 'test_schema.order_seq'
+        }, mockContext) as {
+            success: boolean;
+            sequence: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('CREATE SEQUENCE "test_schema"."order_seq"');
+        expect(result.success).toBe(true);
+        expect(result.sequence).toBe('test_schema.order_seq');
+    });
+
+    it('pg_list_constraints should exclude NOT NULL constraints', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_list_constraints')!;
+        await tool.handler({}, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(expect.stringContaining("con.contype != 'n'"));
+    });
+
+    it('pg_list_functions should filter extension-owned functions via pg_depend', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_list_functions')!;
+        await tool.handler({ exclude: ['ltree'] }, mockContext);
+
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        expect(sql).toContain('pg_depend');
+        expect(sql).toContain('pg_extension');
+        expect(sql).toContain("e.extname IN ('ltree')");
+    });
+
+    it('pg_create_view should accept definition as alias for query', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_create_view')!;
+        const result = await tool.handler({
+            name: 'def_alias_view',
+            definition: 'SELECT * FROM users WHERE active = true'  // Using definition instead of query
+        }, mockContext) as {
+            success: boolean;
+            view: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'CREATE VIEW "def_alias_view" AS SELECT * FROM users WHERE active = true'
+        );
+        expect(result.success).toBe(true);
     });
 });

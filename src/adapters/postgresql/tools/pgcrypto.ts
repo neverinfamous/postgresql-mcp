@@ -9,8 +9,10 @@ import { z } from 'zod';
 import { readOnly, write } from '../../../utils/annotations.js';
 import { getToolIcons } from '../../../utils/icons.js';
 import {
-    PgcryptoHashSchema, PgcryptoHmacSchema, PgcryptoEncryptSchema,
-    PgcryptoDecryptSchema, PgcryptoRandomBytesSchema, PgcryptoGenSaltSchema, PgcryptoCryptSchema
+    PgcryptoHashSchema, PgcryptoHmacSchema,
+    PgcryptoEncryptSchema, PgcryptoEncryptSchemaBase,
+    PgcryptoDecryptSchema, PgcryptoDecryptSchemaBase,
+    PgcryptoRandomBytesSchema, PgcryptoGenSaltSchema, PgcryptoCryptSchema
 } from '../schemas/index.js';
 
 export function getPgcryptoTools(adapter: PostgresAdapter): ToolDefinition[] {
@@ -79,10 +81,12 @@ function createPgcryptoEncryptTool(adapter: PostgresAdapter): ToolDefinition {
         name: 'pg_pgcrypto_encrypt',
         description: 'Encrypt data using PGP symmetric encryption.',
         group: 'pgcrypto',
-        inputSchema: PgcryptoEncryptSchema,
+        // Use base schema for MCP so properties are properly exposed
+        inputSchema: PgcryptoEncryptSchemaBase,
         annotations: readOnly('Encrypt Data'),
         icons: getToolIcons('pgcrypto', readOnly('Encrypt Data')),
         handler: async (params: unknown, _context: RequestContext) => {
+            // Use transformed schema with alias resolution for validation
             const { data, password, options } = PgcryptoEncryptSchema.parse(params);
             const sql = options !== undefined
                 ? `SELECT encode(pgp_sym_encrypt($1, $2, $3), 'base64') as encrypted`
@@ -99,32 +103,46 @@ function createPgcryptoDecryptTool(adapter: PostgresAdapter): ToolDefinition {
         name: 'pg_pgcrypto_decrypt',
         description: 'Decrypt data that was encrypted with pg_pgcrypto_encrypt.',
         group: 'pgcrypto',
-        inputSchema: PgcryptoDecryptSchema,
+        // Use base schema for MCP so properties are properly exposed
+        inputSchema: PgcryptoDecryptSchemaBase,
         annotations: readOnly('Decrypt Data'),
         icons: getToolIcons('pgcrypto', readOnly('Decrypt Data')),
         handler: async (params: unknown, _context: RequestContext) => {
+            // Use transformed schema with alias resolution for validation
             const { encryptedData, password } = PgcryptoDecryptSchema.parse(params);
-            try {
-                const result = await adapter.executeQuery(`SELECT pgp_sym_decrypt(decode($1, 'base64'), $2) as decrypted`, [encryptedData, password]);
-                return { success: true, decrypted: result.rows?.[0]?.['decrypted'] as string };
-            } catch (error) {
-                return { success: false, error: 'Decryption failed - wrong password or corrupted data', details: String(error) };
+            const result = await adapter.executeQuery(
+                `SELECT pgp_sym_decrypt(decode($1, 'base64'), $2) as decrypted`,
+                [encryptedData, password]
+            );
+            const decrypted = result.rows?.[0]?.['decrypted'];
+
+            // Throw error for decryption failure (wrong password or corrupted data)
+            if (decrypted === undefined || decrypted === null) {
+                throw new Error('Decryption failed - wrong password or corrupted data');
             }
+
+            return { success: true, decrypted: decrypted as string, verified: true };
         }
     };
 }
 
 function createPgcryptoGenRandomUuidTool(adapter: PostgresAdapter): ToolDefinition {
+    // Schema with proper validation
+    const GenUuidSchema = z.object({
+        count: z.number().min(1).max(100).optional().describe('Number of UUIDs to generate (default: 1, max: 100)')
+    }).default({});
+
     return {
         name: 'pg_pgcrypto_gen_random_uuid',
         description: 'Generate a cryptographically secure UUID v4.',
         group: 'pgcrypto',
-        inputSchema: z.object({ count: z.number().min(1).max(100).optional().describe('Number of UUIDs to generate (default: 1)') }),
+        inputSchema: GenUuidSchema,
         annotations: readOnly('Generate UUID'),
         icons: getToolIcons('pgcrypto', readOnly('Generate UUID')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { count } = (params as { count?: number });
-            const generateCount = count ?? 1;
+            // Parse via Zod to enforce count validation (max 100)
+            const parsed = GenUuidSchema.parse(params);
+            const generateCount = parsed.count ?? 1;
             const result = await adapter.executeQuery(`SELECT gen_random_uuid()::text as uuid FROM generate_series(1, $1)`, [generateCount]);
             const uuids = (result.rows ?? []).map(r => r['uuid'] as string);
             return { success: true, uuids, count: uuids.length };

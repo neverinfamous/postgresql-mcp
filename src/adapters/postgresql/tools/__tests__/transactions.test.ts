@@ -181,6 +181,21 @@ describe('pg_transaction_savepoint', () => {
         expect(result.success).toBe(true);
         expect(result.savepoint).toBe('my_savepoint');
     });
+
+    it('should accept savepoint as alias for name', async () => {
+        const tool = tools.find(t => t.name === 'pg_transaction_savepoint')!;
+        const result = await tool.handler({
+            transactionId: 'txn-12345',
+            savepoint: 'sp1'  // Using alias
+        }, mockContext) as {
+            success: boolean;
+            savepoint: string;
+        };
+
+        expect(mockAdapter.createSavepoint).toHaveBeenCalledWith('txn-12345', 'sp1');
+        expect(result.success).toBe(true);
+        expect(result.savepoint).toBe('sp1');
+    });
 });
 
 describe('pg_transaction_release', () => {
@@ -209,6 +224,21 @@ describe('pg_transaction_release', () => {
         expect(result.success).toBe(true);
         expect(result.savepoint).toBe('my_savepoint');
     });
+
+    it('should accept savepoint as alias for name', async () => {
+        const tool = tools.find(t => t.name === 'pg_transaction_release')!;
+        const result = await tool.handler({
+            txId: 'txn-12345',  // Using txId alias too
+            savepoint: 'sp1'   // Using savepoint alias
+        }, mockContext) as {
+            success: boolean;
+            savepoint: string;
+        };
+
+        expect(mockAdapter.releaseSavepoint).toHaveBeenCalledWith('txn-12345', 'sp1');
+        expect(result.success).toBe(true);
+        expect(result.savepoint).toBe('sp1');
+    });
 });
 
 describe('pg_transaction_rollback_to', () => {
@@ -236,6 +266,21 @@ describe('pg_transaction_rollback_to', () => {
         expect(mockAdapter.rollbackToSavepoint).toHaveBeenCalledWith('txn-12345', 'my_savepoint');
         expect(result.success).toBe(true);
         expect(result.savepoint).toBe('my_savepoint');
+    });
+
+    it('should accept savepoint as alias for name', async () => {
+        const tool = tools.find(t => t.name === 'pg_transaction_rollback_to')!;
+        const result = await tool.handler({
+            tx: 'txn-12345',    // Using tx alias
+            savepoint: 'sp1'   // Using savepoint alias
+        }, mockContext) as {
+            success: boolean;
+            savepoint: string;
+        };
+
+        expect(mockAdapter.rollbackToSavepoint).toHaveBeenCalledWith('txn-12345', 'sp1');
+        expect(result.success).toBe(true);
+        expect(result.savepoint).toBe('sp1');
     });
 });
 

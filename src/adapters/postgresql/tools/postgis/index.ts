@@ -2,7 +2,7 @@
  * PostgreSQL PostGIS Extension Tools
  * 
  * Geospatial operations and spatial queries.
- * 12 tools total.
+ * 15 tools total.
  */
 
 import type { PostgresAdapter } from '../../PostgresAdapter.js';
@@ -28,11 +28,19 @@ import {
     createGeoClusterTool
 } from './advanced.js';
 
+// Standalone geometry operations (WKT/GeoJSON input)
+import {
+    createGeometryBufferTool,
+    createGeometryIntersectionTool,
+    createGeometryTransformTool
+} from './standalone.js';
+
 /**
  * Get all PostGIS tools
  */
 export function getPostgisTools(adapter: PostgresAdapter): ToolDefinition[] {
     return [
+        // Basic table-based tools
         createPostgisExtensionTool(adapter),
         createGeometryColumnTool(adapter),
         createPointInPolygonTool(adapter),
@@ -41,15 +49,21 @@ export function getPostgisTools(adapter: PostgresAdapter): ToolDefinition[] {
         createIntersectionTool(adapter),
         createBoundingBoxTool(adapter),
         createSpatialIndexTool(adapter),
+        // Advanced table-based tools
         createGeocodeTool(adapter),
         createGeoTransformTool(adapter),
         createGeoIndexOptimizeTool(adapter),
-        createGeoClusterTool(adapter)
+        createGeoClusterTool(adapter),
+        // Standalone geometry tools (WKT/GeoJSON input)
+        createGeometryBufferTool(adapter),
+        createGeometryIntersectionTool(adapter),
+        createGeometryTransformTool(adapter)
     ];
 }
 
 // Re-export individual tool creators
 export {
+    // Basic
     createPostgisExtensionTool,
     createGeometryColumnTool,
     createPointInPolygonTool,
@@ -58,8 +72,13 @@ export {
     createIntersectionTool,
     createBoundingBoxTool,
     createSpatialIndexTool,
+    // Advanced
     createGeocodeTool,
     createGeoTransformTool,
     createGeoIndexOptimizeTool,
-    createGeoClusterTool
+    createGeoClusterTool,
+    // Standalone
+    createGeometryBufferTool,
+    createGeometryIntersectionTool,
+    createGeometryTransformTool
 };

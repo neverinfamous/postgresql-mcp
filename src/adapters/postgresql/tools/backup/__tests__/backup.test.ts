@@ -60,6 +60,8 @@ describe('pg_dump_table', () => {
     });
 
     it('should generate CREATE TABLE statement', async () => {
+        // Mock relkind query (first) - 'r' = regular table
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'users',
             schema: 'public',
@@ -74,15 +76,42 @@ describe('pg_dump_table', () => {
         const result = await tool.handler({
             table: 'users'
         }, mockContext) as {
-            createTable: string;
+            ddl: string;
+            note: string;
         };
 
-        expect(result.createTable).toContain('CREATE TABLE');
-        expect(result.createTable).toContain('"id" integer');
-        expect(result.createTable).toContain('NOT NULL');
+        expect(result.ddl).toContain('CREATE TABLE');
+        expect(result.ddl).toContain('"id" integer');
+        expect(result.ddl).toContain('NOT NULL');
+        expect(result.note).toContain('pg_get_indexes');
+    });
+
+    it('should return ddl field with note about limitations', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
+        mockAdapter.describeTable.mockResolvedValueOnce({
+            name: 'products',
+            schema: 'public',
+            type: 'table',
+            columns: [
+                { name: 'id', type: 'integer', nullable: false }
+            ]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_dump_table')!;
+        const result = await tool.handler({
+            table: 'products'
+        }, mockContext) as {
+            ddl: string;
+            note: string;
+        };
+
+        expect(result.ddl).toContain('CREATE TABLE');
+        expect(result.note).toBeDefined();
+        expect(result.note).toContain('constraints');
     });
 
     it('should include data when requested', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'users',
             schema: 'public',
@@ -98,7 +127,7 @@ describe('pg_dump_table', () => {
             table: 'users',
             includeData: true
         }, mockContext) as {
-            createTable: string;
+            ddl: string;
             insertStatements: string;
         };
 
@@ -107,6 +136,7 @@ describe('pg_dump_table', () => {
     });
 
     it('should handle object-type default values', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'settings',
             schema: 'public',
@@ -121,14 +151,15 @@ describe('pg_dump_table', () => {
         const result = await tool.handler({
             table: 'settings'
         }, mockContext) as {
-            createTable: string;
+            ddl: string;
         };
 
-        expect(result.createTable).toContain('DEFAULT');
-        expect(result.createTable).toContain('"config" jsonb');
+        expect(result.ddl).toContain('DEFAULT');
+        expect(result.ddl).toContain('"config" jsonb');
     });
 
     it('should handle non-string/number/boolean default values', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'test_table',
             schema: 'public',
@@ -143,14 +174,15 @@ describe('pg_dump_table', () => {
         const result = await tool.handler({
             table: 'test_table'
         }, mockContext) as {
-            createTable: string;
+            ddl: string;
         };
 
         // Should stringify unknown types
-        expect(result.createTable).toContain('DEFAULT');
+        expect(result.ddl).toContain('DEFAULT');
     });
 
     it('should handle string default values', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'users',
             schema: 'public',
@@ -164,13 +196,14 @@ describe('pg_dump_table', () => {
         const result = await tool.handler({
             table: 'users'
         }, mockContext) as {
-            createTable: string;
+            ddl: string;
         };
 
-        expect(result.createTable).toContain('DEFAULT active');
+        expect(result.ddl).toContain('DEFAULT active');
     });
 
     it('should handle number default values', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'counters',
             schema: 'public',
@@ -184,13 +217,14 @@ describe('pg_dump_table', () => {
         const result = await tool.handler({
             table: 'counters'
         }, mockContext) as {
-            createTable: string;
+            ddl: string;
         };
 
-        expect(result.createTable).toContain('DEFAULT 0');
+        expect(result.ddl).toContain('DEFAULT 0');
     });
 
     it('should handle boolean default values', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'flags',
             schema: 'public',
@@ -204,13 +238,14 @@ describe('pg_dump_table', () => {
         const result = await tool.handler({
             table: 'flags'
         }, mockContext) as {
-            createTable: string;
+            ddl: string;
         };
 
-        expect(result.createTable).toContain('DEFAULT true');
+        expect(result.ddl).toContain('DEFAULT true');
     });
 
     it('should handle empty data set with includeData: true', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'empty_table',
             schema: 'public',
@@ -226,15 +261,16 @@ describe('pg_dump_table', () => {
             table: 'empty_table',
             includeData: true
         }, mockContext) as {
-            createTable: string;
+            ddl: string;
             insertStatements?: string;
         };
 
-        expect(result.createTable).toContain('CREATE TABLE');
+        expect(result.ddl).toContain('CREATE TABLE');
         expect(result.insertStatements).toBeUndefined();
     });
 
     it('should handle undefined first row gracefully', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
         mockAdapter.describeTable.mockResolvedValueOnce({
             name: 'sparse_table',
             schema: 'public',
@@ -437,7 +473,7 @@ describe('pg_copy_export', () => {
         expect(result.data).toContain('{"key":"value"}');
     });
 
-    it('should return raw rows for non-CSV format', async () => {
+    it('should return tab-delimited data for text format', async () => {
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [{ id: 1, name: 'Test' }, { id: 2, name: 'User' }]
         });
@@ -446,9 +482,11 @@ describe('pg_copy_export', () => {
         const result = await tool.handler({
             query: 'SELECT * FROM test',
             format: 'text'
-        }, mockContext) as { rows: unknown[]; rowCount: number };
+        }, mockContext) as { data: string; rowCount: number };
 
-        expect(result.rows).toHaveLength(2);
+        expect(result.data).toContain('id\tname');  // Tab-delimited header
+        expect(result.data).toContain('1\tTest');
+        expect(result.data).toContain('2\tUser');
         expect(result.rowCount).toBe(2);
     });
 
@@ -478,6 +516,171 @@ describe('pg_copy_export', () => {
 
         expect(result.data).toBe('');
         expect(result.rowCount).toBe(0);
+    });
+
+    it('should fail with clear error when called with empty params', async () => {
+        const tool = tools.find(t => t.name === 'pg_copy_export')!;
+
+        await expect(tool.handler({}, mockContext)).rejects.toThrow('Either query/sql or table parameter is required');
+    });
+
+    it('should support table parameter as shortcut', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1, name: 'Test' }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_copy_export')!;
+        const result = await tool.handler({
+            table: 'users'
+        }, mockContext) as { data: string; rowCount: number };
+
+        expect(result.rowCount).toBe(1);
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('SELECT * FROM "public"."users"');
+    });
+
+    it('should support table with schema parameter', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_copy_export')!;
+        const result = await tool.handler({
+            table: 'products',
+            schema: 'inventory'
+        }, mockContext) as { data: string; rowCount: number };
+
+        expect(result.rowCount).toBe(1);
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('SELECT * FROM "inventory"."products"');
+    });
+
+    it('should support sql alias for query parameter', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_copy_export')!;
+        const result = await tool.handler({
+            sql: 'SELECT 1 as id'
+        }, mockContext) as { data: string; rowCount: number };
+
+        expect(result.rowCount).toBe(1);
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('SELECT 1 as id');
+    });
+
+    it('should use \\N for NULL in text format', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1, name: null }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_copy_export')!;
+        const result = await tool.handler({
+            query: 'SELECT * FROM test',
+            format: 'text'
+        }, mockContext) as { data: string };
+
+        expect(result.data).toContain('\\N');  // NULL representation in text format
+    });
+
+    it('should throw error for binary format', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1, name: 'Test' }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_copy_export')!;
+        await expect(tool.handler({
+            query: 'SELECT * FROM test',
+            format: 'binary'
+        }, mockContext)).rejects.toThrow('Binary format is not supported');
+    });
+});
+
+describe('pg_dump_table timestamp serialization', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getBackupTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getBackupTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('should format ISO timestamp strings as PostgreSQL timestamps', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
+        mockAdapter.describeTable.mockResolvedValueOnce({
+            name: 'events',
+            schema: 'public',
+            type: 'table',
+            columns: [
+                { name: 'id', type: 'integer', nullable: false },
+                { name: 'created_at', type: 'timestamp', nullable: true }
+            ]
+        });
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1, created_at: '2025-12-22T05:06:15.242Z' }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_dump_table')!;
+        const result = await tool.handler({
+            table: 'events',
+            includeData: true
+        }, mockContext) as { insertStatements: string };
+
+        // Should NOT have double-quoted timestamp
+        expect(result.insertStatements).not.toContain('\\"2025-12-22');
+        // Should have properly formatted timestamp
+        expect(result.insertStatements).toContain("'2025-12-22 05:06:15");
+    });
+
+    it('should format Date objects as PostgreSQL timestamps', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
+        mockAdapter.describeTable.mockResolvedValueOnce({
+            name: 'events',
+            schema: 'public',
+            type: 'table',
+            columns: [
+                { name: 'id', type: 'integer', nullable: false },
+                { name: 'created_at', type: 'timestamp', nullable: true }
+            ]
+        });
+        const testDate = new Date('2025-12-22T10:30:00.000Z');
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1, created_at: testDate }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_dump_table')!;
+        const result = await tool.handler({
+            table: 'events',
+            includeData: true
+        }, mockContext) as { insertStatements: string };
+
+        // Should have PostgreSQL format: YYYY-MM-DD HH:MM:SS
+        expect(result.insertStatements).toContain("'2025-12-22 10:30:00");
+    });
+
+    it('should add ::jsonb cast to object values', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
+        mockAdapter.describeTable.mockResolvedValueOnce({
+            name: 'docs',
+            schema: 'public',
+            type: 'table',
+            columns: [
+                { name: 'id', type: 'integer', nullable: false },
+                { name: 'data', type: 'jsonb', nullable: true }
+            ]
+        });
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ id: 1, data: { key: 'value' } }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_dump_table')!;
+        const result = await tool.handler({
+            table: 'docs',
+            includeData: true
+        }, mockContext) as { insertStatements: string };
+
+        expect(result.insertStatements).toContain('::jsonb');
     });
 });
 
@@ -553,12 +756,46 @@ describe('pg_create_backup_plan', () => {
 
         const tool = tools.find(t => t.name === 'pg_create_backup_plan')!;
         const result = await tool.handler({}, mockContext) as {
-            strategy: unknown;
+            strategy: { fullBackup: { cronSchedule: string } };
             estimates: { databaseSize: string };
         };
 
         expect(result.strategy).toBeDefined();
         expect(result.estimates.databaseSize).toBeDefined();
+        // Default should be daily cron
+        expect(result.strategy.fullBackup.cronSchedule).toBe('0 2 * * *');
+    });
+
+    it('should generate hourly cron schedule', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ bytes: 1073741824 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_create_backup_plan')!;
+        const result = await tool.handler({
+            frequency: 'hourly'
+        }, mockContext) as {
+            strategy: { fullBackup: { cronSchedule: string; frequency: string } };
+        };
+
+        expect(result.strategy.fullBackup.frequency).toBe('hourly');
+        expect(result.strategy.fullBackup.cronSchedule).toBe('0 * * * *');
+    });
+
+    it('should generate weekly cron schedule', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ bytes: 1073741824 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_create_backup_plan')!;
+        const result = await tool.handler({
+            frequency: 'weekly'
+        }, mockContext) as {
+            strategy: { fullBackup: { cronSchedule: string; frequency: string } };
+        };
+
+        expect(result.strategy.fullBackup.frequency).toBe('weekly');
+        expect(result.strategy.fullBackup.cronSchedule).toBe('0 2 * * 0');
     });
 });
 
@@ -585,6 +822,21 @@ describe('pg_restore_command', () => {
 
         expect(result.command).toContain('pg_restore');
         expect(result.command).toContain('backup.dump');
+    });
+
+    it('should include warnings when no database specified', async () => {
+        const tool = tools.find(t => t.name === 'pg_restore_command')!;
+        const result = await tool.handler({
+            backupFile: 'backup.dump'
+        }, mockContext) as {
+            command: string;
+            warnings: string[];
+        };
+
+        expect(result.command).toContain('pg_restore');
+        expect(result.warnings).toBeDefined();
+        expect(result.warnings).toHaveLength(1);
+        expect(result.warnings[0]).toContain('No database specified');
     });
 });
 
@@ -774,8 +1026,9 @@ describe('pg_backup_physical extended', () => {
             compress: 6
         }, mockContext) as { command: string };
 
-        expect(result.command).toContain('-z');
+        // Only -Z level is needed, not -z which is redundant
         expect(result.command).toContain('-Z 6');
+        expect(result.command).not.toContain('-z ');  // Should not include redundant -z
     });
 
     it('should not include compression when level is 0', async () => {
@@ -812,10 +1065,11 @@ describe('pg_restore_validate extended', () => {
             recommendations: string[];
         };
 
-        expect(result.validationSteps).toHaveLength(3);
-        expect(result.validationSteps[0]?.name).toContain('Verify base backup');
-        expect(result.validationSteps[1]?.name).toContain('backup_label');
-        expect(result.recommendations).toContainEqual(expect.stringContaining('pg_verifybackup'));
+        expect(result.validationSteps).toHaveLength(4);
+        expect(result.validationSteps[0]?.name).toContain('pg_verifybackup');
+        expect(result.validationSteps[1]?.name).toContain('Verify base backup');
+        expect(result.validationSteps[2]?.name).toContain('backup_label');
+        expect(result.recommendations).toContainEqual(expect.stringContaining('checksums'));
     });
 
     it('should return pg_dump validation steps by default', async () => {

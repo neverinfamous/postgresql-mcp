@@ -9,8 +9,13 @@ import { z } from 'zod';
 import { readOnly, write } from '../../../utils/annotations.js';
 import { getToolIcons } from '../../../utils/icons.js';
 import {
-    LtreeQuerySchema, LtreeSubpathSchema, LtreeLcaSchema, LtreeMatchSchema,
-    LtreeListColumnsSchema, LtreeConvertColumnSchema, LtreeIndexSchema
+    LtreeQuerySchema, LtreeQuerySchemaBase,
+    LtreeSubpathSchema, LtreeSubpathSchemaBase,
+    LtreeLcaSchema,
+    LtreeMatchSchema, LtreeMatchSchemaBase,
+    LtreeListColumnsSchema,
+    LtreeConvertColumnSchema, LtreeConvertColumnSchemaBase,
+    LtreeIndexSchema, LtreeIndexSchemaBase
 } from '../schemas/index.js';
 
 export function getLtreeTools(adapter: PostgresAdapter): ToolDefinition[] {
@@ -40,9 +45,9 @@ function createLtreeExtensionTool(adapter: PostgresAdapter): ToolDefinition {
 function createLtreeQueryTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_ltree_query',
-        description: 'Query hierarchical relationships in ltree columns (descendants/ancestors/exact).',
+        description: 'Query hierarchical relationships in ltree columns. Supports exact paths (descendants/ancestors) and lquery patterns with wildcards.',
         group: 'ltree',
-        inputSchema: LtreeQuerySchema,
+        inputSchema: LtreeQuerySchemaBase,  // Base schema for MCP visibility
         annotations: readOnly('Query Ltree'),
         icons: getToolIcons('ltree', readOnly('Query Ltree')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -50,16 +55,38 @@ function createLtreeQueryTool(adapter: PostgresAdapter): ToolDefinition {
             const schemaName = schema ?? 'public';
             const queryMode = mode ?? 'descendants';
             const qualifiedTable = `"${schemaName}"."${table}"`;
-            let operator: string;
-            switch (queryMode) {
-                case 'ancestors': operator = '@>'; break;
-                case 'exact': operator = '='; break;
-                default: operator = '<@';
-            }
             const limitClause = limit !== undefined ? `LIMIT ${String(limit)}` : '';
-            const sql = `SELECT *, nlevel("${column}") as depth FROM ${qualifiedTable} WHERE "${column}" ${operator} $1::ltree ORDER BY "${column}" ${limitClause}`;
+
+            // Detect if path contains lquery pattern characters
+            const isLqueryPattern = /[*?{!@|]/.test(path);
+
+            let sql: string;
+            if (isLqueryPattern) {
+                // Use lquery pattern matching with ~ operator
+                sql = `SELECT *, nlevel("${column}") as depth FROM ${qualifiedTable} WHERE "${column}" ~ $1::lquery ORDER BY "${column}" ${limitClause}`;
+            } else {
+                // Use standard ltree hierarchy operators
+                // @> means "is ancestor of" (left contains right)
+                // <@ means "is descendant of" (left is contained by right)
+                let operator: string;
+                switch (queryMode) {
+                    // ancestors: column @> path means column contains path, i.e., column is ancestor of path
+                    case 'ancestors': operator = '@>'; break;
+                    case 'exact': operator = '='; break;
+                    // descendants: column <@ path means column is contained by path, i.e., column is descendant of path
+                    default: operator = '<@';
+                }
+                sql = `SELECT *, nlevel("${column}") as depth FROM ${qualifiedTable} WHERE "${column}" ${operator} $1::ltree ORDER BY "${column}" ${limitClause}`;
+            }
+
             const result = await adapter.executeQuery(sql, [path]);
-            return { path, mode: queryMode, results: result.rows ?? [], count: result.rows?.length ?? 0 };
+            return {
+                path,
+                mode: isLqueryPattern ? 'pattern' : queryMode,
+                isPattern: isLqueryPattern,
+                results: result.rows ?? [],
+                count: result.rows?.length ?? 0
+            };
         }
     };
 }
@@ -69,7 +96,7 @@ function createLtreeSubpathTool(adapter: PostgresAdapter): ToolDefinition {
         name: 'pg_ltree_subpath',
         description: 'Extract a portion of an ltree path.',
         group: 'ltree',
-        inputSchema: LtreeSubpathSchema,
+        inputSchema: LtreeSubpathSchemaBase,  // Base schema for MCP visibility
         annotations: readOnly('Ltree Subpath'),
         icons: getToolIcons('ltree', readOnly('Ltree Subpath')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -109,7 +136,7 @@ function createLtreeMatchTool(adapter: PostgresAdapter): ToolDefinition {
         name: 'pg_ltree_match',
         description: 'Match ltree paths using lquery pattern syntax.',
         group: 'ltree',
-        inputSchema: LtreeMatchSchema,
+        inputSchema: LtreeMatchSchemaBase,  // Base schema for MCP visibility
         annotations: readOnly('Ltree Match'),
         icons: getToolIcons('ltree', readOnly('Ltree Match')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -149,7 +176,7 @@ function createLtreeConvertColumnTool(adapter: PostgresAdapter): ToolDefinition 
         name: 'pg_ltree_convert_column',
         description: 'Convert an existing TEXT column to LTREE type.',
         group: 'ltree',
-        inputSchema: LtreeConvertColumnSchema,
+        inputSchema: LtreeConvertColumnSchemaBase,  // Base schema for MCP visibility
         annotations: write('Convert to Ltree'),
         icons: getToolIcons('ltree', write('Convert to Ltree')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -171,7 +198,7 @@ function createLtreeCreateIndexTool(adapter: PostgresAdapter): ToolDefinition {
         name: 'pg_ltree_create_index',
         description: 'Create a GiST index on an ltree column for efficient tree queries.',
         group: 'ltree',
-        inputSchema: LtreeIndexSchema,
+        inputSchema: LtreeIndexSchemaBase,  // Base schema for MCP visibility
         annotations: write('Create Ltree Index'),
         icons: getToolIcons('ltree', write('Create Ltree Index')),
         handler: async (params: unknown, _context: RequestContext) => {

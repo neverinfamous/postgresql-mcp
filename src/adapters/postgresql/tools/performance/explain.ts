@@ -17,10 +17,10 @@ export function createExplainTool(adapter: PostgresAdapter): ToolDefinition {
         annotations: readOnly('Explain Query'),
         icons: getToolIcons('performance', readOnly('Explain Query')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { sql, format } = ExplainSchema.parse(params);
+            const { sql, format, params: queryParams } = ExplainSchema.parse(params);
             const fmt = format ?? 'text';
             const explainSql = `EXPLAIN (FORMAT ${fmt.toUpperCase()}) ${sql}`;
-            const result = await adapter.executeQuery(explainSql);
+            const result = await adapter.executeQuery(explainSql, queryParams ?? []);
 
             if (fmt === 'json') {
                 return { plan: result.rows?.[0]?.['QUERY PLAN'] };
@@ -39,10 +39,10 @@ export function createExplainAnalyzeTool(adapter: PostgresAdapter): ToolDefiniti
         annotations: readOnly('Explain Analyze'),
         icons: getToolIcons('performance', readOnly('Explain Analyze')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { sql, format } = ExplainSchema.parse(params);
+            const { sql, format, params: queryParams } = ExplainSchema.parse(params);
             const fmt = format ?? 'text';
             const explainSql = `EXPLAIN (ANALYZE, FORMAT ${fmt.toUpperCase()}) ${sql}`;
-            const result = await adapter.executeQuery(explainSql);
+            const result = await adapter.executeQuery(explainSql, queryParams ?? []);
 
             if (fmt === 'json') {
                 return { plan: result.rows?.[0]?.['QUERY PLAN'] };
@@ -61,10 +61,10 @@ export function createExplainBuffersTool(adapter: PostgresAdapter): ToolDefiniti
         annotations: readOnly('Explain Buffers'),
         icons: getToolIcons('performance', readOnly('Explain Buffers')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { sql, format } = ExplainSchema.parse(params);
+            const { sql, format, params: queryParams } = ExplainSchema.parse(params);
             const fmt = format ?? 'json';
             const explainSql = `EXPLAIN (ANALYZE, BUFFERS, FORMAT ${fmt.toUpperCase()}) ${sql}`;
-            const result = await adapter.executeQuery(explainSql);
+            const result = await adapter.executeQuery(explainSql, queryParams ?? []);
 
             if (fmt === 'json') {
                 return { plan: result.rows?.[0]?.['QUERY PLAN'] };
@@ -73,3 +73,4 @@ export function createExplainBuffersTool(adapter: PostgresAdapter): ToolDefiniti
         }
     };
 }
+

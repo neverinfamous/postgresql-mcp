@@ -17,9 +17,11 @@ import { readOnly, write } from '../../../utils/annotations.js';
 import { getToolIcons } from '../../../utils/icons.js';
 import {
     CitextConvertColumnSchema,
+    CitextConvertColumnSchemaBase,
     CitextListColumnsSchema,
     CitextAnalyzeCandidatesSchema,
-    CitextSchemaAdvisorSchema
+    CitextSchemaAdvisorSchema,
+    CitextSchemaAdvisorSchemaBase
 } from '../schemas/index.js';
 
 /**
@@ -66,14 +68,16 @@ function createCitextConvertColumnTool(adapter: PostgresAdapter): ToolDefinition
     return {
         name: 'pg_citext_convert_column',
         description: `Convert an existing TEXT column to CITEXT for case-insensitive comparisons.
-This is useful for retrofitting case-insensitivity to existing columns like email or username.`,
+This is useful for retrofitting case-insensitivity to existing columns like email or username.
+Note: If views depend on this column, you must drop and recreate them manually before conversion.`,
         group: 'citext',
-        inputSchema: CitextConvertColumnSchema,
+        inputSchema: CitextConvertColumnSchemaBase,
         annotations: write('Convert to Citext'),
         icons: getToolIcons('citext', write('Convert to Citext')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { table, column, schema } = CitextConvertColumnSchema.parse(params);
-            const schemaName = schema ?? 'public';
+            const parsed = CitextConvertColumnSchema.parse(params ?? {});
+            const { table, column, schema: schemaOpt } = parsed;
+            const schemaName = schemaOpt ?? 'public';
             const qualifiedTable = `"${schemaName}"."${table}"`;
 
             const extCheck = await adapter.executeQuery(`
@@ -84,11 +88,7 @@ This is useful for retrofitting case-insensitivity to existing columns like emai
 
             const hasExt = extCheck.rows?.[0]?.['installed'] as boolean ?? false;
             if (!hasExt) {
-                return {
-                    success: false,
-                    error: 'citext extension is not installed',
-                    hint: 'Run pg_citext_create_extension first'
-                };
+                throw new Error('citext extension is not installed. Run pg_citext_create_extension first.');
             }
 
             const colCheck = await adapter.executeQuery(`
@@ -100,10 +100,7 @@ This is useful for retrofitting case-insensitivity to existing columns like emai
             `, [schemaName, table, column]);
 
             if (!colCheck.rows || colCheck.rows.length === 0) {
-                return {
-                    success: false,
-                    error: `Column ${column} not found in ${qualifiedTable}`
-                };
+                throw new Error(`Column "${column}" not found in table ${qualifiedTable}. Verify the table and column names.`);
             }
 
             const currentType = colCheck.rows[0]?.['data_type'] as string;
@@ -115,20 +112,61 @@ This is useful for retrofitting case-insensitivity to existing columns like emai
                 };
             }
 
-            await adapter.executeQuery(`
-                ALTER TABLE ${qualifiedTable}
-                ALTER COLUMN "${column}" TYPE citext
-            `);
+            // Check for dependent views before attempting the conversion
+            const depCheck = await adapter.executeQuery(`
+                SELECT DISTINCT 
+                    c.relname as dependent_view,
+                    n.nspname as view_schema
+                FROM pg_depend d
+                JOIN pg_rewrite r ON d.objid = r.oid
+                JOIN pg_class c ON r.ev_class = c.oid
+                JOIN pg_namespace n ON c.relnamespace = n.oid
+                JOIN pg_class t ON d.refobjid = t.oid
+                JOIN pg_namespace tn ON t.relnamespace = tn.oid
+                JOIN pg_attribute a ON d.refobjid = a.attrelid AND d.refobjsubid = a.attnum
+                WHERE c.relkind = 'v'
+                  AND tn.nspname = $1
+                  AND t.relname = $2
+                  AND a.attname = $3
+            `, [schemaName, table, column]);
 
-            return {
-                success: true,
-                message: `Column ${column} converted from ${currentType} to citext`,
-                table: qualifiedTable,
-                previousType: currentType
-            };
+            const dependentViews = depCheck.rows ?? [];
+
+            if (dependentViews.length > 0) {
+                return {
+                    success: false,
+                    error: 'Column has dependent views that must be dropped before conversion',
+                    dependentViews: dependentViews.map(v => `${v['view_schema'] as string}.${v['dependent_view'] as string}`),
+                    hint: 'Drop the listed views, run this conversion, then recreate the views. PostgreSQL cannot ALTER COLUMN TYPE when views depend on it.'
+                };
+            }
+
+            try {
+                await adapter.executeQuery(`
+                    ALTER TABLE ${qualifiedTable}
+                    ALTER COLUMN "${column}" TYPE citext USING "${column}"::citext
+                `);
+
+                return {
+                    success: true,
+                    message: `Column ${column} converted from ${currentType} to citext`,
+                    table: qualifiedTable,
+                    previousType: currentType,
+                    affectedViews: dependentViews.length > 0 ? dependentViews.map(v => `${v['view_schema'] as string}.${v['dependent_view'] as string}`) : undefined
+                };
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                return {
+                    success: false,
+                    error: `Failed to convert column: ${errorMessage}`,
+                    hint: 'If views depend on this column, they may need to be dropped and recreated',
+                    dependentViews: dependentViews.length > 0 ? dependentViews.map(v => `${v['view_schema'] as string}.${v['dependent_view'] as string}`) : undefined
+                };
+            }
         }
     };
 }
+
 
 /**
  * List all citext columns in the database
@@ -281,7 +319,12 @@ Useful for testing citext behavior before converting columns.`,
         annotations: readOnly('Compare Citext Values'),
         icons: getToolIcons('citext', readOnly('Compare Citext Values')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { value1, value2 } = (params as { value1: string; value2: string });
+            // Use the schema for proper validation
+            const schema = z.object({
+                value1: z.string(),
+                value2: z.string()
+            });
+            const { value1, value2 } = schema.parse(params);
 
             const extCheck = await adapter.executeQuery(`
                 SELECT EXISTS(
@@ -335,15 +378,27 @@ Useful for testing citext behavior before converting columns.`,
 function createCitextSchemaAdvisorTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_citext_schema_advisor',
-        description: `Analyze a table and recommend which columns should use citext.
-Provides schema design recommendations based on column names and existing data patterns.`,
+        description: `Analyze a specific table and recommend which columns should use citext.
+Provides schema design recommendations based on column names and existing data patterns.
+Requires the 'table' parameter to specify which table to analyze.`,
         group: 'citext',
-        inputSchema: CitextSchemaAdvisorSchema,
+        inputSchema: CitextSchemaAdvisorSchemaBase,
         annotations: readOnly('Citext Schema Advisor'),
         icons: getToolIcons('citext', readOnly('Citext Schema Advisor')),
         handler: async (params: unknown, _context: RequestContext) => {
             const { table, schema } = CitextSchemaAdvisorSchema.parse(params);
             const schemaName = schema ?? 'public';
+            const qualifiedTable = `"${schemaName}"."${table}"`;
+
+            // First check if table exists
+            const tableCheck = await adapter.executeQuery(`
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = $1 AND table_name = $2
+            `, [schemaName, table]);
+
+            if (!tableCheck.rows || tableCheck.rows.length === 0) {
+                throw new Error(`Table ${qualifiedTable} not found. Verify the table name and schema.`);
+            }
 
             const colResult = await adapter.executeQuery(`
                 SELECT 

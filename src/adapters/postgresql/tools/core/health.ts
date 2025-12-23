@@ -252,6 +252,23 @@ export function createAnalyzeQueryIndexesTool(adapter: PostgresAdapter): ToolDef
         handler: async (params: unknown, _context: RequestContext) => {
             const { sql, params: queryParams } = AnalyzeQueryIndexesSchema.parse(params);
 
+            // CRITICAL: Block write queries - EXPLAIN ANALYZE executes them!
+            const sqlUpper = sql.trim().toUpperCase();
+            const isWriteQuery = sqlUpper.startsWith('INSERT') ||
+                sqlUpper.startsWith('UPDATE') ||
+                sqlUpper.startsWith('DELETE') ||
+                sqlUpper.startsWith('TRUNCATE') ||
+                sqlUpper.startsWith('DROP') ||
+                sqlUpper.startsWith('ALTER') ||
+                sqlUpper.startsWith('CREATE');
+
+            if (isWriteQuery) {
+                return {
+                    error: 'Write queries not allowed - EXPLAIN ANALYZE executes the query',
+                    hint: 'Use pg_explain for write queries (no ANALYZE option) or wrap in a transaction and rollback'
+                };
+            }
+
             // Get query plan
             const explainSql = `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${sql}`;
             const result = await adapter.executeQuery(explainSql, queryParams);

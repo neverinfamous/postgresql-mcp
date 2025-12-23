@@ -152,6 +152,9 @@ export function parseToolFilter(filterString: string | undefined): ToolFilterCon
         enabledTools.clear();
     }
 
+    // Track if codemode was explicitly excluded
+    let codemodeExplicitlyExcluded = false;
+
     for (const part of parts) {
         if (!part) continue;
 
@@ -166,6 +169,11 @@ export function parseToolFilter(filterString: string | undefined): ToolFilterCon
             isInclude = false;
             isExclude = true;
             target = part.substring(1);
+        }
+
+        // Track explicit codemode exclusion
+        if (target === 'codemode' && isExclude) {
+            codemodeExplicitlyExcluded = true;
         }
 
         // Special case: 'all'
@@ -220,6 +228,15 @@ export function parseToolFilter(filterString: string | undefined): ToolFilterCon
             } else {
                 enabledTools.add(target);
             }
+        }
+    }
+
+    // Auto-include codemode unless explicitly excluded with -codemode
+    // This ensures code mode is always available by default
+    if (!codemodeExplicitlyExcluded) {
+        const codemodeTools = TOOL_GROUPS.codemode;
+        for (const tool of codemodeTools) {
+            enabledTools.add(tool);
         }
     }
 

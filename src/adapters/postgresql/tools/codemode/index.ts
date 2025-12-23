@@ -57,33 +57,33 @@ export function createExecuteCodeTool(adapter: PostgresAdapter): ToolDefinition 
         description: `Execute TypeScript/JavaScript code in a sandboxed environment with access to all PostgreSQL tools via the pg.* API.
 
 Available API groups:
-- pg.core: Basic CRUD, tables, indexes (13 methods)
-- pg.transactions: BEGIN, COMMIT, ROLLBACK, savepoints (7 methods)
-- pg.jsonb: JSONB operations and queries (19 methods)
-- pg.text: Full-text search, fuzzy matching (11 methods)
-- pg.performance: EXPLAIN, stats, optimization (16 methods)
-- pg.admin: VACUUM, ANALYZE, REINDEX (10 methods)
-- pg.monitoring: Sizes, connections, status (11 methods)
-- pg.backup: pg_dump, COPY, restore (9 methods)
-- pg.schema: Schemas, views, functions (10 methods)
-- pg.vector: pgvector operations (14 methods)
-- pg.postgis: PostGIS operations (12 methods)
-- pg.partitioning: Partition management (6 methods)
-- pg.stats: Statistical analysis (8 methods)
-- pg.cron: pg_cron scheduling (8 methods)
-- pg.partman: pg_partman lifecycle (10 methods)
-- pg.kcache: pg_stat_kcache stats (7 methods)
-- pg.citext: Case-insensitive text (6 methods)
-- pg.ltree: Hierarchical data (8 methods)
-- pg.pgcrypto: Cryptographic functions (9 methods)
+- pg.core: readQuery, writeQuery, listTables, describeTable, createTable, createIndex, etc. (18 methods)
+- pg.transactions: begin, commit, rollback, savepoint, execute (7 methods)
+- pg.jsonb: extract, set, insert, delete, contains, pathQuery (19 methods)
+- pg.text: search, fuzzy, headline, rank (11 methods)
+- pg.performance: explain, tableStats, indexStats (16 methods)
+- pg.admin: vacuum, analyze, reindex (10 methods)
+- pg.monitoring: databaseSize, tableSizes, connectionStats (11 methods)
+- pg.backup: dumpTable, dumpSchema, copyExport, copyImport, createBackupPlan, restoreCommand, physical, restoreValidate, scheduleOptimize (9 methods)
+- pg.schema: createSchema, createView, createSequence (13 methods)
+- pg.vector: search, createIndex, embed (14 methods)
+- pg.postgis: distance, buffer, pointInPolygon (15 methods)
+- pg.partitioning: createPartition, listPartitions (6 methods)
+- pg.stats: descriptive, percentiles, correlation (8 methods)
+- pg.cron: schedule, unschedule, listJobs (8 methods)
+- pg.partman: createParent, runMaintenance (10 methods)
+- pg.kcache: queryStats, reset (7 methods)
+- pg.citext: convertColumn, listColumns (6 methods)
+- pg.ltree: query, subpath, lca (8 methods)
+- pg.pgcrypto: hash, encrypt, decrypt (9 methods)
 
 Example:
 \`\`\`javascript
 const tables = await pg.core.listTables();
 const results = [];
-for (const t of tables) {
-    const stats = await pg.performance.tableStats({ table: t.name });
-    results.push({ table: t.name, rows: stats.row_count });
+for (const t of tables.tables) {
+    const count = await pg.core.readQuery({sql: \`SELECT COUNT(*) as n FROM \${t.name}\`});
+    results.push({ table: t.name, rows: count.rows[0].n });
 }
 return results;
 \`\`\``,
@@ -129,6 +129,21 @@ return results;
             const pgApi = createPgApi(adapter);
             const bindings = pgApi.createSandboxBindings();
 
+            // Validate bindings are populated
+            const totalMethods = Object.values(bindings).reduce((sum: number, group) => {
+                if (typeof group === 'object' && group !== null) {
+                    return sum + Object.keys(group).length;
+                }
+                return sum;
+            }, 0);
+            if (totalMethods === 0) {
+                return {
+                    success: false,
+                    error: 'pg.* API not available: no tool bindings were created. Ensure adapter.getToolDefinitions() returns valid tools.',
+                    metrics: { wallTimeMs: 0, cpuTimeMs: 0, memoryUsedMb: 0 }
+                };
+            }
+
             // Execute in sandbox
             const result = await pool.execute(code, bindings);
 
@@ -141,7 +156,14 @@ return results;
             const record = security.createExecutionRecord(code, result, readonly ?? false, clientId);
             security.auditLog(record);
 
-            return result;
+            // Add help hint for discoverability
+            const helpHint = 'Tip: Use pg.help() to list all groups, or pg.core.help() for group-specific methods.';
+
+            // Include hint in response
+            return {
+                ...result,
+                hint: helpHint
+            };
         }
     };
 }

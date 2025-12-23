@@ -70,6 +70,10 @@ export function validateIdentifier(name: string): void {
     }
 
     if (!IDENTIFIER_PATTERN.test(name)) {
+        // Check if user is trying to use schema.table format
+        if (name.includes('.')) {
+            throw new InvalidIdentifierError(name, 'Schema-qualified names (schema.table) are not supported in this parameter. Use the separate "schema" parameter instead.');
+        }
         throw new InvalidIdentifierError(name, 'Identifier contains invalid characters. Must start with a letter or underscore and contain only letters, digits, underscores, or dollar signs');
     }
 }

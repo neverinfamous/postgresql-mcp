@@ -34,9 +34,9 @@ describe('JSONB Tools', () => {
                 table: 'users',
                 column: 'data',
                 path: '$.name'
-            }, mockContext) as { values: unknown[] };
+            }, mockContext) as { results: unknown[] };
 
-            expect(result.values).toEqual(['John']);
+            expect(result.results).toEqual(['John']);
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('#>'),
                 expect.anything()
@@ -68,20 +68,25 @@ describe('JSONB Tools', () => {
                 table: 'users',
                 column: 'data',
                 path: ['name'],
-                value: 'Jane',
+                value: { first: 'Jane' },  // Use object to test JSON stringification
                 where: 'id = 1'
             }, mockContext) as { rowsAffected: number };
 
             expect(result.rowsAffected).toBe(1);
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('jsonb_set'),
-                expect.arrayContaining([['name'], '"Jane"', true])
+                expect.arrayContaining([['name'], '{"first":"Jane"}', true])
             );
         });
     });
 
     describe('pg_jsonb_insert', () => {
         it('should insert value into JSONB', async () => {
+            // First call: NULL column check
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ null_count: 0 }] });
+            // Second call: array type check  
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ type: 'array' }] });
+            // Third call: actual insert
             mockAdapter.executeQuery.mockResolvedValueOnce({ rowsAffected: 1 });
 
             const tool = findTool('pg_jsonb_insert');
@@ -247,17 +252,18 @@ describe('JSONB Tools', () => {
     });
 
     describe('pg_jsonb_object', () => {
-        it('should build JSONB object from pairs', async () => {
+        it('should build JSONB object from key-value pairs', async () => {
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [{ result: { name: 'John', age: 30 } }]
             });
 
             const tool = findTool('pg_jsonb_object');
+            // Pass key-value pairs directly (no 'pairs' wrapper)
             const result = await tool!.handler({
-                pairs: { name: 'John', age: 30 }
-            }, mockContext) as { result: Record<string, unknown> };
+                name: 'John', age: 30
+            }, mockContext) as { object: Record<string, unknown> };
 
-            expect(result.result).toEqual({ name: 'John', age: 30 });
+            expect(result).toEqual({ object: { name: 'John', age: 30 } });
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('jsonb_build_object'),
                 expect.anything()
@@ -274,9 +280,9 @@ describe('JSONB Tools', () => {
             const tool = findTool('pg_jsonb_array');
             const result = await tool!.handler({
                 values: [1, 2, 3]
-            }, mockContext) as { result: number[] };
+            }, mockContext) as { array: number[] };
 
-            expect(result.result).toEqual([1, 2, 3]);
+            expect(result.array).toEqual([1, 2, 3]);
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('jsonb_build_array'),
                 expect.anything()
@@ -404,7 +410,20 @@ describe('JSONB Tools', () => {
     });
 
     describe('pg_jsonb_merge', () => {
-        it('should merge two JSONB documents', async () => {
+        it('should merge two JSONB documents with deep merge', async () => {
+            // Deep merge now happens entirely in TypeScript, no PostgreSQL call needed
+            const tool = findTool('pg_jsonb_merge');
+            const result = await tool!.handler({
+                base: { a: 1, b: 2 },
+                overlay: { c: 3 }
+            }, mockContext) as { merged: Record<string, number>; deep: boolean };
+
+            expect(result.merged).toEqual({ a: 1, b: 2, c: 3 });
+            expect(result.deep).toBe(true);
+            // Deep merge no longer calls PostgreSQL
+        });
+
+        it('should shallow merge with deep=false', async () => {
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [{ result: { a: 1, b: 2, c: 3 } }]
             });
@@ -412,10 +431,12 @@ describe('JSONB Tools', () => {
             const tool = findTool('pg_jsonb_merge');
             const result = await tool!.handler({
                 base: { a: 1, b: 2 },
-                overlay: { c: 3 }
-            }, mockContext) as { merged: Record<string, number> };
+                overlay: { c: 3 },
+                deep: false
+            }, mockContext) as { merged: Record<string, number>; deep: boolean };
 
             expect(result.merged).toEqual({ a: 1, b: 2, c: 3 });
+            expect(result.deep).toBe(false);
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('||'),
                 expect.anything()
@@ -425,6 +446,9 @@ describe('JSONB Tools', () => {
 
     describe('pg_jsonb_normalize', () => {
         it('should normalize JSONB to key-value pairs', async () => {
+            // First call: idColumn detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] }); // No 'id' column
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [
                     { key: 'name', value: 'John' },
@@ -508,28 +532,33 @@ describe('JSONB Tools', () => {
     describe('pg_jsonb_security_scan', () => {
         it('should detect sensitive keys', async () => {
             mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ count: 50 }] })  // Count query
                 .mockResolvedValueOnce({
                     rows: [{ key: 'password', count: 5 }]
                 })
-                .mockResolvedValueOnce({ rows: [] });
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [] });  // XSS scan
 
             const tool = findTool('pg_jsonb_security_scan');
             const result = await tool!.handler({
                 table: 'users',
                 column: 'data'
-            }, mockContext) as { issues: Array<{ type: string }>; riskLevel: string };
+            }, mockContext) as { issues: Array<{ type: string }>; riskLevel: string; scannedRows: number };
 
             expect(result.issues).toHaveLength(1);
             expect(result.issues[0].type).toBe('sensitive_key');
             expect(result.riskLevel).toBe('medium');
+            expect(result.scannedRows).toBe(50);
         });
 
         it('should detect SQL injection patterns', async () => {
             mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ count: 100 }] })  // Count query
                 .mockResolvedValueOnce({ rows: [] })
                 .mockResolvedValueOnce({
                     rows: [{ key: 'comment', count: 2 }]
-                });
+                })
+                .mockResolvedValueOnce({ rows: [] });  // XSS scan
 
             const tool = findTool('pg_jsonb_security_scan');
             const result = await tool!.handler({
@@ -542,8 +571,10 @@ describe('JSONB Tools', () => {
 
         it('should report low risk when no issues', async () => {
             mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ count: 100 }] })  // Count query
                 .mockResolvedValueOnce({ rows: [] })
-                .mockResolvedValueOnce({ rows: [] });
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [] });  // XSS scan
 
             const tool = findTool('pg_jsonb_security_scan');
             const result = await tool!.handler({

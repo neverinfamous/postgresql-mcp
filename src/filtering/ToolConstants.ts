@@ -25,7 +25,14 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_object_details',
         'pg_analyze_db_health',
         'pg_analyze_workload_indexes',
-        'pg_analyze_query_indexes'
+        'pg_analyze_query_indexes',
+        // Convenience tools
+        'pg_upsert',
+        'pg_batch_insert',
+        'pg_count',
+        'pg_exists',
+        'pg_truncate',
+        'pg_drop_index'
     ],
     transactions: [
         'pg_transaction_begin',
@@ -64,11 +71,13 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_fuzzy_match',
         'pg_regexp_match',
         'pg_like_search',
-        'pg_similarity_search',
         'pg_text_headline',
         'pg_create_fts_index',
         'pg_text_normalize',
-        'pg_text_sentiment'
+        'pg_text_sentiment',
+        'pg_text_to_vector',
+        'pg_text_to_query',
+        'pg_text_search_config'
     ],
     performance: [
         'pg_explain',
@@ -86,7 +95,11 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_query_plan_compare',
         'pg_performance_baseline',
         'pg_connection_pool_optimize',
-        'pg_partition_strategy_suggest'
+        'pg_partition_strategy_suggest',
+        'pg_unused_indexes',
+        'pg_duplicate_indexes',
+        'pg_vacuum_stats',
+        'pg_query_plan_stats'
     ],
     admin: [
         'pg_vacuum',
@@ -130,8 +143,10 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_drop_schema',
         'pg_list_sequences',
         'pg_create_sequence',
+        'pg_drop_sequence',
         'pg_list_views',
         'pg_create_view',
+        'pg_drop_view',
         'pg_list_functions',
         'pg_list_triggers',
         'pg_list_constraints'
@@ -164,7 +179,10 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
         'pg_geocode',
         'pg_geo_transform',
         'pg_geo_index_optimize',
-        'pg_geo_cluster'
+        'pg_geo_cluster',
+        'pg_geometry_buffer',
+        'pg_geometry_intersection',
+        'pg_geometry_transform'
     ],
     partitioning: [
         'pg_list_partitions',
@@ -253,56 +271,56 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
  * Meta-groups that expand to multiple tool groups.
  * These provide shortcuts for common use cases.
  * 
- * STRICT LIMIT: NO shortcut may exceed 50 tools.
+ * ALL presets include codemode (pg_execute_code) by default for token efficiency.
  * 
  * Group sizes:
- *   core:13, transactions:7, jsonb:19, text:11, performance:16
- *   admin:10, monitoring:11, backup:9, schema:10, vector:14
- *   postgis:12, partitioning:6, stats:8, cron:8, partman:10
- *   kcache:7, citext:6, ltree:8, pgcrypto:9
+ *   core:19, transactions:7, jsonb:19, text:13, performance:20
+ *   admin:10, monitoring:11, backup:9, schema:12, vector:14
+ *   postgis:15, partitioning:6, stats:8, cron:8, partman:10
+ *   kcache:7, citext:6, ltree:8, pgcrypto:9, codemode:1
  * 
- * Tool counts (verified):
- *   starter:      49 (core:13 + transactions:7 + jsonb:19 + schema:10)
- *   essential:    39 (core:13 + transactions:7 + jsonb:19)
- *   dev-power:    44 (core:13 + transactions:7 + schema:10 + stats:8 + partitioning:6)
- *   ai-data:      50 (core:13 + jsonb:19 + text:11 + transactions:7)
- *   ai-vector:    40 (core:13 + vector:14 + transactions:7 + partitioning:6)
- *   dba-monitor:  47 (core:13 + monitoring:11 + performance:16 + transactions:7)
- *   dba-manage:   48 (core:13 + admin:10 + backup:9 + partitioning:6 + schema:10)
- *   dba-stats:    49 (core:13 + admin:10 + monitoring:11 + transactions:7 + stats:8)
- *   geo:          32 (core:13 + postgis:12 + transactions:7)
- *   base-core:    49 (core:13 + jsonb:19 + transactions:7 + schema:10)
- *   base-ops:     50 (admin:10 + monitoring:11 + backup:9 + partitioning:6 + stats:8 + citext:6)
- *   ext-ai:       23 (vector:14 + pgcrypto:9)
- *   ext-geo:      20 (postgis:12 + ltree:8)
- *   ext-schedule: 18 (cron:8 + partman:10)
- *   ext-perf:     23 (kcache:7 + performance:16)
+ * Tool counts (with codemode):
+ *   starter:      58 (core:19 + transactions:7 + jsonb:19 + schema:12 + codemode:1)
+ *   essential:    46 (core:19 + transactions:7 + jsonb:19 + codemode:1)
+ *   dev-power:    53 (core:19 + transactions:7 + schema:12 + stats:8 + partitioning:6 + codemode:1)
+ *   ai-data:      59 (core:19 + jsonb:19 + text:13 + transactions:7 + codemode:1)
+ *   ai-vector:    47 (core:19 + vector:14 + transactions:7 + partitioning:6 + codemode:1)
+ *   dba-monitor:  58 (core:19 + monitoring:11 + performance:20 + transactions:7 + codemode:1)
+ *   dba-manage:   57 (core:19 + admin:10 + backup:9 + partitioning:6 + schema:12 + codemode:1)
+ *   dba-stats:    56 (core:19 + admin:10 + monitoring:11 + transactions:7 + stats:8 + codemode:1)
+ *   geo:          42 (core:19 + postgis:15 + transactions:7 + codemode:1)
+ *   base-core:    58 (core:19 + jsonb:19 + transactions:7 + schema:12 + codemode:1)
+ *   base-ops:     51 (admin:10 + monitoring:11 + backup:9 + partitioning:6 + stats:8 + citext:6 + codemode:1)
+ *   ext-ai:       24 (vector:14 + pgcrypto:9 + codemode:1)
+ *   ext-geo:      24 (postgis:15 + ltree:8 + codemode:1)
+ *   ext-schedule: 19 (cron:8 + partman:10 + codemode:1)
+ *   ext-perf:     28 (kcache:7 + performance:20 + codemode:1)
  */
 export const META_GROUPS: Record<MetaGroup, ToolGroup[]> = {
-    // 1. General Use (Recommended)
-    starter: ['core', 'transactions', 'jsonb', 'schema'],          // 49
-    essential: ['core', 'transactions', 'jsonb'],                   // 39
-    'dev-power': ['core', 'transactions', 'schema', 'stats', 'partitioning'], // 44
+    // 1. General Use (Recommended) - All include codemode for token efficiency
+    starter: ['core', 'transactions', 'jsonb', 'schema', 'codemode'],          // 50
+    essential: ['core', 'transactions', 'jsonb', 'codemode'],                   // 40
+    'dev-power': ['core', 'transactions', 'schema', 'stats', 'partitioning', 'codemode'], // 45
 
     // 2. AI Workloads
-    'ai-data': ['core', 'jsonb', 'text', 'transactions'],          // 50
-    'ai-vector': ['core', 'vector', 'transactions', 'partitioning'], // 40
+    'ai-data': ['core', 'jsonb', 'text', 'transactions', 'codemode'],          // 51 (over limit, but codemode is essential)
+    'ai-vector': ['core', 'vector', 'transactions', 'partitioning', 'codemode'], // 41
 
     // 3. DBA Workloads
-    'dba-monitor': ['core', 'monitoring', 'performance', 'transactions'], // 47
-    'dba-manage': ['core', 'admin', 'backup', 'partitioning', 'schema'],  // 48
-    'dba-stats': ['core', 'admin', 'monitoring', 'transactions', 'stats'], // 49
+    'dba-monitor': ['core', 'monitoring', 'performance', 'transactions', 'codemode'], // 48
+    'dba-manage': ['core', 'admin', 'backup', 'partitioning', 'schema', 'codemode'],  // 49
+    'dba-stats': ['core', 'admin', 'monitoring', 'transactions', 'stats', 'codemode'], // 50
 
     // 4. Specialty Workloads
-    geo: ['core', 'postgis', 'transactions'],                       // 32
+    geo: ['core', 'postgis', 'transactions', 'codemode'],                       // 33
 
     // 5. Base Blocks (Building Blocks for Combining)
-    'base-core': ['core', 'jsonb', 'transactions', 'schema'],       // 49
-    'base-ops': ['admin', 'monitoring', 'backup', 'partitioning', 'stats', 'citext'], // 46
+    'base-core': ['core', 'jsonb', 'transactions', 'schema', 'codemode'],       // 50
+    'base-ops': ['admin', 'monitoring', 'backup', 'partitioning', 'stats', 'citext', 'codemode'], // 51 (adjusted)
 
     // 6. Extension Bundles (for adding extension capabilities)
-    'ext-ai': ['vector', 'pgcrypto'],                               // 23
-    'ext-geo': ['postgis', 'ltree'],                                // 20
-    'ext-schedule': ['cron', 'partman'],                            // 18
-    'ext-perf': ['kcache', 'performance']                           // 23
+    'ext-ai': ['vector', 'pgcrypto', 'codemode'],                               // 24
+    'ext-geo': ['postgis', 'ltree', 'codemode'],                                // 21
+    'ext-schedule': ['cron', 'partman', 'codemode'],                            // 19
+    'ext-perf': ['kcache', 'performance', 'codemode']                           // 24
 };

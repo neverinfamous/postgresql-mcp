@@ -8,7 +8,7 @@
 import type { PostgresAdapter } from '../PostgresAdapter.js';
 import type { ToolDefinition, RequestContext } from '../../../types/index.js';
 import { z } from 'zod';
-import { readOnly, write } from '../../../utils/annotations.js';
+import { readOnly } from '../../../utils/annotations.js';
 import { getToolIcons } from '../../../utils/icons.js';
 import { DatabaseSizeSchema, TableSizesSchema, ShowSettingsSchema } from '../schemas/index.js';
 
@@ -165,22 +165,41 @@ function createServerVersionTool(adapter: PostgresAdapter): ToolDefinition {
 function createShowSettingsTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_show_settings',
-        description: 'Show current PostgreSQL configuration settings.',
+        description: 'Show current PostgreSQL configuration settings. Filter by name pattern or exact setting name. Accepts: pattern, setting, or name parameter.',
         group: 'monitoring',
         inputSchema: ShowSettingsSchema,
         annotations: readOnly('Show Settings'),
         icons: getToolIcons('monitoring', readOnly('Show Settings')),
         handler: async (params: unknown, _context: RequestContext) => {
             const { pattern } = ShowSettingsSchema.parse(params);
-            const whereClause = pattern ? `WHERE name LIKE $1` : '';
+
+            // Auto-detect if user passed exact name vs LIKE pattern
+            // If no wildcards, try exact match first, fall back to LIKE with wildcards
+            let whereClause = '';
+            let queryParams: string[] = [];
+
+            if (pattern !== undefined) {
+                if (pattern.includes('%') || pattern.includes('_')) {
+                    // User specified LIKE pattern explicitly
+                    whereClause = 'WHERE name LIKE $1';
+                    queryParams = [pattern];
+                } else {
+                    // Exact name - try exact match first, or pattern match with auto-wildcards
+                    whereClause = 'WHERE name = $1 OR name LIKE $2';
+                    queryParams = [pattern, `%${pattern}%`];
+                }
+            }
 
             const sql = `SELECT name, setting, unit, category, short_desc
                         FROM pg_settings
                         ${whereClause}
                         ORDER BY category, name`;
 
-            const result = await adapter.executeQuery(sql, pattern ? [pattern] : []);
-            return { settings: result.rows };
+            const result = await adapter.executeQuery(sql, queryParams);
+            return {
+                settings: result.rows,
+                count: result.rows?.length ?? 0
+            };
         }
     };
 }
@@ -226,20 +245,29 @@ function createRecoveryStatusTool(adapter: PostgresAdapter): ToolDefinition {
  * Capacity planning analysis
  */
 function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
+    // Schema with alias support
+    const CapacityPlanningSchema = z.object({
+        projectionDays: z.number().optional().describe('Days to project growth (default: 90)'),
+        days: z.number().optional().describe('Alias for projectionDays')
+    }).transform((data) => ({
+        projectionDays: data.projectionDays ?? data.days ?? 90
+    }));
+
     return {
         name: 'pg_capacity_planning',
-        description: 'Analyze database growth trends and provide capacity planning forecasts.',
+        description: 'Analyze database growth trends and provide capacity planning forecasts. Note: Growth estimates are based on pg_stat_user_tables counters since last stats reset; accuracy depends on how long stats have been accumulating.',
         group: 'monitoring',
         inputSchema: z.object({
-            projectionDays: z.number().optional().describe('Days to project growth (default: 90)')
+            projectionDays: z.number().optional().describe('Days to project growth (default: 90)'),
+            days: z.number().optional().describe('Alias for projectionDays')
         }),
         annotations: readOnly('Capacity Planning'),
         icons: getToolIcons('monitoring', readOnly('Capacity Planning')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { projectionDays?: number });
-            const projectionDays = parsed.projectionDays ?? 90;
+            const parsed = CapacityPlanningSchema.parse(params ?? {});
+            const projectionDays = parsed.projectionDays;
 
-            const [dbSize, tableStats, connStats] = await Promise.all([
+            const [dbSize, tableStats, connStats, statsAge] = await Promise.all([
                 adapter.executeQuery(`
                     SELECT 
                         pg_database_size(current_database()) as current_size_bytes,
@@ -259,12 +287,27 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
                         count(*) as current_connections
                     FROM pg_stat_activity
                     WHERE backend_type = 'client backend'
+                `),
+                // Get time since stats reset for accurate daily rate calculation
+                // Use pg_stat_database.stats_reset (works in all PG versions including 17+)
+                // Fall back to server start time if stats_reset is NULL
+                adapter.executeQuery(`
+                    SELECT 
+                        COALESCE(
+                            (SELECT stats_reset FROM pg_stat_database WHERE datname = current_database()),
+                            pg_postmaster_start_time()
+                        ) as stats_since,
+                        EXTRACT(EPOCH FROM (now() - COALESCE(
+                            (SELECT stats_reset FROM pg_stat_database WHERE datname = current_database()),
+                            pg_postmaster_start_time()
+                        ))) / 86400.0 as days_of_data
                 `)
             ]);
 
             const currentBytes = Number(dbSize.rows?.[0]?.['current_size_bytes'] ?? 0);
             const tableData = tableStats.rows?.[0];
             const connData = connStats.rows?.[0];
+            const ageData = statsAge.rows?.[0];
 
             const totalInserts = Number(tableData?.['total_inserts'] ?? 0);
             const totalDeletes = Number(tableData?.['total_deletes'] ?? 0);
@@ -273,9 +316,21 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
             const totalRows = Number(tableData?.['total_rows'] ?? 1);
             const avgRowSize = currentBytes / Math.max(totalRows, 1);
 
-            const dailyGrowthEstimate = (netRowGrowth * avgRowSize) / 30;
-            const projectedGrowthBytes = dailyGrowthEstimate * projectionDays;
+            // Use actual days of data for accurate daily growth rate
+            const daysOfData = Number(ageData?.['days_of_data'] ?? 1);
+            const dailyRowGrowth = daysOfData > 0.01 ? netRowGrowth / daysOfData : 0;
+            const dailyGrowthBytes = dailyRowGrowth * avgRowSize;
+            const projectedGrowthBytes = dailyGrowthBytes * projectionDays;
             const projectedTotalBytes = currentBytes + projectedGrowthBytes;
+
+            // Determine estimation quality based on data availability
+            const estimationQuality = daysOfData < 1
+                ? 'Low confidence - less than 1 day of data'
+                : daysOfData < 7
+                    ? 'Moderate confidence - less than 1 week of data'
+                    : daysOfData < 30
+                        ? 'Good confidence - more than 1 week of data'
+                        : 'High confidence - more than 30 days of data';
 
             return {
                 current: {
@@ -288,17 +343,22 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
                     totalInserts: tableData?.['total_inserts'],
                     totalDeletes: tableData?.['total_deletes'],
                     netRowGrowth,
-                    estimatedDailyGrowthBytes: Math.round(dailyGrowthEstimate)
+                    daysOfData: daysOfData.toFixed(1),
+                    statsSince: ageData?.['stats_since'],
+                    estimatedDailyRowGrowth: Math.round(dailyRowGrowth),
+                    estimatedDailyGrowthBytes: Math.round(dailyGrowthBytes),
+                    estimationQuality
                 },
                 projection: {
                     days: projectionDays,
                     projectedSizeBytes: Math.round(projectedTotalBytes),
                     projectedSizePretty: `${(projectedTotalBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`,
-                    growthPercentage: ((projectedGrowthBytes / currentBytes) * 100).toFixed(1)
+                    growthPercentage: currentBytes > 0 ? ((projectedGrowthBytes / currentBytes) * 100).toFixed(1) : '0.0'
                 },
                 recommendations: [
                     projectedTotalBytes > 100 * 1024 * 1024 * 1024 ? 'Consider archiving old data or implementing table partitioning' : null,
-                    (Number(connData?.['current_connections'] ?? 0)) > (Number(connData?.['max_connections'] ?? 100)) * 0.7 ? 'Connection usage is high, consider increasing max_connections' : null
+                    (Number(connData?.['current_connections'] ?? 0)) > (Number(connData?.['max_connections'] ?? 100)) * 0.7 ? 'Connection usage is high, consider increasing max_connections' : null,
+                    daysOfData < 7 ? 'Wait for more data accumulation for more accurate projections' : null
                 ].filter(Boolean)
             };
         }
@@ -317,19 +377,42 @@ function createResourceUsageAnalyzeTool(adapter: PostgresAdapter): ToolDefinitio
         annotations: readOnly('Resource Usage Analysis'),
         icons: getToolIcons('monitoring', readOnly('Resource Usage Analysis')),
         handler: async (_params: unknown, _context: RequestContext) => {
+            // Detect PostgreSQL version for checkpoint stats compatibility
+            const versionResult = await adapter.executeQuery(`SELECT current_setting('server_version_num')::int as version_num`);
+            const versionNum = Number(versionResult.rows?.[0]?.['version_num'] ?? 0);
+            const isPg17Plus = versionNum >= 170000;
+
             const [bgWriter, checkpoints, connections, buffers, activity] = await Promise.all([
-                adapter.executeQuery(`
-                    SELECT 
-                        buffers_checkpoint, buffers_clean, buffers_backend,
-                        maxwritten_clean, buffers_alloc
-                    FROM pg_stat_bgwriter
-                `),
-                adapter.executeQuery(`
-                    SELECT 
-                        checkpoints_timed, checkpoints_req,
-                        checkpoint_write_time, checkpoint_sync_time
-                    FROM pg_stat_bgwriter
-                `),
+                // PG17+ moved buffers_checkpoint to pg_stat_checkpointer as buffers_written
+                isPg17Plus
+                    ? adapter.executeQuery(`
+                        SELECT 
+                            buffers_clean, maxwritten_clean, buffers_alloc
+                        FROM pg_stat_bgwriter
+                    `)
+                    : adapter.executeQuery(`
+                        SELECT 
+                            buffers_checkpoint, buffers_clean, buffers_backend,
+                            maxwritten_clean, buffers_alloc
+                        FROM pg_stat_bgwriter
+                    `),
+                // PG17+ moved checkpoint stats to pg_stat_checkpointer with renamed columns
+                isPg17Plus
+                    ? adapter.executeQuery(`
+                        SELECT 
+                            num_timed as checkpoints_timed, 
+                            num_requested as checkpoints_req,
+                            write_time as checkpoint_write_time, 
+                            sync_time as checkpoint_sync_time,
+                            buffers_written as buffers_checkpoint
+                        FROM pg_stat_checkpointer
+                    `)
+                    : adapter.executeQuery(`
+                        SELECT 
+                            checkpoints_timed, checkpoints_req,
+                            checkpoint_write_time, checkpoint_sync_time
+                        FROM pg_stat_bgwriter
+                    `),
                 adapter.executeQuery(`
                     SELECT 
                         state, wait_event_type, wait_event,
@@ -363,21 +446,36 @@ function createResourceUsageAnalyzeTool(adapter: PostgresAdapter): ToolDefinitio
             const indexHits = Number(bufferData?.['index_hits'] ?? 0);
             const indexReads = Number(bufferData?.['index_reads'] ?? 0);
 
+            // Calculate hit rates
+            const heapHitRate = heapHits + heapReads > 0
+                ? (heapHits / (heapHits + heapReads)) * 100
+                : null;
+            const indexHitRate = indexHits + indexReads > 0
+                ? (indexHits / (indexHits + indexReads)) * 100
+                : null;
+
+            // Interpret buffer hit rates
+            const getHitRateAnalysis = (rate: number | null, type: string): string => {
+                if (rate === null) return `No ${type} activity recorded yet - run some queries first`;
+                if (rate >= 99) return `Excellent (${rate.toFixed(2)}%) - nearly all ${type} data served from cache`;
+                if (rate >= 95) return `Good (${rate.toFixed(2)}%) - most ${type} reads from cache`;
+                if (rate >= 80) return `Fair (${rate.toFixed(2)}%) - consider increasing shared_buffers`;
+                return `Poor (${rate.toFixed(2)}%) - significant disk I/O; increase shared_buffers or optimize queries`;
+            };
+
             return {
                 backgroundWriter: bgWriter.rows?.[0],
                 checkpoints: checkpoints.rows?.[0],
                 connectionDistribution: connections.rows,
                 bufferUsage: {
                     ...bufferData,
-                    heapHitRate: heapHits + heapReads > 0
-                        ? ((heapHits / (heapHits + heapReads)) * 100).toFixed(2) + '%'
-                        : 'N/A',
-                    indexHitRate: indexHits + indexReads > 0
-                        ? ((indexHits / (indexHits + indexReads)) * 100).toFixed(2) + '%'
-                        : 'N/A'
+                    heapHitRate: heapHitRate !== null ? heapHitRate.toFixed(2) + '%' : 'N/A',
+                    indexHitRate: indexHitRate !== null ? indexHitRate.toFixed(2) + '%' : 'N/A'
                 },
                 activity: activity.rows?.[0],
                 analysis: {
+                    heapCachePerformance: getHitRateAnalysis(heapHitRate, 'heap'),
+                    indexCachePerformance: getHitRateAnalysis(indexHitRate, 'index'),
                     checkpointPressure: Number(checkpoints.rows?.[0]?.['checkpoints_req'] ?? 0) > Number(checkpoints.rows?.[0]?.['checkpoints_timed'] ?? 0)
                         ? 'HIGH - More forced checkpoints than scheduled'
                         : 'Normal',
@@ -394,12 +492,12 @@ function createResourceUsageAnalyzeTool(adapter: PostgresAdapter): ToolDefinitio
 }
 
 /**
- * Alert threshold configuration
+ * Alert threshold recommendations (informational)
  */
 function createAlertThresholdSetTool(_adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_alert_threshold_set',
-        description: 'Get recommended alert thresholds for monitoring key database metrics.',
+        description: 'Get recommended alert thresholds for monitoring key database metrics. Note: This is informational only - returns suggested warning/critical thresholds for external monitoring tools. Does not configure alerts in PostgreSQL itself.',
         group: 'monitoring',
         inputSchema: z.object({
             metric: z.enum([
@@ -411,11 +509,11 @@ function createAlertThresholdSetTool(_adapter: PostgresAdapter): ToolDefinition 
                 'lock_wait_time'
             ]).optional().describe('Specific metric to get thresholds for, or all if not specified')
         }),
-        annotations: write('Set Alert Threshold'),
-        icons: getToolIcons('monitoring', write('Set Alert Threshold')),
+        annotations: readOnly('Get Alert Thresholds'),
+        icons: getToolIcons('monitoring', readOnly('Get Alert Thresholds')),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { metric?: string });
+            const parsed = ((params ?? {}) as { metric?: string });
 
             const thresholds: Record<string, { warning: string; critical: string; description: string }> = {
                 connection_usage: {

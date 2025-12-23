@@ -23,8 +23,8 @@ describe('getPostgisTools', () => {
         tools = getPostgisTools(adapter);
     });
 
-    it('should return 12 PostGIS tools', () => {
-        expect(tools).toHaveLength(12);
+    it('should return 15 PostGIS tools', () => {
+        expect(tools).toHaveLength(15);
     });
 
     it('should have all expected tool names', () => {
@@ -43,6 +43,10 @@ describe('getPostgisTools', () => {
         expect(toolNames).toContain('pg_geo_transform');
         expect(toolNames).toContain('pg_geo_index_optimize');
         expect(toolNames).toContain('pg_geo_cluster');
+        // Standalone geometry tools
+        expect(toolNames).toContain('pg_geometry_buffer');
+        expect(toolNames).toContain('pg_geometry_intersection');
+        expect(toolNames).toContain('pg_geometry_transform');
     });
 
     it('should have handler function for all tools', () => {
@@ -90,6 +94,21 @@ describe('Tool Annotations', () => {
         const tool = tools.find(t => t.name === 'pg_spatial_index')!;
         expect(tool.annotations?.readOnlyHint).toBe(false);
     });
+
+    it('pg_geometry_buffer should be read-only', () => {
+        const tool = tools.find(t => t.name === 'pg_geometry_buffer')!;
+        expect(tool.annotations?.readOnlyHint).toBe(true);
+    });
+
+    it('pg_geometry_intersection should be read-only', () => {
+        const tool = tools.find(t => t.name === 'pg_geometry_intersection')!;
+        expect(tool.annotations?.readOnlyHint).toBe(true);
+    });
+
+    it('pg_geometry_transform should be read-only', () => {
+        const tool = tools.find(t => t.name === 'pg_geometry_transform')!;
+        expect(tool.annotations?.readOnlyHint).toBe(true);
+    });
 });
 
 describe('Handler Execution', () => {
@@ -127,6 +146,73 @@ describe('Handler Execution', () => {
                 table: 'locations',
                 column: 'geom',
                 numClusters: 5
+            }, mockContext) as Record<string, unknown>;
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalled();
+            expect(result).toBeDefined();
+        });
+    });
+
+    describe('pg_geometry_buffer', () => {
+        it('should create buffer from WKT geometry', async () => {
+            mockAdapter.executeQuery.mockResolvedValue({
+                rows: [{ buffer_geojson: '{"type":"Polygon"}', buffer_wkt: 'POLYGON(...)' }]
+            });
+
+            const tool = tools.find(t => t.name === 'pg_geometry_buffer')!;
+            const result = await tool.handler({
+                geometry: 'POINT(-74.006 40.7128)',
+                distance: 1000
+            }, mockContext) as Record<string, unknown>;
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalled();
+            expect(result).toBeDefined();
+        });
+
+        it('should detect GeoJSON input format', async () => {
+            mockAdapter.executeQuery.mockResolvedValue({
+                rows: [{ buffer_geojson: '{}', buffer_wkt: '', inputFormat: 'GeoJSON' }]
+            });
+
+            const tool = tools.find(t => t.name === 'pg_geometry_buffer')!;
+            const result = await tool.handler({
+                geometry: '{"type":"Point","coordinates":[-74.006,40.7128]}',
+                distance: 500,
+                srid: 4326
+            }, mockContext) as Record<string, unknown>;
+
+            expect(result['inputFormat']).toBe('GeoJSON');
+        });
+    });
+
+    describe('pg_geometry_intersection', () => {
+        it('should compute intersection of two geometries', async () => {
+            mockAdapter.executeQuery.mockResolvedValue({
+                rows: [{ intersects: true, intersection_geojson: '{}' }]
+            });
+
+            const tool = tools.find(t => t.name === 'pg_geometry_intersection')!;
+            const result = await tool.handler({
+                geometry1: 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))',
+                geometry2: 'POLYGON((0.5 0.5, 2 0.5, 2 2, 0.5 2, 0.5 0.5))'
+            }, mockContext) as Record<string, unknown>;
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalled();
+            expect(result).toBeDefined();
+        });
+    });
+
+    describe('pg_geometry_transform', () => {
+        it('should transform geometry between SRIDs', async () => {
+            mockAdapter.executeQuery.mockResolvedValue({
+                rows: [{ transformed_geojson: '{}', from_srid: 4326, to_srid: 3857 }]
+            });
+
+            const tool = tools.find(t => t.name === 'pg_geometry_transform')!;
+            const result = await tool.handler({
+                geometry: 'POINT(-74.006 40.7128)',
+                fromSrid: 4326,
+                toSrid: 3857
             }, mockContext) as Record<string, unknown>;
 
             expect(mockAdapter.executeQuery).toHaveBeenCalled();

@@ -2,20 +2,20 @@
 
 <!-- mcp-name: io.github.neverinfamous/postgres-mcp -->
 
-*Last updated December 19, 2025 - Initial Implementation Complete*
+*Last updated December 21, 2025 - Code Mode Default in All Presets*
 
-*Enterprise-grade PostgreSQL MCP Server with OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and advanced PostgreSQL features - TypeScript Edition*
+*Enterprise-grade PostgreSQL MCP Server with OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, HypoPG, and advanced PostgreSQL features*
 
-> **✅ Under Development** - 195 tools, 21 resources, and 19 prompts.
+> **✅ Under Development** - 202 tools, 21 resources, and 19 prompts.
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
-[![Tests](https://img.shields.io/badge/Tests-1554_passed-success.svg)](https://github.com/neverinfamous/postgres-mcp)
+[![Tests](https://img.shields.io/badge/Tests-1561_passed-success.svg)](https://github.com/neverinfamous/postgres-mcp)
 [![Coverage](https://img.shields.io/badge/Coverage-97.55%25-brightgreen.svg)](https://github.com/neverinfamous/postgres-mcp)
 
-A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **195 specialized tools**, **21 resources**, and **19 AI-powered prompts**.
+A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **202 specialized tools**, **21 resources**, and **19 AI-powered prompts**.
 
 ---
 
@@ -39,19 +39,23 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
 
 ---
 
-## 📓 Jupyter Notebook
-
-A hands-on [quickstart notebook](examples/notebooks/quickstart.ipynb) demonstrates all major features using the Python MCP SDK:
-
-- CRUD operations, transactions, and error handling
-- Resources for observability (`postgres://health`, `postgres://extensions`)
-- JSONB, full-text search, pgvector, and PostGIS
-- Code Mode for multi-step operations
+## Development
 
 ```bash
-cd examples/notebooks
-pip install mcp python-dotenv
-python -m jupyterlab
+# Clone and install
+git clone https://github.com/neverinfamous/postgres-mcp.git
+cd postgres-mcp
+npm install
+
+# Build
+npm run build
+
+# Run checks
+npm run lint && npm run typecheck
+
+# Test CLI
+node dist/cli.js info
+node dist/cli.js list-tools
 ```
 
 ---
@@ -76,7 +80,7 @@ python -m jupyterlab
 ```
 
 > [!TIP]
-> The `starter` shortcut provides 49 essential tools that work well with all AI IDEs. See [Tool Filtering](#-tool-filtering) to add more tools as needed.
+> The `starter` shortcut provides 58 tools including **Code Mode** for token-efficient operations. All presets include Code Mode by default. See [Tool Filtering](#-tool-filtering) to customize.
 
 ### Using Environment Variables (Recommended)
 
@@ -101,7 +105,6 @@ python -m jupyterlab
 }
 ```
 
-
 ---
 
 ## 🔗 Database Connection Scenarios
@@ -122,62 +125,28 @@ python -m jupyterlab
 
 ---
 
-## 🧪 Code Mode
+## Code Mode: Maximum Efficiency
 
-Code Mode lets you write JavaScript that orchestrates multiple database operations in a single call. Instead of calling tools one-by-one, write code that loops, aggregates, and transforms data.
+Code Mode (`pg_execute_code`) dramatically reduces token usage (70–90%) and is included by default in all presets.
 
-### **Token Savings Estimate**
+#### Disabling Code Mode (Non-Admin Users)
 
-**Code Mode vs. Standard Method**
-
-| Scenario                        | Standard (individual calls)                     | Code Mode                             | Savings |
-| ------------------------------- | ----------------------------------------------- | ------------------------------------- | ------- |
-| Get row counts for 10 tables    | ~10 tool calls × ~200 tokens = **2,000 tokens** | 1 call × ~300 tokens = **300 tokens** | **85%** |
-| Find unused indexes + get sizes | ~20 calls = **4,000 tokens**                    | 1 call = **400 tokens**               | **90%** |
-| Database health report          | ~15 calls = **3,000 tokens**                    | 1 call = **350 tokens**               | **88%** |
-
-### **Estimated Average**
-
-* **70–90% token reduction** for multi-step operations
-
-### **Key Savings**
-
-* Eliminates per-call overhead (tool name, description parsing)
-* Reduces context window pollution from intermediate results
-* Fewer round-trips means less “here’s what I’m going to do” explanations
-
-### Quick Start
-
-**No configuration changes required.** Add `codemode` to your tool filter to access `pg_execute_code`:
+If you don't have admin access or prefer individual tool calls, exclude codemode:
 
 ```json
 {
-  "args": ["--tool-filter", "starter,+codemode"]
+  "args": ["--tool-filter", "starter,-codemode"]
 }
-```
-
-### Example
-
-```javascript
-// Get row counts for all tables
-const tables = await pg.core.listTables();
-return Promise.all(tables.map(async t => ({
-  table: t.name,
-  rows: (await pg.performance.tableStats({ table: t.name })).row_count
-})));
 ```
 
 ### Isolation Modes
 
 | Mode | Isolation | When to Use |
 |------|-----------|-------------|
-| `vm` | Same process | Default, best performance |
-| `worker` | Separate V8 thread | Enhanced security |
+| `vm` | Same process | **Default, recommended** |
+| `worker` | Separate V8 thread | Not recommended (incomplete) |
 
-Set via environment variable:
-```json
-{ "env": { "CODEMODE_ISOLATION": "worker" } }
-```
+The `vm` mode is fully functional and is the default. No configuration needed.
 
 ### Security
 
@@ -192,10 +161,7 @@ Set via environment variable:
 ## 🛠️ Tool Filtering
 
 > [!IMPORTANT]
-> **AI IDEs like Cursor have tool limits (typically 40-50 tools).** With 195 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (49 tools) as a starting point.
-
-> [!TIP]
-> **Code Mode:** Add `+codemode` to any shortcut to enable `pg_execute_code` (+1 tool). Example: `starter,+codemode` = 50 tools.
+> AI IDEs like Cursor have tool limits. With 203 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (58 tools) as a starting point. Code Mode is included in all presets by default for 70-90% token savings on multi-step operations.
 
 ### What Can You Filter?
 
@@ -203,54 +169,56 @@ The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names*
 
 | Filter Pattern | Example | Tools | Description |
 |----------------|---------|-------|-------------|
-| Shortcut only | `starter` | 49 | Use a predefined bundle |
-| Groups only | `core,jsonb,transactions` | 39 | Combine individual groups |
-| Shortcut + Group | `starter,+text` | 60 | Extend a shortcut |
-| Shortcut - Tool | `starter,-pg_drop_table` | 48 | Remove specific tools |
+| Shortcut only | `starter` | 58 | Use a predefined bundle |
+| Groups only | `core,jsonb,transactions` | 45 | Combine individual groups |
+| Shortcut + Group | `starter,+text` | 69 | Extend a shortcut |
+| Shortcut - Tool | `starter,-pg_drop_table` | 57 | Remove specific tools |
+
+All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by default for token-efficient operations. To exclude it, add `-codemode` to your filter: `--tool-filter cron,pgcrypto,-codemode`
 
 ### Shortcuts (Predefined Bundles)
 
 | Shortcut | Tools | Use Case | What's Included |
 |----------|-------|----------|-----------------|
-| `starter` | **49** | 🌟 **Recommended** | Core, trans, JSONB, schema |
-| `essential` | 39 | Minimal footprint | Core, trans, JSONB |
-| `dev-power` | 44 | Power Developer | Core, trans, schema, stats, part |
-| `ai-data` | 50 | AI Data Analyst | Core, JSONB, text, trans |
-| `ai-vector` | 40 | AI/ML with pgvector | Core, vector, trans, part |
-| `dba-monitor` | 47 | DBA Monitoring | Core, monitoring, perf, trans |
-| `dba-manage` | 48 | DBA Management | Core, admin, backup, part, schema |
-| `dba-stats` | 49 | DBA Stats/Security | Core, admin, monitoring, trans, stats |
-| `geo` | 32 | Geospatial Workloads | Core, PostGIS, trans |
-| `base-core` | 49 | Base Building Block | Core, JSONB, trans, schema |
-| `base-ops` | 50 | Operations Block | Admin, monitoring, backup, part, stats, citext |
-| `ext-ai` | 23 | Extension: AI/Security | pgvector, pgcrypto |
-| `ext-geo` | 20 | Extension: Spatial | PostGIS, ltree |
-| `ext-schedule` | 18 | Extension: Scheduling | pg_cron, pg_partman |
-| `ext-perf` | 23 | Extension: Perf/Analysis | pg_stat_kcache, performance |
+| `starter` | **58** | 🌟 **Recommended** | Core, trans, JSONB, schema, codemode |
+| `essential` | 46 | Minimal footprint | Core, trans, JSONB, codemode |
+| `dev-power` | 53 | Power Developer | Core, trans, schema, stats, part, codemode |
+| `ai-data` | 59 | AI Data Analyst | Core, JSONB, text, trans, codemode |
+| `ai-vector` | 47 | AI/ML with pgvector | Core, vector, trans, part, codemode |
+| `dba-monitor` | 58 | DBA Monitoring | Core, monitoring, perf, trans, codemode |
+| `dba-manage` | 57 | DBA Management | Core, admin, backup, part, schema, codemode |
+| `dba-stats` | 56 | DBA Stats/Security | Core, admin, monitoring, trans, stats, codemode |
+| `geo` | 42 | Geospatial Workloads | Core, PostGIS, trans, codemode |
+| `base-core` | 58 | Base Building Block | Core, JSONB, trans, schema, codemode |
+| `base-ops` | 51 | Operations Block | Admin, monitoring, backup, part, stats, citext, codemode |
+| `ext-ai` | 24 | Extension: AI/Security | pgvector, pgcrypto, codemode |
+| `ext-geo` | 24 | Extension: Spatial | PostGIS, ltree, codemode |
+| `ext-schedule` | 19 | Extension: Scheduling | pg_cron, pg_partman, codemode |
+| `ext-perf` | 28 | Extension: Perf/Analysis | pg_stat_kcache, performance, codemode |
 
 ### Tool Groups (20 Available)
 
 | Group | Tools | Description |
 |-------|-------|-------------|
-| `core` | 13 | Read/write queries, tables, indexes |
-| `transactions` | 7 | BEGIN, COMMIT, ROLLBACK, savepoints |
-| `jsonb` | 19 | JSONB manipulation and queries |
-| `text` | 11 | Full-text search, fuzzy matching |
-| `performance` | 16 | EXPLAIN, query analysis, optimization |
-| `admin` | 10 | VACUUM, ANALYZE, REINDEX |
-| `monitoring` | 11 | Database sizes, connections, status |
-| `backup` | 9 | pg_dump, COPY, restore |
-| `schema` | 10 | Schemas, views, functions, triggers |
-| `partitioning` | 6 | Native partition management |
-| `stats` | 8 | Statistical analysis |
-| `vector` | 14 | pgvector (AI/ML similarity search) |
-| `postgis` | 12 | PostGIS (geospatial) |
-| `cron` | 8 | pg_cron (job scheduling) |
-| `partman` | 10 | pg_partman (auto-partitioning) |
-| `kcache` | 7 | pg_stat_kcache (OS-level stats) |
-| `citext` | 6 | citext (case-insensitive text) |
-| `ltree` | 8 | ltree (hierarchical data) |
-| `pgcrypto` | 9 | pgcrypto (encryption, UUIDs) |
+| `core` | 20 | Read/write queries, tables, indexes, convenience/drop tools |
+| `transactions` | 8 | BEGIN, COMMIT, ROLLBACK, savepoints |
+| `jsonb` | 20 | JSONB manipulation and queries |
+| `text` | 13 | Full-text search, fuzzy matching |
+| `performance` | 20 | EXPLAIN, query analysis, optimization |
+| `admin` | 11 | VACUUM, ANALYZE, REINDEX |
+| `monitoring` | 12 | Database sizes, connections, status |
+| `backup` | 10 | pg_dump, COPY, restore |
+| `schema` | 13 | Schemas, views, sequences, functions, triggers |
+| `partitioning` | 7 | Native partition management |
+| `stats` | 9 | Statistical analysis |
+| `vector` | 15 | pgvector (AI/ML similarity search) |
+| `postgis` | 16 | PostGIS (geospatial) |
+| `cron` | 9 | pg_cron (job scheduling) |
+| `partman` | 11 | pg_partman (auto-partitioning) |
+| `kcache` | 8 | pg_stat_kcache (OS-level stats) |
+| `citext` | 7 | citext (case-insensitive text) |
+| `ltree` | 9 | ltree (hierarchical data) |
+| `pgcrypto` | 10 | pgcrypto (encryption, UUIDs) |
 | `codemode` | 1 | Code Mode (sandboxed code execution) |
 
 ---
@@ -475,7 +443,7 @@ This server provides **21 resources** for structured data access:
 | `fuzzystrmatch` | Fuzzy matching | `pg_fuzzy_match` |
 | `hypopg` | Hypothetical indexes | `pg_index_recommendations` |
 | `pgvector` | Vector similarity search | 14 vector tools |
-| `PostGIS` | Geospatial operations | 12 postgis tools |
+| `PostGIS` | Geospatial operations | 15 postgis tools |
 | `pg_cron` | Job scheduling | 8 cron tools |
 | `pg_partman` | Automated partition management | 10 partman tools |
 | `pg_stat_kcache` | OS-level CPU/memory/I/O stats | 7 kcache tools |
@@ -489,7 +457,7 @@ This server provides **21 resources** for structured data access:
 
 ## 🏷️ Tool Annotations
 
-All 194 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints to MCP clients about tool behavior:
+All 199 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints to MCP clients about tool behavior:
 
 | Annotation | Description | Example |
 |------------|-------------|---------|
@@ -498,6 +466,8 @@ All 194 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints t
 | `destructiveHint` | Tool may delete/modify data | `true` for DROP, DELETE |
 | `idempotentHint` | Safe to retry without side effects | `true` for IF NOT EXISTS |
 | `openWorldHint` | Tool interacts with external systems | `false` for all tools |
+
+---
 
 ## 🔥 Core Capabilities
 
@@ -520,7 +490,7 @@ All 194 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints t
 ## 🏆 Why Choose postgres-mcp?
 
 ✅ **TypeScript Native** - Full type safety with strict mode  
-✅ **194 Specialized Tools** - Comprehensive PostgreSQL coverage  
+✅ **199 Specialized Tools** - Comprehensive PostgreSQL coverage  
 ✅ **Tool Annotations** - UX hints for read-only, destructive, and idempotent operations  
 ✅ **Connection Pooling** - Efficient PostgreSQL connection management  
 ✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements, pg_cron  
@@ -529,23 +499,19 @@ All 194 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints t
 
 ---
 
-## Development
+## 📓 Jupyter Notebook
+
+A hands-on [quickstart notebook](examples/notebooks/quickstart.ipynb) demonstrates all major features using the Python MCP SDK:
+
+- CRUD operations, transactions, and error handling
+- Resources for observability (`postgres://health`, `postgres://extensions`)
+- JSONB, full-text search, pgvector, and PostGIS
+- Code Mode for multi-step operations
 
 ```bash
-# Clone and install
-git clone https://github.com/neverinfamous/postgres-mcp.git
-cd postgres-mcp
-npm install
-
-# Build
-npm run build
-
-# Run checks
-npm run lint && npm run typecheck
-
-# Test CLI
-node dist/cli.js info
-node dist/cli.js list-tools
+cd examples/notebooks
+pip install mcp python-dotenv
+python -m jupyterlab
 ```
 
 ---

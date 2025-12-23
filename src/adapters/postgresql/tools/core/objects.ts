@@ -210,16 +210,21 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
                     details = { ...details, ...result.rows[0] };
                 }
             } else if (objectType === 'sequence') {
+                // Use pg_sequence catalog table for cross-version compatibility
+                // pg_sequences view has different column names across PG versions
                 const sql = `
                     SELECT 
-                        seqstart as start_value,
-                        seqmin as min_value,
-                        seqmax as max_value,
-                        seqincrement as increment,
-                        seqcycle as cycle,
-                        seqcache as cache
-                    FROM pg_sequences
-                    WHERE schemaname = $1 AND sequencename = $2
+                        s.seqstart as start_value,
+                        s.seqmin as min_value,
+                        s.seqmax as max_value,
+                        s.seqincrement as increment,
+                        s.seqcycle as cycle,
+                        s.seqcache as cache,
+                        pg_get_userbyid(c.relowner) as owner
+                    FROM pg_sequence s
+                    JOIN pg_class c ON c.oid = s.seqrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = $1 AND c.relname = $2
                 `;
                 const result = await adapter.executeQuery(sql, [schemaName, name]);
                 if (result.rows && result.rows.length > 0) {

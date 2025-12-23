@@ -23,8 +23,8 @@ describe('getTextTools', () => {
         tools = getTextTools(adapter);
     });
 
-    it('should return 11 text tools', () => {
-        expect(tools).toHaveLength(11);
+    it('should return 13 text tools', () => {
+        expect(tools).toHaveLength(13);
     });
 
     it('should have all expected tool names', () => {
@@ -35,11 +35,13 @@ describe('getTextTools', () => {
         expect(toolNames).toContain('pg_fuzzy_match');
         expect(toolNames).toContain('pg_regexp_match');
         expect(toolNames).toContain('pg_like_search');
-        expect(toolNames).toContain('pg_similarity_search');
         expect(toolNames).toContain('pg_text_headline');
         expect(toolNames).toContain('pg_create_fts_index');
         expect(toolNames).toContain('pg_text_normalize');
         expect(toolNames).toContain('pg_text_sentiment');
+        expect(toolNames).toContain('pg_text_to_vector');
+        expect(toolNames).toContain('pg_text_to_query');
+        expect(toolNames).toContain('pg_text_search_config');
     });
 
     it('should have group set to text for all tools', () => {
@@ -496,59 +498,6 @@ describe('pg_like_search', () => {
     });
 });
 
-describe('pg_similarity_search', () => {
-    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
-    let tools: ReturnType<typeof getTextTools>;
-    let mockContext: ReturnType<typeof createMockRequestContext>;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        mockAdapter = createMockPostgresAdapter();
-        tools = getTextTools(mockAdapter as unknown as PostgresAdapter);
-        mockContext = createMockRequestContext();
-    });
-
-    it('should search for similar strings', async () => {
-        mockAdapter.executeQuery
-            .mockResolvedValueOnce({ rows: [] }) // set_limit call
-            .mockResolvedValueOnce({
-                rows: [{ name: 'PostgreSQL', sim: 0.75 }]
-            });
-
-        const tool = tools.find(t => t.name === 'pg_similarity_search')!;
-        const result = await tool.handler({
-            table: 'products',
-            column: 'name',
-            value: 'Postgres'
-        }, mockContext) as {
-            rows: unknown[];
-        };
-
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining('set_limit'),
-        );
-        expect(result.rows).toHaveLength(1);
-    });
-
-    it('should use custom select columns when provided (line 241 branch)', async () => {
-        mockAdapter.executeQuery
-            .mockResolvedValueOnce({ rows: [] }) // set_limit call
-            .mockResolvedValueOnce({ rows: [] });
-
-        const tool = tools.find(t => t.name === 'pg_similarity_search')!;
-        await tool.handler({
-            table: 'products',
-            column: 'name',
-            value: 'Postgres',
-            select: ['id', 'category']
-        }, mockContext);
-
-        // Second call should have the select columns
-        const sql = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
-        expect(sql).toContain('"id", "category",');
-    });
-});
-
 describe('pg_text_headline', () => {
     let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
     let tools: ReturnType<typeof getTextTools>;
@@ -572,14 +521,16 @@ describe('pg_text_headline', () => {
             column: 'content',
             query: 'PostgreSQL'
         }, mockContext) as {
-            headlines: string[];
+            rows: Array<{ headline: string }>;
+            count: number;
         };
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
             expect.stringContaining('ts_headline'),
             ['PostgreSQL']
         );
-        expect(result.headlines[0]).toContain('<b>PostgreSQL</b>');
+        expect(result.rows[0].headline).toContain('<b>PostgreSQL</b>');
+        expect(result.count).toBe(1);
     });
 });
 
@@ -632,9 +583,9 @@ describe('pg_text_normalize', () => {
     });
 
     it('should normalize text using unaccent', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({
-            rows: [{ normalized: 'cafe' }]
-        });
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [] }) // CREATE EXTENSION call
+            .mockResolvedValueOnce({ rows: [{ normalized: 'cafe' }] }); // unaccent query
 
         const tool = tools.find(t => t.name === 'pg_text_normalize')!;
         const result = await tool.handler({
@@ -643,7 +594,12 @@ describe('pg_text_normalize', () => {
             normalized: string;
         };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            1,
+            'CREATE EXTENSION IF NOT EXISTS unaccent'
+        );
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            2,
             'SELECT unaccent($1) as normalized',
             ['café']
         );
@@ -812,3 +768,179 @@ describe('pg_text_sentiment score branches', () => {
     });
 });
 
+// =============================================================================
+// New Text Tools Tests
+// =============================================================================
+
+describe('pg_text_to_vector', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getTextTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getTextTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('should convert text to tsvector with default config', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ vector: "'hello':1 'world':2" }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_text_to_vector')!;
+        const result = await tool.handler({
+            text: 'hello world'
+        }, mockContext) as {
+            vector: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'SELECT to_tsvector($1, $2) as vector',
+            ['english', 'hello world']
+        );
+        expect(result.vector).toBe("'hello':1 'world':2");
+    });
+
+    it('should use custom config when specified', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ vector: "'hallo':1" }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_text_to_vector')!;
+        await tool.handler({
+            text: 'hallo welt',
+            config: 'german'
+        }, mockContext);
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'SELECT to_tsvector($1, $2) as vector',
+            ['german', 'hallo welt']
+        );
+    });
+});
+
+describe('pg_text_to_query', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getTextTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getTextTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('should convert text to tsquery with plain mode (default)', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ query: "'hello' & 'world'" }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_text_to_query')!;
+        const result = await tool.handler({
+            text: 'hello world'
+        }, mockContext) as {
+            query: string;
+            mode: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'SELECT plainto_tsquery($1, $2) as query',
+            ['english', 'hello world']
+        );
+        expect(result.mode).toBe('plain');
+    });
+
+    it('should use phrase mode when specified', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ query: "'hello' <-> 'world'" }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_text_to_query')!;
+        const result = await tool.handler({
+            text: 'hello world',
+            mode: 'phrase'
+        }, mockContext) as {
+            query: string;
+            mode: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'SELECT phraseto_tsquery($1, $2) as query',
+            ['english', 'hello world']
+        );
+        expect(result.mode).toBe('phrase');
+    });
+
+    it('should use websearch mode when specified', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ query: "'hello' | 'world'" }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_text_to_query')!;
+        const result = await tool.handler({
+            text: 'hello OR world',
+            mode: 'websearch'
+        }, mockContext) as {
+            query: string;
+            mode: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'SELECT websearch_to_tsquery($1, $2) as query',
+            ['english', 'hello OR world']
+        );
+        expect(result.mode).toBe('websearch');
+    });
+});
+
+describe('pg_text_search_config', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getTextTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getTextTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('should list available search configurations', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [
+                { name: 'english', schema: 'pg_catalog', description: 'English' },
+                { name: 'german', schema: 'pg_catalog', description: 'German' },
+                { name: 'simple', schema: 'pg_catalog', description: 'Simple' }
+            ]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_text_search_config')!;
+        const result = await tool.handler({}, mockContext) as {
+            configs: Array<{ name: string; schema: string; description: string }>;
+            count: number;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('pg_ts_config')
+        );
+        expect(result.configs).toHaveLength(3);
+        expect(result.count).toBe(3);
+        expect(result.configs[0]?.name).toBe('english');
+    });
+
+    it('should return empty array when no configs found', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_text_search_config')!;
+        const result = await tool.handler({}, mockContext) as {
+            configs: unknown[];
+            count: number;
+        };
+
+        expect(result.configs).toEqual([]);
+        expect(result.count).toBe(0);
+    });
+});

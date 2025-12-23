@@ -1,7 +1,7 @@
 /**
  * postgres-mcp - PostGIS Extension Tools Unit Tests
  * 
- * Tests for geospatial operations (12 tools total).
+ * Tests for geospatial operations (15 tools total).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -78,6 +78,38 @@ describe('PostGIS Tools', () => {
                 expect.stringContaining("'POLYGON'")
             );
         });
+
+        it('should return alreadyExists when ifNotExists is true and column exists', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ column_name: 'geom' }]
+            });
+
+            const tool = findTool('pg_geometry_column');
+            const result = await tool!.handler({
+                table: 'locations',
+                column: 'geom',
+                ifNotExists: true
+            }, mockContext) as { success: boolean; alreadyExists: boolean };
+
+            expect(result.success).toBe(true);
+            expect(result.alreadyExists).toBe(true);
+            // Should only call the check query, not AddGeometryColumn
+            expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(1);
+        });
+
+        it('should accept tableName as alias for table', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_geometry_column');
+            await tool!.handler({
+                tableName: 'locations',  // Using alias
+                column: 'geom'
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining("'locations'")
+            );
+        });
     });
 
     describe('pg_point_in_polygon', () => {
@@ -99,6 +131,23 @@ describe('PostGIS Tools', () => {
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('ST_Contains'),
                 [-74.0060, 40.7128]
+            );
+        });
+
+        it('should use schema parameter for non-public schemas', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_point_in_polygon');
+            await tool!.handler({
+                schema: 'geo',
+                table: 'zones',
+                column: 'geom',
+                point: { lat: 40.7128, lng: -74.0060 }
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('"geo"."zones"'),
+                expect.anything()
             );
         });
     });
@@ -127,6 +176,23 @@ describe('PostGIS Tools', () => {
             );
         });
 
+        it('should use schema parameter for non-public schemas', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_distance');
+            await tool!.handler({
+                schema: 'geo',
+                table: 'stores',
+                column: 'location',
+                point: { lat: 40.7128, lng: -74.0060 }
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('"geo"."stores"'),
+                expect.anything()
+            );
+        });
+
         it('should filter by max distance', async () => {
             mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -140,6 +206,61 @@ describe('PostGIS Tools', () => {
 
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('<= 1000'),
+                expect.anything()
+            );
+        });
+
+        it('should use CTE for consistent distance filtering', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_distance');
+            await tool!.handler({
+                table: 'stores',
+                column: 'location',
+                point: { lat: 40.7128, lng: -74.0060 },
+                maxDistance: 5000
+            }, mockContext);
+
+            // Verify CTE structure is used
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('WITH distances AS'),
+                expect.anything()
+            );
+            // Verify filtering uses computed distance_meters column
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('WHERE distance_meters <='),
+                expect.anything()
+            );
+        });
+
+        it('should accept geom as alias for column', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_distance');
+            await tool!.handler({
+                table: 'stores',
+                geom: 'location',  // Using alias
+                point: { lat: 40.7128, lng: -74.0060 }
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('"location"'),
+                expect.anything()
+            );
+        });
+
+        it('should accept geometry as alias for column', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_distance');
+            await tool!.handler({
+                table: 'stores',
+                geometry: 'location',  // Using alias
+                point: { lat: 40.7128, lng: -74.0060 }
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('"location"'),
                 expect.anything()
             );
         });
@@ -275,6 +396,38 @@ describe('PostGIS Tools', () => {
                 expect.stringContaining('"custom_spatial_idx"')
             );
         });
+
+        it('should return alreadyExists when ifNotExists is true and index exists', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ exists: true }]
+            });
+
+            const tool = findTool('pg_spatial_index');
+            const result = await tool!.handler({
+                table: 'locations',
+                column: 'geom',
+                ifNotExists: true
+            }, mockContext) as { success: boolean; alreadyExists: boolean };
+
+            expect(result.success).toBe(true);
+            expect(result.alreadyExists).toBe(true);
+            expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(1);
+        });
+
+        it('should accept indexName as alias for name', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_spatial_index');
+            await tool!.handler({
+                table: 'locations',
+                column: 'geom',
+                indexName: 'my_custom_idx'  // Using alias
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('"my_custom_idx"')
+            );
+        });
     });
 
     // Advanced PostGIS Tools
@@ -315,6 +468,16 @@ describe('PostGIS Tools', () => {
                 expect.anything(),
                 [-74.0060, 40.7128, 3857]
             );
+        });
+
+        it('should reject when lat/lng are missing', async () => {
+            const tool = findTool('pg_geocode');
+
+            // Empty object should fail validation
+            await expect(tool!.handler({}, mockContext)).rejects.toThrow('lat (or latitude alias) is required');
+
+            // Only lat without lng should fail
+            await expect(tool!.handler({ lat: 40.7128 }, mockContext)).rejects.toThrow('lng (or lon/longitude alias) is required');
         });
     });
 
@@ -406,7 +569,9 @@ describe('PostGIS Tools', () => {
         });
 
         it('should perform K-Means clustering', async () => {
+            // First call is COUNT validation, then 2 clustering queries
             mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ cnt: 10 }] })  // COUNT validation
                 .mockResolvedValueOnce({ rows: [] })
                 .mockResolvedValueOnce({ rows: [{}] });
 
@@ -422,10 +587,71 @@ describe('PostGIS Tools', () => {
                 expect.stringContaining('ST_ClusterKMeans')
             );
         });
+
+        it('should accept algorithm as alias for method', async () => {
+            // First call is COUNT validation, then 2 clustering queries
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ cnt: 10 }] })  // COUNT validation
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [{}] });
+
+            const tool = findTool('pg_geo_cluster');
+            await tool!.handler({
+                table: 'points',
+                column: 'geom',
+                algorithm: 'kmeans',  // Using alias
+                numClusters: 5
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('ST_ClusterKMeans')
+            );
+        });
+
+        it('should accept k as alias for numClusters', async () => {
+            // First call is COUNT validation, then 2 clustering queries
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ cnt: 10 }] })  // COUNT validation
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [{}] });
+
+            const tool = findTool('pg_geo_cluster');
+            await tool!.handler({
+                table: 'points',
+                column: 'geom',
+                method: 'kmeans',
+                k: 3  // Using k alias instead of numClusters
+            }, mockContext);
+
+            // Verify k=3 is used, not default of 5
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('ST_ClusterKMeans("geom", 3)')
+            );
+        });
+
+        it('should merge params object with top-level params', async () => {
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [] })
+                .mockResolvedValueOnce({ rows: [{}] });
+
+            const tool = findTool('pg_geo_cluster');
+            await tool!.handler({
+                table: 'points',
+                column: 'geom',
+                method: 'dbscan',
+                eps: 200,  // Top-level overrides params.eps
+                params: { eps: 100, minPoints: 5 }  // minPoints comes from params
+            }, mockContext);
+
+            // Top-level eps (200) takes precedence, params.minPoints (5) is used
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('ST_ClusterDBSCAN("geom", 200, 5)')
+            );
+        });
     });
 
-    it('should export all 12 PostGIS tools', () => {
-        expect(tools).toHaveLength(12);
+    it('should export all 15 PostGIS tools', () => {
+        expect(tools).toHaveLength(15);
         const toolNames = tools.map(t => t.name);
         // Basic
         expect(toolNames).toContain('pg_postgis_create_extension');
@@ -441,5 +667,9 @@ describe('PostGIS Tools', () => {
         expect(toolNames).toContain('pg_geo_transform');
         expect(toolNames).toContain('pg_geo_index_optimize');
         expect(toolNames).toContain('pg_geo_cluster');
+        // Standalone geometry tools
+        expect(toolNames).toContain('pg_geometry_buffer');
+        expect(toolNames).toContain('pg_geometry_intersection');
+        expect(toolNames).toContain('pg_geometry_transform');
     });
 });

@@ -2,7 +2,7 @@
  * PostgreSQL pgvector Extension Tools
  * 
  * Vector similarity search operations.
- * 14 tools total.
+ * 16 tools total.
  */
 
 import type { PostgresAdapter } from '../../PostgresAdapter.js';
@@ -17,7 +17,9 @@ import {
     createVectorCreateIndexTool,
     createVectorDistanceTool,
     createVectorNormalizeTool,
-    createVectorAggregateTool
+    createVectorAggregateTool,
+    createVectorBatchInsertTool,
+    createVectorValidateTool
 } from './basic.js';
 
 import {
@@ -37,11 +39,13 @@ export function getVectorTools(adapter: PostgresAdapter): ToolDefinition[] {
         createVectorExtensionTool(adapter),
         createVectorAddColumnTool(adapter),
         createVectorInsertTool(adapter),
+        createVectorBatchInsertTool(adapter),
         createVectorSearchTool(adapter),
         createVectorCreateIndexTool(adapter),
         createVectorDistanceTool(adapter),
         createVectorNormalizeTool(),
         createVectorAggregateTool(adapter),
+        createVectorValidateTool(adapter),
         createVectorClusterTool(adapter),
         createVectorIndexOptimizeTool(adapter),
         createHybridSearchTool(adapter),
@@ -50,3 +54,4 @@ export function getVectorTools(adapter: PostgresAdapter): ToolDefinition[] {
         createVectorEmbedTool()
     ];
 }
+

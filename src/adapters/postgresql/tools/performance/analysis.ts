@@ -9,46 +9,257 @@ import { readOnly } from '../../../../utils/annotations.js';
 import { getToolIcons } from '../../../../utils/icons.js';
 
 export function createSeqScanTablesTool(adapter: PostgresAdapter): ToolDefinition {
+    const SeqScanTablesSchema = z.preprocess(
+        (input) => input ?? {},
+        z.object({
+            minScans: z.number().optional().describe('Minimum seq scans to include (default: 10)'),
+            schema: z.string().optional().describe('Schema to filter')
+        })
+    );
+
     return {
         name: 'pg_seq_scan_tables',
-        description: 'Find tables with high sequential scan counts (potential missing indexes).',
+        description: 'Find tables with high sequential scan counts (potential missing indexes). Default minScans=10; use higher values (e.g., 100+) for production databases.',
         group: 'performance',
-        inputSchema: z.object({
-            minScans: z.number().optional()
-        }),
+        inputSchema: SeqScanTablesSchema,
         annotations: readOnly('Sequential Scan Tables'),
         icons: getToolIcons('performance', readOnly('Sequential Scan Tables')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { minScans?: number });
-            const minScans = parsed.minScans ?? 100;
+            const parsed = SeqScanTablesSchema.parse(params);
+            const minScans = parsed.minScans ?? 10; // Default to 10 for better testing visibility
+
+            let whereClause = `seq_scan > ${String(minScans)}`;
+            if (parsed.schema !== undefined) {
+                whereClause += ` AND schemaname = '${parsed.schema}'`;
+            }
 
             const sql = `SELECT schemaname, relname as table_name,
                         seq_scan, seq_tup_read, 
                         idx_scan, idx_tup_fetch,
-                        CASE WHEN idx_scan > 0 THEN round(100.0 * seq_scan / (seq_scan + idx_scan), 2) ELSE 100 END as seq_scan_pct
+                        CASE WHEN idx_scan > 0 THEN round((100.0 * seq_scan / (seq_scan + idx_scan))::numeric, 2) ELSE 100 END as seq_scan_pct
                         FROM pg_stat_user_tables
-                        WHERE seq_scan > ${String(minScans)}
+                        WHERE ${whereClause}
                         ORDER BY seq_scan DESC`;
 
             const result = await adapter.executeQuery(sql);
-            return { tables: result.rows };
+            return {
+                tables: result.rows,
+                count: result.rows?.length ?? 0,
+                minScans,
+                hint: 'High seq_scan_pct indicates tables that could benefit from indexes.'
+            };
         }
     };
 }
 
+
 export function createIndexRecommendationsTool(adapter: PostgresAdapter): ToolDefinition {
+    // Preprocess for query alias and handle undefined params
+    const IndexRecommendationsSchema = z.preprocess(
+        (input) => {
+            const normalized = (input ?? {}) as Record<string, unknown>;
+            const result = { ...normalized };
+            // Alias: query → sql
+            if (result['sql'] === undefined && result['query'] !== undefined) {
+                result['sql'] = result['query'];
+            }
+            return result;
+        },
+        z.object({
+            table: z.string().optional().describe('Table name to analyze'),
+            sql: z.string().optional().describe('SQL query to analyze for index recommendations'),
+            schema: z.string().optional().describe('Schema name (default: public)')
+        })
+    );
+
+    // Helper to check if HypoPG extension is available
+    const checkHypoPG = async (): Promise<boolean> => {
+        try {
+            const result = await adapter.executeQuery(
+                "SELECT 1 FROM pg_extension WHERE extname = 'hypopg'"
+            );
+            return (result.rows?.length ?? 0) > 0;
+        } catch {
+            return false;
+        }
+    };
+
+    // Helper to extract cost from EXPLAIN JSON plan
+    const extractCost = (plan: Record<string, unknown> | undefined): number | null => {
+        if (plan === undefined) return null;
+        const totalCost = plan['Total Cost'];
+        return typeof totalCost === 'number' ? totalCost : null;
+    };
+
+    // Type for index candidate
+    interface IndexCandidate {
+        table: string;
+        column: string;
+        indexDDL: string;
+    }
+
+    // Helper to extract Seq Scan candidates from EXPLAIN plan
+    const extractSeqScanCandidates = (node: Record<string, unknown> | undefined, depth = 0): IndexCandidate[] => {
+        if (node === undefined || depth > 20) return [];
+
+        const candidates: IndexCandidate[] = [];
+        const nodeType = node['Node Type'] as string | undefined;
+        const relationName = node['Relation Name'] as string | undefined;
+        const filter = node['Filter'] as string | undefined;
+
+        if (nodeType === 'Seq Scan' && relationName !== undefined && filter !== undefined) {
+            // Extract column from filter (handles patterns like "(column = value)" or "(column > value)")
+            const colMatch = /\((\w+)\s*[=<>!]/.exec(filter);
+            if (colMatch?.[1] !== undefined) {
+                candidates.push({
+                    table: relationName,
+                    column: colMatch[1],
+                    indexDDL: `CREATE INDEX ON ${relationName} (${colMatch[1]})`
+                });
+            }
+        }
+
+        // Recurse into child plans
+        const plans = node['Plans'] as Record<string, unknown>[] | undefined;
+        if (Array.isArray(plans)) {
+            for (const child of plans) {
+                candidates.push(...extractSeqScanCandidates(child, depth + 1));
+            }
+        }
+
+        return candidates;
+    };
+
     return {
         name: 'pg_index_recommendations',
-        description: 'Suggest missing indexes based on table statistics.',
+        description: 'Suggest missing indexes based on table statistics or query analysis. When sql is provided and HypoPG is installed, creates hypothetical indexes to measure potential performance improvement.',
         group: 'performance',
-        inputSchema: z.object({
-            table: z.string().optional()
-        }),
+        inputSchema: IndexRecommendationsSchema,
         annotations: readOnly('Index Recommendations'),
         icons: getToolIcons('performance', readOnly('Index Recommendations')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { table?: string });
-            const tableClause = parsed.table ? `AND relname = '${parsed.table}'` : '';
+            const parsed = IndexRecommendationsSchema.parse(params);
+            const schemaName = parsed.schema ?? 'public';
+
+            // If SQL query provided, perform query-specific analysis
+            if (parsed.sql !== undefined && parsed.sql.trim() !== '') {
+                const hypopgAvailable = await checkHypoPG();
+
+                // Get baseline EXPLAIN plan
+                const baselineResult = await adapter.executeQuery(
+                    `EXPLAIN (FORMAT JSON) ${parsed.sql}`
+                );
+                const baselinePlanRow = baselineResult.rows?.[0] as { 'QUERY PLAN'?: unknown[] } | undefined;
+                const baselinePlan = baselinePlanRow?.['QUERY PLAN']?.[0] as { Plan?: Record<string, unknown> } | undefined;
+                const baselineCost = extractCost(baselinePlan?.Plan);
+
+                // Extract Seq Scan candidates
+                const candidates = extractSeqScanCandidates(baselinePlan?.Plan);
+
+                // If no candidates or no baseline cost, return basic analysis
+                if (candidates.length === 0 || baselineCost === null) {
+                    return {
+                        queryAnalysis: true,
+                        hypopgAvailable,
+                        baselineCost,
+                        recommendations: [],
+                        hint: 'Query appears well-indexed. No sequential scans with filterable columns detected.'
+                    };
+                }
+
+                // If HypoPG is available, create hypothetical indexes and measure improvement
+                if (hypopgAvailable) {
+                    const recommendations: {
+                        table: string;
+                        column: string;
+                        suggestedIndex: string;
+                        baselineCost: number;
+                        improvedCost: number;
+                        improvement: string;
+                    }[] = [];
+
+                    try {
+                        // Reset any existing hypothetical indexes
+                        await adapter.executeQuery('SELECT hypopg_reset()');
+
+                        // Test each candidate index
+                        for (const candidate of candidates) {
+                            try {
+                                // Create hypothetical index
+                                await adapter.executeQuery(
+                                    `SELECT hypopg_create_index('${candidate.indexDDL.replace(/'/g, "''")}')`
+                                );
+
+                                // Re-run EXPLAIN with hypothetical index
+                                const improvedResult = await adapter.executeQuery(
+                                    `EXPLAIN (FORMAT JSON) ${parsed.sql}`
+                                );
+                                const improvedPlanRow = improvedResult.rows?.[0] as { 'QUERY PLAN'?: unknown[] } | undefined;
+                                const improvedPlan = improvedPlanRow?.['QUERY PLAN']?.[0] as { Plan?: Record<string, unknown> } | undefined;
+                                const improvedCost = extractCost(improvedPlan?.Plan);
+
+                                if (improvedCost !== null && improvedCost < baselineCost) {
+                                    const improvementPct = ((baselineCost - improvedCost) / baselineCost) * 100;
+                                    recommendations.push({
+                                        table: candidate.table,
+                                        column: candidate.column,
+                                        suggestedIndex: candidate.indexDDL,
+                                        baselineCost,
+                                        improvedCost,
+                                        improvement: `${improvementPct.toFixed(1)}% cost reduction`
+                                    });
+                                }
+
+                                // Reset for next candidate
+                                await adapter.executeQuery('SELECT hypopg_reset()');
+                            } catch {
+                                // Skip this candidate if it fails
+                                await adapter.executeQuery('SELECT hypopg_reset()').catch(() => {/* ignore */ });
+                            }
+                        }
+                    } finally {
+                        // Ensure cleanup
+                        await adapter.executeQuery('SELECT hypopg_reset()').catch(() => {/* ignore */ });
+                    }
+
+                    // Sort by improvement
+                    recommendations.sort((a, b) => {
+                        const aImprv = parseFloat(a.improvement);
+                        const bImprv = parseFloat(b.improvement);
+                        return bImprv - aImprv;
+                    });
+
+                    return {
+                        queryAnalysis: true,
+                        hypopgAvailable: true,
+                        baselineCost,
+                        recommendations,
+                        hint: recommendations.length > 0
+                            ? `Found ${String(recommendations.length)} index(es) that would improve query performance. Review and create indexes as needed.`
+                            : 'No indexes found that would significantly improve this query.'
+                    };
+                }
+
+                // HypoPG not available - return basic recommendations without cost analysis
+                const basicRecommendations = candidates.map(c => ({
+                    table: c.table,
+                    column: c.column,
+                    suggestedIndex: c.indexDDL,
+                    recommendation: 'Sequential scan detected - consider adding this index'
+                }));
+
+                return {
+                    queryAnalysis: true,
+                    hypopgAvailable: false,
+                    baselineCost,
+                    recommendations: basicRecommendations,
+                    hint: 'Install HypoPG extension for precise cost improvement analysis. Basic recommendations provided based on EXPLAIN output.'
+                };
+            }
+
+            // Fall back to table statistics-based recommendations
+            const tableClause = parsed.table !== undefined ? `AND relname = '${parsed.table}'` : '';
+            const schemaClause = `AND schemaname = '${schemaName}'`;
 
             const sql = `SELECT schemaname, relname as table_name,
                         seq_scan, idx_scan,
@@ -60,31 +271,52 @@ export function createIndexRecommendationsTool(adapter: PostgresAdapter): ToolDe
                             ELSE 'LOW - Good index usage'
                         END as recommendation
                         FROM pg_stat_user_tables
-                        WHERE seq_scan > 50 ${tableClause}
+                        WHERE seq_scan > 50 ${schemaClause} ${tableClause}
                         ORDER BY seq_scan DESC
                         LIMIT 20`;
 
             const result = await adapter.executeQuery(sql);
-            return { recommendations: result.rows };
+            return {
+                queryAnalysis: false,
+                recommendations: result.rows,
+                hint: 'Based on table statistics. Provide a SQL query for query-specific recommendations.'
+            };
         }
     };
 }
 
+
+
 export function createQueryPlanCompareTool(adapter: PostgresAdapter): ToolDefinition {
+    // Preprocess for sql1/sql2 → query1/query2 aliases
+    const QueryPlanCompareSchema = z.preprocess((input) => {
+        if (typeof input !== 'object' || input === null) return input;
+        const obj = input as Record<string, unknown>;
+        const result = { ...obj };
+        // Alias: sql1 → query1, sql2 → query2
+        if (result['query1'] === undefined && result['sql1'] !== undefined) {
+            result['query1'] = result['sql1'];
+        }
+        if (result['query2'] === undefined && result['sql2'] !== undefined) {
+            result['query2'] = result['sql2'];
+        }
+        return result;
+    }, z.object({
+        query1: z.string().describe('First SQL query'),
+        query2: z.string().describe('Second SQL query'),
+        analyze: z.boolean().optional().describe('Run EXPLAIN ANALYZE (executes queries)')
+    }));
+
     return {
         name: 'pg_query_plan_compare',
         description: 'Compare execution plans of two SQL queries to identify performance differences.',
         group: 'performance',
-        inputSchema: z.object({
-            query1: z.string().describe('First SQL query'),
-            query2: z.string().describe('Second SQL query'),
-            analyze: z.boolean().optional().describe('Run EXPLAIN ANALYZE (executes queries)')
-        }),
+        inputSchema: QueryPlanCompareSchema,
         annotations: readOnly('Query Plan Compare'),
         icons: getToolIcons('performance', readOnly('Query Plan Compare')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { query1: string; query2: string; analyze?: boolean });
-            const explainType = parsed.analyze ? 'EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)' : 'EXPLAIN (FORMAT JSON)';
+            const parsed = QueryPlanCompareSchema.parse(params);
+            const explainType = parsed.analyze === true ? 'EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)' : 'EXPLAIN (FORMAT JSON)';
 
             const [result1, result2] = await Promise.all([
                 adapter.executeQuery(`${explainType} ${parsed.query1}`),

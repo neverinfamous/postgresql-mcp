@@ -23,8 +23,8 @@ describe('getPerformanceTools', () => {
         tools = getPerformanceTools(adapter);
     });
 
-    it('should return 16 performance tools', () => {
-        expect(tools).toHaveLength(16);
+    it('should return 20 performance tools', () => {
+        expect(tools).toHaveLength(20);
     });
 
     it('should have all expected tool names', () => {
@@ -45,6 +45,11 @@ describe('getPerformanceTools', () => {
         expect(toolNames).toContain('pg_performance_baseline');
         expect(toolNames).toContain('pg_connection_pool_optimize');
         expect(toolNames).toContain('pg_partition_strategy_suggest');
+        // New tools
+        expect(toolNames).toContain('pg_unused_indexes');
+        expect(toolNames).toContain('pg_duplicate_indexes');
+        expect(toolNames).toContain('pg_vacuum_stats');
+        expect(toolNames).toContain('pg_query_plan_stats');
     });
 
     it('should have group set to performance for all tools', () => {
@@ -81,7 +86,8 @@ describe('pg_explain', () => {
         };
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining('EXPLAIN')
+            expect.stringContaining('EXPLAIN'),
+            []
         );
         expect(result.plan).toContain('Seq Scan');
     });
@@ -100,7 +106,8 @@ describe('pg_explain', () => {
         };
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining('FORMAT JSON')
+            expect.stringContaining('FORMAT JSON'),
+            []
         );
         expect(result.plan).toBeDefined();
     });
@@ -131,7 +138,8 @@ describe('pg_explain_analyze', () => {
         };
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining('EXPLAIN (ANALYZE')
+            expect.stringContaining('EXPLAIN (ANALYZE'),
+            []
         );
         expect(result.plan).toContain('actual time');
     });
@@ -160,7 +168,8 @@ describe('pg_explain_buffers', () => {
         }, mockContext);
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining('BUFFERS')
+            expect.stringContaining('BUFFERS'),
+            []
         );
     });
 });
@@ -1090,7 +1099,8 @@ describe('EXPLAIN Tools (Coverage)', () => {
         };
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining('FORMAT JSON')
+            expect.stringContaining('FORMAT JSON'),
+            []
         );
         expect(result.plan).toEqual(jsonPlan);
     });
@@ -1110,7 +1120,8 @@ describe('EXPLAIN Tools (Coverage)', () => {
         };
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining('FORMAT JSON')
+            expect.stringContaining('FORMAT JSON'),
+            []
         );
         expect(result.plan).toEqual(jsonPlan);
     });
@@ -1132,9 +1143,122 @@ describe('EXPLAIN Tools (Coverage)', () => {
         };
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining('FORMAT TEXT')
+            expect.stringContaining('FORMAT TEXT'),
+            []
         );
         expect(result.plan).toContain('Seq Scan');
         expect(result.plan).toContain('Buffers');
+    });
+});
+
+// =============================================================================
+// Phase 3: No-Arg Calls and Parameter Aliases Tests
+// =============================================================================
+
+describe('No-Arg Calls (undefined params)', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getPerformanceTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getPerformanceTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('pg_stat_statements should work with undefined params', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ query: 'SELECT 1', calls: 100 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_stat_statements')!;
+        const result = await tool.handler(undefined, mockContext) as { statements: unknown[] };
+
+        expect(result.statements).toHaveLength(1);
+    });
+
+    it('pg_stat_activity should work with undefined params', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ pid: 123, state: 'active' }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_stat_activity')!;
+        const result = await tool.handler(undefined, mockContext) as { connections: unknown[] };
+
+        expect(result.connections).toHaveLength(1);
+    });
+
+    it('pg_performance_baseline should work with undefined params and auto-generate name', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ cache_hit_ratio: 99 }] })
+            .mockResolvedValueOnce({ rows: [{ total_seq_scans: 100 }] })
+            .mockResolvedValueOnce({ rows: [{ total_indexes: 20 }] })
+            .mockResolvedValueOnce({ rows: [{ total_connections: 10 }] })
+            .mockResolvedValueOnce({ rows: [{ size_bytes: 1000000 }] });
+
+        const tool = tools.find(t => t.name === 'pg_performance_baseline')!;
+        const result = await tool.handler(undefined, mockContext) as { name: string };
+
+        expect(result.name).toMatch(/^baseline_\d{4}-\d{2}-\d{2}T/);
+    });
+});
+
+describe('Parameter Aliases', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getPerformanceTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getPerformanceTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('pg_partition_strategy_suggest should accept tableName alias', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ relname: 'orders', n_live_tup: 1000 }] })
+            .mockResolvedValueOnce({ rows: [{ column_name: 'id', data_type: 'integer' }] })
+            .mockResolvedValueOnce({ rows: [{ table_size: '1 MB', size_bytes: 1000000 }] });
+
+        const tool = tools.find(t => t.name === 'pg_partition_strategy_suggest')!;
+        const result = await tool.handler({ tableName: 'orders' }, mockContext) as { table: string };
+
+        expect(result.table).toBe('public.orders');
+    });
+
+    it('pg_partition_strategy_suggest should accept name alias', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ relname: 'events', n_live_tup: 500 }] })
+            .mockResolvedValueOnce({ rows: [{ column_name: 'created_at', data_type: 'timestamp' }] })
+            .mockResolvedValueOnce({ rows: [{ table_size: '500 KB', size_bytes: 500000 }] });
+
+        const tool = tools.find(t => t.name === 'pg_partition_strategy_suggest')!;
+        const result = await tool.handler({ name: 'events' }, mockContext) as { table: string };
+
+        expect(result.table).toBe('public.events');
+    });
+
+    it('pg_query_plan_compare should accept sql1/sql2 aliases', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ 'QUERY PLAN': [{ Plan: { 'Total Cost': 100 } }] }] })
+            .mockResolvedValueOnce({ rows: [{ 'QUERY PLAN': [{ Plan: { 'Total Cost': 50 } }] }] });
+
+        const tool = tools.find(t => t.name === 'pg_query_plan_compare')!;
+        const result = await tool.handler({
+            sql1: 'SELECT * FROM users',
+            sql2: 'SELECT id FROM users'
+        }, mockContext) as { query1: unknown; query2: unknown };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(2);
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            1,
+            expect.stringContaining('SELECT * FROM users')
+        );
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            2,
+            expect.stringContaining('SELECT id FROM users')
+        );
     });
 });

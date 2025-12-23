@@ -182,6 +182,11 @@ describe('pg_cron_unschedule', () => {
     });
 
     it('should unschedule by job ID', async () => {
+        // Mock lookup query (returns job info)
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ jobid: 5, jobname: 'test_job' }]
+        });
+        // Mock unschedule query
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [{ removed: true }]
         });
@@ -194,8 +199,8 @@ describe('pg_cron_unschedule', () => {
             message: string;
         };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            'SELECT cron.unschedule($1) as removed',
+        expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+            'SELECT cron.unschedule($1::bigint) as removed',
             [5]
         );
         expect(result.success).toBe(true);
@@ -203,30 +208,34 @@ describe('pg_cron_unschedule', () => {
     });
 
     it('should unschedule by job name', async () => {
+        // Mock lookup query (returns job info)
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ jobid: 10, jobname: 'heartbeat' }]
+        });
+        // Mock unschedule query
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [{ removed: true }]
         });
 
         const tool = tools.find(t => t.name === 'pg_cron_unschedule')!;
-        await tool.handler({
+        const result = await tool.handler({
             jobName: 'heartbeat'
-        }, mockContext);
+        }, mockContext) as { jobId: number | null };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            'SELECT cron.unschedule($1) as removed',
+        expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+            'SELECT cron.unschedule($1::text) as removed',
             ['heartbeat']
         );
+        // Verify jobId is returned from lookup
+        expect(result.jobId).toBe(10);
     });
 
     it('should fail when no identifier provided', async () => {
         const tool = tools.find(t => t.name === 'pg_cron_unschedule')!;
-        const result = await tool.handler({}, mockContext) as {
-            success: boolean;
-            error: string;
-        };
 
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('must be provided');
+        await expect(tool.handler({}, mockContext)).rejects.toThrow(
+            'Either jobId or jobName must be provided'
+        );
     });
 });
 
@@ -444,5 +453,174 @@ describe('pg_cron_cleanup_history', () => {
             expect.stringContaining('jobid = $1'),
             [5]
         );
+    });
+
+    it('should accept days alias for olderThanDays', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rowsAffected: 25 });
+
+        const tool = tools.find(t => t.name === 'pg_cron_cleanup_history')!;
+        const result = await tool.handler({ days: 14 }, mockContext) as {
+            olderThanDays: number;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining("interval '14 days'"),
+            []
+        );
+        expect(result.olderThanDays).toBe(14);
+    });
+});
+
+describe('pg_cron parameter aliases', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getCronTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getCronTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('should accept sql alias for command in schedule', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ jobid: 10 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_cron_schedule')!;
+        const result = await tool.handler({
+            schedule: '0 * * * *',
+            sql: 'SELECT NOW()'  // alias for command
+        }, mockContext) as { success: boolean; jobId: number };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'SELECT cron.schedule($1, $2) as jobid',
+            ['0 * * * *', 'SELECT NOW()']
+        );
+        expect(result.success).toBe(true);
+    });
+
+    it('should accept query alias for command in schedule', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ jobid: 11 }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_cron_schedule')!;
+        const result = await tool.handler({
+            schedule: '30 2 * * *',
+            query: 'VACUUM users'  // alias for command
+        }, mockContext) as { success: boolean; jobId: number };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            'SELECT cron.schedule($1, $2) as jobid',
+            ['30 2 * * *', 'VACUUM users']
+        );
+        expect(result.success).toBe(true);
+    });
+});
+
+describe('pg_cron string jobId coercion', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getCronTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getCronTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('should accept string jobId in pg_cron_unschedule', async () => {
+        // Mock lookup query (returns job info)
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ jobid: 5, jobname: null }]
+        });
+        // Mock unschedule query
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ removed: true }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_cron_unschedule')!;
+        const result = await tool.handler({
+            jobId: '5'  // String from listJobs
+        }, mockContext) as { success: boolean };
+
+        expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+            'SELECT cron.unschedule($1::bigint) as removed',
+            [5]  // Coerced to number
+        );
+        expect(result.success).toBe(true);
+    });
+
+    it('should accept string jobId in pg_cron_alter_job', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_cron_alter_job')!;
+        const result = await tool.handler({
+            jobId: '20',  // String from listJobs
+            schedule: '0 4 * * *'
+        }, mockContext) as { success: boolean; jobId: number };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('cron.alter_job'),
+            expect.arrayContaining([20, '0 4 * * *'])  // jobId coerced to number
+        );
+        expect(result.success).toBe(true);
+        expect(result.jobId).toBe(20);
+    });
+
+    it('should accept string jobId in pg_cron_job_run_details', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ runid: '101', jobid: '5', status: 'succeeded' }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_cron_job_run_details')!;
+        const result = await tool.handler({
+            jobId: '5'  // String from listJobs
+        }, mockContext) as { runs: Array<{ runid: number; jobid: number }>; count: number };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('jobid = $1'),
+            [5]  // Coerced to number
+        );
+        expect(result.count).toBe(1);
+        // Output should normalize to numbers
+        expect(result.runs[0].runid).toBe(101);
+        expect(result.runs[0].jobid).toBe(5);
+    });
+
+    it('should normalize list_jobs output to numbers', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [
+                { jobid: '1', jobname: 'test', schedule: '* * * * *', active: true },
+                { jobid: '2', jobname: 'test2', schedule: '0 * * * *', active: false }
+            ]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_cron_list_jobs')!;
+        const result = await tool.handler({}, mockContext) as {
+            jobs: Array<{ jobid: number }>;
+            count: number;
+        };
+
+        expect(result.jobs[0].jobid).toBe(1);  // Normalized to number
+        expect(result.jobs[1].jobid).toBe(2);  // Normalized to number
+    });
+
+    it('should accept string jobId in pg_cron_cleanup_history', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rowsAffected: 5 });
+
+        const tool = tools.find(t => t.name === 'pg_cron_cleanup_history')!;
+        const result = await tool.handler({
+            jobId: '10'  // String from listJobs
+        }, mockContext) as { success: boolean };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect.stringContaining('jobid = $1'),
+            [10]  // Coerced to number
+        );
+        expect(result.success).toBe(true);
     });
 });

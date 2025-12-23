@@ -11,6 +11,7 @@ import type { DatabaseAdapter } from '../adapters/DatabaseAdapter.js';
 import type { ToolFilterConfig } from '../types/index.js';
 import { parseToolFilter } from '../filtering/ToolFilter.js';
 import { logger } from '../utils/logger.js';
+import { SERVER_INSTRUCTIONS } from '../constants/ServerInstructions.js';
 
 export interface ServerConfig {
     name: string;
@@ -32,7 +33,8 @@ export class PostgresMcpServer {
         this.adapter = config.adapter;
         this.filterConfig = parseToolFilter(config.toolFilter);
 
-        // Create MCP server with logging capability enabled
+
+        // Create MCP server with logging capability enabled and server instructions
         this.mcpServer = new McpServer(
             {
                 name: config.name,
@@ -41,7 +43,8 @@ export class PostgresMcpServer {
             {
                 capabilities: {
                     logging: {}
-                }
+                },
+                instructions: SERVER_INSTRUCTIONS
             }
         );
 

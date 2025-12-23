@@ -87,6 +87,9 @@ describe('pg_partman_create_parent', () => {
     });
 
     it('should create a partition set with required parameters', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'public' }] });
+        // Mock create_parent result
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_create_parent')!;
@@ -96,8 +99,9 @@ describe('pg_partman_create_parent', () => {
             interval: '1 month'
         }, mockContext) as { success: boolean; parentTable: string; controlColumn: string };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining("partman.create_parent(p_parent_table := 'public.events', p_control := 'created_at', p_type := 'native', p_interval := '1 month')")
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            2,
+            expect.stringContaining("create_parent(p_parent_table := 'public.events', p_control := 'created_at', p_interval := '1 month')")
         );
         expect(result.success).toBe(true);
         expect(result.parentTable).toBe('public.events');
@@ -105,6 +109,9 @@ describe('pg_partman_create_parent', () => {
     });
 
     it('should include premake parameter when specified', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'public' }] });
+        // Mock create_parent result
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_create_parent')!;
@@ -115,12 +122,15 @@ describe('pg_partman_create_parent', () => {
             premake: 10
         }, mockContext) as { premake: number };
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
         expect(callArg).toContain('p_premake := 10');
         expect(result.premake).toBe(10);
     });
 
     it('should include start partition when specified', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'public' }] });
+        // Mock create_parent result
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_create_parent')!;
@@ -131,11 +141,14 @@ describe('pg_partman_create_parent', () => {
             startPartition: '2024-01-01'
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
         expect(callArg).toContain("p_start_partition := '2024-01-01'");
     });
 
     it('should include template table when specified', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'public' }] });
+        // Mock create_parent result
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_create_parent')!;
@@ -146,11 +159,14 @@ describe('pg_partman_create_parent', () => {
             templateTable: 'public.logs_template'
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
         expect(callArg).toContain("p_template_table := 'public.logs_template'");
     });
 
     it('should include default partition option when specified', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'public' }] });
+        // Mock create_parent result
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_create_parent')!;
@@ -161,8 +177,29 @@ describe('pg_partman_create_parent', () => {
             defaultPartition: true
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
         expect(callArg).toContain('p_default_table := true');
+    });
+
+    it('should accept table and column aliases for parentTable and controlColumn', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'public' }] });
+        // Mock create_parent result
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_partman_create_parent')!;
+        const result = await tool.handler({
+            table: 'public.events',      // alias for parentTable
+            column: 'created_at',        // alias for controlColumn
+            interval: '1 month'
+        }, mockContext) as { success: boolean; parentTable: string; controlColumn: string };
+
+        const callArg = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
+        expect(callArg).toContain("p_parent_table := 'public.events'");
+        expect(callArg).toContain("p_control := 'created_at'");
+        expect(result.success).toBe(true);
+        expect(result.parentTable).toBe('public.events');
+        expect(result.controlColumn).toBe('created_at');
     });
 });
 
@@ -179,22 +216,35 @@ describe('pg_partman_run_maintenance', () => {
     });
 
     it('should run maintenance for all partition sets', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock config query (new: iterates configs for all)
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ parent_table: 'public.events' }] });
+        // Mock table exists check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock run_maintenance for the table
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_run_maintenance')!;
         const result = await tool.handler({}, mockContext) as {
             success: boolean;
             parentTable: string;
+            maintained: string[];
             message: string;
         };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('SELECT partman.run_maintenance()');
         expect(result.success).toBe(true);
         expect(result.parentTable).toBe('all');
-        expect(result.message).toContain('all partition sets');
+        expect(result.maintained).toContain('public.events');
+        expect(result.message).toContain('partition sets');
     });
 
     it('should run maintenance for specific table', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock config check - table is managed
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock run_maintenance
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_run_maintenance')!;
@@ -202,13 +252,18 @@ describe('pg_partman_run_maintenance', () => {
             parentTable: 'public.events'
         }, mockContext) as { parentTable: string; message: string };
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
         expect(callArg).toContain("p_parent_table := 'public.events'");
         expect(result.parentTable).toBe('public.events');
         expect(result.message).toContain('public.events');
     });
 
     it('should include analyze option when specified', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock config check - table is managed
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock run_maintenance
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_run_maintenance')!;
@@ -217,7 +272,7 @@ describe('pg_partman_run_maintenance', () => {
             analyze: true
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
         expect(callArg).toContain('p_analyze := true');
     });
 });
@@ -235,6 +290,11 @@ describe('pg_partman_show_partitions', () => {
     });
 
     it('should list partitions for a table', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock config check - table is managed by pg_partman
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock show_partitions result
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [
                 { partition_schemaname: 'public', partition_tablename: 'events_p2024_01' },
@@ -247,8 +307,8 @@ describe('pg_partman_show_partitions', () => {
             parentTable: 'public.events'
         }, mockContext) as { partitions: unknown[]; count: number; parentTable: string };
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
-        expect(callArg).toContain("partman.show_partitions");
+        const callArg = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
+        expect(callArg).toContain("show_partitions");
         expect(callArg).toContain("p_parent_table := 'public.events'");
         expect(result.partitions).toHaveLength(2);
         expect(result.count).toBe(2);
@@ -256,6 +316,11 @@ describe('pg_partman_show_partitions', () => {
     });
 
     it('should include default partition when requested', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock config check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock show_partitions result
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_show_partitions')!;
@@ -264,11 +329,16 @@ describe('pg_partman_show_partitions', () => {
             includeDefault: true
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
         expect(callArg).toContain('p_include_default := true');
     });
 
     it('should use DESC order when specified', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock config check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock show_partitions result
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_show_partitions')!;
@@ -277,8 +347,24 @@ describe('pg_partman_show_partitions', () => {
             order: 'desc'
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
         expect(callArg).toContain("p_order := 'DESC'");
+    });
+
+    it('should accept table alias for parentTable', async () => {
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock config check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock show_partitions result
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ partition_schemaname: 'public', partition_tablename: 'events_p1' }] });
+
+        const tool = tools.find(t => t.name === 'pg_partman_show_partitions')!;
+        const result = await tool.handler({
+            table: 'public.events'  // alias for parentTable
+        }, mockContext) as { parentTable: string };
+
+        expect(result.parentTable).toBe('public.events');
     });
 });
 
@@ -295,6 +381,21 @@ describe('pg_partman_show_config', () => {
     });
 
     it('should return configuration for all partition sets', async () => {
+        // Mock schema detection query first
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ table_schema: 'partman' }]
+        });
+        // Mock column detection query
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [
+                { column_name: 'parent_table' },
+                { column_name: 'control' },
+                { column_name: 'partition_interval' },
+                { column_name: 'premake' },
+                { column_name: 'inherit_fk' }
+            ]
+        });
+        // Mock main config query
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [
                 { parent_table: 'public.events', control: 'created_at', partition_interval: '1 month' },
@@ -308,7 +409,8 @@ describe('pg_partman_show_config', () => {
             count: number;
         };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            3,
             expect.stringContaining('FROM partman.part_config'),
             []
         );
@@ -317,6 +419,19 @@ describe('pg_partman_show_config', () => {
     });
 
     it('should filter by parent table when specified', async () => {
+        // Mock schema detection query first
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ table_schema: 'partman' }]
+        });
+        // Mock column detection query
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [
+                { column_name: 'parent_table' },
+                { column_name: 'control' },
+                { column_name: 'partition_interval' }
+            ]
+        });
+        // Mock main config query
         mockAdapter.executeQuery.mockResolvedValueOnce({
             rows: [{ parent_table: 'public.events' }]
         });
@@ -326,7 +441,8 @@ describe('pg_partman_show_config', () => {
             parentTable: 'public.events'
         }, mockContext);
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            3,
             expect.stringContaining('WHERE parent_table = $1'),
             ['public.events']
         );
@@ -346,24 +462,39 @@ describe('pg_partman_check_default', () => {
     });
 
     it('should report when no default partition exists', async () => {
+        // Mock table existence check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock default partition query - no default found
         mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+        // Mock child partition check - has children (is partitioned)
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock relkind check - not needed if has children (we return early)
 
         const tool = tools.find(t => t.name === 'pg_partman_check_default')!;
         const result = await tool.handler({
             parentTable: 'public.events'
         }, mockContext) as {
             hasDefault: boolean;
+            isPartitioned: boolean;
+            hasChildPartitions: boolean;
             message: string;
         };
 
         expect(result.hasDefault).toBe(false);
-        expect(result.message).toBe('No default partition found');
+        expect(result.isPartitioned).toBe(true);
+        expect(result.hasChildPartitions).toBe(true);
+        expect(result.message).toContain('partitioned with child partitions but has no default');
     });
 
     it('should report when default partition has no data', async () => {
+        // Mock table existence check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock default partition query
         mockAdapter.executeQuery.mockResolvedValueOnce({
-            rows: [{ default_partition: 'events_default', schema: 'public', estimated_rows: 0 }]
+            rows: [{ default_partition: 'events_default', schema: 'public' }]
         });
+        // Mock COUNT query - no data
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ count: 0 }] });
 
         const tool = tools.find(t => t.name === 'pg_partman_check_default')!;
         const result = await tool.handler({
@@ -380,9 +511,14 @@ describe('pg_partman_check_default', () => {
     });
 
     it('should report when default partition has data', async () => {
+        // Mock table existence check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock default partition query
         mockAdapter.executeQuery.mockResolvedValueOnce({
-            rows: [{ default_partition: 'events_default', schema: 'public', estimated_rows: 5000 }]
+            rows: [{ default_partition: 'events_default', schema: 'public' }]
         });
+        // Mock COUNT query - has data
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ count: 1 }] });
 
         const tool = tools.find(t => t.name === 'pg_partman_check_default')!;
         const result = await tool.handler({
@@ -390,13 +526,11 @@ describe('pg_partman_check_default', () => {
         }, mockContext) as {
             hasDefault: boolean;
             hasDataInDefault: boolean;
-            estimatedRows: number;
             recommendation: string;
         };
 
         expect(result.hasDefault).toBe(true);
         expect(result.hasDataInDefault).toBe(true);
-        expect(result.estimatedRows).toBe(5000);
         expect(result.recommendation).toContain('pg_partman_partition_data');
     });
 });
@@ -415,30 +549,39 @@ describe('pg_partman_partition_data', () => {
 
     it('should move data from default to child partitions', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({ rows: [{ control: 'created_at', epoch: null }] }) // config check
-            .mockResolvedValueOnce({ rows: [{ partition_data_proc: 1000 }] }); // partition_data result
+            .mockResolvedValueOnce({ rows: [{ count: 100 }] }) // COUNT before
+            .mockResolvedValueOnce({ rows: [] }) // CALL returns no rows
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // COUNT after
 
         const tool = tools.find(t => t.name === 'pg_partman_partition_data')!;
         const result = await tool.handler({
             parentTable: 'public.events'
-        }, mockContext) as { success: boolean; rowsMoved: number; message: string };
+        }, mockContext) as { success: boolean; message: string; rowsMoved: number };
 
         expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
-            1,
-            expect.stringContaining('FROM partman.part_config'),
+            2,
+            expect.stringContaining('FROM'),
             ['public.events']
         );
         expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
-            2,
-            expect.stringContaining("partman.partition_data_proc(p_parent_table := 'public.events')")
+            4,
+            expect.stringContaining("CALL")  // Should use CALL for procedure
+        );
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            4,
+            expect.stringContaining("partition_data_proc(p_parent_table := 'public.events')")
         );
         expect(result.success).toBe(true);
-        expect(result.rowsMoved).toBe(1000);
-        expect(result.message).toContain('1000 rows');
+        expect(result.rowsMoved).toBe(100);
+        expect(result.message).toContain('100 rows moved');
     });
 
     it('should fail when no configuration found', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] }); // no config
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
+            .mockResolvedValueOnce({ rows: [] }); // no config
 
         const tool = tools.find(t => t.name === 'pg_partman_partition_data')!;
         const result = await tool.handler({
@@ -451,8 +594,11 @@ describe('pg_partman_partition_data', () => {
 
     it('should include batch size parameter when specified', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({ rows: [{ control: 'ts', epoch: null }] })
-            .mockResolvedValueOnce({ rows: [{ partition_data_proc: 100 }] });
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // COUNT before
+            .mockResolvedValueOnce({ rows: [] }) // CALL returns no rows
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // COUNT after
 
         const tool = tools.find(t => t.name === 'pg_partman_partition_data')!;
         await tool.handler({
@@ -460,14 +606,18 @@ describe('pg_partman_partition_data', () => {
             batchSize: 500
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
-        expect(callArg).toContain('p_batch_count := 500');
+        const callArg = mockAdapter.executeQuery.mock.calls[3]?.[0] as string;
+        expect(callArg).toContain('CALL');
+        expect(callArg).toContain('p_loop_count := 500');
     });
 
     it('should include lock wait parameter when specified', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({ rows: [{ control: 'ts', epoch: null }] })
-            .mockResolvedValueOnce({ rows: [{ partition_data_proc: 50 }] });
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // COUNT before
+            .mockResolvedValueOnce({ rows: [] }) // CALL returns no rows
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // COUNT after
 
         const tool = tools.find(t => t.name === 'pg_partman_partition_data')!;
         await tool.handler({
@@ -475,22 +625,27 @@ describe('pg_partman_partition_data', () => {
             lockWaitSeconds: 30
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[3]?.[0] as string;
+        expect(callArg).toContain('CALL');
         expect(callArg).toContain('p_lock_wait := 30');
     });
 
-    it('should report when no rows need to be moved', async () => {
+    it('should complete successfully with no specific row count', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({ rows: [{ control: 'created_at', epoch: null }] })
-            .mockResolvedValueOnce({ rows: [{ partition_data_proc: 0 }] });
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // COUNT before - 0 rows
+            .mockResolvedValueOnce({ rows: [] }) // CALL returns no rows
+            .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // COUNT after - still 0
 
         const tool = tools.find(t => t.name === 'pg_partman_partition_data')!;
         const result = await tool.handler({
             parentTable: 'public.events'
-        }, mockContext) as { rowsMoved: number; message: string };
+        }, mockContext) as { success: boolean; message: string; rowsMoved: number };
 
+        expect(result.success).toBe(true);
         expect(result.rowsMoved).toBe(0);
-        expect(result.message).toContain('No rows needed');
+        expect(result.message).toContain('no rows needed to be moved');
     });
 });
 
@@ -507,7 +662,9 @@ describe('pg_partman_set_retention', () => {
     });
 
     it('should set retention policy', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
+            .mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
 
         const tool = tools.find(t => t.name === 'pg_partman_set_retention')!;
         const result = await tool.handler({
@@ -519,7 +676,8 @@ describe('pg_partman_set_retention', () => {
             message: string;
         };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            2,
             expect.stringContaining("retention = '6 months'"),
             ['public.events']
         );
@@ -529,7 +687,9 @@ describe('pg_partman_set_retention', () => {
     });
 
     it('should set retention with keep table option', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
+            .mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
 
         const tool = tools.find(t => t.name === 'pg_partman_set_retention')!;
         const result = await tool.handler({
@@ -541,23 +701,22 @@ describe('pg_partman_set_retention', () => {
             message: string;
         };
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
         expect(callArg).toContain('retention_keep_table = true');
         expect(result.retentionKeepTable).toBe(true);
         expect(result.message).toContain('detached');
     });
 
-    it('should fail when no configuration found', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
+    it('should throw when no configuration found', async () => {
+        mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
+            .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
 
         const tool = tools.find(t => t.name === 'pg_partman_set_retention')!;
-        const result = await tool.handler({
+        await expect(tool.handler({
             parentTable: 'public.nonexistent',
             retention: '30 days'
-        }, mockContext) as { success: boolean; error: string };
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('No pg_partman configuration found');
+        }, mockContext)).rejects.toThrow('No pg_partman configuration found');
     });
 });
 
@@ -574,31 +733,42 @@ describe('pg_partman_undo_partition', () => {
     });
 
     it('should undo partitioning for a table', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({
-            rows: [{ undo_partition_proc: 5000 }]
-        });
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock target table exists check (new validation)
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock CALL undo_partition_proc - no result rows for CALL
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_undo_partition')!;
         const result = await tool.handler({
-            parentTable: 'public.events'
+            parentTable: 'public.events',
+            targetTable: 'public.events_archive'  // required parameter
         }, mockContext) as {
             success: boolean;
-            rowsMoved: number;
             message: string;
+            targetTable: string;
         };
 
-        expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-            expect.stringContaining("partman.undo_partition_proc(p_parent_table := 'public.events')")
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            3,
+            expect.stringContaining("CALL")
+        );
+        expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+            3,
+            expect.stringContaining("p_target_table := 'public.events_archive'")
         );
         expect(result.success).toBe(true);
-        expect(result.rowsMoved).toBe(5000);
-        expect(result.message).toContain('5000 rows consolidated');
+        expect(result.targetTable).toBe('public.events_archive');
     });
 
     it('should include target table when specified', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({
-            rows: [{ undo_partition_proc: 1000 }]
-        });
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock target table exists check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock CALL undo_partition_proc
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_undo_partition')!;
         const result = await tool.handler({
@@ -606,38 +776,46 @@ describe('pg_partman_undo_partition', () => {
             targetTable: 'public.events_archive'
         }, mockContext) as { targetTable: string };
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
         expect(callArg).toContain("p_target_table := 'public.events_archive'");
         expect(result.targetTable).toBe('public.events_archive');
     });
 
     it('should include batch size when specified', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({
-            rows: [{ undo_partition_proc: 500 }]
-        });
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock target table exists check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock CALL undo_partition_proc
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_undo_partition')!;
         await tool.handler({
             parentTable: 'public.events',
+            targetTable: 'public.events_archive',  // required parameter
             batchSize: 100
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
-        expect(callArg).toContain('p_batch_count := 100');
+        const callArg = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
+        expect(callArg).toContain('p_loop_count := 100');
     });
 
     it('should include keep table option when specified', async () => {
-        mockAdapter.executeQuery.mockResolvedValueOnce({
-            rows: [{ undo_partition_proc: 200 }]
-        });
+        // Mock schema detection
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] });
+        // Mock target table exists check
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
+        // Mock CALL undo_partition_proc
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
         const tool = tools.find(t => t.name === 'pg_partman_undo_partition')!;
         await tool.handler({
             parentTable: 'public.events',
+            targetTable: 'public.events_archive',  // required parameter
             keepTable: true
         }, mockContext);
 
-        const callArg = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        const callArg = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
         expect(callArg).toContain('p_keep_table := true');
     });
 });
@@ -656,6 +834,7 @@ describe('pg_partman_analyze_partition_health', () => {
 
     it('should analyze and report healthy partition set', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({ // config query
                 rows: [{
                     parent_table: 'public.events',
@@ -668,6 +847,7 @@ describe('pg_partman_analyze_partition_health', () => {
                     template_table: null
                 }]
             })
+            .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table exists check
             .mockResolvedValueOnce({ rows: [{ count: 10 }] }) // partition count
             .mockResolvedValueOnce({ rows: [] }); // default check (no default)
 
@@ -685,6 +865,7 @@ describe('pg_partman_analyze_partition_health', () => {
 
     it('should detect data in default partition', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({
                 rows: [{
                     parent_table: 'public.events',
@@ -695,6 +876,7 @@ describe('pg_partman_analyze_partition_health', () => {
                     automatic_maintenance: 'on'
                 }]
             })
+            .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table exists check
             .mockResolvedValueOnce({ rows: [{ count: 10 }] }) // partition count
             .mockResolvedValueOnce({ rows: [{ rows: 5000 }] }); // default has data
 
@@ -711,20 +893,22 @@ describe('pg_partman_analyze_partition_health', () => {
         expect(result.summary.overallHealth).toBe('issues_found');
     });
 
-    it('should detect missing retention policy', async () => {
+    it('should not flag missing retention as warning (intentional design for audit tables)', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({
                 rows: [{
                     parent_table: 'public.logs',
                     control: 'ts',
                     partition_interval: '1 day',
                     premake: 4,
-                    retention: null, // no retention
+                    retention: null, // no retention - intentional for audit tables
                     automatic_maintenance: 'on'
                 }]
             })
-            .mockResolvedValueOnce({ rows: [{ count: 10 }] })
-            .mockResolvedValueOnce({ rows: [] });
+            .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table exists check
+            .mockResolvedValueOnce({ rows: [{ count: 10 }] }) // partition count satisfies premake
+            .mockResolvedValueOnce({ rows: [] }); // no default partition
 
         const tool = tools.find(t => t.name === 'pg_partman_analyze_partition_health')!;
         const result = await tool.handler({}, mockContext) as {
@@ -732,14 +916,14 @@ describe('pg_partman_analyze_partition_health', () => {
             summary: { totalWarnings: number; overallHealth: string };
         };
 
-        expect(result.partitionSets[0]?.warnings).toContainEqual(expect.stringContaining('No retention policy'));
-        expect(result.partitionSets[0]?.recommendations).toContainEqual(expect.stringContaining('pg_partman_set_retention'));
-        expect(result.summary.totalWarnings).toBeGreaterThan(0);
-        expect(result.summary.overallHealth).toBe('warnings');
+        // Missing retention should NOT produce a warning (many valid use cases don't need retention)
+        expect(result.partitionSets[0]?.warnings).not.toContainEqual(expect.stringContaining('retention'));
+        expect(result.summary.overallHealth).toBe('healthy');
     });
 
     it('should detect when automatic maintenance is disabled', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({
                 rows: [{
                     parent_table: 'public.events',
@@ -763,6 +947,7 @@ describe('pg_partman_analyze_partition_health', () => {
 
     it('should detect insufficient partition count', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({
                 rows: [{
                     parent_table: 'public.events',
@@ -773,6 +958,7 @@ describe('pg_partman_analyze_partition_health', () => {
                     automatic_maintenance: 'on'
                 }]
             })
+            .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table exists check
             .mockResolvedValueOnce({ rows: [{ count: 3 }] }) // only 3 partitions
             .mockResolvedValueOnce({ rows: [] });
 
@@ -787,6 +973,7 @@ describe('pg_partman_analyze_partition_health', () => {
 
     it('should filter by specific table when provided', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({
                 rows: [{
                     parent_table: 'public.events',
@@ -806,7 +993,7 @@ describe('pg_partman_analyze_partition_health', () => {
         }, mockContext);
 
         expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
-            1,
+            2,
             expect.stringContaining('WHERE parent_table = $1'),
             ['public.events']
         );
@@ -814,6 +1001,7 @@ describe('pg_partman_analyze_partition_health', () => {
 
     it('should handle multiple partition sets', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ table_schema: 'partman' }] }) // schema detection
             .mockResolvedValueOnce({
                 rows: [
                     { parent_table: 'public.events', control: 'created_at', partition_interval: '1 month', premake: 4, retention: '1 year', automatic_maintenance: 'on' },

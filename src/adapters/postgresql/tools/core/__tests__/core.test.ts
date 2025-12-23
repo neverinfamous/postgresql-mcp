@@ -24,8 +24,8 @@ describe('getCoreTools', () => {
         tools = getCoreTools(adapter);
     });
 
-    it('should return 13 core tools', () => {
-        expect(tools).toHaveLength(13);
+    it('should return 19 core tools', () => {
+        expect(tools).toHaveLength(19);
     });
 
     it('should have all expected tool names', () => {
@@ -171,6 +171,58 @@ describe('Handler Execution', () => {
             await tool.handler({}, mockContext);
 
             expect(mockAdapter.listTables).toHaveBeenCalled();
+        });
+    });
+
+    describe('pg_read_query - query alias', () => {
+        it('should accept query as alias for sql parameter', async () => {
+            const expectedResult = createMockQueryResult([{ id: 1 }]);
+            mockAdapter.executeReadQuery.mockResolvedValue(expectedResult);
+
+            const tool = tools.find(t => t.name === 'pg_read_query')!;
+            const result = await tool.handler({ query: 'SELECT 1' }, mockContext) as {
+                rows: unknown[];
+            };
+
+            expect(mockAdapter.executeReadQuery).toHaveBeenCalledWith('SELECT 1', undefined);
+            expect(result.rows).toEqual([{ id: 1 }]);
+        });
+    });
+
+    describe('pg_write_query - query alias', () => {
+        it('should accept query as alias for sql parameter', async () => {
+            mockAdapter.executeWriteQuery.mockResolvedValue({
+                rows: [],
+                rowsAffected: 1,
+                command: 'INSERT',
+                executionTimeMs: 5
+            });
+
+            const tool = tools.find(t => t.name === 'pg_write_query')!;
+            const result = await tool.handler({
+                query: 'INSERT INTO users (name) VALUES ($1)',
+                params: ['test']
+            }, mockContext) as { rowsAffected: number };
+
+            expect(mockAdapter.executeWriteQuery).toHaveBeenCalled();
+            expect(result.rowsAffected).toBe(1);
+        });
+    });
+
+    describe('pg_create_index - column alias', () => {
+        it('should accept column (singular) as alias for columns (array)', async () => {
+            mockAdapter.executeQuery.mockResolvedValue({ rows: [], rowsAffected: 0 });
+
+            const tool = tools.find(t => t.name === 'pg_create_index')!;
+            const result = await tool.handler({
+                table: 'users',
+                column: 'email',  // Singular - should be auto-wrapped to array
+                name: 'idx_users_email'
+            }, mockContext) as { success: boolean };
+
+            expect(result.success).toBe(true);
+            const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+            expect(sql).toContain('"email"');
         });
     });
 

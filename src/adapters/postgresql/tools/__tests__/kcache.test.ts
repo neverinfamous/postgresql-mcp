@@ -145,6 +145,9 @@ describe('Kcache Tools', () => {
 
     describe('pg_kcache_top_cpu', () => {
         it('should return top CPU-consuming queries', async () => {
+            // First call: column detection (empty = old version)
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [{
                     queryid: '12345',
@@ -166,12 +169,15 @@ describe('Kcache Tools', () => {
         });
 
         it('should apply custom limit', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_kcache_top_cpu');
             await tool!.handler({ limit: 5 }, mockContext);
 
-            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
                 expect.stringContaining('LIMIT 5')
             );
         });
@@ -179,6 +185,9 @@ describe('Kcache Tools', () => {
 
     describe('pg_kcache_top_io', () => {
         it('should return top I/O queries by default (both)', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [{
                     queryid: '12345',
@@ -199,30 +208,59 @@ describe('Kcache Tools', () => {
         });
 
         it('should filter by reads only', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_kcache_top_io');
             await tool!.handler({ type: 'reads' }, mockContext);
 
-            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
                 expect.stringContaining('ORDER BY k.reads DESC')
             );
         });
 
         it('should filter by writes only', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_kcache_top_io');
             await tool!.handler({ type: 'writes' }, mockContext);
 
-            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
                 expect.stringContaining('ORDER BY k.writes DESC')
+            );
+        });
+
+        it('should support ioType alias for type parameter', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ queryid: '1', read_bytes: 1000 }]
+            });
+
+            const tool = findTool('pg_kcache_top_io');
+            const result = await tool!.handler({ ioType: 'reads' }, mockContext) as {
+                topIoQueries: unknown[];
+                ioType: string;
+            };
+
+            expect(result.ioType).toBe('reads');
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+                expect.stringContaining('ORDER BY k.reads DESC')
             );
         });
     });
 
     describe('pg_kcache_database_stats', () => {
         it('should return aggregated stats for all databases', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [
                     { database: 'testdb', total_cpu_time: 100.5, total_reads: 1024000 },
@@ -237,13 +275,16 @@ describe('Kcache Tools', () => {
             };
 
             expect(result.count).toBe(2);
-            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
                 expect.stringContaining('GROUP BY datname'),
                 []
             );
         });
 
         it('should filter by specific database', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [{ database: 'testdb', total_cpu_time: 100.5 }]
             });
@@ -251,7 +292,7 @@ describe('Kcache Tools', () => {
             const tool = findTool('pg_kcache_database_stats');
             await tool!.handler({ database: 'testdb' }, mockContext);
 
-            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
                 expect.stringContaining('d.datname = $1'),
                 ['testdb']
             );
@@ -260,6 +301,9 @@ describe('Kcache Tools', () => {
 
     describe('pg_kcache_resource_analysis', () => {
         it('should classify queries as CPU-bound or I/O-bound', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [
                     { queryid: '1', resource_classification: 'CPU-bound', cpu_time: 10, io_bytes: 1000 },
@@ -280,18 +324,39 @@ describe('Kcache Tools', () => {
         });
 
         it('should filter by specific queryId', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_kcache_resource_analysis');
             await tool!.handler({ queryId: '12345' }, mockContext);
 
-            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
                 expect.stringContaining("s.queryid::text = $1"),
                 ['12345']
             );
         });
 
+        it('should apply custom limit', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_kcache_resource_analysis');
+            await tool!.handler({ limit: 5 }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+                expect.stringContaining('LIMIT 5'),
+                []
+            );
+        });
+
         it('should provide recommendations based on analysis', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [
                     { resource_classification: 'CPU-bound' },
@@ -309,6 +374,9 @@ describe('Kcache Tools', () => {
         });
 
         it('should recommend I/O optimization when I/O-bound > CPU-bound', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [
                     { resource_classification: 'I/O-bound' },
@@ -330,6 +398,9 @@ describe('Kcache Tools', () => {
         });
 
         it('should recommend balanced optimization when workload is balanced', async () => {
+            // First call: column detection
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Second call: actual query
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [
                     { resource_classification: 'Balanced' },
@@ -380,5 +451,57 @@ describe('Kcache Tools', () => {
         expect(toolNames).toContain('pg_kcache_database_stats');
         expect(toolNames).toContain('pg_kcache_resource_analysis');
         expect(toolNames).toContain('pg_kcache_reset');
+    });
+
+    describe('No-Arg Calls (undefined params)', () => {
+        it('pg_kcache_top_cpu should work with undefined params', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ queryid: '1', total_cpu_time: 10 }] });
+
+            const tool = findTool('pg_kcache_top_cpu');
+            const result = await tool!.handler(undefined, mockContext) as { topCpuQueries: unknown[] };
+
+            expect(result.topCpuQueries).toHaveLength(1);
+        });
+
+        it('pg_kcache_top_io should work with undefined params', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ queryid: '1', total_io_bytes: 1000 }] });
+
+            const tool = findTool('pg_kcache_top_io');
+            const result = await tool!.handler(undefined, mockContext) as { topIoQueries: unknown[]; ioType: string };
+
+            expect(result.topIoQueries).toHaveLength(1);
+            expect(result.ioType).toBe('both');
+        });
+
+        it('pg_kcache_database_stats should work with undefined params', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ database: 'testdb' }] });
+
+            const tool = findTool('pg_kcache_database_stats');
+            const result = await tool!.handler(undefined, mockContext) as { databaseStats: unknown[] };
+
+            expect(result.databaseStats).toHaveLength(1);
+        });
+
+        it('pg_kcache_query_stats should work with undefined params', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ queryid: '1' }] });
+
+            const tool = findTool('pg_kcache_query_stats');
+            const result = await tool!.handler(undefined, mockContext) as { queries: unknown[] };
+
+            expect(result.queries).toHaveLength(1);
+        });
+
+        it('pg_kcache_resource_analysis should work with undefined params', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ resource_classification: 'Balanced' }] });
+
+            const tool = findTool('pg_kcache_resource_analysis');
+            const result = await tool!.handler(undefined, mockContext) as { queries: unknown[] };
+
+            expect(result.queries).toHaveLength(1);
+        });
     });
 });

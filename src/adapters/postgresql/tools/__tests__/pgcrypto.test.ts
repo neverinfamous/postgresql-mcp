@@ -190,13 +190,10 @@ describe('Pgcrypto Tools', () => {
             mockAdapter.executeQuery.mockRejectedValueOnce(new Error('Wrong key'));
 
             const tool = findTool('pg_pgcrypto_decrypt');
-            const result = await tool!.handler({
+            await expect(tool!.handler({
                 encryptedData: 'invalid_data',
                 password: 'wrong_password'
-            }, mockContext) as { success: boolean; error: string };
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('failed');
+            }, mockContext)).rejects.toThrow();
         });
     });
 
@@ -208,6 +205,24 @@ describe('Pgcrypto Tools', () => {
 
             const tool = findTool('pg_pgcrypto_gen_random_uuid');
             const result = await tool!.handler({}, mockContext) as {
+                success: boolean;
+                uuids: string[];
+                count: number;
+            };
+
+            expect(result.success).toBe(true);
+            expect(result.uuids).toHaveLength(1);
+            expect(result.count).toBe(1);
+        });
+
+        it('should handle undefined params (zero-argument call)', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ uuid: '550e8400-e29b-41d4-a716-446655440000' }]
+            });
+
+            const tool = findTool('pg_pgcrypto_gen_random_uuid');
+            // Pass undefined to simulate calling without arguments
+            const result = await tool!.handler(undefined, mockContext) as {
                 success: boolean;
                 uuids: string[];
                 count: number;

@@ -16,9 +16,12 @@ export {
     CreateIndexSchema,
     BeginTransactionSchema,
     TransactionIdSchema,
+    TransactionIdSchemaBase,
     SavepointSchema,
+    SavepointSchemaBase,
     ExecuteInTransactionSchema,
-    TransactionExecuteSchema
+    TransactionExecuteSchema,
+    TransactionExecuteSchemaBase
 } from './core.js';
 
 // JSONB operation schemas
@@ -26,7 +29,16 @@ export {
     JsonbExtractSchema,
     JsonbSetSchema,
     JsonbContainsSchema,
-    JsonbPathQuerySchema
+    JsonbPathQuerySchema,
+    JsonbInsertSchema,
+    JsonbDeleteSchema,
+    // Path normalization functions (for handler use)
+    normalizePathToArray,
+    normalizePathForInsert,
+    normalizePathToString,
+    parseJsonbValue,
+    stringPathToArray,
+    arrayPathToString
 } from './jsonb.js';
 
 // Text search schemas
@@ -46,10 +58,15 @@ export {
 // Admin operation schemas
 export {
     VacuumSchema,
+    VacuumSchemaBase,
     AnalyzeSchema,
+    AnalyzeSchemaBase,
     ReindexSchema,
+    ReindexSchemaBase,
     TerminateBackendSchema,
-    CancelBackendSchema
+    TerminateBackendSchemaBase,
+    CancelBackendSchema,
+    CancelBackendSchemaBase
 } from './admin.js';
 
 // Monitoring schemas
@@ -62,6 +79,7 @@ export {
 // Backup and export schemas
 export {
     CopyExportSchema,
+    CopyExportSchemaBase,
     DumpSchemaSchema
 } from './backup.js';
 
@@ -76,14 +94,44 @@ export {
 // pgvector schemas
 export {
     VectorSearchSchema,
-    VectorCreateIndexSchema
+    VectorCreateIndexSchema,
+    FiniteNumberArray
 } from './vector.js';
 
 // PostGIS schemas
 export {
+    // Base schemas for MCP visibility
+    GeometryColumnSchemaBase,
+    GeometryDistanceSchemaBase,
+    PointInPolygonSchemaBase,
+    SpatialIndexSchemaBase,
+    BufferSchemaBase,
+    IntersectionSchemaBase,
+    BoundingBoxSchemaBase,
+    GeocodeSchemaBase,
+    GeoTransformSchemaBase,
+    GeoClusterSchemaBase,
+    GeometryBufferSchemaBase,
+    GeometryIntersectionSchemaBase,
+    GeometryTransformSchemaBase,
+    // Transformed schemas for handler validation
+    GeometryColumnSchema,
     GeometryDistanceSchema,
     PointInPolygonSchema,
-    SpatialIndexSchema
+    SpatialIndexSchema,
+    BufferSchema,
+    IntersectionSchema,
+    BoundingBoxSchema,
+    GeocodeSchema,
+    GeoTransformSchema,
+    GeoClusterSchema,
+    GeometryBufferSchema,
+    GeometryIntersectionSchema,
+    GeometryTransformSchema,
+    // Utility functions
+    preprocessPostgisParams,
+    preprocessPoint,
+    convertToMeters
 } from './postgis.js';
 
 // Partitioning schemas
@@ -97,11 +145,14 @@ export {
 // pg_cron schemas
 export {
     CronScheduleSchema,
+    CronScheduleSchemaBase,
     CronScheduleInDatabaseSchema,
+    CronScheduleInDatabaseSchemaBase,
     CronUnscheduleSchema,
     CronAlterJobSchema,
     CronJobRunDetailsSchema,
-    CronCleanupHistorySchema
+    CronCleanupHistorySchema,
+    CronCleanupHistorySchemaBase
 } from './cron.js';
 
 // pg_partman schemas
@@ -125,22 +176,31 @@ export {
     KcacheResourceAnalysisSchema,
     // citext
     CitextConvertColumnSchema,
+    CitextConvertColumnSchemaBase,
     CitextListColumnsSchema,
     CitextAnalyzeCandidatesSchema,
     CitextSchemaAdvisorSchema,
+    CitextSchemaAdvisorSchemaBase,
     // ltree
     LtreeQuerySchema,
+    LtreeQuerySchemaBase,
     LtreeSubpathSchema,
+    LtreeSubpathSchemaBase,
     LtreeLcaSchema,
     LtreeMatchSchema,
+    LtreeMatchSchemaBase,
     LtreeListColumnsSchema,
     LtreeConvertColumnSchema,
+    LtreeConvertColumnSchemaBase,
     LtreeIndexSchema,
+    LtreeIndexSchemaBase,
     // pgcrypto
     PgcryptoHashSchema,
     PgcryptoHmacSchema,
     PgcryptoEncryptSchema,
+    PgcryptoEncryptSchemaBase,
     PgcryptoDecryptSchema,
+    PgcryptoDecryptSchemaBase,
     PgcryptoRandomBytesSchema,
     PgcryptoGenSaltSchema,
     PgcryptoCryptSchema

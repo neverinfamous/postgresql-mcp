@@ -8,18 +8,38 @@ import { z } from 'zod';
 import { readOnly } from '../../../../utils/annotations.js';
 import { getToolIcons } from '../../../../utils/icons.js';
 
+// Helper to handle undefined params (allows tools to be called without {})
+const defaultToEmpty = (val: unknown): unknown => val ?? {};
+
+// Preprocess partition strategy params with tableName/name aliases
+function preprocessPartitionStrategyParams(input: unknown): unknown {
+    const normalized = defaultToEmpty(input) as Record<string, unknown>;
+    const result = { ...normalized };
+    // Alias: tableName/name → table
+    if (result['table'] === undefined) {
+        if (result['tableName'] !== undefined) result['table'] = result['tableName'];
+        else if (result['name'] !== undefined) result['table'] = result['name'];
+    }
+    return result;
+}
+
 export function createPerformanceBaselineTool(adapter: PostgresAdapter): ToolDefinition {
+    const PerformanceBaselineSchema = z.preprocess(
+        defaultToEmpty,
+        z.object({
+            name: z.string().optional().describe('Baseline name for reference')
+        })
+    );
+
     return {
         name: 'pg_performance_baseline',
         description: 'Capture current database performance metrics as a baseline for comparison.',
         group: 'performance',
-        inputSchema: z.object({
-            name: z.string().optional().describe('Baseline name for reference')
-        }),
+        inputSchema: PerformanceBaselineSchema,
         annotations: readOnly('Performance Baseline'),
         icons: getToolIcons('performance', readOnly('Performance Baseline')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { name?: string });
+            const parsed = PerformanceBaselineSchema.parse(params);
             const baselineName = parsed.name ?? `baseline_${new Date().toISOString()}`;
 
             const [cacheHit, tableStats, indexStats, connections, dbSize] = await Promise.all([
@@ -150,18 +170,23 @@ export function createConnectionPoolOptimizeTool(adapter: PostgresAdapter): Tool
 }
 
 export function createPartitionStrategySuggestTool(adapter: PostgresAdapter): ToolDefinition {
+    const PartitionStrategySchema = z.preprocess(
+        preprocessPartitionStrategyParams,
+        z.object({
+            table: z.string().describe('Table to analyze'),
+            schema: z.string().optional().describe('Schema name')
+        })
+    );
+
     return {
         name: 'pg_partition_strategy_suggest',
         description: 'Analyze a table and suggest optimal partitioning strategy.',
         group: 'performance',
-        inputSchema: z.object({
-            table: z.string().describe('Table to analyze'),
-            schema: z.string().optional().describe('Schema name')
-        }),
+        inputSchema: PartitionStrategySchema,
         annotations: readOnly('Partition Strategy Suggest'),
         icons: getToolIcons('performance', readOnly('Partition Strategy Suggest')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { table: string; schema?: string });
+            const parsed = PartitionStrategySchema.parse(params);
             const schemaName = parsed.schema ?? 'public';
 
             const [tableInfo, columnInfo, tableSize] = await Promise.all([

@@ -23,6 +23,54 @@ import {
     KcacheResourceAnalysisSchema
 } from '../schemas/index.js';
 
+// Helper to handle undefined params (allows tools to be called without {})
+const defaultToEmpty = (val: unknown): unknown => val ?? {};
+
+/**
+ * Column naming in pg_stat_kcache changed in version 2.2:
+ * - Old (< 2.2): user_time, system_time, reads, writes
+ * - New (>= 2.2): exec_user_time, exec_system_time, exec_reads, exec_writes
+ * 
+ * IMPORTANT: The pg_stat_kcache() FUNCTION returns columns like exec_reads (bytes).
+ * The pg_stat_kcache VIEW has different columns like exec_reads_blks.
+ * This helper returns column names for the FUNCTION (used with queryid joins).
+ */
+interface KcacheColumns {
+    userTime: string;
+    systemTime: string;
+    reads: string;  // bytes (not blocks!)
+    writes: string; // bytes (not blocks!)
+    minflts: string;
+    majflts: string;
+}
+
+async function getKcacheColumnNames(adapter: PostgresAdapter): Promise<KcacheColumns> {
+    const result = await adapter.executeQuery(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'pg_stat_kcache' AND column_name = 'exec_user_time'
+    `);
+    const isNewVersion = (result.rows?.length ?? 0) > 0;
+
+    if (isNewVersion) {
+        return {
+            userTime: 'exec_user_time',
+            systemTime: 'exec_system_time',
+            reads: 'exec_reads',      // function returns bytes, not blocks
+            writes: 'exec_writes',    // function returns bytes, not blocks
+            minflts: 'exec_minflts',
+            majflts: 'exec_majflts'
+        };
+    }
+    return {
+        userTime: 'user_time',
+        systemTime: 'system_time',
+        reads: 'reads',
+        writes: 'writes',
+        minflts: 'minflts',
+        majflts: 'majflts'
+    };
+}
+
 /**
  * Get all pg_stat_kcache tools
  */
@@ -83,21 +131,24 @@ function createKcacheQueryStatsTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_kcache_query_stats',
         description: `Get query statistics with OS-level CPU and I/O metrics. 
-Joins pg_stat_statements with pg_stat_kcache to show what SQL did AND what system resources it consumed.`,
+Joins pg_stat_statements with pg_stat_kcache to show what SQL did AND what system resources it consumed.
+
+orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minCalls parameter to filter by call count.`,
         group: 'kcache',
         inputSchema: KcacheQueryStatsSchema,
         annotations: readOnly('Kcache Query Stats'),
         icons: getToolIcons('kcache', readOnly('Kcache Query Stats')),
         handler: async (params: unknown, _context: RequestContext) => {
             const { limit, orderBy, minCalls } = KcacheQueryStatsSchema.parse(params);
+            const cols = await getKcacheColumnNames(adapter);
 
             const limitVal = limit ?? 25;
             const orderColumn = orderBy === 'cpu_time'
-                ? '(k.user_time + k.system_time)'
+                ? `(k.${cols.userTime} + k.${cols.systemTime})`
                 : orderBy === 'reads'
-                    ? 'k.reads'
+                    ? `k.${cols.reads}`
                     : orderBy === 'writes'
-                        ? 'k.writes'
+                        ? `k.${cols.writes}`
                         : 's.total_exec_time';
 
             const conditions: string[] = [];
@@ -120,15 +171,15 @@ Joins pg_stat_statements with pg_stat_kcache to show what SQL did AND what syste
                     s.calls,
                     s.total_exec_time as total_time_ms,
                     s.mean_exec_time as mean_time_ms,
-                    k.user_time,
-                    k.system_time,
-                    (k.user_time + k.system_time) as total_cpu_time,
-                    k.reads,
-                    k.reads_blks,
-                    k.writes,
-                    k.writes_blks,
-                    k.minflts as minor_page_faults,
-                    k.majflts as major_page_faults
+                    k.${cols.userTime} as user_time,
+                    k.${cols.systemTime} as system_time,
+                    (k.${cols.userTime} + k.${cols.systemTime}) as total_cpu_time,
+                    k.${cols.reads} as read_bytes,
+                    k.${cols.writes} as write_bytes,
+                    pg_size_pretty(k.${cols.reads}::bigint) as reads_pretty,
+                    pg_size_pretty(k.${cols.writes}::bigint) as writes_pretty,
+                    k.${cols.minflts} as minor_page_faults,
+                    k.${cols.majflts} as major_page_faults
                 FROM pg_stat_statements s
                 JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
                     AND s.userid = k.userid 
@@ -158,40 +209,44 @@ function createKcacheTopCpuTool(adapter: PostgresAdapter): ToolDefinition {
         description: `Get top CPU-consuming queries. Shows which queries spend the most time 
 in user CPU (application code) vs system CPU (kernel operations).`,
         group: 'kcache',
-        inputSchema: z.object({
-            limit: z.number().optional().describe('Number of top queries to return (default: 10)')
-        }),
+        inputSchema: z.preprocess(
+            defaultToEmpty,
+            z.object({
+                limit: z.number().optional().describe('Number of top queries to return (default: 10)')
+            })
+        ),
         annotations: readOnly('Kcache Top CPU'),
         icons: getToolIcons('kcache', readOnly('Kcache Top CPU')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = params as { limit?: number };
+            const parsed = z.object({ limit: z.number().optional() }).parse(params ?? {});
             const limitVal = parsed.limit ?? 10;
+            const cols = await getKcacheColumnNames(adapter);
 
             const sql = `
                 SELECT 
                     s.queryid,
                     LEFT(s.query, 100) as query_preview,
                     s.calls,
-                    k.user_time,
-                    k.system_time,
-                    (k.user_time + k.system_time) as total_cpu_time,
+                    k.${cols.userTime} as user_time,
+                    k.${cols.systemTime} as system_time,
+                    (k.${cols.userTime} + k.${cols.systemTime}) as total_cpu_time,
                     CASE 
-                        WHEN (k.user_time + k.system_time) > 0 
-                        THEN ROUND((k.user_time / (k.user_time + k.system_time) * 100)::numeric, 2)
+                        WHEN (k.${cols.userTime} + k.${cols.systemTime}) > 0 
+                        THEN ROUND((k.${cols.userTime} / (k.${cols.userTime} + k.${cols.systemTime}) * 100)::numeric, 2)
                         ELSE 0 
                     END as user_cpu_percent,
                     s.total_exec_time as total_time_ms,
                     CASE 
                         WHEN s.total_exec_time > 0 
-                        THEN ROUND(((k.user_time + k.system_time) / s.total_exec_time * 100)::numeric, 2)
+                        THEN ROUND(((k.${cols.userTime} + k.${cols.systemTime}) / s.total_exec_time * 100)::numeric, 2)
                         ELSE 0 
                     END as cpu_time_percent
                 FROM pg_stat_statements s
                 JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
                     AND s.userid = k.userid 
                     AND s.dbid = k.dbid
-                WHERE (k.user_time + k.system_time) > 0
-                ORDER BY (k.user_time + k.system_time) DESC
+                WHERE (k.${cols.userTime} + k.${cols.systemTime}) > 0
+                ORDER BY (k.${cols.userTime} + k.${cols.systemTime}) DESC
                 LIMIT ${String(limitVal)}
             `;
 
@@ -215,42 +270,64 @@ function createKcacheTopIoTool(adapter: PostgresAdapter): ToolDefinition {
         description: `Get top I/O-consuming queries. Shows filesystem-level reads and writes, 
 which represent actual disk access (not just shared buffer hits).`,
         group: 'kcache',
-        inputSchema: z.object({
-            type: z.enum(['reads', 'writes', 'both']).optional()
-                .describe('I/O type to rank by (default: both)'),
-            limit: z.number().optional().describe('Number of top queries to return (default: 10)')
-        }),
+        inputSchema: z.preprocess(
+            (input) => {
+                const obj = defaultToEmpty(input) as Record<string, unknown>;
+                // Alias: ioType -> type
+                if (obj['ioType'] !== undefined && obj['type'] === undefined) {
+                    obj['type'] = obj['ioType'];
+                }
+                return obj;
+            },
+            z.object({
+                type: z.enum(['reads', 'writes', 'both']).optional()
+                    .describe('I/O type to rank by (default: both)'),
+                ioType: z.enum(['reads', 'writes', 'both']).optional()
+                    .describe('Alias for type'),
+                limit: z.number().optional().describe('Number of top queries to return (default: 10)')
+            })
+        ),
         annotations: readOnly('Kcache Top IO'),
         icons: getToolIcons('kcache', readOnly('Kcache Top IO')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = params as { type?: 'reads' | 'writes' | 'both'; limit?: number };
+            // Apply the same preprocessing as inputSchema
+            const preprocessed = (() => {
+                const obj = (params ?? {}) as Record<string, unknown>;
+                if (obj['ioType'] !== undefined && obj['type'] === undefined) {
+                    return { ...obj, type: obj['ioType'] };
+                }
+                return obj;
+            })();
+            const parsed = z.object({
+                type: z.enum(['reads', 'writes', 'both']).optional(),
+                limit: z.number().optional()
+            }).parse(preprocessed);
             const ioType = parsed.type ?? 'both';
             const limitVal = parsed.limit ?? 10;
+            const cols = await getKcacheColumnNames(adapter);
 
             const orderColumn = ioType === 'reads'
-                ? 'k.reads'
+                ? `k.${cols.reads}`
                 : ioType === 'writes'
-                    ? 'k.writes'
-                    : '(k.reads + k.writes)';
+                    ? `k.${cols.writes}`
+                    : `(k.${cols.reads} + k.${cols.writes})`;
 
             const sql = `
                 SELECT 
                     s.queryid,
                     LEFT(s.query, 100) as query_preview,
                     s.calls,
-                    k.reads as read_bytes,
-                    k.reads_blks as read_blocks,
-                    k.writes as write_bytes,
-                    k.writes_blks as write_blocks,
-                    (k.reads + k.writes) as total_io_bytes,
-                    pg_size_pretty(k.reads::bigint) as reads_pretty,
-                    pg_size_pretty(k.writes::bigint) as writes_pretty,
+                    k.${cols.reads} as read_bytes,
+                    k.${cols.writes} as write_bytes,
+                    (k.${cols.reads} + k.${cols.writes}) as total_io_bytes,
+                    pg_size_pretty(k.${cols.reads}::bigint) as reads_pretty,
+                    pg_size_pretty(k.${cols.writes}::bigint) as writes_pretty,
                     s.total_exec_time as total_time_ms
                 FROM pg_stat_statements s
                 JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
                     AND s.userid = k.userid 
                     AND s.dbid = k.dbid
-                WHERE (k.reads + k.writes) > 0
+                WHERE (k.${cols.reads} + k.${cols.writes}) > 0
                 ORDER BY ${orderColumn} DESC
                 LIMIT ${String(limitVal)}
             `;
@@ -281,6 +358,7 @@ Shows total CPU time, I/O, and page faults across all queries.`,
         icons: getToolIcons('kcache', readOnly('Kcache Database Stats')),
         handler: async (params: unknown, _context: RequestContext) => {
             const { database } = KcacheDatabaseStatsSchema.parse(params);
+            const cols = await getKcacheColumnNames(adapter);
 
             let sql: string;
             const queryParams: unknown[] = [];
@@ -289,16 +367,16 @@ Shows total CPU time, I/O, and page faults across all queries.`,
                 sql = `
                     SELECT 
                         d.datname as database,
-                        SUM(k.user_time) as total_user_time,
-                        SUM(k.system_time) as total_system_time,
-                        SUM(k.user_time + k.system_time) as total_cpu_time,
-                        SUM(k.reads) as total_reads,
-                        SUM(k.writes) as total_writes,
-                        pg_size_pretty(SUM(k.reads)::bigint) as total_reads_pretty,
-                        pg_size_pretty(SUM(k.writes)::bigint) as total_writes_pretty,
-                        SUM(k.minflts) as total_minor_faults,
-                        SUM(k.majflts) as total_major_faults,
-                        COUNT(DISTINCT k.queryid) as unique_queries
+                        SUM(k.${cols.userTime}) as total_user_time,
+                        SUM(k.${cols.systemTime}) as total_system_time,
+                        SUM(k.${cols.userTime} + k.${cols.systemTime}) as total_cpu_time,
+                        SUM(k.${cols.reads}) as total_read_bytes,
+                        SUM(k.${cols.writes}) as total_write_bytes,
+                        pg_size_pretty(SUM(k.${cols.reads})::bigint) as total_reads_pretty,
+                        pg_size_pretty(SUM(k.${cols.writes})::bigint) as total_writes_pretty,
+                        SUM(k.${cols.minflts}) as total_minor_faults,
+                        SUM(k.${cols.majflts}) as total_major_faults,
+                        COUNT(*) as total_statement_entries
                     FROM pg_stat_kcache k
                     JOIN pg_database d ON k.datname = d.datname
                     WHERE d.datname = $1
@@ -309,19 +387,19 @@ Shows total CPU time, I/O, and page faults across all queries.`,
                 sql = `
                     SELECT 
                         datname as database,
-                        SUM(user_time) as total_user_time,
-                        SUM(system_time) as total_system_time,
-                        SUM(user_time + system_time) as total_cpu_time,
-                        SUM(reads) as total_reads,
-                        SUM(writes) as total_writes,
-                        pg_size_pretty(SUM(reads)::bigint) as total_reads_pretty,
-                        pg_size_pretty(SUM(writes)::bigint) as total_writes_pretty,
-                        SUM(minflts) as total_minor_faults,
-                        SUM(majflts) as total_major_faults,
-                        COUNT(DISTINCT queryid) as unique_queries
+                        SUM(${cols.userTime}) as total_user_time,
+                        SUM(${cols.systemTime}) as total_system_time,
+                        SUM(${cols.userTime} + ${cols.systemTime}) as total_cpu_time,
+                        SUM(${cols.reads}) as total_read_bytes,
+                        SUM(${cols.writes}) as total_write_bytes,
+                        pg_size_pretty(SUM(${cols.reads})::bigint) as total_reads_pretty,
+                        pg_size_pretty(SUM(${cols.writes})::bigint) as total_writes_pretty,
+                        SUM(${cols.minflts}) as total_minor_faults,
+                        SUM(${cols.majflts}) as total_major_faults,
+                        COUNT(*) as total_statement_entries
                     FROM pg_stat_kcache
                     GROUP BY datname
-                    ORDER BY SUM(user_time + system_time) DESC
+                    ORDER BY SUM(${cols.userTime} + ${cols.systemTime}) DESC
                 `;
             }
 
@@ -348,8 +426,10 @@ Helps identify the root cause of performance issues - is the query computation-h
         annotations: readOnly('Kcache Resource Analysis'),
         icons: getToolIcons('kcache', readOnly('Kcache Resource Analysis')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { queryId, threshold } = KcacheResourceAnalysisSchema.parse(params);
+            const { queryId, threshold, limit } = KcacheResourceAnalysisSchema.parse(params);
             const thresholdVal = threshold ?? 0.5;
+            const limitVal = limit ?? 50;
+            const cols = await getKcacheColumnNames(adapter);
 
             const conditions: string[] = [];
             const queryParams: unknown[] = [];
@@ -360,7 +440,7 @@ Helps identify the root cause of performance issues - is the query computation-h
                 queryParams.push(queryId);
             }
 
-            conditions.push('(k.user_time + k.system_time + k.reads + k.writes) > 0');
+            conditions.push(`(k.${cols.userTime} + k.${cols.systemTime} + k.${cols.reads} + k.${cols.writes}) > 0`);
 
             const whereClause = conditions.length > 0
                 ? `WHERE ${conditions.join(' AND ')}`
@@ -373,12 +453,12 @@ Helps identify the root cause of performance issues - is the query computation-h
                         LEFT(s.query, 100) as query_preview,
                         s.calls,
                         s.total_exec_time as total_time_ms,
-                        (k.user_time + k.system_time) as cpu_time,
-                        (k.reads + k.writes) as io_bytes,
-                        k.user_time,
-                        k.system_time,
-                        k.reads,
-                        k.writes
+                        (k.${cols.userTime} + k.${cols.systemTime}) as cpu_time,
+                        (k.${cols.reads} + k.${cols.writes}) as io_bytes,
+                        k.${cols.userTime} as user_time,
+                        k.${cols.systemTime} as system_time,
+                        k.${cols.reads} as reads,
+                        k.${cols.writes} as writes
                     FROM pg_stat_statements s
                     JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
                         AND s.userid = k.userid 
@@ -410,7 +490,7 @@ Helps identify the root cause of performance issues - is the query computation-h
                     pg_size_pretty(io_bytes::bigint) as io_pretty
                 FROM query_metrics
                 ORDER BY total_time_ms DESC
-                LIMIT 50
+                LIMIT ${String(limitVal)}
             `;
 
             const result = await adapter.executeQuery(sql, queryParams);

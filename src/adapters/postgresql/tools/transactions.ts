@@ -12,8 +12,11 @@ import { getToolIcons } from '../../../utils/icons.js';
 import {
     BeginTransactionSchema,
     TransactionIdSchema,
+    TransactionIdSchemaBase,
     SavepointSchema,
-    TransactionExecuteSchema
+    SavepointSchemaBase,
+    TransactionExecuteSchema,
+    TransactionExecuteSchemaBase
 } from '../schemas/index.js';
 
 /**
@@ -56,7 +59,7 @@ function createCommitTransactionTool(adapter: PostgresAdapter): ToolDefinition {
         name: 'pg_transaction_commit',
         description: 'Commit a transaction, making all changes permanent.',
         group: 'transactions',
-        inputSchema: TransactionIdSchema,
+        inputSchema: TransactionIdSchemaBase,  // Use base schema for MCP visibility
         annotations: write('Commit Transaction'),
         icons: getToolIcons('transactions', write('Commit Transaction')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -76,7 +79,7 @@ function createRollbackTransactionTool(adapter: PostgresAdapter): ToolDefinition
         name: 'pg_transaction_rollback',
         description: 'Rollback a transaction, undoing all changes.',
         group: 'transactions',
-        inputSchema: TransactionIdSchema,
+        inputSchema: TransactionIdSchemaBase,  // Use base schema for MCP visibility
         annotations: write('Rollback Transaction'),
         icons: getToolIcons('transactions', write('Rollback Transaction')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -96,7 +99,7 @@ function createSavepointTool(adapter: PostgresAdapter): ToolDefinition {
         name: 'pg_transaction_savepoint',
         description: 'Create a savepoint within a transaction for partial rollback.',
         group: 'transactions',
-        inputSchema: SavepointSchema,
+        inputSchema: SavepointSchemaBase,  // Use base schema for MCP visibility
         annotations: write('Create Savepoint'),
         icons: getToolIcons('transactions', write('Create Savepoint')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -117,7 +120,7 @@ function createReleaseSavepointTool(adapter: PostgresAdapter): ToolDefinition {
         name: 'pg_transaction_release',
         description: 'Release a savepoint, keeping all changes since it was created.',
         group: 'transactions',
-        inputSchema: SavepointSchema,
+        inputSchema: SavepointSchemaBase,  // Use base schema for MCP visibility
         annotations: write('Release Savepoint'),
         icons: getToolIcons('transactions', write('Release Savepoint')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -138,7 +141,7 @@ function createRollbackToSavepointTool(adapter: PostgresAdapter): ToolDefinition
         name: 'pg_transaction_rollback_to',
         description: 'Rollback to a savepoint, undoing changes made after it.',
         group: 'transactions',
-        inputSchema: SavepointSchema,
+        inputSchema: SavepointSchemaBase,  // Use base schema for MCP visibility
         annotations: write('Rollback to Savepoint'),
         icons: getToolIcons('transactions', write('Rollback to Savepoint')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -159,7 +162,7 @@ function createTransactionExecuteTool(adapter: PostgresAdapter): ToolDefinition 
         name: 'pg_transaction_execute',
         description: 'Execute multiple statements atomically in a single transaction.',
         group: 'transactions',
-        inputSchema: TransactionExecuteSchema,
+        inputSchema: TransactionExecuteSchemaBase,  // Use base schema for MCP visibility
         annotations: write('Transaction Execute'),
         icons: getToolIcons('transactions', write('Transaction Execute')),
         handler: async (params: unknown, _context: RequestContext) => {
@@ -179,7 +182,9 @@ function createTransactionExecuteTool(adapter: PostgresAdapter): ToolDefinition 
                     results.push({
                         sql: stmt.sql,
                         rowsAffected: result.rowsAffected,
-                        rows: result.rows?.length
+                        rowCount: result.rows?.length ?? 0,
+                        // Include returned rows when using RETURNING clause
+                        ...(result.rows && result.rows.length > 0 && { rows: result.rows })
                     });
                 }
 

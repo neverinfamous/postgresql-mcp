@@ -484,7 +484,9 @@ describe('pg_resource_usage_analyze', () => {
     });
 
     it('should return resource usage analysis', async () => {
+        // First mock: version detection (PG16, uses old bgwriter schema)
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ version_num: 160000 }] })
             .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000, buffers_clean: 500 }] })
             .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
             .mockResolvedValueOnce({ rows: [{ state: 'active', count: 5 }] })
@@ -508,6 +510,7 @@ describe('pg_resource_usage_analyze', () => {
 
     it('should detect checkpoint pressure', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ version_num: 160000 }] })
             .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
             .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 10, checkpoints_req: 50 }] }) // More forced than scheduled
             .mockResolvedValueOnce({ rows: [] })
@@ -524,6 +527,7 @@ describe('pg_resource_usage_analyze', () => {
 
     it('should detect I/O waiting queries', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ version_num: 160000 }] })
             .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
             .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
             .mockResolvedValueOnce({ rows: [] })
@@ -540,6 +544,7 @@ describe('pg_resource_usage_analyze', () => {
 
     it('should detect lock contention', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ version_num: 160000 }] })
             .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
             .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
             .mockResolvedValueOnce({ rows: [] })
@@ -556,6 +561,7 @@ describe('pg_resource_usage_analyze', () => {
 
     it('should return N/A for heap hit rate when no heap activity', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ version_num: 160000 }] })
             .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
             .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
             .mockResolvedValueOnce({ rows: [] })
@@ -573,6 +579,7 @@ describe('pg_resource_usage_analyze', () => {
 
     it('should return N/A for index hit rate when no index activity', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ version_num: 160000 }] })
             .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
             .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
             .mockResolvedValueOnce({ rows: [] })
@@ -590,6 +597,7 @@ describe('pg_resource_usage_analyze', () => {
 
     it('should show no I/O bottlenecks when io_waiting is 0', async () => {
         mockAdapter.executeQuery
+            .mockResolvedValueOnce({ rows: [{ version_num: 160000 }] })
             .mockResolvedValueOnce({ rows: [{ buffers_checkpoint: 1000 }] })
             .mockResolvedValueOnce({ rows: [{ checkpoints_timed: 100, checkpoints_req: 10 }] })
             .mockResolvedValueOnce({ rows: [] })

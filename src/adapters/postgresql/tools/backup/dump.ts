@@ -9,23 +9,105 @@ import type { ToolDefinition, RequestContext } from '../../../../types/index.js'
 import { z } from 'zod';
 import { readOnly, write } from '../../../../utils/annotations.js';
 import { getToolIcons } from '../../../../utils/icons.js';
-import { CopyExportSchema, DumpSchemaSchema } from '../../schemas/index.js';
+import { CopyExportSchema, CopyExportSchemaBase, DumpSchemaSchema } from '../../schemas/index.js';
 
 export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_dump_table',
-        description: 'Generate CREATE TABLE statement for a table.',
+        description: 'Generate DDL for a table or sequence. Returns CREATE TABLE for tables, CREATE SEQUENCE for sequences.',
         group: 'backup',
         inputSchema: z.object({
-            table: z.string(),
-            schema: z.string().optional(),
-            includeData: z.boolean().optional()
+            table: z.string().describe('Table or sequence name'),
+            schema: z.string().optional().describe('Schema name (default: public)'),
+            includeData: z.boolean().optional().describe('Include INSERT statements for table data')
         }),
         annotations: readOnly('Dump Table'),
         icons: getToolIcons('backup', readOnly('Dump Table')),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = (params as { table: string; schema?: string; includeData?: boolean });
             const schemaName = parsed.schema ?? 'public';
+
+            // Check if it's a sequence by querying pg_class
+            const relkindResult = await adapter.executeQuery(`
+                SELECT relkind FROM pg_class c
+                JOIN pg_namespace n ON c.relnamespace = n.oid
+                WHERE n.nspname = '${schemaName}' AND c.relname = '${parsed.table}'
+            `);
+            const relkind = relkindResult.rows?.[0]?.['relkind'];
+
+            // relkind 'S' = sequence
+            if (relkind === 'S') {
+                // Use pg_sequence system catalog (works in all PostgreSQL versions 10+)
+                // Fallback to basic DDL if query fails
+                try {
+                    const seqInfo = await adapter.executeQuery(`
+                        SELECT s.seqstart as start_value, s.seqincrement as increment_by,
+                               s.seqmin as min_value, s.seqmax as max_value, s.seqcycle as cycle
+                        FROM pg_sequence s
+                        JOIN pg_class c ON s.seqrelid = c.oid
+                        JOIN pg_namespace n ON c.relnamespace = n.oid
+                        WHERE n.nspname = '${schemaName}' AND c.relname = '${parsed.table}'
+                    `);
+                    const seq = seqInfo.rows?.[0];
+                    if (seq !== undefined) {
+                        const startVal = typeof seq['start_value'] === 'number' || typeof seq['start_value'] === 'bigint' ? String(seq['start_value']) : null;
+                        const incrVal = typeof seq['increment_by'] === 'number' || typeof seq['increment_by'] === 'bigint' ? Number(seq['increment_by']) : null;
+                        const minVal = typeof seq['min_value'] === 'number' || typeof seq['min_value'] === 'bigint' ? String(seq['min_value']) : null;
+                        const maxVal = typeof seq['max_value'] === 'number' || typeof seq['max_value'] === 'bigint' ? String(seq['max_value']) : null;
+
+                        const startValue = startVal !== null ? ` START ${startVal}` : '';
+                        const increment = incrVal !== null && incrVal !== 1 ? ` INCREMENT ${String(incrVal)}` : '';
+                        const minValue = minVal !== null ? ` MINVALUE ${minVal}` : '';
+                        const maxValue = maxVal !== null ? ` MAXVALUE ${maxVal}` : '';
+                        const cycle = seq['cycle'] === true ? ' CYCLE' : '';
+                        const ddl = `CREATE SEQUENCE "${schemaName}"."${parsed.table}"${startValue}${increment}${minValue}${maxValue}${cycle};`;
+                        return {
+                            ddl,
+                            type: 'sequence',
+                            note: 'Use pg_list_sequences to see all sequences.',
+                            ...(parsed.includeData === true && { warning: 'includeData is ignored for sequences - sequences have no row data to export' })
+                        };
+                    }
+                } catch {
+                    // Query failed, use basic DDL
+                }
+                // Fallback if pg_sequence query fails
+                return {
+                    ddl: `CREATE SEQUENCE "${schemaName}"."${parsed.table}";`,
+                    type: 'sequence',
+                    note: 'Basic CREATE SEQUENCE. Use pg_list_sequences for details.',
+                    ...(parsed.includeData === true && { warning: 'includeData is ignored for sequences - sequences have no row data to export' })
+                };
+            }
+
+            // relkind 'v' = view, 'm' = materialized view
+            if (relkind === 'v' || relkind === 'm') {
+                try {
+                    const viewDefResult = await adapter.executeQuery(`
+                        SELECT definition FROM pg_views
+                        WHERE schemaname = '${schemaName}' AND viewname = '${parsed.table}'
+                    `);
+                    const definition = viewDefResult.rows?.[0]?.['definition'];
+                    if (typeof definition === 'string') {
+                        const createType = relkind === 'm' ? 'MATERIALIZED VIEW' : 'VIEW';
+                        const ddl = `CREATE ${createType} "${schemaName}"."${parsed.table}" AS\n${definition.trim()}`;
+                        return {
+                            ddl,
+                            type: relkind === 'm' ? 'materialized_view' : 'view',
+                            note: `Use pg_list_views to see all views.`
+                        };
+                    }
+                } catch {
+                    // Query failed, use basic DDL
+                }
+                // Fallback for views
+                const createType = relkind === 'm' ? 'MATERIALIZED VIEW' : 'VIEW';
+                return {
+                    ddl: `-- Unable to retrieve ${createType.toLowerCase()} definition\nCREATE ${createType} "${schemaName}"."${parsed.table}" AS SELECT ...;`,
+                    type: relkind === 'm' ? 'materialized_view' : 'view',
+                    note: 'View definition could not be retrieved. Use pg_list_views for details.'
+                };
+            }
 
             const tableInfo = await adapter.describeTable(parsed.table, schemaName);
 
@@ -48,7 +130,11 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
 
             const createTable = `CREATE TABLE "${schemaName}"."${parsed.table}" (\n${columns}\n);`;
 
-            const result: { createTable: string; insertStatements?: string } = { createTable };
+            const result: { ddl: string; type?: string; insertStatements?: string; note: string } = {
+                ddl: createTable,
+                type: 'table',
+                note: 'Basic CREATE TABLE only. For indexes use pg_get_indexes, for constraints use pg_get_constraints.'
+            };
 
             if (parsed.includeData) {
                 const dataResult = await adapter.executeQuery(
@@ -61,9 +147,27 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
                     const inserts = dataResult.rows.map(row => {
                         const vals = Object.entries(row).map(([, value]) => {
                             if (value === null) return 'NULL';
-                            if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+                            // Handle Date objects - format as PostgreSQL timestamp
+                            if (value instanceof Date) {
+                                const iso = value.toISOString();
+                                // Convert ISO 8601 to PostgreSQL format: 'YYYY-MM-DD HH:MM:SS.mmm'
+                                const pgTimestamp = iso.replace('T', ' ').replace('Z', '');
+                                return `'${pgTimestamp}'`;
+                            }
+                            if (typeof value === 'string') {
+                                // Escape backslashes first, then single quotes (PostgreSQL string literal escaping)
+                                const escaped = value.replace(/\\/g, '\\\\').replace(/'/g, "''");
+                                // Check if string looks like an ISO timestamp
+                                if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+                                    // Convert ISO format to PostgreSQL format
+                                    const pgTimestamp = value.replace('T', ' ').replace('Z', '').replace(/\.\d+$/, '');
+                                    return `'${pgTimestamp.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
+                                }
+                                return `'${escaped}'`;
+                            }
                             if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-                            return `'${JSON.stringify(value).replace(/'/g, "''")}'`;
+                            // For objects (JSONB, arrays), use PostgreSQL JSONB literal
+                            return `'${JSON.stringify(value).replace(/\\/g, '\\\\').replace(/'/g, "''")}'::jsonb`;
                         }).join(', ');
                         return `INSERT INTO "${schemaName}"."${parsed.table}" (${cols}) VALUES (${vals});`;
                     }).join('\n');
@@ -86,7 +190,7 @@ export function createDumpSchemaTool(_adapter: PostgresAdapter): ToolDefinition 
         icons: getToolIcons('backup', readOnly('Dump Schema')),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
-            const { table, schema } = DumpSchemaSchema.parse(params);
+            const { table, schema, filename } = DumpSchemaSchema.parse(params);
 
             let command = 'pg_dump';
             command += ' --format=custom';
@@ -99,14 +203,22 @@ export function createDumpSchemaTool(_adapter: PostgresAdapter): ToolDefinition 
                 command += ` --table="${table}"`;
             }
 
-            command += ' --file=backup.dump';
+            // Warn if filename ends with .sql since custom format is binary
+            const outputFilename = filename ?? 'backup.dump';
+            const sqlExtWarning = outputFilename.endsWith('.sql')
+                ? 'Warning: Using .sql extension with --format=custom produces binary output. Use .dump extension or --format=plain for SQL text output.'
+                : undefined;
+
+            command += ` --file=${outputFilename}`;
             command += ' $POSTGRES_CONNECTION_STRING';
 
             return {
                 command,
+                ...(schema !== undefined && table !== undefined && { warning: 'Both --schema and --table specified. The --table flag may match tables in other schemas if not schema-qualified.' }),
+                ...(sqlExtWarning !== undefined && { formatWarning: sqlExtWarning }),
                 notes: [
                     'Replace $POSTGRES_CONNECTION_STRING with your connection string',
-                    'Use --format=plain for SQL output',
+                    'Use --format=plain for SQL output (recommended for .sql extension)',
                     'Add --data-only to exclude schema',
                     'Add --schema-only to exclude data'
                 ]
@@ -118,13 +230,13 @@ export function createDumpSchemaTool(_adapter: PostgresAdapter): ToolDefinition 
 export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_copy_export',
-        description: 'Export query results using COPY TO (returns data as text).',
+        description: 'Export query results using COPY TO. Use query/sql for custom query or table for SELECT *.',
         group: 'backup',
-        inputSchema: CopyExportSchema,
+        inputSchema: CopyExportSchemaBase,  // Use base schema for MCP visibility
         annotations: readOnly('Copy Export'),
         icons: getToolIcons('backup', readOnly('Copy Export')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { query, format, header, delimiter } = CopyExportSchema.parse(params);
+            const { query, format, header, delimiter, conflictWarning } = CopyExportSchema.parse(params);  // Use transform for validation
 
             const options: string[] = [];
             options.push(`FORMAT ${format ?? 'csv'}`);
@@ -136,11 +248,26 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
 
             const result = await adapter.executeQuery(query);
 
+            // Handle CSV format (default)
             if (format === 'csv' || format === undefined) {
-                if (result.rows === undefined || result.rows.length === 0) return { data: '', rowCount: 0 };
+                if (result.rows === undefined || result.rows.length === 0) {
+                    return {
+                        data: '',
+                        rowCount: 0,
+                        note: 'Query returned no rows. Headers omitted for empty results.',
+                        ...(conflictWarning !== undefined ? { warning: conflictWarning } : {})
+                    };
+                }
 
                 const firstRowData = result.rows[0];
-                if (firstRowData === undefined) return { data: '', rowCount: 0 };
+                if (firstRowData === undefined) {
+                    return {
+                        data: '',
+                        rowCount: 0,
+                        note: 'Query returned no rows. Headers omitted for empty results.',
+                        ...(conflictWarning !== undefined ? { warning: conflictWarning } : {})
+                    };
+                }
                 const headers = Object.keys(firstRowData);
                 const delim = delimiter ?? ',';
                 const lines: string[] = [];
@@ -164,10 +291,64 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
                     }).join(delim));
                 }
 
-                return { data: lines.join('\n'), rowCount: result.rows.length };
+                return {
+                    data: lines.join('\n'),
+                    rowCount: result.rows.length,
+                    ...(conflictWarning !== undefined ? { warning: conflictWarning } : {})
+                };
             }
 
-            return { rows: result.rows, rowCount: result.rows?.length ?? 0 };
+            // Handle TEXT format - tab-delimited with \N for NULLs
+            if (format === 'text') {
+                if (result.rows === undefined || result.rows.length === 0) {
+                    return {
+                        data: '',
+                        rowCount: 0,
+                        note: 'Query returned no rows. Headers omitted for empty results.',
+                        ...(conflictWarning !== undefined ? { warning: conflictWarning } : {})
+                    };
+                }
+
+                const firstRowData = result.rows[0];
+                if (firstRowData === undefined) {
+                    return {
+                        data: '',
+                        rowCount: 0,
+                        note: 'Query returned no rows. Headers omitted for empty results.',
+                        ...(conflictWarning !== undefined ? { warning: conflictWarning } : {})
+                    };
+                }
+                const headers = Object.keys(firstRowData);
+                const delim = delimiter ?? '\t';
+                const lines: string[] = [];
+
+                if (header !== false) {
+                    lines.push(headers.join(delim));
+                }
+
+                for (const row of result.rows) {
+                    lines.push(headers.map(h => {
+                        const v = row[h];
+                        if (v === null) return '\\N';  // PostgreSQL NULL representation in text format
+                        if (typeof v === 'object') return JSON.stringify(v);
+                        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+                            return String(v);
+                        }
+                        // Fallback for any other type
+                        return JSON.stringify(v);
+                    }).join(delim));
+                }
+
+                return {
+                    data: lines.join('\n'),
+                    rowCount: result.rows.length,
+                    ...(conflictWarning !== undefined ? { warning: conflictWarning } : {})
+                };
+            }
+
+            // Handle BINARY format - not supported via MCP protocol
+            // Binary data cannot be safely serialized to JSON without corruption
+            throw new Error('Binary format is not supported via MCP protocol. Use format: "csv" or "text" instead. For binary export, use pg_dump_schema to generate a pg_dump command.');
         }
     };
 }
@@ -180,6 +361,7 @@ export function createCopyImportTool(_adapter: PostgresAdapter): ToolDefinition 
         inputSchema: z.object({
             table: z.string(),
             schema: z.string().optional(),
+            filePath: z.string().optional().describe('Path to import file (default: /path/to/file.csv)'),
             format: z.enum(['csv', 'text', 'binary']).optional(),
             header: z.boolean().optional(),
             delimiter: z.string().optional(),
@@ -192,6 +374,7 @@ export function createCopyImportTool(_adapter: PostgresAdapter): ToolDefinition 
             const parsed = (params as {
                 table: string;
                 schema?: string;
+                filePath?: string;
                 format?: string;
                 header?: boolean;
                 delimiter?: string;
@@ -211,8 +394,12 @@ export function createCopyImportTool(_adapter: PostgresAdapter): ToolDefinition 
             if (parsed.header) options.push('HEADER');
             if (parsed.delimiter) options.push(`DELIMITER '${parsed.delimiter}'`);
 
+            // Use provided filePath or generate placeholder with appropriate extension
+            const ext = parsed.format === 'text' ? 'txt' : parsed.format === 'binary' ? 'bin' : 'csv';
+            const filePath = parsed.filePath ?? `/path/to/file.${ext}`;
+
             return {
-                command: `COPY ${tableName}${columnClause} FROM '/path/to/file.csv' WITH (${options.join(', ')})`,
+                command: `COPY ${tableName}${columnClause} FROM '${filePath}' WITH (${options.join(', ')})`,
                 stdinCommand: `COPY ${tableName}${columnClause} FROM STDIN WITH (${options.join(', ')})`,
                 notes: 'Use \\copy in psql for client-side files'
             };

@@ -174,8 +174,8 @@ export abstract class DatabaseAdapter {
     protected registerTool(server: McpServer, tool: ToolDefinition): void {
         // MCP SDK server.tool() registration
         // Extract the Zod shape from inputSchema for MCP SDK compatibility
-        const inputSchema = tool.inputSchema as { shape?: Record<string, unknown> } | undefined;
-        const zodShape = inputSchema?.shape ?? {};
+        // Handle complex chains: z.preprocess().transform().refine() etc.
+        const zodShape = this.extractZodShape(tool.inputSchema);
 
         // Build metadata object with annotations and icons
         const metadata: Record<string, unknown> = {
@@ -204,6 +204,44 @@ export abstract class DatabaseAdapter {
                 };
             }
         );
+    }
+
+    /**
+     * Extract the Zod shape from a schema, handling complex pipelines
+     * Traverses through: preprocess, transform, effects, refine, pipe
+     */
+    private extractZodShape(schema: unknown): Record<string, unknown> {
+        if (schema === null || schema === undefined) {
+            return {};
+        }
+
+        const s = schema as {
+            shape?: Record<string, unknown>;
+            _def?: {
+                schema?: unknown;
+                innerType?: unknown;
+                typeName?: string;
+            };
+        };
+
+        // Direct ZodObject - has shape directly
+        if (s.shape !== undefined && typeof s.shape === 'object') {
+            return s.shape;
+        }
+
+        // Check _def for wrapped types
+        if (s._def !== undefined) {
+            // ZodEffects (preprocess, transform, refine) - dive into innerType
+            if (s._def.innerType !== undefined) {
+                return this.extractZodShape(s._def.innerType);
+            }
+            // ZodPipeline or other wrapped - dive into schema
+            if (s._def.schema !== undefined) {
+                return this.extractZodShape(s._def.schema);
+            }
+        }
+
+        return {};
     }
 
     /**

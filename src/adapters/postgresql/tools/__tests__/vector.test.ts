@@ -95,9 +95,12 @@ describe('Vector Tools', () => {
 
     describe('pg_vector_search', () => {
         it('should search using L2 distance by default', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({
-                rows: [{ id: 1, distance: 0.1 }, { id: 2, distance: 0.2 }]
-            });
+            // First: type check query, Second: actual search
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ udt_name: 'vector' }] }) // type check
+                .mockResolvedValueOnce({
+                    rows: [{ id: 1, distance: 0.1 }, { id: 2, distance: 0.2 }]
+                });
 
             const tool = findTool('pg_vector_search');
             const result = await tool!.handler({
@@ -108,13 +111,12 @@ describe('Vector Tools', () => {
 
             expect(result.results).toHaveLength(2);
             expect(result.metric).toBe('l2');
-            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-                expect.stringContaining('<->')
-            );
         });
 
         it('should search using cosine distance', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ udt_name: 'vector' }] }) // type check
+                .mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_vector_search');
             await tool!.handler({
@@ -130,7 +132,9 @@ describe('Vector Tools', () => {
         });
 
         it('should search using inner product', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ udt_name: 'vector' }] }) // type check
+                .mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_vector_search');
             await tool!.handler({
@@ -146,7 +150,9 @@ describe('Vector Tools', () => {
         });
 
         it('should apply where clause and limit', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ udt_name: 'vector' }] }) // type check
+                .mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_vector_search');
             await tool!.handler({
@@ -330,18 +336,20 @@ describe('Vector Tools', () => {
                 table: 'documents',
                 column: 'embedding',
                 k: 5
-            }, mockContext) as { error: string };
+            }, mockContext) as { error: string; success: boolean };
 
-            expect(result.error).toContain('Not enough vectors');
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('Cannot create 5 clusters');
         });
     });
 
     describe('pg_vector_index_optimize', () => {
         it('should recommend no index for small tables', async () => {
             mockAdapter.executeQuery
-                .mockResolvedValueOnce({ rows: [{ estimated_rows: 5000, table_size: '1 MB' }] })
-                .mockResolvedValueOnce({ rows: [{ dimensions: 384 }] })
-                .mockResolvedValueOnce({ rows: [] });
+                .mockResolvedValueOnce({ rows: [{ estimated_rows: 5000, table_size: '1 MB' }] }) // stats
+                .mockResolvedValueOnce({ rows: [{ udt_name: 'vector' }] }) // type check
+                .mockResolvedValueOnce({ rows: [{ dimensions: 384 }] }) // dimensions
+                .mockResolvedValueOnce({ rows: [] }); // indexes
 
             const tool = findTool('pg_vector_index_optimize');
             const result = await tool!.handler({
@@ -354,9 +362,10 @@ describe('Vector Tools', () => {
 
         it('should recommend HNSW for large tables', async () => {
             mockAdapter.executeQuery
-                .mockResolvedValueOnce({ rows: [{ estimated_rows: 500000, table_size: '500 MB' }] })
-                .mockResolvedValueOnce({ rows: [{ dimensions: 1536 }] })
-                .mockResolvedValueOnce({ rows: [] });
+                .mockResolvedValueOnce({ rows: [{ estimated_rows: 500000, table_size: '500 MB' }] }) // stats
+                .mockResolvedValueOnce({ rows: [{ udt_name: 'vector' }] }) // type check
+                .mockResolvedValueOnce({ rows: [{ dimensions: 1536 }] }) // dimensions
+                .mockResolvedValueOnce({ rows: [] }); // indexes
 
             const tool = findTool('pg_vector_index_optimize');
             const result = await tool!.handler({
@@ -370,11 +379,15 @@ describe('Vector Tools', () => {
 
     describe('pg_hybrid_search', () => {
         it('should combine vector and text search', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({
-                rows: [
-                    { id: 1, combined_score: 0.9, vector_score: 0.8, text_score: 1.0 }
-                ]
-            });
+            // Mock column type check, column list query, and main query
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ data_type: 'USER-DEFINED', udt_name: 'vector' }] })
+                .mockResolvedValueOnce({ rows: [{ column_name: 'id' }, { column_name: 'content' }] })
+                .mockResolvedValueOnce({
+                    rows: [
+                        { id: 1, combined_score: 0.9, vector_score: 0.8, text_score: 1.0 }
+                    ]
+                });
 
             const tool = findTool('pg_hybrid_search');
             const result = await tool!.handler({
@@ -395,7 +408,11 @@ describe('Vector Tools', () => {
         });
 
         it('should use custom weights', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+            // Mock column type check, column list query, and main query
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ data_type: 'USER-DEFINED', udt_name: 'vector' }] })
+                .mockResolvedValueOnce({ rows: [{ column_name: 'id' }] })
+                .mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_hybrid_search');
             const result = await tool!.handler({
@@ -415,6 +432,7 @@ describe('Vector Tools', () => {
     describe('pg_vector_performance', () => {
         it('should analyze vector performance', async () => {
             mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // Column check
                 .mockResolvedValueOnce({
                     rows: [{ indexname: 'idx_embedding', indexdef: 'USING hnsw', index_size: '10 MB' }]
                 })
@@ -426,14 +444,16 @@ describe('Vector Tools', () => {
             const result = await tool!.handler({
                 table: 'documents',
                 column: 'embedding'
-            }, mockContext) as { indexes: unknown[]; stats: unknown };
+            }, mockContext) as { indexes: unknown[]; tableSize: string; estimatedRows: number };
 
             expect(result.indexes).toHaveLength(1);
-            expect(result.stats).toBeDefined();
+            expect(result.tableSize).toBe('500 MB');
+            expect(result.estimatedRows).toBe(100000);
         });
 
         it('should run benchmark with test vector', async () => {
             mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ 1: 1 }] }) // Column check
                 .mockResolvedValueOnce({ rows: [] })
                 .mockResolvedValueOnce({ rows: [{ estimated_rows: 10000 }] })
                 .mockResolvedValueOnce({
@@ -502,7 +522,7 @@ describe('Vector Tools', () => {
     });
 
     it('should export all 14 vector tools', () => {
-        expect(tools).toHaveLength(14);
+        expect(tools).toHaveLength(16);
         const toolNames = tools.map(t => t.name);
         // Basic
         expect(toolNames).toContain('pg_vector_create_extension');

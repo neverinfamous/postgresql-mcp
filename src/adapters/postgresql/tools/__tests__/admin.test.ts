@@ -122,6 +122,82 @@ describe('pg_vacuum', () => {
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith('VACUUM VERBOSE ');
     });
+
+    it('should accept undefined (no args) and vacuum all tables', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_vacuum')!;
+        const result = await tool.handler(undefined, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('VACUUM ');
+        expect(result.success).toBe(true);
+    });
+
+    it('should reflect analyze flag in message', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_vacuum')!;
+        const result = await tool.handler({ analyze: true }, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('VACUUM ANALYZE ');
+        expect(result.message).toBe('VACUUM ANALYZE completed');
+    });
+
+    it('should reflect both FULL and ANALYZE in message', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_vacuum')!;
+        const result = await tool.handler({ full: true, analyze: true }, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('VACUUM FULL ANALYZE ');
+        expect(result.message).toBe('VACUUM FULL ANALYZE completed');
+    });
+
+    it('should include verbose hint when verbose=true', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_vacuum')!;
+        const result = await tool.handler({ verbose: true }, mockContext) as {
+            success: boolean;
+            hint: string;
+        };
+
+        expect(result.hint).toBe('Verbose output written to PostgreSQL server logs');
+    });
+
+    it('should echo back table and schema in response', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_vacuum')!;
+        const result = await tool.handler({ table: 'users', schema: 'public' }, mockContext) as {
+            success: boolean;
+            table: string;
+            schema: string;
+        };
+
+        expect(result.table).toBe('users');
+        expect(result.schema).toBe('public');
+    });
+
+    it('should expose parameters in schema for MCP visibility', () => {
+        const tool = tools.find(t => t.name === 'pg_vacuum')!;
+        const schema = tool.inputSchema as { shape?: Record<string, unknown> };
+
+        expect(schema.shape).toBeDefined();
+        expect(schema.shape?.['table']).toBeDefined();
+        expect(schema.shape?.['schema']).toBeDefined();
+        expect(schema.shape?.['full']).toBeDefined();
+        expect(schema.shape?.['verbose']).toBeDefined();
+    });
 });
 
 describe('pg_vacuum_analyze', () => {
@@ -166,6 +242,32 @@ describe('pg_vacuum_analyze', () => {
         await tool.handler({ verbose: true, table: 'users' }, mockContext);
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith('VACUUM VERBOSE ANALYZE "users"');
+    });
+
+    it('should accept undefined (no args) and vacuum analyze all tables', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_vacuum_analyze')!;
+        const result = await tool.handler(undefined, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('VACUUM ANALYZE ');
+        expect(result.success).toBe(true);
+    });
+
+    it('should run VACUUM FULL ANALYZE when full=true', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_vacuum_analyze')!;
+        const result = await tool.handler({ full: true }, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('VACUUM FULL ANALYZE ');
+        expect(result.message).toBe('VACUUM FULL ANALYZE completed');
     });
 });
 
@@ -212,6 +314,36 @@ describe('pg_analyze', () => {
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith('ANALYZE "users"("email", "created_at")');
     });
+
+    it('should accept undefined (no args) and analyze all tables', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_analyze')!;
+        const result = await tool.handler(undefined, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('ANALYZE ');
+        expect(result.success).toBe(true);
+    });
+
+    it('should expose parameters in schema for MCP visibility', () => {
+        const tool = tools.find(t => t.name === 'pg_analyze')!;
+        const schema = tool.inputSchema as { shape?: Record<string, unknown> };
+
+        expect(schema.shape).toBeDefined();
+        expect(schema.shape?.['table']).toBeDefined();
+        expect(schema.shape?.['schema']).toBeDefined();
+        expect(schema.shape?.['columns']).toBeDefined();
+    });
+
+    it('should throw error when columns specified without table', async () => {
+        const tool = tools.find(t => t.name === 'pg_analyze')!;
+
+        await expect(tool.handler({ columns: ['email'] }, mockContext))
+            .rejects.toThrow('table is required when columns is specified');
+    });
 });
 
 describe('pg_reindex', () => {
@@ -256,6 +388,36 @@ describe('pg_reindex', () => {
         await tool.handler({ target: 'table', name: 'users', concurrently: true }, mockContext);
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith('REINDEX TABLE CONCURRENTLY "users"');
+    });
+
+    it('should reindex database with auto-default to current database', async () => {
+        // First call returns current database name
+        mockAdapter.executeQuery.mockResolvedValueOnce({
+            rows: [{ current_database: 'testdb' }]
+        });
+        // Second call is the actual REINDEX
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_reindex')!;
+        const result = await tool.handler({ target: 'database' }, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('SELECT current_database()');
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('REINDEX DATABASE "testdb"');
+        expect(result.success).toBe(true);
+        expect(result.message).toBe('Reindexed database: testdb');
+    });
+
+    it('should expose parameters in schema for MCP visibility', () => {
+        const tool = tools.find(t => t.name === 'pg_reindex')!;
+        const schema = tool.inputSchema as { shape?: Record<string, unknown> };
+
+        expect(schema.shape).toBeDefined();
+        expect(schema.shape?.['target']).toBeDefined();
+        expect(schema.shape?.['name']).toBeDefined();
+        expect(schema.shape?.['concurrently']).toBeDefined();
     });
 });
 
@@ -303,6 +465,14 @@ describe('pg_terminate_backend', () => {
         expect(result.success).toBe(false);
         expect(result.message).toBe('Failed to terminate');
     });
+
+    it('should expose parameters in schema for MCP visibility', () => {
+        const tool = tools.find(t => t.name === 'pg_terminate_backend')!;
+        const schema = tool.inputSchema as { shape?: Record<string, unknown> };
+
+        expect(schema.shape).toBeDefined();
+        expect(schema.shape?.['pid']).toBeDefined();
+    });
 });
 
 describe('pg_cancel_backend', () => {
@@ -347,6 +517,14 @@ describe('pg_cancel_backend', () => {
 
         expect(result.success).toBe(false);
         expect(result.message).toBe('Failed to cancel');
+    });
+
+    it('should expose parameters in schema for MCP visibility', () => {
+        const tool = tools.find(t => t.name === 'pg_cancel_backend')!;
+        const schema = tool.inputSchema as { shape?: Record<string, unknown> };
+
+        expect(schema.shape).toBeDefined();
+        expect(schema.shape?.['pid']).toBeDefined();
     });
 });
 
@@ -432,6 +610,16 @@ describe('pg_set_config', () => {
             ['enable_seqscan', 'on', true]
         );
     });
+
+    it('should expose parameters in schema for MCP visibility', () => {
+        const tool = tools.find(t => t.name === 'pg_set_config')!;
+        const schema = tool.inputSchema as { shape?: Record<string, unknown> };
+
+        expect(schema.shape).toBeDefined();
+        expect(schema.shape?.['name']).toBeDefined();
+        expect(schema.shape?.['value']).toBeDefined();
+        expect(schema.shape?.['isLocal']).toBeDefined();
+    });
 });
 
 describe('pg_reset_stats', () => {
@@ -512,5 +700,56 @@ describe('pg_cluster', () => {
         }, mockContext);
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledWith('CLUSTER "app"."users" USING "idx_users_email"');
+    });
+
+    it('should re-cluster all previously-clustered tables when no args', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_cluster')!;
+        const result = await tool.handler({}, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('CLUSTER');
+        expect(result.success).toBe(true);
+        expect(result.message).toBe('Re-clustered all previously-clustered tables');
+    });
+
+    it('should accept undefined (no args) and re-cluster all tables', async () => {
+        mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+        const tool = tools.find(t => t.name === 'pg_cluster')!;
+        const result = await tool.handler(undefined, mockContext) as {
+            success: boolean;
+            message: string;
+        };
+
+        expect(mockAdapter.executeQuery).toHaveBeenCalledWith('CLUSTER');
+        expect(result.success).toBe(true);
+    });
+
+    it('should expose parameters in schema for MCP visibility', () => {
+        const tool = tools.find(t => t.name === 'pg_cluster')!;
+        const schema = tool.inputSchema as { shape?: Record<string, unknown> };
+
+        expect(schema.shape).toBeDefined();
+        expect(schema.shape?.['table']).toBeDefined();
+        expect(schema.shape?.['index']).toBeDefined();
+        expect(schema.shape?.['schema']).toBeDefined();
+    });
+
+    it('should throw error when index specified without table', async () => {
+        const tool = tools.find(t => t.name === 'pg_cluster')!;
+
+        await expect(tool.handler({ index: 'idx_users_email' }, mockContext))
+            .rejects.toThrow('table and index must both be specified together');
+    });
+
+    it('should throw error when table specified without index', async () => {
+        const tool = tools.find(t => t.name === 'pg_cluster')!;
+
+        await expect(tool.handler({ table: 'users' }, mockContext))
+            .rejects.toThrow('table and index must both be specified together');
     });
 });

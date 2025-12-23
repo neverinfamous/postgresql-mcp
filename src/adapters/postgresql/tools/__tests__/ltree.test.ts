@@ -56,6 +56,7 @@ describe('Ltree Tools', () => {
 
             expect(result.mode).toBe('descendants');
             expect(result.count).toBe(2);
+            // descendants uses <@ operator (column is contained by path)
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('<@'),
                 ['root.child1']
@@ -75,6 +76,7 @@ describe('Ltree Tools', () => {
                 mode: 'ancestors'
             }, mockContext);
 
+            // ancestors uses @> operator (column contains path, i.e., column is ancestor of path)
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('@>'),
                 expect.anything()
@@ -151,6 +153,64 @@ describe('Ltree Tools', () => {
                 ['root.child1.grandchild', 1, 1]
             );
         });
+
+        it('should accept len as alias for length', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ subpath: 'child1', original_depth: 3 }]
+            });
+
+            const tool = findTool('pg_ltree_subpath');
+            await tool!.handler({
+                path: 'root.child1.grandchild',
+                offset: 1,
+                len: 1  // Using len alias instead of length
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('subpath($1::ltree, $2, $3)'),
+                ['root.child1.grandchild', 1, 1]
+            );
+        });
+
+        it('should default offset to 0 when not provided', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ subpath: 'root.child1.grandchild', original_depth: 3 }]
+            });
+
+            const tool = findTool('pg_ltree_subpath');
+            const result = await tool!.handler({
+                path: 'root.child1.grandchild'
+                // No offset provided - should default to 0
+            }, mockContext) as { subpath: string; offset: number };
+
+            expect(result.offset).toBe(0);
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('subpath($1::ltree, $2)'),
+                ['root.child1.grandchild', 0]
+            );
+        });
+    });
+
+    describe('pg_ltree_query type alias', () => {
+        it('should accept type as alias for mode', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ id: 1, path: 'root', depth: 1 }]
+            });
+
+            const tool = findTool('pg_ltree_query');
+            await tool!.handler({
+                table: 'categories',
+                column: 'path',
+                path: 'root.child1.grandchild',
+                type: 'ancestors'  // Using type alias instead of mode
+            }, mockContext);
+
+            // Should use @> operator for ancestors
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('@>'),
+                expect.anything()
+            );
+        });
     });
 
     describe('pg_ltree_lca', () => {
@@ -202,6 +262,39 @@ describe('Ltree Tools', () => {
             expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
                 expect.stringContaining('~ $1::lquery'),
                 ['root.products.*']
+            );
+        });
+
+        it('should accept query as alias for pattern', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_ltree_match');
+            await tool!.handler({
+                table: 'categories',
+                column: 'path',
+                query: 'root.*'  // Using alias
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('~ $1::lquery'),
+                ['root.*']
+            );
+        });
+
+        it('should accept maxResults as alias for limit', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = findTool('pg_ltree_match');
+            await tool!.handler({
+                table: 'categories',
+                column: 'path',
+                pattern: 'root.*',
+                maxResults: 5  // Using alias
+            }, mockContext);
+
+            expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+                expect.stringContaining('LIMIT 5'),
+                expect.anything()
             );
         });
     });

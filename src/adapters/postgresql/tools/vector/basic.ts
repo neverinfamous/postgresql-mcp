@@ -10,6 +10,41 @@ import { getToolIcons } from '../../../../utils/icons.js';
 import { sanitizeIdentifier, sanitizeTableName } from '../../../../utils/identifiers.js';
 import { VectorSearchSchema, VectorCreateIndexSchema } from '../../schemas/index.js';
 
+/**
+ * Parse a PostgreSQL vector string to a number array.
+ * Handles formats like "[0.1,0.2,0.3]" or "(0.1,0.2,0.3)"
+ */
+function parseVector(vecStr: unknown): number[] | null {
+    if (typeof vecStr !== 'string') return null;
+    try {
+        const cleaned = vecStr.replace(/[[\]()]/g, '');
+        return cleaned.split(',').map(Number);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Truncate a vector for display, showing first/last N values.
+ * For vectors <= maxDisplay, returns the full vector.
+ */
+function truncateVector(vec: number[] | null | undefined, maxDisplay = 10): {
+    preview: number[] | null;
+    dimensions: number;
+    truncated: boolean;
+} {
+    if (vec === null || vec === undefined) {
+        return { preview: null, dimensions: 0, truncated: false };
+    }
+    if (vec.length <= maxDisplay) {
+        return { preview: vec, dimensions: vec.length, truncated: false };
+    }
+    // Show first 5 and last 5
+    const half = Math.floor(maxDisplay / 2);
+    const preview = [...vec.slice(0, half), ...vec.slice(-half)];
+    return { preview, dimensions: vec.length, truncated: true };
+}
+
 export function createVectorExtensionTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_vector_create_extension',
@@ -26,26 +61,76 @@ export function createVectorExtensionTool(adapter: PostgresAdapter): ToolDefinit
 }
 
 export function createVectorAddColumnTool(adapter: PostgresAdapter): ToolDefinition {
+    // Schema with parameter smoothing: tableName -> table, col -> column
+    const AddColumnSchema = z.object({
+        table: z.string().optional(),
+        tableName: z.string().optional(),
+        column: z.string().optional(),
+        col: z.string().optional(),
+        dimensions: z.number().describe('Vector dimensions (e.g., 1536 for OpenAI)'),
+        schema: z.string().optional(),
+        ifNotExists: z.boolean().optional().describe('Skip if column already exists (default: false)')
+    }).transform((data) => ({
+        table: data.table ?? data.tableName ?? '',
+        column: data.column ?? data.col ?? '',
+        dimensions: data.dimensions,
+        schema: data.schema,
+        ifNotExists: data.ifNotExists ?? false
+    }));
+
     return {
         name: 'pg_vector_add_column',
-        description: 'Add a vector column to a table.',
+        description: 'Add a vector column to a table. Requires: table, column, dimensions.',
         group: 'vector',
-        inputSchema: z.object({
-            table: z.string(),
-            column: z.string(),
-            dimensions: z.number().describe('Vector dimensions (e.g., 1536 for OpenAI)'),
-            schema: z.string().optional()
-        }),
+        inputSchema: AddColumnSchema,
         annotations: write('Add Vector Column'),
         icons: getToolIcons('vector', write('Add Vector Column')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { table: string; column: string; dimensions: number; schema?: string });
+            const parsed = AddColumnSchema.parse(params);
+
+            // Validate required params with clear errors
+            if (parsed.table === '') {
+                return {
+                    success: false,
+                    error: 'table (or tableName) parameter is required',
+                    requiredParams: ['table', 'column', 'dimensions']
+                };
+            }
+            if (parsed.column === '') {
+                return {
+                    success: false,
+                    error: 'column (or col) parameter is required',
+                    requiredParams: ['table', 'column', 'dimensions']
+                };
+            }
+
             const tableName = sanitizeTableName(parsed.table, parsed.schema);
             const columnName = sanitizeIdentifier(parsed.column);
 
+            // Check if column exists when ifNotExists is true
+            if (parsed.ifNotExists) {
+                const schemaName = parsed.schema ?? 'public';
+                const checkSql = `
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+                `;
+                const checkResult = await adapter.executeQuery(checkSql, [schemaName, parsed.table, parsed.column]);
+                if (checkResult.rows && checkResult.rows.length > 0) {
+                    return {
+                        success: true,
+                        table: parsed.table,
+                        column: parsed.column,
+                        dimensions: parsed.dimensions,
+                        ifNotExists: true,
+                        alreadyExists: true,
+                        message: `Column ${parsed.column} already exists on table ${parsed.table}`
+                    };
+                }
+            }
+
             const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} vector(${String(parsed.dimensions)})`;
             await adapter.executeQuery(sql);
-            return { success: true, table: parsed.table, column: parsed.column, dimensions: parsed.dimensions };
+            return { success: true, table: parsed.table, column: parsed.column, dimensions: parsed.dimensions, ifNotExists: parsed.ifNotExists };
         }
     };
 }
@@ -53,14 +138,17 @@ export function createVectorAddColumnTool(adapter: PostgresAdapter): ToolDefinit
 export function createVectorInsertTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_vector_insert',
-        description: 'Insert a vector into a table.',
+        description: 'Insert a vector into a table, or update an existing row\'s vector. For upsert: use updateExisting + conflictColumn + conflictValue to UPDATE existing rows (avoids NOT NULL issues).',
         group: 'vector',
         inputSchema: z.object({
             table: z.string(),
             column: z.string(),
             vector: z.array(z.number()),
             additionalColumns: z.record(z.string(), z.unknown()).optional(),
-            schema: z.string().optional()
+            schema: z.string().optional(),
+            updateExisting: z.boolean().optional().describe('Update vector on existing row (requires conflictColumn and conflictValue)'),
+            conflictColumn: z.string().optional().describe('Column to match for updates (e.g., id)'),
+            conflictValue: z.union([z.string(), z.number()]).optional().describe('Value of conflictColumn to match (e.g., 123)')
         }),
         annotations: write('Insert Vector'),
         icons: getToolIcons('vector', write('Insert Vector')),
@@ -71,18 +159,74 @@ export function createVectorInsertTool(adapter: PostgresAdapter): ToolDefinition
                 vector: number[];
                 additionalColumns?: Record<string, unknown>;
                 schema?: string;
+                updateExisting?: boolean;
+                conflictColumn?: string;
+                conflictValue?: string | number;
             });
+
+            // Validate required params with clear errors
+            if (parsed.table === undefined || parsed.table === '') {
+                return {
+                    success: false,
+                    error: 'table parameter is required',
+                    requiredParams: ['table', 'column', 'vector']
+                };
+            }
+            if (parsed.column === undefined || parsed.column === '') {
+                return {
+                    success: false,
+                    error: 'column parameter is required',
+                    requiredParams: ['table', 'column', 'vector']
+                };
+            }
+            if (parsed.vector === undefined || !Array.isArray(parsed.vector) || parsed.vector.length === 0) {
+                return {
+                    success: false,
+                    error: 'vector parameter is required and must be a non-empty array of numbers',
+                    requiredParams: ['table', 'column', 'vector']
+                };
+            }
+
+            // Validate upsert mode parameters
+            if (parsed.updateExisting === true) {
+                if (parsed.conflictColumn === undefined || parsed.conflictValue === undefined) {
+                    return {
+                        success: false,
+                        error: 'updateExisting requires both conflictColumn and conflictValue parameters',
+                        suggestion: 'Specify conflictColumn (e.g., "id") and conflictValue (e.g., 123) to identify the row to update',
+                        example: '{ updateExisting: true, conflictColumn: "id", conflictValue: 42, vector: [...] }'
+                    };
+                }
+            }
 
             const tableName = sanitizeTableName(parsed.table, parsed.schema);
             const columnName = sanitizeIdentifier(parsed.column);
             const vectorStr = `[${parsed.vector.join(',')}]`;
 
+            // Use direct UPDATE for updateExisting mode (avoids NOT NULL constraint issues)
+            if (parsed.updateExisting === true && parsed.conflictColumn !== undefined && parsed.conflictValue !== undefined) {
+                const conflictCol = sanitizeIdentifier(parsed.conflictColumn);
+                const sql = `UPDATE ${tableName} SET ${columnName} = $1::vector WHERE ${conflictCol} = $2`;
+                const result = await adapter.executeQuery(sql, [vectorStr, parsed.conflictValue]);
+
+                if (result.rowsAffected === 0) {
+                    return {
+                        success: false,
+                        error: `No row found with ${parsed.conflictColumn} = ${String(parsed.conflictValue)}`,
+                        suggestion: 'Use insert mode (without updateExisting) to create new rows, or verify the conflictValue exists'
+                    };
+                }
+
+                return { success: true, rowsAffected: result.rowsAffected, mode: 'update' };
+            }
+
+            // Standard INSERT mode
             const columns = [columnName];
             const values = [vectorStr];
             const params_: unknown[] = [];
             let paramIndex = 1;
 
-            if (parsed.additionalColumns) {
+            if (parsed.additionalColumns !== undefined) {
                 for (const [col, val] of Object.entries(parsed.additionalColumns)) {
                     columns.push(sanitizeIdentifier(col));
                     values.push(`$${String(paramIndex++)}`);
@@ -91,8 +235,36 @@ export function createVectorInsertTool(adapter: PostgresAdapter): ToolDefinition
             }
 
             const sql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ('${vectorStr}'${params_.length > 0 ? ', ' + values.slice(1).join(', ') : ''})`;
-            const result = await adapter.executeQuery(sql, params_);
-            return { success: true, rowsAffected: result.rowsAffected };
+            try {
+                const result = await adapter.executeQuery(sql, params_);
+                return { success: true, rowsAffected: result.rowsAffected };
+            } catch (error: unknown) {
+                // Parse dimension mismatch errors for user-friendly message
+                if (error instanceof Error) {
+                    const dimMatch = /expected (\d+) dimensions?, not (\d+)/.exec(error.message);
+                    if (dimMatch) {
+                        const expectedDim = dimMatch[1] ?? '0';
+                        const providedDim = dimMatch[2] ?? '0';
+                        return {
+                            success: false,
+                            error: 'Vector dimension mismatch',
+                            expectedDimensions: parseInt(expectedDim, 10),
+                            providedDimensions: parseInt(providedDim, 10),
+                            suggestion: `Column expects ${expectedDim} dimensions but vector has ${providedDim}. Resize vector or check embedding model.`
+                        };
+                    }
+                    // Check for NOT NULL constraint violation
+                    if (error.message.includes('NOT NULL') || error.message.includes('null value in column')) {
+                        return {
+                            success: false,
+                            error: 'NOT NULL constraint violation',
+                            rawError: error.message,
+                            suggestion: 'Table has NOT NULL columns that require values. Use additionalColumns param or updateExisting mode to update existing rows.'
+                        };
+                    }
+                }
+                throw error;
+            }
         }
     };
 }
@@ -100,20 +272,61 @@ export function createVectorInsertTool(adapter: PostgresAdapter): ToolDefinition
 export function createVectorSearchTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_vector_search',
-        description: 'Search for similar vectors using L2, cosine, or inner product distance.',
+        description: 'Search for similar vectors. Requires: table, column, vector. Use select param to include identifying columns (e.g., select: ["id", "name"]).',
         group: 'vector',
         inputSchema: VectorSearchSchema,
         annotations: readOnly('Vector Search'),
         icons: getToolIcons('vector', readOnly('Vector Search')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { table, column, vector, metric, limit, select, where } = VectorSearchSchema.parse(params);
+            const { table, column, vector, metric, limit, select, where, schema } = VectorSearchSchema.parse(params);
 
-            const tableName = sanitizeTableName(table);
+            // Validate required params with clear errors
+            if (table === '') {
+                return {
+                    success: false,
+                    error: 'table (or tableName) parameter is required',
+                    requiredParams: ['table', 'column', 'vector']
+                };
+            }
+            if (column === '') {
+                return {
+                    success: false,
+                    error: 'column (or col) parameter is required for the vector column name',
+                    requiredParams: ['table', 'column', 'vector']
+                };
+            }
+
+            const tableName = sanitizeTableName(table, schema);
             const columnName = sanitizeIdentifier(column);
+            const schemaName = schema ?? 'public';
+
+            // Validate column is actually a vector type
+            const typeCheckSql = `
+                SELECT udt_name FROM information_schema.columns 
+                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+            `;
+            const typeResult = await adapter.executeQuery(typeCheckSql, [schemaName, table, column]);
+            if ((typeResult.rows?.length ?? 0) === 0) {
+                return {
+                    success: false,
+                    error: `Column '${column}' does not exist in table '${table}'`,
+                    suggestion: 'Use pg_describe_table to find available columns'
+                };
+            }
+            const udtName = typeResult.rows?.[0]?.['udt_name'] as string | undefined;
+            if (udtName !== 'vector') {
+                return {
+                    success: false,
+                    error: `Column '${column}' is not a vector column (type: ${udtName ?? 'unknown'})`,
+                    suggestion: 'Use a column with vector type, or use pg_vector_add_column to create one'
+                };
+            }
             const vectorStr = `[${vector.join(',')}]`;
             const limitVal = limit !== undefined && limit > 0 ? limit : 10;
             const selectCols = select !== undefined && select.length > 0 ? select.map(c => sanitizeIdentifier(c)).join(', ') + ', ' : '';
             const whereClause = where ? ` AND ${where}` : '';
+            const { excludeNull } = VectorSearchSchema.parse(params);
+            const nullFilter = excludeNull === true ? ` AND ${columnName} IS NOT NULL` : '';
 
             let distanceExpr: string;
             switch (metric) {
@@ -121,7 +334,7 @@ export function createVectorSearchTool(adapter: PostgresAdapter): ToolDefinition
                     distanceExpr = `${columnName} <=> '${vectorStr}'`;
                     break;
                 case 'inner_product':
-                    distanceExpr = `${columnName} <#> '${vectorStr}'`;
+                    distanceExpr = `${columnName} <#>'${vectorStr}'`;
                     break;
                 default: // l2
                     distanceExpr = `${columnName} <-> '${vectorStr}'`;
@@ -129,12 +342,51 @@ export function createVectorSearchTool(adapter: PostgresAdapter): ToolDefinition
 
             const sql = `SELECT ${selectCols}${distanceExpr} as distance
                         FROM ${tableName}
-                        WHERE TRUE${whereClause}
+                        WHERE TRUE${nullFilter}${whereClause}
                         ORDER BY ${distanceExpr}
-                        LIMIT ${String(limitVal)}`;
+                        LIMIT ${String(limitVal)} `;
 
-            const result = await adapter.executeQuery(sql);
-            return { results: result.rows, count: result.rows?.length ?? 0, metric: metric ?? 'l2' };
+            try {
+                const result = await adapter.executeQuery(sql);
+
+                // Check for NULL distance values (from NULL vectors)
+                const nullCount = (result.rows ?? []).filter((r: Record<string, unknown>) => r['distance'] === null).length;
+
+                const response: Record<string, unknown> = {
+                    results: result.rows,
+                    count: result.rows?.length ?? 0,
+                    metric: metric ?? 'l2'
+                };
+
+                // Add hint when no select columns specified
+                if (select === undefined || select.length === 0) {
+                    response['hint'] = 'Results only contain distance. Use select param (e.g., select: ["id", "name"]) to include identifying columns.';
+                }
+
+                // Note about NULL vectors
+                if (nullCount > 0) {
+                    response['note'] = `${String(nullCount)} result(s) have NULL distance (rows with NULL vectors). Filter with WHERE ${column} IS NOT NULL.`;
+                }
+
+                return response;
+            } catch (error: unknown) {
+                // Parse dimension mismatch errors for user-friendly message
+                if (error instanceof Error) {
+                    const dimMatch = /different vector dimensions (\d+) and (\d+)/.exec(error.message);
+                    if (dimMatch) {
+                        const expectedDim = dimMatch[1] ?? '0';
+                        const providedDim = dimMatch[2] ?? '0';
+                        return {
+                            success: false,
+                            error: `Vector dimension mismatch: column '${column}' expects ${expectedDim} dimensions, but you provided ${providedDim} dimensions.`,
+                            expectedDimensions: parseInt(expectedDim, 10),
+                            providedDimensions: parseInt(providedDim, 10),
+                            suggestion: 'Ensure your query vector has the same dimensions as the column.'
+                        };
+                    }
+                }
+                throw error;
+            }
         }
     };
 }
@@ -142,82 +394,192 @@ export function createVectorSearchTool(adapter: PostgresAdapter): ToolDefinition
 export function createVectorCreateIndexTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_vector_create_index',
-        description: 'Create an IVFFlat or HNSW index for vector similarity search.',
+        description: 'Create vector index. Requires: table, column, type (ivfflat or hnsw).',
         group: 'vector',
         inputSchema: VectorCreateIndexSchema,
         annotations: write('Create Vector Index'),
         icons: getToolIcons('vector', write('Create Vector Index')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const { table, column, type, lists, m, efConstruction } = VectorCreateIndexSchema.parse(params);
+            const { table, column, type, metric, ifNotExists, lists, m, efConstruction, schema } = VectorCreateIndexSchema.parse(params);
 
-            const tableName = sanitizeTableName(table);
+            // Validate required params with clear errors
+            if (table === '') {
+                return {
+                    success: false,
+                    error: 'table (or tableName) parameter is required',
+                    requiredParams: ['table', 'column', 'type']
+                };
+            }
+            if (column === '') {
+                return {
+                    success: false,
+                    error: 'column (or col) parameter is required for the vector column name',
+                    requiredParams: ['table', 'column', 'type']
+                };
+            }
+
+            const tableName = sanitizeTableName(table, schema);
             const columnName = sanitizeIdentifier(column);
-            const indexNameRaw = `idx_${table}_${column}_${type}`;
-            const indexName = sanitizeIdentifier(indexNameRaw);
-            let withClause = '';
 
+            // Include metric in index name to allow multiple indexes with different metrics
+            const metricSuffix = metric !== 'l2' ? `_${metric}` : '';
+            const indexNameRaw = `idx_${table}_${column}_${type}${metricSuffix}`;
+            const indexName = sanitizeIdentifier(indexNameRaw);
+
+            // Map metric to PostgreSQL operator class
+            const opsMap: Record<string, string> = {
+                'l2': 'vector_l2_ops',
+                'cosine': 'vector_cosine_ops',
+                'inner_product': 'vector_ip_ops'
+            };
+            const opsClass = opsMap[metric] ?? 'vector_l2_ops';
+
+            // If ifNotExists is true, check if index already exists BEFORE creating
+            if (ifNotExists === true) {
+                const checkSql = `
+                    SELECT 1 FROM pg_indexes 
+                    WHERE indexname = $1
+                `;
+                const checkResult = await adapter.executeQuery(checkSql, [indexNameRaw]);
+                if (checkResult.rows && checkResult.rows.length > 0) {
+                    return {
+                        success: true,
+                        index: indexNameRaw,
+                        type,
+                        metric,
+                        table,
+                        column,
+                        ifNotExists: true,
+                        alreadyExists: true,
+                        message: `Index ${indexNameRaw} already exists`
+                    };
+                }
+            }
+
+            let withClause = '';
+            let appliedParams: Record<string, number> = {};
             if (type === 'ivfflat') {
                 const numLists = lists ?? 100;
-                withClause = `WITH (lists = ${String(numLists)})`;
+                withClause = `WITH(lists = ${String(numLists)})`;
+                appliedParams = { lists: numLists };
             } else { // hnsw
                 const mVal = m ?? 16;
                 const efVal = efConstruction ?? 64;
-                withClause = `WITH (m = ${String(mVal)}, ef_construction = ${String(efVal)})`;
+                withClause = `WITH(m = ${String(mVal)}, ef_construction = ${String(efVal)})`;
+                appliedParams = { m: mVal, efConstruction: efVal };
             }
 
-            const sql = `CREATE INDEX ${indexName} ON ${tableName} USING ${type} (${columnName} vector_l2_ops) ${withClause}`;
-            await adapter.executeQuery(sql);
-            return { success: true, index: indexNameRaw, type, table, column };
+            const sql = `CREATE INDEX ${indexName} ON ${tableName} USING ${type} (${columnName} ${opsClass}) ${withClause} `;
+
+            try {
+                await adapter.executeQuery(sql);
+                return {
+                    success: true,
+                    index: indexNameRaw,
+                    type,
+                    metric,
+                    table,
+                    column,
+                    appliedParams,
+                    ifNotExists: ifNotExists ?? false
+                };
+            } catch (error: unknown) {
+                // If ifNotExists is true and the error is "already exists", return success with alreadyExists flag
+                // (This handles race conditions where index is created between check and create)
+                if (ifNotExists === true && error instanceof Error) {
+                    const msg = error.message.toLowerCase();
+                    if (msg.includes('already exists') || msg.includes('duplicate')) {
+                        return {
+                            success: true,
+                            index: indexNameRaw,
+                            type,
+                            table,
+                            column,
+                            ifNotExists: true,
+                            alreadyExists: true,
+                            message: `Index ${indexNameRaw} already exists`
+                        };
+                    }
+                }
+                // Re-throw other errors
+                throw error;
+            }
         }
     };
 }
 
 export function createVectorDistanceTool(adapter: PostgresAdapter): ToolDefinition {
+    const DistanceSchema = z.object({
+        vector1: z.array(z.number()),
+        vector2: z.array(z.number()),
+        metric: z.enum(['l2', 'cosine', 'inner_product']).optional()
+    });
+
     return {
         name: 'pg_vector_distance',
-        description: 'Calculate distance between two vectors.',
+        description: 'Calculate distance between two vectors. Valid metrics: l2 (default), cosine, inner_product.',
         group: 'vector',
-        inputSchema: z.object({
-            vector1: z.array(z.number()),
-            vector2: z.array(z.number()),
-            metric: z.enum(['l2', 'cosine', 'inner_product']).optional()
-        }),
+        inputSchema: DistanceSchema,
         annotations: readOnly('Vector Distance'),
         icons: getToolIcons('vector', readOnly('Vector Distance')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { vector1: number[]; vector2: number[]; metric?: string });
+            const parsed = DistanceSchema.parse(params);
+
+            // Validate dimension match before query
+            if (parsed.vector1.length !== parsed.vector2.length) {
+                return {
+                    success: false,
+                    error: `Vector dimensions must match: vector1 has ${String(parsed.vector1.length)} dimensions, vector2 has ${String(parsed.vector2.length)} dimensions`,
+                    suggestion: 'Ensure both vectors have the same number of dimensions'
+                };
+            }
+
             const v1 = `[${parsed.vector1.join(',')}]`;
             const v2 = `[${parsed.vector2.join(',')}]`;
+            const metric = parsed.metric ?? 'l2';
 
             let op: string;
-            switch (parsed.metric) {
+            switch (metric) {
                 case 'cosine': op = '<=>'; break;
                 case 'inner_product': op = '<#>'; break;
                 default: op = '<->'; // l2
             }
 
-            const sql = `SELECT '${v1}'::vector ${op} '${v2}'::vector as distance`;
+            const sql = `SELECT '${v1}'::vector ${op} '${v2}':: vector as distance`;
             const result = await adapter.executeQuery(sql);
-            return { distance: result.rows?.[0]?.['distance'], metric: parsed.metric ?? 'l2' };
+            return { distance: result.rows?.[0]?.['distance'], metric };
         }
     };
 }
 
 export function createVectorNormalizeTool(): ToolDefinition {
+    const NormalizeSchema = z.object({
+        vector: z.array(z.number()).describe('Vector to normalize to unit length')
+    });
+
     return {
         name: 'pg_vector_normalize',
         description: 'Normalize a vector to unit length.',
         group: 'vector',
-        inputSchema: z.object({
-            vector: z.array(z.number())
-        }),
+        inputSchema: NormalizeSchema,
         annotations: readOnly('Normalize Vector'),
         icons: getToolIcons('vector', readOnly('Normalize Vector')),
         // eslint-disable-next-line @typescript-eslint/require-await
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { vector: number[] });
+            const parsed = NormalizeSchema.parse(params ?? {});
 
             const magnitude = Math.sqrt(parsed.vector.reduce((sum, x) => sum + x * x, 0));
+
+            // Check for zero vector
+            if (magnitude === 0) {
+                return {
+                    success: false,
+                    error: 'Cannot normalize a zero vector (all values are 0)',
+                    suggestion: 'Provide a vector with at least one non-zero value',
+                    magnitude: 0
+                };
+            }
+
             const normalized = parsed.vector.map(x => x / magnitude);
 
             return { normalized, magnitude };
@@ -226,29 +588,308 @@ export function createVectorNormalizeTool(): ToolDefinition {
 }
 
 export function createVectorAggregateTool(adapter: PostgresAdapter): ToolDefinition {
+    // Schema with parameter smoothing
+    const AggregateSchema = z.object({
+        table: z.string().optional().describe('Table name'),
+        tableName: z.string().optional().describe('Alias for table'),
+        column: z.string().optional().describe('Vector column'),
+        col: z.string().optional().describe('Alias for column'),
+        where: z.string().optional(),
+        groupBy: z.string().optional().describe('Column to group results by'),
+        schema: z.string().optional().describe('Database schema (default: public)'),
+        excludeNullGroups: z.boolean().optional().describe('Filter out groups with NULL average vectors'),
+        summarizeVector: z.boolean().optional().describe('Truncate large vectors to preview (default: true)')
+    }).transform((data) => ({
+        table: data.table ?? data.tableName ?? '',
+        column: data.column ?? data.col ?? '',
+        where: data.where,
+        groupBy: data.groupBy,
+        schema: data.schema,
+        excludeNullGroups: data.excludeNullGroups,
+        summarizeVector: data.summarizeVector ?? true
+    }));
+
     return {
         name: 'pg_vector_aggregate',
-        description: 'Calculate average vector for a group of rows.',
+        description: 'Calculate average vector. Requires: table, column. Optional: groupBy, where.',
         group: 'vector',
-        inputSchema: z.object({
-            table: z.string(),
-            column: z.string(),
-            where: z.string().optional()
-        }),
+        inputSchema: AggregateSchema,
         annotations: readOnly('Vector Aggregate'),
         icons: getToolIcons('vector', readOnly('Vector Aggregate')),
         handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = (params as { table: string; column: string; where?: string });
-            const whereClause = parsed.where ? ` WHERE ${parsed.where}` : '';
+            const parsed = AggregateSchema.parse(params);
 
-            const tableName = sanitizeTableName(parsed.table);
+            // Validate required params with clear errors
+            if (parsed.table === '') {
+                return {
+                    success: false,
+                    error: 'table (or tableName) parameter is required',
+                    requiredParams: ['table', 'column']
+                };
+            }
+            if (parsed.column === '') {
+                return {
+                    success: false,
+                    error: 'column (or col) parameter is required for the vector column name',
+                    requiredParams: ['table', 'column']
+                };
+            }
+
+            const whereClause = parsed.where !== undefined ? ` WHERE ${parsed.where} ` : '';
+
+            const tableName = sanitizeTableName(parsed.table, parsed.schema);
             const columnName = sanitizeIdentifier(parsed.column);
 
-            const sql = `SELECT avg(${columnName}) as average_vector, count(*) as count
-                        FROM ${tableName}${whereClause}`;
+            // Handle groupBy mode
+            if (parsed.groupBy !== undefined) {
+                const groupByCol = sanitizeIdentifier(parsed.groupBy);
+                const sql = `SELECT ${groupByCol} as group_key, avg(${columnName})::text as average_vector, count(*):: integer as count
+                            FROM ${tableName}${whereClause}
+                            GROUP BY ${groupByCol}
+                            ORDER BY ${groupByCol} `;
+
+                const result = await adapter.executeQuery(sql);
+                let groups = result.rows?.map((row: Record<string, unknown>) => {
+                    const vec = parseVector(row['average_vector']);
+                    return {
+                        group_key: row['group_key'],
+                        average_vector: parsed.summarizeVector && vec !== null ? truncateVector(vec) : (vec ?? row['average_vector']),
+                        count: typeof row['count'] === 'string' ? parseInt(row['count'], 10) : (row['count'] ?? 0)
+                    };
+                }) ?? [];
+
+                // Check for groups with NULL average vector
+                const nullGroups = groups.filter(g => g.average_vector === null ||
+                    (typeof g.average_vector === 'object' && g.average_vector !== null && 'preview' in g.average_vector && g.average_vector.preview === null));
+
+                // Filter out null groups if requested
+                if (parsed.excludeNullGroups === true) {
+                    groups = groups.filter(g => !(g.average_vector === null ||
+                        (typeof g.average_vector === 'object' && g.average_vector !== null && 'preview' in g.average_vector && g.average_vector.preview === null)));
+                }
+
+                const response: Record<string, unknown> = {
+                    groups,
+                    count: groups.length
+                };
+
+                if (nullGroups.length > 0 && parsed.excludeNullGroups !== true) {
+                    response['note'] = `${String(nullGroups.length)} group(s) have NULL average_vector. Use excludeNullGroups: true to filter them.`;
+                }
+
+                return response;
+            }
+
+            // Non-grouped overall average
+            const sql = `SELECT avg(${columnName})::text as average_vector, count(*):: integer as count
+                        FROM ${tableName}${whereClause} `;
 
             const result = await adapter.executeQuery(sql);
-            return result.rows?.[0];
+            const row = result.rows?.[0] ?? {};
+            // Ensure count is a number (PostgreSQL returns bigint as string)
+            const countVal = row['count'];
+            const count: number = typeof countVal === 'string' ? parseInt(countVal, 10) : (typeof countVal === 'number' ? countVal : 0);
+            const vec = parseVector(row['average_vector']);
+
+            const response: Record<string, unknown> = {
+                average_vector: parsed.summarizeVector && vec !== null ? truncateVector(vec) : (vec ?? row['average_vector']),
+                count
+            };
+
+            // Add message for empty/null result
+            if (vec === null && count === 0) {
+                response['note'] = 'No vectors found to aggregate (table empty or all vectors are NULL)';
+            } else if (vec === null) {
+                response['note'] = `All ${String(count)} rows have NULL vectors`;
+            }
+
+            return response;
+        }
+    };
+}
+
+export function createVectorBatchInsertTool(adapter: PostgresAdapter): ToolDefinition {
+    // Schema with parameter smoothing
+    const BatchInsertSchema = z.object({
+        table: z.string().optional().describe('Table name'),
+        tableName: z.string().optional().describe('Alias for table'),
+        column: z.string().optional().describe('Vector column'),
+        col: z.string().optional().describe('Alias for column'),
+        vectors: z.array(z.object({
+            vector: z.array(z.number()),
+            data: z.record(z.string(), z.unknown()).optional().describe('Additional column values')
+        })).describe('Array of vectors with optional additional data'),
+        schema: z.string().optional().describe('Database schema (default: public)')
+    }).transform((data) => ({
+        table: data.table ?? data.tableName ?? '',
+        column: data.column ?? data.col ?? '',
+        vectors: data.vectors,
+        schema: data.schema
+    }));
+
+    return {
+        name: 'pg_vector_batch_insert',
+        description: 'Efficiently insert multiple vectors. vectors param expects array of {vector: [...], data?: {...}} objects, NOT raw arrays. Example: vectors: [{vector: [0.1, 0.2], data: {name: "a"}}]',
+        group: 'vector',
+        inputSchema: BatchInsertSchema,
+        annotations: write('Batch Insert Vectors'),
+        icons: getToolIcons('vector', write('Batch Insert Vectors')),
+        handler: async (params: unknown, _context: RequestContext) => {
+            const parsed = BatchInsertSchema.parse(params);
+            const tableName = sanitizeTableName(parsed.table, parsed.schema);
+            const columnName = sanitizeIdentifier(parsed.column);
+
+            if (parsed.vectors.length === 0) {
+                return { success: true, rowsInserted: 0, message: 'No vectors to insert' };
+            }
+
+            // Build batch INSERT with VALUES clause
+            const allDataKeys = new Set<string>();
+            for (const v of parsed.vectors) {
+                if (v.data !== undefined) {
+                    for (const k of Object.keys(v.data)) {
+                        allDataKeys.add(k);
+                    }
+                }
+            }
+            const dataColumns = Array.from(allDataKeys);
+
+            const columns = [columnName, ...dataColumns.map(c => sanitizeIdentifier(c))];
+            const valueRows: string[] = [];
+            const allParams: unknown[] = [];
+            let paramIndex = 1;
+
+            for (const v of parsed.vectors) {
+                const vectorStr = `'[${v.vector.join(', ')}]':: vector`;
+                const rowValues = [vectorStr];
+
+                for (const col of dataColumns) {
+                    rowValues.push(`$${String(paramIndex++)} `);
+                    allParams.push(v.data?.[col] ?? null);
+                }
+
+                valueRows.push(`(${rowValues.join(', ')})`);
+            }
+
+            const sql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${valueRows.join(', ')} `;
+            const result = await adapter.executeQuery(sql, allParams);
+
+            return {
+                success: true,
+                rowsInserted: parsed.vectors.length,
+                rowsAffected: result.rowsAffected
+            };
+        }
+    };
+}
+
+export function createVectorValidateTool(adapter: PostgresAdapter): ToolDefinition {
+    // Schema with parameter smoothing
+    const ValidateSchema = z.object({
+        table: z.string().optional().describe('Table name'),
+        tableName: z.string().optional().describe('Alias for table'),
+        column: z.string().optional().describe('Vector column'),
+        col: z.string().optional().describe('Alias for column'),
+        vector: z.array(z.number()).optional().describe('Vector to validate dimensions'),
+        dimensions: z.number().optional().describe('Expected dimensions to check'),
+        schema: z.string().optional().describe('Database schema (default: public)')
+    }).transform((data) => ({
+        table: data.table ?? data.tableName ?? '',
+        column: data.column ?? data.col ?? '',
+        vector: data.vector,
+        dimensions: data.dimensions,
+        schema: data.schema
+    }));
+
+    return {
+        name: 'pg_vector_validate',
+        description: 'Validate vector dimensions against a column or check a vector before operations.',
+        group: 'vector',
+        inputSchema: ValidateSchema,
+        annotations: readOnly('Validate Vector'),
+        icons: getToolIcons('vector', readOnly('Validate Vector')),
+        handler: async (params: unknown, _context: RequestContext) => {
+            const parsed = ValidateSchema.parse(params);
+
+            // Get column dimensions if table/column specified
+            let columnDimensions: number | undefined;
+            if (parsed.table !== '' && parsed.column !== '') {
+                const schemaName = parsed.schema ?? 'public';
+
+                // First check if table and column exist
+                const existsSql = `
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+                `;
+                const existsResult = await adapter.executeQuery(existsSql, [schemaName, parsed.table, parsed.column]);
+                if ((existsResult.rows?.length ?? 0) === 0) {
+                    // Check if table exists at all
+                    const tableCheckSql = `
+                        SELECT 1 FROM information_schema.tables 
+                        WHERE table_schema = $1 AND table_name = $2
+                    `;
+                    const tableCheckResult = await adapter.executeQuery(tableCheckSql, [schemaName, parsed.table]);
+                    if ((tableCheckResult.rows?.length ?? 0) === 0) {
+                        return {
+                            valid: false,
+                            error: `Table '${parsed.table}' does not exist in schema '${schemaName}'`,
+                            suggestion: 'Use pg_list_tables to find available tables'
+                        };
+                    }
+                    return {
+                        valid: false,
+                        error: `Column '${parsed.column}' does not exist in table '${parsed.table}'`,
+                        suggestion: 'Use pg_describe_table to find available columns'
+                    };
+                }
+
+                // Try to get actual dimensions from a sample row
+                const sampleSql = `
+                    SELECT vector_dims("${parsed.column}") as dimensions
+                    FROM "${schemaName}"."${parsed.table}"
+                    WHERE "${parsed.column}" IS NOT NULL
+                    LIMIT 1
+                `;
+                try {
+                    const sampleResult = await adapter.executeQuery(sampleSql);
+                    const dims = sampleResult.rows?.[0]?.['dimensions'];
+                    if (dims !== undefined && dims !== null) {
+                        columnDimensions = typeof dims === 'string' ? parseInt(dims, 10) : Number(dims);
+                    }
+                } catch {
+                    // Table might be empty, check type definition instead
+                    const typeSql = `
+                        SELECT udt_name, character_maximum_length
+                        FROM information_schema.columns 
+                        WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+                `;
+                    const typeResult = await adapter.executeQuery(typeSql, [schemaName, parsed.table, parsed.column]);
+                    if (typeResult.rows?.[0]?.['character_maximum_length'] !== undefined) {
+                        columnDimensions = typeResult.rows[0]['character_maximum_length'] as number;
+                    }
+                }
+            }
+
+            const expectedDimensions = parsed.dimensions ?? columnDimensions;
+            const vectorDimensions = parsed.vector?.length;
+
+            // Validation results
+            const valid = vectorDimensions !== undefined && expectedDimensions !== undefined
+                ? vectorDimensions === expectedDimensions
+                : true;
+
+            return {
+                valid,
+                vectorDimensions,
+                columnDimensions,
+                expectedDimensions,
+                ...(parsed.vector !== undefined && expectedDimensions !== undefined && vectorDimensions !== undefined && vectorDimensions !== expectedDimensions ? {
+                    error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
+                    suggestion: vectorDimensions > expectedDimensions
+                        ? 'Use pg_vector_dimension_reduce to reduce dimensions'
+                        : 'Ensure your embedding model outputs the correct dimensions'
+                } : {})
+            };
         }
     };
 }

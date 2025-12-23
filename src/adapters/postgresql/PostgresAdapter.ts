@@ -382,8 +382,9 @@ export class PostgresAdapter extends DatabaseAdapter {
     /**
      * Get all indexes across all user tables in a single query
      * Performance optimization: eliminates N+1 query pattern
+     * Public so it can be used by pg_get_indexes when no table is specified
      */
-    private async getAllIndexes(): Promise<IndexInfo[]> {
+    async getAllIndexes(): Promise<IndexInfo[]> {
         // Check cache first
         const cached = this.getCached('all_indexes') as IndexInfo[] | undefined;
         if (cached) return cached;
@@ -416,7 +417,7 @@ export class PostgresAdapter extends DatabaseAdapter {
             name: row['name'] as string,
             tableName: row['table_name'] as string,
             schemaName: row['schema_name'] as string,
-            columns: row['columns'] as string[],
+            columns: this.parseColumnsArray(row['columns']),
             unique: row['is_unique'] as boolean,
             type: row['type'] as IndexInfo['type'],
             sizeBytes: Number(row['size_bytes']) || undefined,
@@ -425,6 +426,23 @@ export class PostgresAdapter extends DatabaseAdapter {
 
         this.setCache('all_indexes', indexes);
         return indexes;
+    }
+
+    /**
+     * Parse columns from PostgreSQL array format
+     * Handles both native arrays and string representations like "{col1,col2}"
+     */
+    private parseColumnsArray(columns: unknown): string[] {
+        if (Array.isArray(columns)) {
+            return columns as string[];
+        }
+        if (typeof columns === 'string') {
+            // Handle PostgreSQL array string format: "{col1,col2}"
+            const trimmed = columns.replace(/^{|}$/g, '');
+            if (trimmed === '') return [];
+            return trimmed.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        }
+        return [];
     }
 
     async listTables(): Promise<TableInfo[]> {
@@ -490,16 +508,20 @@ export class PostgresAdapter extends DatabaseAdapter {
             ORDER BY a.attnum
         `, [schemaName, tableName]);
 
-        const columns: ColumnInfo[] = (columnsResult.rows ?? []).map(row => ({
-            name: row['name'] as string,
-            type: row['type'] as string,
-            nullable: row['nullable'] as boolean,
-            primaryKey: row['primary_key'] as boolean,
-            defaultValue: row['default_value'],
-            isGenerated: row['is_generated'] as boolean,
-            generatedExpression: row['generated_expression'] as string | undefined,
-            comment: row['comment'] as string | undefined
-        }));
+        const columns: ColumnInfo[] = (columnsResult.rows ?? []).map(row => {
+            const isGenerated = row['is_generated'] as boolean;
+            return {
+                name: row['name'] as string,
+                type: row['type'] as string,
+                nullable: row['nullable'] as boolean,
+                primaryKey: row['primary_key'] as boolean,
+                defaultValue: row['default_value'],
+                isGenerated,
+                // Only set generatedExpression for actual generated columns
+                generatedExpression: isGenerated ? row['generated_expression'] as string | undefined : undefined,
+                comment: row['comment'] as string | undefined
+            };
+        });
 
         // Get table info
         const tableResult = await this.executeQuery(`
@@ -579,7 +601,7 @@ export class PostgresAdapter extends DatabaseAdapter {
             name: row['name'] as string,
             tableName,
             schemaName,
-            columns: row['columns'] as string[],
+            columns: this.parseColumnsArray(row['columns']),
             unique: row['is_unique'] as boolean,
             type: row['type'] as IndexInfo['type'],
             sizeBytes: Number(row['size_bytes']) || undefined,

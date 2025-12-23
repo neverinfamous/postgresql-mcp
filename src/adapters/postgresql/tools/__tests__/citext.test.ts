@@ -39,34 +39,28 @@ describe('Citext Tools', () => {
     });
 
     describe('pg_citext_convert_column', () => {
-        it('should return error if extension not installed', async () => {
+        it('should throw error if extension not installed', async () => {
             mockAdapter.executeQuery.mockResolvedValueOnce({
                 rows: [{ installed: false }]
             });
 
             const tool = findTool('pg_citext_convert_column');
-            const result = await tool!.handler({
+            await expect(tool!.handler({
                 table: 'users',
                 column: 'email'
-            }, mockContext) as { success: boolean; error?: string };
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('not installed');
+            }, mockContext)).rejects.toThrow('citext extension is not installed');
         });
 
-        it('should return error if column not found', async () => {
+        it('should throw error if column not found', async () => {
             mockAdapter.executeQuery
                 .mockResolvedValueOnce({ rows: [{ installed: true }] })
                 .mockResolvedValueOnce({ rows: [] });
 
             const tool = findTool('pg_citext_convert_column');
-            const result = await tool!.handler({
+            await expect(tool!.handler({
                 table: 'users',
                 column: 'nonexistent'
-            }, mockContext) as { success: boolean; error?: string };
-
-            expect(result.success).toBe(false);
-            expect(result.error).toContain('not found');
+            }, mockContext)).rejects.toThrow('not found');
         });
 
         it('should report already citext column', async () => {
@@ -236,17 +230,27 @@ describe('Citext Tools', () => {
             expect(result.extensionInstalled).toBe(false);
             expect(result.hint).toBeDefined();
         });
+
+        it('should throw validation error when value2 is missing', async () => {
+            const tool = findTool('pg_citext_compare');
+            await expect(tool!.handler({
+                value1: 'HELLO'
+                // value2 is missing
+            }, mockContext)).rejects.toThrow();
+        });
     });
 
     describe('pg_citext_schema_advisor', () => {
         it('should recommend columns for conversion', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({
-                rows: [
-                    { column_name: 'email', data_type: 'text', udt_name: 'text' },
-                    { column_name: 'username', data_type: 'text', udt_name: 'text' },
-                    { column_name: 'bio', data_type: 'text', udt_name: 'text' }
-                ]
-            });
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // table exists
+                .mockResolvedValueOnce({
+                    rows: [
+                        { column_name: 'email', data_type: 'text', udt_name: 'text' },
+                        { column_name: 'username', data_type: 'text', udt_name: 'text' },
+                        { column_name: 'bio', data_type: 'text', udt_name: 'text' }
+                    ]
+                });
 
             const tool = findTool('pg_citext_schema_advisor');
             const result = await tool!.handler({
@@ -265,11 +269,13 @@ describe('Citext Tools', () => {
         });
 
         it('should detect already citext columns', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({
-                rows: [
-                    { column_name: 'email', data_type: 'USER-DEFINED', udt_name: 'citext' }
-                ]
-            });
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // table exists
+                .mockResolvedValueOnce({
+                    rows: [
+                        { column_name: 'email', data_type: 'USER-DEFINED', udt_name: 'citext' }
+                    ]
+                });
 
             const tool = findTool('pg_citext_schema_advisor');
             const result = await tool!.handler({
@@ -284,9 +290,11 @@ describe('Citext Tools', () => {
         });
 
         it('should provide next steps when conversions recommended', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({
-                rows: [{ column_name: 'email', data_type: 'text', udt_name: 'text' }]
-            });
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // table exists
+                .mockResolvedValueOnce({
+                    rows: [{ column_name: 'email', data_type: 'text', udt_name: 'text' }]
+                });
 
             const tool = findTool('pg_citext_schema_advisor');
             const result = await tool!.handler({
@@ -296,6 +304,15 @@ describe('Citext Tools', () => {
 
             expect(result.nextSteps.length).toBeGreaterThan(0);
             expect(result.nextSteps.some(step => step.includes('Review'))).toBe(true);
+        });
+
+        it('should throw error for non-existent table', async () => {
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] }); // table does not exist
+
+            const tool = findTool('pg_citext_schema_advisor');
+            await expect(tool!.handler({
+                table: 'nonexistent'
+            }, mockContext)).rejects.toThrow('not found');
         });
     });
 

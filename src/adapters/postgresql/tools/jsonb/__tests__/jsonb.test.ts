@@ -125,7 +125,7 @@ describe('Handler Execution', () => {
             }, mockContext) as Record<string, unknown>;
 
             expect(mockAdapter.executeQuery).toHaveBeenCalled();
-            expect(result).toHaveProperty('values');
+            expect(result).toHaveProperty('results');
         });
     });
 
@@ -277,9 +277,10 @@ describe('Handler Execution', () => {
 
     describe('pg_jsonb_normalize', () => {
         it('should use array mode with jsonb_array_elements', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({
-                rows: [{ element: { id: 1 } }, { element: { id: 2 } }]
-            });
+            // First call is idColumn detection, second is the actual query
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [] }) // No 'id' column found
+                .mockResolvedValueOnce({ rows: [{ element: { id: 1 } }, { element: { id: 2 } }] });
 
             const tool = tools.find(t => t.name === 'pg_jsonb_normalize')!;
             const result = await tool.handler({
@@ -288,15 +289,17 @@ describe('Handler Execution', () => {
                 mode: 'array'
             }, mockContext) as { rows: unknown[]; count: number };
 
-            const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+            // Check the second call (index 1) for the main query
+            const sql = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
             expect(sql).toContain('jsonb_array_elements');
             expect(result.count).toBe(2);
         });
 
         it('should use flatten mode with jsonb_each', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({
-                rows: [{ key: 'name', value: '"John"' }, { key: 'age', value: '30' }]
-            });
+            // First call is idColumn detection, second is the actual query
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [] }) // No 'id' column found
+                .mockResolvedValueOnce({ rows: [{ key: 'name', value: '"John"' }, { key: 'age', value: '30' }] });
 
             const tool = tools.find(t => t.name === 'pg_jsonb_normalize')!;
             const result = await tool.handler({
@@ -305,16 +308,18 @@ describe('Handler Execution', () => {
                 mode: 'flatten'
             }, mockContext) as { rows: unknown[]; count: number };
 
-            const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+            // Check the second call (index 1) for the main query
+            const sql = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
             expect(sql).toContain('jsonb_each');
             expect(sql).not.toContain('jsonb_each_text');
             expect(result.count).toBe(2);
         });
 
         it('should use keys mode (default) with jsonb_each_text', async () => {
-            mockAdapter.executeQuery.mockResolvedValueOnce({
-                rows: [{ key: 'name', value: 'John' }]
-            });
+            // First call is idColumn detection, second is the actual query
+            mockAdapter.executeQuery
+                .mockResolvedValueOnce({ rows: [] }) // No 'id' column found
+                .mockResolvedValueOnce({ rows: [{ key: 'name', value: 'John' }] });
 
             const tool = tools.find(t => t.name === 'pg_jsonb_normalize')!;
             const result = await tool.handler({
@@ -323,7 +328,8 @@ describe('Handler Execution', () => {
                 // mode defaults to 'keys'
             }, mockContext) as { rows: unknown[]; count: number };
 
-            const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+            // Check the second call (index 1) for the main query
+            const sql = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
             expect(sql).toContain('jsonb_each_text');
             expect(result.count).toBe(1);
         });

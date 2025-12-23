@@ -2,7 +2,7 @@
  * PostgreSQL Performance Tools
  * 
  * Query analysis, statistics, and performance monitoring.
- * 16 tools total.
+ * 20 tools total.
  */
 
 import type { PostgresAdapter } from '../../PostgresAdapter.js';
@@ -10,7 +10,7 @@ import type { ToolDefinition } from '../../../../types/index.js';
 
 // Import from sub-modules
 import { createExplainTool, createExplainAnalyzeTool, createExplainBuffersTool } from './explain.js';
-import { createIndexStatsTool, createTableStatsTool, createStatStatementsTool, createStatActivityTool } from './stats.js';
+import { createIndexStatsTool, createTableStatsTool, createStatStatementsTool, createStatActivityTool, createUnusedIndexesTool, createDuplicateIndexesTool, createVacuumStatsTool, createQueryPlanStatsTool } from './stats.js';
 import { createLocksTool, createBloatCheckTool, createCacheHitRatioTool } from './monitoring.js';
 import { createSeqScanTablesTool, createIndexRecommendationsTool, createQueryPlanCompareTool } from './analysis.js';
 import { createPerformanceBaselineTool, createConnectionPoolOptimizeTool, createPartitionStrategySuggestTool } from './optimization.js';
@@ -35,6 +35,10 @@ export function getPerformanceTools(adapter: PostgresAdapter): ToolDefinition[] 
         createQueryPlanCompareTool(adapter),
         createPerformanceBaselineTool(adapter),
         createConnectionPoolOptimizeTool(adapter),
-        createPartitionStrategySuggestTool(adapter)
+        createPartitionStrategySuggestTool(adapter),
+        createUnusedIndexesTool(adapter),
+        createDuplicateIndexesTool(adapter),
+        createVacuumStatsTool(adapter),
+        createQueryPlanStatsTool(adapter)
     ];
 }

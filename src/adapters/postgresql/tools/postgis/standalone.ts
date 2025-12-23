@@ -80,8 +80,8 @@ export function createGeometryIntersectionTool(adapter: PostgresAdapter): ToolDe
             const geom1 = parseGeometry(geometry1);
             const geom2 = parseGeometry(geometry2);
 
-            // Replace $1 with actual parameter positions
-            const geom1Expr = geom1.sql.replace('$1', '$1');
+            // geom1 uses $1 (first parameter), geom2 uses $2 (second parameter)
+            const geom1Expr = geom1.sql;
             const geom2Expr = geom2.sql.replace('$1', '$2');
 
             const sql = `

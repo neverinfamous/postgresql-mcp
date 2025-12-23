@@ -1246,10 +1246,10 @@ describe('Parameter Aliases', () => {
             .mockResolvedValueOnce({ rows: [{ 'QUERY PLAN': [{ Plan: { 'Total Cost': 50 } }] }] });
 
         const tool = tools.find(t => t.name === 'pg_query_plan_compare')!;
-        const result = await tool.handler({
+        await tool.handler({
             sql1: 'SELECT * FROM users',
             sql2: 'SELECT id FROM users'
-        }, mockContext) as { query1: unknown; query2: unknown };
+        }, mockContext);
 
         expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(2);
         expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(

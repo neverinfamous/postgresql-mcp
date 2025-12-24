@@ -2,11 +2,11 @@
 
 <!-- mcp-name: io.github.neverinfamous/postgres-mcp -->
 
-*Last updated December 21, 2025 - Code Mode Default in All Presets*
+*Last updated December 23, 2025*
 
-*Enterprise-grade PostgreSQL MCP Server with OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, HypoPG, and advanced PostgreSQL features*
+A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **202 specialized tools**, **20 resources**, and **19 AI-powered prompts** and includes OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, HypoPG, and advanced PostgreSQL features.
 
-> **✅ Under Development** - 202 tools, 21 resources, and 19 prompts.
+> **✅ Under Development** - 202 tools, 20 resources, and 19 prompts.
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -14,8 +14,6 @@
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 [![Tests](https://img.shields.io/badge/Tests-1561_passed-success.svg)](https://github.com/neverinfamous/postgres-mcp)
 [![Coverage](https://img.shields.io/badge/Coverage-97.55%25-brightgreen.svg)](https://github.com/neverinfamous/postgres-mcp)
-
-A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **202 specialized tools**, **21 resources**, and **19 AI-powered prompts**.
 
 ---
 
@@ -406,7 +404,7 @@ This server includes **19 intelligent prompts** for guided workflows:
 
 Resources give you instant snapshots of database state without writing queries. Perfect for quickly checking schema, health, or performance metrics — the AI can read these to understand your database context before suggesting changes.
 
-This server provides **21 resources** for structured data access:
+This server provides **20 resources** for structured data access:
 
 | Resource | URI | Description |
 |----------|-----|-------------|
@@ -430,7 +428,6 @@ This server provides **21 resources** for structured data access:
 | Vector | `postgres://vector` | pgvector columns, indexes, and recommendations |
 | PostGIS | `postgres://postgis` | PostGIS spatial columns and index status |
 | Crypto | `postgres://crypto` | pgcrypto availability and security recommendations |
-| Annotations | `postgres://annotations` | Tool behavior hints categorized by type |
 
 ---
 

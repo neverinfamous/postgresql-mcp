@@ -496,23 +496,6 @@ All 199 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints t
 
 ---
 
-## 📓 Jupyter Notebook
-
-A hands-on [quickstart notebook](examples/notebooks/quickstart.ipynb) demonstrates all major features using the Python MCP SDK:
-
-- CRUD operations, transactions, and error handling
-- Resources for observability (`postgres://health`, `postgres://extensions`)
-- JSONB, full-text search, pgvector, and PostGIS
-- Code Mode for multi-step operations
-
-```bash
-cd examples/notebooks
-pip install mcp python-dotenv
-python -m jupyterlab
-```
-
----
-
 ## Contributing
 
 Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a pull request.

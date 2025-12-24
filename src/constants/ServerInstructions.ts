@@ -14,17 +14,35 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 ## ⚠️ Critical Gotchas
 
 1. **Transactions**: Use \`pg.transactions.execute({statements})\` for atomic ops, OR pass \`transactionId\` to individual queries
-2. **pg_upsert conflictColumns**: Requires existing UNIQUE/PRIMARY KEY constraint on conflict columns
-3. **pg_vector_insert updateExisting**: Uses direct UPDATE (avoids NOT NULL constraint issues vs INSERT mode)
-4. **Small tables**: Optimizer correctly uses Seq Scan for <1000 rows—this is expected behavior
+2. **pg_write_query**: ⛔ Throws for SELECT—use \`pg_read_query\` for SELECT statements
+3. **pg_upsert/pg_create_table**: \`schema.table\` format auto-parses (e.g., \`'myschema.users'\` → schema: 'myschema', table: 'users')
+4. **pg_create_table columns**: \`notNull\`, \`defaultValue\`, \`check\`, \`references\` (object or string \`"table(column)"\` syntax)
+5. **pg_create_index expression**: Columns can be expressions like \`LOWER(name)\` or \`name::text\`—auto-detected
+6. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`
+7. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint
+8. **pg_exists optional WHERE**: \`where\`/\`condition\`/\`filter\` is optional. Without it, checks if table has any rows
+9. **pg_describe_table**: Returns columns, foreignKeys, primaryKey—use \`pg_get_indexes\` separately for index details
+10. **pg_vector_insert updateExisting**: Uses direct UPDATE (avoids NOT NULL constraint issues vs INSERT mode)
+11. **pg_get_indexes without table**: Returns ALL database indexes (potentially large). Use \`table\` param for specific table
+12. **Small tables**: Optimizer correctly uses Seq Scan for <1000 rows—this is expected behavior
 
 ## 🔄 Response Structures
 
 | Tool | Returns | Notes |
 |------|---------|-------|
-| \`pg_write_query\` | \`{rowsAffected, rows?}\` | \`rows\` only with RETURNING clause |
-| \`pg_count\` | \`{count: N}\` | — |
-| \`pg_exists\` | \`{exists: bool}\` | — |
+| \`pg_read_query\` | \`{rows, rowCount, fields?}\` | \`fields\` contains column metadata (name, dataTypeID) |
+| \`pg_write_query\` | \`{rowsAffected, affectedRows, rows?}\` | \`rows\` only with RETURNING clause. ⛔ Throws for SELECT |
+| \`pg_upsert\` | \`{operation, rowsAffected, rowCount, rows?}\` | \`operation: 'insert'|'update'\`. \`rows\` only with RETURNING clause |
+| \`pg_batch_insert\` | \`{rowsAffected, affectedRows, rows?}\` | Empty objects use DEFAULT VALUES. ⚠️ BIGINT > 2^53 loses precision |
+| \`pg_count\` | \`{count: N}\` | Use \`params\` for placeholders: \`where: 'id=$1', params: [5]\`. DISTINCT: use \`pg_read_query\` |
+| \`pg_exists\` | \`{exists: bool, mode, hint?}\` | \`params\` for placeholders. \`mode: 'filtered'|'any_rows'\` |
+| \`pg_get_indexes\` | \`{indexes, count, totalCount?}\` | Default \`limit: 100\` without \`table\`. Use \`schema\`/\`limit\` to filter |
+| \`pg_list_objects\` | \`{objects, count, totalCount, byType}\` | Use \`limit\` to cap results, \`type\`/\`types\` to filter |
+| \`pg_object_details\` | \`{name, schema, type, returnType?, ...}\` | Functions: \`returnType\` alias. Views: \`definition\` |
+| \`pg_analyze_db_health\` | \`{cacheHitRatio: {ratio, heap, index, status}}\` | \`ratio\` = primary numeric %. \`bloat\` available |
+| \`pg_describe_table\` | \`{columns, indexes, constraints, foreignKeys}\` | Columns include \`foreignKey\` field. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL |
+| \`pg_analyze_query_indexes\` | \`{plan, explainPlan, executionPlan, issues}\` | \`explainPlan\`/\`executionPlan\` = aliases for \`plan\` |
+| \`pg_list_tables\` | \`{tables, count}\` | Use \`schema\` to filter, \`limit\` to cap results |
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |
 | \`pg_jsonb_agg groupBy\` | \`{groups: [{group_key, items}], count}\` | Empty array \`[]\` when no match |
 | \`pg_vector_aggregate\` | \`{groups: [{group_key, average_vector, count}]}\` | When using \`groupBy\` |

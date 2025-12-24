@@ -38,6 +38,8 @@ export function createReadQueryTool(adapter: PostgresAdapter): ToolDefinition {
             return {
                 rows: result.rows,
                 rowCount: result.rows?.length ?? 0,
+                // Include column metadata if available
+                fields: result.fields?.map(f => ({ name: f.name, dataTypeID: f.dataTypeID })),
                 executionTimeMs: result.executionTimeMs
             };
         }
@@ -58,6 +60,12 @@ export function createWriteQueryTool(adapter: PostgresAdapter): ToolDefinition {
         handler: async (params: unknown, _context: RequestContext) => {
             const { sql, params: queryParams, transactionId } = WriteQuerySchema.parse(params);
 
+            // Block SELECT statements - use pg_read_query instead
+            const trimmedUpper = sql.trim().toUpperCase();
+            if (trimmedUpper.startsWith('SELECT')) {
+                throw new Error('pg_write_query is for INSERT/UPDATE/DELETE only. Use pg_read_query for SELECT statements.');
+            }
+
             let result;
             if (transactionId !== undefined) {
                 const client = adapter.getTransactionConnection(transactionId);
@@ -69,18 +77,14 @@ export function createWriteQueryTool(adapter: PostgresAdapter): ToolDefinition {
                 result = await adapter.executeWriteQuery(sql, queryParams);
             }
 
-            // Detect SELECT usage and add guidance
-            const isSelect = sql.trim().toUpperCase().startsWith('SELECT');
-
             return {
                 rowsAffected: result.rowsAffected,
+                affectedRows: result.rowsAffected,  // Alias for common API naming
                 rowCount: result.rowsAffected,  // Alias for consistency
                 command: result.command,
                 executionTimeMs: result.executionTimeMs,
                 // Include returned rows when using RETURNING clause
-                ...(result.rows && result.rows.length > 0 && { rows: result.rows }),
-                // Add hint if SELECT was used
-                ...(isSelect && { hint: 'Use pg_read_query for SELECT statements' })
+                ...(result.rows && result.rows.length > 0 && { rows: result.rows })
             };
         }
     };

@@ -16,13 +16,13 @@ import { ListObjectsSchema, ObjectDetailsSchema } from './schemas.js';
 export function createListObjectsTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_list_objects',
-        description: 'List all database objects (tables, views, functions, sequences, indexes, triggers) with metadata.',
+        description: 'List database objects filtered by type. Use type: "table" (singular) or types: ["table","view"] (array). Supports: table, view, materialized_view, function, procedure, sequence, index, trigger.',
         group: 'core',
         annotations: readOnly('List Objects'),
         icons: getToolIcons('core', readOnly('List Objects')),
         inputSchema: ListObjectsSchema,
         handler: async (params: unknown, _context: RequestContext) => {
-            const { schema, types } = ListObjectsSchema.parse(params);
+            const { schema, types, limit } = ListObjectsSchema.parse(params);
 
             const schemaFilter = schema
                 ? `AND n.nspname = '${schema}'`
@@ -128,13 +128,23 @@ export function createListObjectsTool(adapter: PostgresAdapter): ToolDefinition 
                 objects.push(...(result.rows as typeof objects));
             }
 
+            // Apply limit if specified
+            const limitedObjects = limit !== undefined && limit > 0
+                ? objects.slice(0, limit)
+                : objects;
+
             return {
-                objects,
-                count: objects.length,
-                byType: objects.reduce<Record<string, number>>((acc, obj) => {
+                objects: limitedObjects,
+                count: limitedObjects.length,
+                totalCount: objects.length,  // Total before limit
+                byType: limitedObjects.reduce<Record<string, number>>((acc, obj) => {
                     acc[obj.type] = (acc[obj.type] ?? 0) + 1;
                     return acc;
-                }, {})
+                }, {}),
+                ...(limit !== undefined && limit > 0 && objects.length > limit && {
+                    truncated: true,
+                    hint: `Showing ${String(limit)} of ${String(objects.length)} objects. Remove limit to see all.`
+                })
             };
         }
     };
@@ -155,30 +165,37 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
             const { name, schema, type } = ObjectDetailsSchema.parse(params);
             const schemaName = schema ?? 'public';
 
-            // First, determine the object type if not provided
-            let objectType = type;
-            if (!objectType) {
-                const detectSql = `
-                    SELECT 
-                        CASE 
-                            WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
-                                        WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'r') THEN 'table'
-                            WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
-                                        WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v') THEN 'view'
-                            WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
-                                        WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'i') THEN 'index'
-                            WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
-                                        WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'S') THEN 'sequence'
-                            WHEN EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace 
-                                        WHERE p.proname = $1 AND n.nspname = $2) THEN 'function'
-                        END as object_type
-                `;
-                const detectResult = await adapter.executeQuery(detectSql, [name, schemaName]);
-                objectType = (detectResult.rows?.[0] as { object_type: string } | undefined)?.object_type as typeof type;
+            // Determine the actual object type
+            const detectSql = `
+                SELECT 
+                    CASE 
+                        WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
+                                    WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'r') THEN 'table'
+                        WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
+                                    WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v') THEN 'view'
+                        WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
+                                    WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'i') THEN 'index'
+                        WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
+                                    WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'S') THEN 'sequence'
+                        WHEN EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace 
+                                    WHERE p.proname = $1 AND n.nspname = $2) THEN 'function'
+                    END as object_type
+            `;
+            const detectResult = await adapter.executeQuery(detectSql, [name, schemaName]);
+            const detectedType = (detectResult.rows?.[0] as { object_type: string } | undefined)?.object_type as typeof type;
+
+            // Validate type if specified
+            if (type && detectedType && type !== detectedType) {
+                throw new Error(
+                    `Object '${schemaName}.${name}' is a ${detectedType}, not a ${type}. ` +
+                    `Use type: '${detectedType}' or omit type to auto-detect.`
+                );
             }
 
+            const objectType = type ?? detectedType;
+
             if (!objectType) {
-                return { error: `Object '${schemaName}.${name}' not found` };
+                throw new Error(`Object '${schemaName}.${name}' not found. Use pg_list_objects to discover available objects.`);
             }
 
             let details: Record<string, unknown> = {
@@ -190,6 +207,21 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
             if (objectType === 'table' || objectType === 'view') {
                 const tableDetails = await adapter.describeTable(name, schemaName);
                 details = { ...details, ...tableDetails };
+
+                // For views, also get the view definition SQL
+                if (objectType === 'view') {
+                    const viewDefSql = `
+                        SELECT pg_get_viewdef(c.oid, true) as definition
+                        FROM pg_class c
+                        JOIN pg_namespace n ON n.oid = c.relnamespace
+                        WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v'
+                    `;
+                    const viewDefResult = await adapter.executeQuery(viewDefSql, [name, schemaName]);
+                    if (viewDefResult.rows && viewDefResult.rows.length > 0) {
+                        details['definition'] = viewDefResult.rows[0]?.['definition'] as string;
+                        details['hasDefinition'] = true;
+                    }
+                }
             } else if (objectType === 'function') {
                 const sql = `
                     SELECT 
@@ -206,13 +238,18 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
                     WHERE p.proname = $1 AND n.nspname = $2
                 `;
                 const result = await adapter.executeQuery(sql, [name, schemaName]);
-                if (result.rows && result.rows.length > 0) {
-                    details = { ...details, ...result.rows[0] };
+                const funcRow = result.rows?.[0];
+                if (funcRow) {
+                    details = {
+                        ...details,
+                        ...funcRow,
+                        // Add camelCase aliases
+                        returnType: funcRow['return_type'] as string
+                    };
                 }
             } else if (objectType === 'sequence') {
-                // Use pg_sequence catalog table for cross-version compatibility
-                // pg_sequences view has different column names across PG versions
-                const sql = `
+                // Get sequence metadata from pg_sequence catalog
+                const metaSql = `
                     SELECT 
                         s.seqstart as start_value,
                         s.seqmin as min_value,
@@ -226,9 +263,26 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE n.nspname = $1 AND c.relname = $2
                 `;
-                const result = await adapter.executeQuery(sql, [schemaName, name]);
-                if (result.rows && result.rows.length > 0) {
-                    details = { ...details, ...result.rows[0] };
+                const metaResult = await adapter.executeQuery(metaSql, [schemaName, name]);
+                if (metaResult.rows && metaResult.rows.length > 0) {
+                    details = { ...details, ...metaResult.rows[0] };
+                }
+
+                // Get current value by querying the sequence directly
+                try {
+                    const valueSql = `SELECT last_value, is_called FROM "${schemaName}"."${name}"`;
+                    const valueResult = await adapter.executeQuery(valueSql);
+                    if (valueResult.rows && valueResult.rows.length > 0) {
+                        const seqRow = valueResult.rows[0] as { last_value: number; is_called: boolean };
+                        details['last_value'] = seqRow.last_value;
+                        details['is_called'] = seqRow.is_called;
+                        // Add human-readable current value explanation
+                        details['current_value'] = seqRow.is_called
+                            ? seqRow.last_value
+                            : `${String(seqRow.last_value)} (not yet used, next call returns this value)`;
+                    }
+                } catch {
+                    // Sequence might not be accessible, skip current value
                 }
             } else if (objectType === 'index') {
                 const sql = `

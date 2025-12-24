@@ -85,7 +85,8 @@ function preprocessTableParams(input: unknown): unknown {
 export const ListTablesSchema = z.preprocess(
     defaultToEmpty,
     z.object({
-        schema: z.string().optional().describe('Schema name (default: all user schemas)')
+        schema: z.string().optional().describe('Schema name (default: all user schemas)'),
+        limit: z.number().optional().describe('Maximum number of tables to return')
     })
 );
 
@@ -115,25 +116,115 @@ const CreateTableSchemaBase = z.object({
     columns: z.array(z.object({
         name: z.string(),
         type: z.string(),
-        nullable: z.boolean().optional(),
+        nullable: z.boolean().optional().describe('Allow NULL values (default: true)'),
+        notNull: z.boolean().optional().describe('Alias: notNull=true ≡ nullable=false'),
         primaryKey: z.boolean().optional(),
         unique: z.boolean().optional(),
-        default: z.string().optional(),
-        references: z.object({
-            table: z.string(),
-            column: z.string(),
-            onDelete: z.string().optional(),
-            onUpdate: z.string().optional()
-        }).optional()
+        default: z.string().optional().describe('Default value (raw SQL expression)'),
+        defaultValue: z.string().optional().describe('Alias for default'),
+        check: z.string().optional().describe('CHECK constraint expression'),
+        // Support both object {table, column} and string 'table(column)' syntax
+        references: z.union([
+            z.object({
+                table: z.string(),
+                column: z.string(),
+                onDelete: z.string().optional(),
+                onUpdate: z.string().optional()
+            }),
+            z.string().describe('String syntax: "table(column)"')
+        ]).optional().describe('Foreign key reference: {table, column} or "table(column)"')
     })).describe('Column definitions'),
+    primaryKey: z.array(z.string()).optional().describe('Composite primary key columns (alternative to column-level primaryKey: true)'),
+    constraints: z.array(z.object({
+        name: z.string().optional().describe('Constraint name'),
+        type: z.enum(['check', 'unique']).describe('Constraint type'),
+        expression: z.string().optional().describe('CHECK expression or columns for UNIQUE'),
+        columns: z.array(z.string()).optional().describe('Columns for UNIQUE constraint')
+    })).optional().describe('Table-level constraints (CHECK, UNIQUE)'),
     ifNotExists: z.boolean().optional().describe('Use IF NOT EXISTS')
 });
 
-// Transformed schema with alias resolution
-export const CreateTableSchema = CreateTableSchemaBase.transform((data) => ({
+/**
+ * Preprocess create table params for schema.table parsing
+ */
+function preprocessCreateTableParams(input: unknown): unknown {
+    if (typeof input !== 'object' || input === null) return input;
+    const result = { ...input as Record<string, unknown> };
+
+    // Get table name from name or table alias
+    const tableName = result['name'] ?? result['table'];
+
+    // Parse schema.table format if schema not explicitly provided
+    if (typeof tableName === 'string' && tableName.includes('.') && result['schema'] === undefined) {
+        const parts = tableName.split('.');
+        if (parts.length === 2) {
+            result['schema'] = parts[0];
+            // Update the correct field
+            if (result['name'] !== undefined) {
+                result['name'] = parts[1];
+            } else {
+                result['table'] = parts[1];
+            }
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Parse string foreign key reference syntax: "table(column)" or "schema.table(column)"
+ */
+function parseStringReference(ref: string): { table: string; column: string } | undefined {
+    // Match patterns like "users(id)" or "public.users(id)"
+    const regex = /^([a-zA-Z_][a-zA-Z0-9_.]*)\(([a-zA-Z_][a-zA-Z0-9_]*)\)$/;
+    const match = regex.exec(ref);
+    if (match?.[1] !== undefined && match[2] !== undefined) {
+        return { table: match[1], column: match[2] };
+    }
+    return undefined;
+}
+
+// Transformed schema with alias resolution and preprocessing
+export const CreateTableSchema = z.preprocess(
+    preprocessCreateTableParams,
+    CreateTableSchemaBase
+).transform((data) => ({
     name: data.name ?? data.table ?? '',
     schema: data.schema,
-    columns: data.columns,
+    columns: data.columns.map(col => {
+        // Parse string references like 'users(id)' → {table: 'users', column: 'id'}
+        type RefType = { table: string; column: string; onDelete?: string; onUpdate?: string } | undefined;
+        let references: RefType = undefined;
+
+        if (typeof col.references === 'string') {
+            const parsed = parseStringReference(col.references);
+            if (!parsed) {
+                throw new Error(
+                    `Invalid references format: '${col.references}'. ` +
+                    `Use object syntax {table: 'name', column: 'col'} or string syntax 'table(column)'.`
+                );
+            }
+            references = parsed;
+        } else if (col.references !== undefined) {
+            // Explicitly cast to preserve the object structure
+            references = col.references as RefType;
+        }
+
+        return {
+            name: col.name,
+            type: col.type,
+            // Support notNull: notNull=true → nullable=false
+            nullable: col.nullable ?? (col.notNull === true ? false : undefined),
+            primaryKey: col.primaryKey,
+            unique: col.unique,
+            // Support defaultValue alias
+            default: col.default ?? col.defaultValue,
+            check: col.check,
+            references
+        };
+    }),
+    primaryKey: data.primaryKey,
+    constraints: data.constraints,
     ifNotExists: data.ifNotExists
 })).refine((data) => data.name !== '', {
     message: 'name (or table alias) is required'
@@ -172,7 +263,8 @@ export const DropTableSchema = z.preprocess(
 const GetIndexesSchemaBase = z.object({
     table: z.string().optional().describe('Table name (supports schema.table format). Omit to list all indexes.'),
     tableName: z.string().optional().describe('Alias for table'),
-    schema: z.string().optional().describe('Schema name (default: public)')
+    schema: z.string().optional().describe('Schema name (default: public)'),
+    limit: z.number().optional().describe('Maximum indexes to return (default: 100 when no table specified)')
 });
 
 // Transformed schema with alias resolution and schema.table parsing
@@ -186,7 +278,8 @@ export const GetIndexesSchema = z.preprocess(
     GetIndexesSchemaBase
 ).transform((data) => ({
     table: data.table ?? data.tableName,
-    schema: data.schema
+    schema: data.schema,
+    limit: data.limit
 }));
 
 /**
@@ -210,6 +303,16 @@ function preprocessCreateIndexParams(input: unknown): unknown {
         }
     }
 
+    // Support 'method' as alias for 'type' (common terminology)
+    if (result['method'] !== undefined && result['type'] === undefined) {
+        result['type'] = result['method'];
+    }
+
+    // Normalize type to lowercase
+    if (typeof result['type'] === 'string') {
+        result['type'] = result['type'].toLowerCase();
+    }
+
     return result;
 }
 
@@ -217,12 +320,14 @@ function preprocessCreateIndexParams(input: unknown): unknown {
 const CreateIndexSchemaBase = z.object({
     name: z.string().optional().describe('Index name'),
     indexName: z.string().optional().describe('Alias for name'),
+    index: z.string().optional().describe('Alias for name'),
     table: z.string().describe('Table name'),
     schema: z.string().optional().describe('Schema name (default: public)'),
     columns: z.array(z.string()).optional().describe('Columns to index'),
     column: z.string().optional().describe('Single column (auto-wrapped to array)'),
     unique: z.boolean().optional().describe('Create a unique index'),
     type: z.enum(['btree', 'hash', 'gist', 'gin', 'spgist', 'brin']).optional().describe('Index type'),
+    method: z.enum(['btree', 'hash', 'gist', 'gin', 'spgist', 'brin']).optional().describe('Alias for type'),
     where: z.string().optional().describe('Partial index condition'),
     concurrently: z.boolean().optional().describe('Create index concurrently'),
     ifNotExists: z.boolean().optional().describe('Use IF NOT EXISTS (silently succeeds if index exists)')
@@ -236,8 +341,10 @@ export const CreateIndexSchema = z.preprocess(
     // Handle column → columns smoothing (wrap string in array)
     const columns = data.columns ?? (data.column ? [data.column] : []);
 
+    // Resolve index name from all aliases: name, indexName, index
+    let name = data.name ?? data.indexName ?? data.index ?? '';
+
     // Auto-generate index name if not provided: idx_{table}_{columns}
-    let name = data.name ?? data.indexName ?? '';
     if (name === '' && columns.length > 0) {
         name = `idx_${data.table}_${columns.join('_')}`;
     }
@@ -254,7 +361,7 @@ export const CreateIndexSchema = z.preprocess(
         ifNotExists: data.ifNotExists
     };
 }).refine((data) => data.name !== '', {
-    message: 'name is required (or provide table and columns to auto-generate)'
+    message: 'name (or indexName/index alias) is required (or provide table and columns to auto-generate)'
 }).refine((data) => data.columns.length > 0, {
     message: 'columns (or column alias) is required'
 });

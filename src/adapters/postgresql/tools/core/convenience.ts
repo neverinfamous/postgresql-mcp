@@ -117,7 +117,8 @@ const CountSchemaBase = z.object({
     table: z.string().optional().describe('Table name (supports schema.table format)'),
     tableName: z.string().optional().describe('Alias for table'),
     schema: z.string().optional().describe('Schema name (default: public)'),
-    where: z.string().optional().describe('WHERE clause'),
+    where: z.string().optional().describe('WHERE clause (supports $1, $2 placeholders)'),
+    params: z.array(z.unknown()).optional().describe('Parameters for WHERE clause placeholders'),
     column: z.string().optional().describe('Column to count (default: * for all rows)')
 });
 
@@ -136,7 +137,8 @@ const ExistsSchemaBase = z.object({
     table: z.string().optional().describe('Table name (supports schema.table format)'),
     tableName: z.string().optional().describe('Alias for table'),
     schema: z.string().optional().describe('Schema name (default: public)'),
-    where: z.string().optional().describe('WHERE clause to check'),
+    where: z.string().optional().describe('WHERE clause (supports $1, $2 placeholders)'),
+    params: z.array(z.unknown()).optional().describe('Parameters for WHERE clause placeholders'),
     condition: z.string().optional().describe('Alias for where'),
     filter: z.string().optional().describe('Alias for where')
 });
@@ -166,11 +168,9 @@ export const ExistsSchema = z.preprocess(
 ).transform((data) => ({
     ...data,
     table: data.table ?? data.tableName ?? '',
-    where: data.where ?? data.condition ?? data.filter ?? ''
+    where: data.where ?? data.condition ?? data.filter
 })).refine((data) => data.table !== '', {
     message: 'table (or tableName alias) is required'
-}).refine((data) => data.where !== '', {
-    message: 'where (or condition/filter alias) is required'
 });
 
 // Base schema for truncate
@@ -202,7 +202,7 @@ export const TruncateSchema = z.preprocess(
 export function createUpsertTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_upsert',
-        description: 'Insert a row or update if it already exists (INSERT ... ON CONFLICT DO UPDATE). Specify conflict columns for uniqueness check.',
+        description: 'Insert a row or update if it already exists (INSERT ... ON CONFLICT DO UPDATE). Specify conflict columns for uniqueness check. Use data or values for column-value pairs.',
         group: 'core',
         inputSchema: UpsertSchema,
         annotations: write('Upsert'),
@@ -235,20 +235,55 @@ export function createUpsertTool(adapter: PostgresAdapter): ToolDefinition {
                 conflictAction = `DO UPDATE SET ${updateSet}`;
             }
 
-            // Build RETURNING clause
-            const returningClause = parsed.returning !== undefined && parsed.returning.length > 0
-                ? ` RETURNING ${parsed.returning.map(c => `"${c}"`).join(', ')}`
-                : '';
+            // Build RETURNING clause - always include xmax to detect insert vs update
+            const returningCols = parsed.returning ?? [];
+            const hasReturning = returningCols.length > 0;
+            // Always add xmax to detect if it was insert (xmax=0) or update (xmax>0)
+            const xmaxClause = 'xmax::text::int as _xmax';
+            const returningClause = hasReturning
+                ? ` RETURNING ${returningCols.map(c => `"${c}"`).join(', ')}, ${xmaxClause}`
+                : ` RETURNING ${xmaxClause}`;
 
             const sql = `INSERT INTO ${qualifiedTable} (${columnList}) VALUES (${placeholders}) ON CONFLICT (${conflictCols}) ${conflictAction}${returningClause}`;
 
-            const result = await adapter.executeQuery(sql, values);
-            return {
-                success: true,
-                rowsAffected: result.rowsAffected ?? 0,
-                rows: result.rows,
-                sql
-            };
+            try {
+                const result = await adapter.executeQuery(sql, values);
+                // Determine if it was an insert or update from xmax
+                // xmax = 0 means INSERT, xmax > 0 means UPDATE
+                const firstRow = result.rows?.[0];
+                const xmaxValue = Number(firstRow?.['_xmax'] ?? 0);
+                const operation = xmaxValue === 0 ? 'insert' : 'update';
+
+                // Remove _xmax from returned rows if not explicitly requested
+                const cleanedRows = result.rows?.map(row => {
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    const { _xmax, ...rest } = row;
+                    return rest;
+                });
+
+                return {
+                    success: true,
+                    operation,  // 'insert' or 'update'
+                    rowsAffected: result.rowsAffected ?? 0,
+                    affectedRows: result.rowsAffected ?? 0,  // Alias for common API naming
+                    rowCount: 1,  // Upsert always affects one row
+                    // Only include rows when RETURNING clause was explicitly requested
+                    ...(hasReturning && cleanedRows && cleanedRows.length > 0 && { rows: cleanedRows }),
+                    sql
+                };
+            } catch (error: unknown) {
+                // Provide clearer error message for constraint issues
+                if (error instanceof Error) {
+                    const msg = error.message.toLowerCase();
+                    if (msg.includes('no unique or exclusion constraint')) {
+                        throw new Error(
+                            `conflictColumns [${parsed.conflictColumns.join(', ')}] must reference columns with a UNIQUE constraint or PRIMARY KEY. ` +
+                            `Create a unique constraint first: ALTER TABLE ${qualifiedTable} ADD CONSTRAINT unique_name UNIQUE (${conflictCols})`
+                        );
+                    }
+                }
+                throw error;
+            }
         }
     };
 }
@@ -259,13 +294,22 @@ export function createUpsertTool(adapter: PostgresAdapter): ToolDefinition {
 export function createBatchInsertTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_batch_insert',
-        description: 'Insert multiple rows in a single statement. More efficient than individual inserts.',
+        description: 'Insert multiple rows in a single statement. More efficient than individual inserts. Rows array must not be empty.',
         group: 'core',
         inputSchema: BatchInsertSchema,
         annotations: write('Batch Insert'),
         icons: getToolIcons('core', write('Batch Insert')),
         handler: async (params: unknown, _context: RequestContext) => {
             const parsed = BatchInsertSchema.parse(params);
+
+            // Validate rows array is not empty
+            if (parsed.rows.length === 0) {
+                throw new Error(
+                    'rows array must not be empty. Provide at least one row to insert, ' +
+                    'e.g., rows: [{column: "value"}]'
+                );
+            }
+
             const schemaName = parsed.schema ?? 'public';
             const qualifiedTable = `"${schemaName}"."${parsed.table}"`;
 
@@ -277,6 +321,35 @@ export function createBatchInsertTool(adapter: PostgresAdapter): ToolDefinition 
                 }
             }
             const columns = Array.from(allColumns);
+
+            // Handle SERIAL-only tables (empty objects)
+            if (columns.length === 0) {
+                // Use INSERT ... DEFAULT VALUES for each row
+                const returningClause = parsed.returning !== undefined && parsed.returning.length > 0
+                    ? ` RETURNING ${parsed.returning.map(c => `"${c}"`).join(', ')}`
+                    : '';
+
+                // Execute individual DEFAULT VALUES inserts for each row
+                let totalAffected = 0;
+                const allRows: Record<string, unknown>[] = [];
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                for (const _row of parsed.rows) {
+                    const sql = `INSERT INTO ${qualifiedTable} DEFAULT VALUES${returningClause}`;
+                    const result = await adapter.executeQuery(sql);
+                    totalAffected += result.rowsAffected ?? 1;
+                    if (result.rows && result.rows.length > 0) {
+                        allRows.push(...result.rows);
+                    }
+                }
+                return {
+                    success: true,
+                    rowsAffected: totalAffected,
+                    affectedRows: totalAffected,
+                    rowCount: parsed.rows.length,
+                    hint: 'Used DEFAULT VALUES for SERIAL-only table (no columns specified)',
+                    ...(allRows.length > 0 && { rows: allRows })
+                };
+            }
 
             // Build values placeholders
             const values: unknown[] = [];
@@ -304,8 +377,10 @@ export function createBatchInsertTool(adapter: PostgresAdapter): ToolDefinition 
             return {
                 success: true,
                 rowsAffected: result.rowsAffected ?? 0,
+                affectedRows: result.rowsAffected ?? 0,  // Alias for common API naming
                 rowCount: parsed.rows.length,
-                rows: result.rows
+                // Only include returned rows when RETURNING clause is used
+                ...(result.rows && result.rows.length > 0 && { rows: result.rows })
             };
         }
     };
@@ -334,7 +409,7 @@ export function createCountTool(adapter: PostgresAdapter): ToolDefinition {
                 : '';
 
             const sql = `SELECT COUNT(${countExpr}) as count FROM ${qualifiedTable}${whereClause}`;
-            const result = await adapter.executeQuery(sql);
+            const result = await adapter.executeQuery(sql, parsed.params);
 
             const count = Number(result.rows?.[0]?.['count']) || 0;
             return { count };
@@ -348,7 +423,7 @@ export function createCountTool(adapter: PostgresAdapter): ToolDefinition {
 export function createExistsTool(adapter: PostgresAdapter): ToolDefinition {
     return {
         name: 'pg_exists',
-        description: 'Check if any rows exist matching the WHERE clause. Returns boolean.',
+        description: 'Check if rows exist in a table. WHERE clause is optional: with WHERE = checks matching rows; without WHERE = checks if table has any rows at all. For table *schema* existence, use pg_list_tables.',
         group: 'core',
         inputSchema: ExistsSchema,
         annotations: readOnly('Exists'),
@@ -358,11 +433,23 @@ export function createExistsTool(adapter: PostgresAdapter): ToolDefinition {
             const schemaName = parsed.schema ?? 'public';
             const qualifiedTable = `"${schemaName}"."${parsed.table}"`;
 
-            const sql = `SELECT EXISTS(SELECT 1 FROM ${qualifiedTable} WHERE ${parsed.where}) as exists`;
-            const result = await adapter.executeQuery(sql);
+            // Build SQL with optional WHERE clause
+            const whereValue = parsed.where ?? '';
+            const hasWhere = whereValue.trim() !== '';
+            const whereClause = hasWhere ? ` WHERE ${whereValue}` : '';
+            const sql = `SELECT EXISTS(SELECT 1 FROM ${qualifiedTable}${whereClause}) as exists`;
+
+            const result = await adapter.executeQuery(sql, parsed.params);
 
             const exists = result.rows?.[0]?.['exists'] === true;
-            return { exists };
+            return {
+                exists,
+                table: `${schemaName}.${parsed.table}`,
+                // Add clarifying context based on usage
+                mode: hasWhere ? 'filtered' : 'any_rows',
+                ...(hasWhere && { where: whereValue }),
+                ...(!hasWhere && { hint: 'No WHERE clause provided. Checked if table has any rows. To check specific conditions, add where/condition/filter parameter.' })
+            };
         }
     };
 }

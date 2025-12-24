@@ -26,6 +26,7 @@ export function createAnalyzeDbHealthTool(adapter: PostgresAdapter): ToolDefinit
 
             interface DbHealthReport {
                 cacheHitRatio?: {
+                    ratio: number | null;  // Primary numeric value
                     heap: number | null;
                     index: number | null;
                     status: string;
@@ -35,9 +36,16 @@ export function createAnalyzeDbHealthTool(adapter: PostgresAdapter): ToolDefinit
                 unusedIndexes?: number | undefined;
                 tablesNeedingVacuum?: number | undefined;
                 connections?: Record<string, unknown> | undefined;
+                connectionStats?: Record<string, unknown> | undefined;  // Alias for connections
                 isReplica?: boolean | undefined;
                 overallScore?: number | undefined;
                 overallStatus?: string | undefined;
+                bloat?: {
+                    tableBloatBytes: number;
+                    indexBloatBytes: number;
+                    totalBloatBytes: number;
+                    tablesWithBloat: number;
+                } | undefined;
             }
 
             const health: DbHealthReport = {};
@@ -53,8 +61,10 @@ export function createAnalyzeDbHealthTool(adapter: PostgresAdapter): ToolDefinit
             const cacheRow = cacheResult.rows?.[0] as { heap_hit_ratio: number | null; index_hit_ratio: number | null } | undefined;
 
             if (cacheRow) {
+                const heapRatio = cacheRow.heap_hit_ratio !== null ? Number((cacheRow.heap_hit_ratio * 100).toFixed(2)) : null;
                 health.cacheHitRatio = {
-                    heap: cacheRow.heap_hit_ratio !== null ? Number((cacheRow.heap_hit_ratio * 100).toFixed(2)) : null,
+                    ratio: heapRatio,  // Primary numeric value for easy access
+                    heap: heapRatio,
                     index: cacheRow.index_hit_ratio !== null ? Number((cacheRow.index_hit_ratio * 100).toFixed(2)) : null,
                     status: (cacheRow.heap_hit_ratio ?? 0) > 0.95 ? 'good' : (cacheRow.heap_hit_ratio ?? 0) > 0.8 ? 'fair' : 'poor'
                 };
@@ -118,7 +128,35 @@ export function createAnalyzeDbHealthTool(adapter: PostgresAdapter): ToolDefinit
                 const connResult = await adapter.executeQuery(connQuery);
                 if (connResult.rows && connResult.rows.length > 0) {
                     health.connections = connResult.rows[0];
+                    health.connectionStats = connResult.rows[0];  // Alias for API consistency
                 }
+            }
+
+            // Bloat analysis (estimate based on dead tuples)
+            const bloatQuery = `
+                SELECT 
+                    COALESCE(SUM(pg_relation_size(c.oid) * GREATEST(0, 1 - n_live_tup::float / NULLIF(reltuples, 0))), 0)::bigint as table_bloat_bytes,
+                    COALESCE(SUM(pg_indexes_size(c.oid) * GREATEST(0, 1 - n_live_tup::float / NULLIF(reltuples, 0))), 0)::bigint as index_bloat_bytes,
+                    COUNT(*) FILTER (WHERE n_dead_tup > 1000) as tables_with_bloat
+                FROM pg_stat_user_tables s
+                JOIN pg_class c ON c.relname = s.relname
+                JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = s.schemaname
+            `;
+            try {
+                const bloatResult = await adapter.executeQuery(bloatQuery);
+                if (bloatResult.rows && bloatResult.rows.length > 0) {
+                    const row = bloatResult.rows[0] as { table_bloat_bytes: bigint; index_bloat_bytes: bigint; tables_with_bloat: number };
+                    const tableBloat = Number(row.table_bloat_bytes) || 0;
+                    const indexBloat = Number(row.index_bloat_bytes) || 0;
+                    health.bloat = {
+                        tableBloatBytes: tableBloat,
+                        indexBloatBytes: indexBloat,
+                        totalBloatBytes: tableBloat + indexBloat,
+                        tablesWithBloat: row.tables_with_bloat
+                    };
+                }
+            } catch {
+                // Bloat estimation may fail on some configurations - not critical
             }
 
             // Replication status
@@ -165,10 +203,11 @@ export function createAnalyzeWorkloadIndexesTool(adapter: PostgresAdapter): Tool
             );
 
             if (!extCheck.rows || extCheck.rows.length === 0) {
-                return {
-                    error: 'pg_stat_statements extension not installed',
-                    recommendation: 'Install with: CREATE EXTENSION pg_stat_statements;'
-                };
+                throw new Error(
+                    'pg_stat_statements extension is not installed. ' +
+                    'This tool requires pg_stat_statements to analyze query workload. ' +
+                    'Install with: CREATE EXTENSION pg_stat_statements; (requires postgresql.conf: shared_preload_libraries)'
+                );
             }
 
             // Get slow queries with sequential scans
@@ -330,7 +369,9 @@ export function createAnalyzeQueryIndexesTool(adapter: PostgresAdapter): ToolDef
                 planningTime: plan['Planning Time'] as number,
                 issues,
                 recommendations,
-                plan: rootPlan
+                plan: rootPlan,
+                explainPlan: rootPlan,  // Alias for discoverability
+                executionPlan: rootPlan  // Additional alias
             };
         }
     };

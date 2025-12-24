@@ -228,17 +228,43 @@ describe('Handler Execution', () => {
 
     describe('pg_describe_table', () => {
         it('should call describeTable with table name', async () => {
+            // Mock the type check query to return a valid table type
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
+
             const tool = tools.find(t => t.name === 'pg_describe_table')!;
             await tool.handler({ table: 'users' }, mockContext);
 
-            expect(mockAdapter.describeTable).toHaveBeenCalledWith('users', undefined);
+            expect(mockAdapter.describeTable).toHaveBeenCalledWith('users', 'public');
         });
 
         it('should accept schema parameter', async () => {
+            // Mock the type check query to return a valid table type
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'r' }] });
+
             const tool = tools.find(t => t.name === 'pg_describe_table')!;
             await tool.handler({ table: 'orders', schema: 'sales' }, mockContext);
 
             expect(mockAdapter.describeTable).toHaveBeenCalledWith('orders', 'sales');
+        });
+
+        it('should throw error for sequences', async () => {
+            // Mock the type check query to return a sequence type
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ relkind: 'S' }] });
+
+            const tool = tools.find(t => t.name === 'pg_describe_table')!;
+
+            await expect(tool.handler({ table: 'my_sequence' }, mockContext))
+                .rejects.toThrow(/is a sequence, not a table/);
+        });
+
+        it('should throw error for non-existent objects', async () => {
+            // Mock the type check query to return no rows
+            mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+            const tool = tools.find(t => t.name === 'pg_describe_table')!;
+
+            await expect(tool.handler({ table: 'nonexistent' }, mockContext))
+                .rejects.toThrow(/not found/);
         });
     });
 
@@ -481,13 +507,13 @@ describe('Health Analysis Tools', () => {
     });
 
     describe('pg_analyze_workload_indexes', () => {
-        it('should return error when pg_stat_statements not installed', async () => {
+        it('should throw error when pg_stat_statements not installed', async () => {
             mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
             const tool = tools.find(t => t.name === 'pg_analyze_workload_indexes')!;
-            const result = await tool.handler({}, mockContext) as Record<string, unknown>;
 
-            expect(result).toHaveProperty('error');
+            await expect(tool.handler({}, mockContext))
+                .rejects.toThrow(/pg_stat_statements extension is not installed/);
         });
 
         it('should analyze queries when extension is available', async () => {
@@ -927,9 +953,31 @@ describe('Object Tools', () => {
             });
 
             const tool = tools.find(t => t.name === 'pg_object_details')!;
-            const result = await tool.handler({ name: 'nonexistent' }, mockContext) as Record<string, unknown>;
 
-            expect(result).toHaveProperty('error');
+            await expect(tool.handler({ name: 'nonexistent' }, mockContext))
+                .rejects.toThrow(/not found/);
+        });
+
+        it('should parse schema.name format correctly', async () => {
+            // Detection query returns sequence type
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ object_type: 'sequence' }]
+            });
+            // Sequence details query
+            mockAdapter.executeQuery.mockResolvedValueOnce({
+                rows: [{ start_value: 1, min_value: 1, max_value: 9223372036854775807, increment: 1, cycle: false, cache: 1 }]
+            });
+
+            const tool = tools.find(t => t.name === 'pg_object_details')!;
+            const result = await tool.handler({ name: 'test_schema.order_seq' }, mockContext) as Record<string, unknown>;
+
+            expect(result.schema).toBe('test_schema');
+            expect(result.name).toBe('order_seq');
+            expect(result.type).toBe('sequence');
+
+            // Verify the detection query was called with parsed schema/name
+            const detectCall = mockAdapter.executeQuery.mock.calls[0];
+            expect(detectCall?.[1]).toEqual(['order_seq', 'test_schema']);
         });
     });
 });
@@ -1078,6 +1126,48 @@ describe('Create Table with Advanced Column Options', () => {
         expect(sql).toContain('REFERENCES "posts"("id")');
         // Should NOT contain ON DELETE or ON UPDATE since they weren't specified
     });
+
+    it('should create table with composite primary key', async () => {
+        mockAdapter.executeQuery.mockResolvedValue({ rows: [], rowsAffected: 0 });
+
+        const tool = tools.find(t => t.name === 'pg_create_table')!;
+        const result = await tool.handler({
+            name: 'order_items',
+            columns: [
+                { name: 'order_id', type: 'INTEGER', primaryKey: true },
+                { name: 'product_id', type: 'INTEGER', primaryKey: true },
+                { name: 'quantity', type: 'INTEGER' }
+            ]
+        }, mockContext) as { compositePrimaryKey: string[] };
+
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        // Should NOT have inline PRIMARY KEY on individual columns
+        expect(sql).not.toMatch(/"order_id" INTEGER PRIMARY KEY/);
+        expect(sql).not.toMatch(/"product_id" INTEGER PRIMARY KEY/);
+        // Should have table-level constraint
+        expect(sql).toContain('PRIMARY KEY ("order_id", "product_id")');
+        // Should return composite PK info in response
+        expect(result.compositePrimaryKey).toEqual(['order_id', 'product_id']);
+    });
+
+    it('should create table with single primary key normally', async () => {
+        mockAdapter.executeQuery.mockResolvedValue({ rows: [], rowsAffected: 0 });
+
+        const tool = tools.find(t => t.name === 'pg_create_table')!;
+        await tool.handler({
+            name: 'users',
+            columns: [
+                { name: 'id', type: 'SERIAL', primaryKey: true },
+                { name: 'email', type: 'TEXT' }
+            ]
+        }, mockContext);
+
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        // Should have inline PRIMARY KEY for single-column PK
+        expect(sql).toContain('"id" SERIAL PRIMARY KEY');
+        // Should NOT have table-level constraint
+        expect(sql).not.toContain('PRIMARY KEY ("id")');
+    });
 });
 
 describe('Drop Table with Options', () => {
@@ -1119,3 +1209,186 @@ describe('Drop Table with Options', () => {
         expect(result.dropped).toContain('archive.');
     });
 });
+
+describe('pg_write_query response fields', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getCoreTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getCoreTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('should include affectedRows alias in response', async () => {
+        mockAdapter.executeWriteQuery.mockResolvedValue({
+            rows: [],
+            rowsAffected: 10,
+            command: 'UPDATE',
+            executionTimeMs: 5
+        });
+
+        const tool = tools.find(t => t.name === 'pg_write_query')!;
+        const result = await tool.handler({
+            sql: 'UPDATE users SET active = true WHERE created_at < NOW()'
+        }, mockContext) as { rowsAffected: number; affectedRows: number; rowCount: number };
+
+        expect(result.rowsAffected).toBe(10);
+        expect(result.affectedRows).toBe(10);  // New alias
+        expect(result.rowCount).toBe(10);
+    });
+
+    it('should include affectedRows for INSERT operations', async () => {
+        mockAdapter.executeWriteQuery.mockResolvedValue({
+            rows: [],
+            rowsAffected: 3,
+            command: 'INSERT',
+            executionTimeMs: 2
+        });
+
+        const tool = tools.find(t => t.name === 'pg_write_query')!;
+        const result = await tool.handler({
+            sql: 'INSERT INTO logs (message) VALUES ($1), ($2), ($3)',
+            params: ['msg1', 'msg2', 'msg3']
+        }, mockContext) as { affectedRows: number };
+
+        expect(result.affectedRows).toBe(3);
+    });
+
+    it('should include affectedRows for DELETE operations', async () => {
+        mockAdapter.executeWriteQuery.mockResolvedValue({
+            rows: [],
+            rowsAffected: 5,
+            command: 'DELETE',
+            executionTimeMs: 3
+        });
+
+        const tool = tools.find(t => t.name === 'pg_write_query')!;
+        const result = await tool.handler({
+            sql: 'DELETE FROM expired_sessions WHERE created_at < NOW()'
+        }, mockContext) as { affectedRows: number };
+
+        expect(result.affectedRows).toBe(5);
+    });
+});
+
+describe('pg_exists optional WHERE clause', () => {
+    let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+    let tools: ReturnType<typeof getCoreTools>;
+    let mockContext: ReturnType<typeof createMockRequestContext>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockAdapter = createMockPostgresAdapter();
+        tools = getCoreTools(mockAdapter as unknown as PostgresAdapter);
+        mockContext = createMockRequestContext();
+    });
+
+    it('should check if table has any rows when WHERE omitted', async () => {
+        mockAdapter.executeQuery.mockResolvedValue({
+            rows: [{ exists: true }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_exists')!;
+        const result = await tool.handler({
+            table: 'users'
+        }, mockContext) as { exists: boolean; hint?: string; mode: string };
+
+        expect(result.exists).toBe(true);
+        expect(result.mode).toBe('any_rows');
+        expect(result.hint).toContain('any rows');
+        expect(result.hint).toContain('where/condition/filter');
+
+        // Verify SQL doesn't have WHERE clause
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        expect(sql).not.toContain('WHERE');
+    });
+
+    it('should not include hint when WHERE is provided', async () => {
+        mockAdapter.executeQuery.mockResolvedValue({
+            rows: [{ exists: false }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_exists')!;
+        const result = await tool.handler({
+            table: 'users',
+            where: 'email = \'test@example.com\''
+        }, mockContext) as { exists: boolean; hint?: string };
+
+        expect(result.exists).toBe(false);
+        expect(result.hint).toBeUndefined();
+
+        // Verify SQL has WHERE clause
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        expect(sql).toContain('WHERE');
+    });
+
+    it('should accept condition as alias for where', async () => {
+        mockAdapter.executeQuery.mockResolvedValue({
+            rows: [{ exists: true }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_exists')!;
+        const result = await tool.handler({
+            table: 'orders',
+            condition: 'status = \'pending\''
+        }, mockContext) as { exists: boolean; hint?: string };
+
+        expect(result.exists).toBe(true);
+        expect(result.hint).toBeUndefined();
+
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        expect(sql).toContain('WHERE');
+        expect(sql).toContain('pending');
+    });
+
+    it('should accept filter as alias for where', async () => {
+        mockAdapter.executeQuery.mockResolvedValue({
+            rows: [{ exists: true }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_exists')!;
+        const result = await tool.handler({
+            table: 'products',
+            filter: 'stock > 0'
+        }, mockContext) as { exists: boolean; hint?: string };
+
+        expect(result.exists).toBe(true);
+        expect(result.hint).toBeUndefined();
+
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        expect(sql).toContain('WHERE');
+        expect(sql).toContain('stock');
+    });
+
+    it('should return false when table is empty', async () => {
+        mockAdapter.executeQuery.mockResolvedValue({
+            rows: [{ exists: false }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_exists')!;
+        const result = await tool.handler({
+            table: 'empty_table'
+        }, mockContext) as { exists: boolean; hint?: string };
+
+        expect(result.exists).toBe(false);
+        expect(result.hint).toContain('any rows');
+    });
+
+    it('should support schema.table format', async () => {
+        mockAdapter.executeQuery.mockResolvedValue({
+            rows: [{ exists: true }]
+        });
+
+        const tool = tools.find(t => t.name === 'pg_exists')!;
+        await tool.handler({
+            table: 'archive.events'
+        }, mockContext);
+
+        const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+        expect(sql).toContain('"archive"."events"');
+    });
+});
+

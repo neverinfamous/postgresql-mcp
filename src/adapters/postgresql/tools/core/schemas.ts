@@ -9,40 +9,96 @@ import { z } from 'zod';
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
 
+/**
+ * Preprocess list objects params for type/types alias handling
+ */
+function preprocessListObjectsParams(input: unknown): unknown {
+    if (input === undefined || input === null) return {};
+    if (typeof input !== 'object') return input;
+    const result = { ...input as Record<string, unknown> };
+
+    // Handle 'type' as alias for 'types' (support singular form)
+    if (result['types'] === undefined && result['type'] !== undefined) {
+        const typeValue = result['type'];
+        // Convert single string to array
+        if (typeof typeValue === 'string') {
+            result['types'] = [typeValue];
+        } else if (Array.isArray(typeValue)) {
+            result['types'] = typeValue;
+        }
+        delete result['type'];
+    }
+
+    // If types is a single string, wrap in array
+    if (typeof result['types'] === 'string') {
+        result['types'] = [result['types']];
+    }
+
+    return result;
+}
+
 export const ListObjectsSchema = z.preprocess(
-    defaultToEmpty,
+    preprocessListObjectsParams,
     z.object({
         schema: z.string().optional().describe('Schema name (default: all user schemas)'),
-        types: z.array(z.enum(['table', 'view', 'materialized_view', 'function', 'procedure', 'sequence', 'index', 'trigger'])).optional().describe('Object types to include')
+        types: z.array(z.enum(['table', 'view', 'materialized_view', 'function', 'procedure', 'sequence', 'index', 'trigger'])).optional().describe('Object types to include'),
+        type: z.union([
+            z.string(),
+            z.array(z.string())
+        ]).optional().describe('Alias for types (singular or array)'),
+        limit: z.number().optional().describe('Maximum number of objects to return')
     })
 );
 
 export const ObjectDetailsSchema = z.preprocess(
     (val: unknown) => {
         const obj = (val ?? {}) as Record<string, unknown>;
-        // Support 'table' as alias for 'name'
-        if (obj['table'] !== undefined && obj['name'] === undefined) {
-            obj['name'] = obj['table'];
+        // Support 'table', 'object', and 'objectName' as aliases for 'name'
+        if (obj['name'] === undefined) {
+            if (obj['table'] !== undefined) obj['name'] = obj['table'];
+            else if (obj['object'] !== undefined) obj['name'] = obj['object'];
+            else if (obj['objectName'] !== undefined) obj['name'] = obj['objectName'];
         }
-        // Normalize 'type' to lowercase for case-insensitivity
+        // Parse schema.name format if schema not explicitly provided
+        if (typeof obj['name'] === 'string' && obj['name'].includes('.') && obj['schema'] === undefined) {
+            const parts = obj['name'].split('.');
+            if (parts.length === 2) {
+                obj['schema'] = parts[0];
+                obj['name'] = parts[1];
+            }
+        }
+        // Normalize 'type' and 'objectType' to lowercase for case-insensitivity
         if (typeof obj['type'] === 'string') {
             obj['type'] = obj['type'].toLowerCase();
+        }
+        if (typeof obj['objectType'] === 'string') {
+            obj['objectType'] = obj['objectType'].toLowerCase();
         }
         return obj;
     },
     z.object({
-        name: z.string().describe('Object name'),
+        name: z.string().optional().describe('Object name (supports schema.name format)'),
+        object: z.string().optional().describe('Alias for name'),
+        objectName: z.string().optional().describe('Alias for name (Code Mode API)'),
+        table: z.string().optional().describe('Alias for name'),
         schema: z.string().optional().describe('Schema name (default: public)'),
-        type: z.enum(['table', 'view', 'function', 'sequence', 'index']).optional().describe('Object type hint (case-insensitive)')
+        type: z.enum(['table', 'view', 'function', 'sequence', 'index']).optional().describe('Object type hint (case-insensitive)'),
+        objectType: z.enum(['table', 'view', 'function', 'sequence', 'index']).optional().describe('Alias for type')
     })
-);
+).transform((data) => ({
+    name: data.name ?? data.object ?? data.objectName ?? data.table ?? '',
+    schema: data.schema,
+    type: data.type ?? data.objectType
+})).refine((data) => data.name !== '', {
+    message: 'name (or object/objectName/table alias) is required'
+});
 
 export const AnalyzeDbHealthSchema = z.preprocess(
     defaultToEmpty,
     z.object({
-        includeIndexes: z.boolean().optional().describe('Include index health analysis'),
-        includeVacuum: z.boolean().optional().describe('Include vacuum/bloat analysis'),
-        includeConnections: z.boolean().optional().describe('Include connection analysis')
+        includeIndexes: z.boolean().optional().describe('Include unused indexes analysis (default: true)'),
+        includeVacuum: z.boolean().optional().describe('Include tables needing vacuum analysis (default: true)'),
+        includeConnections: z.boolean().optional().describe('Include connection stats (default: true)')
     })
 );
 

@@ -168,6 +168,12 @@ export interface ColumnInfo {
     numericScale?: number | undefined;
     arrayDimensions?: number | undefined;
     comment?: string | undefined;
+    /** Foreign key reference for this column */
+    foreignKey?: {
+        table: string;
+        schema: string;
+        column: string;
+    } | undefined;
 }
 
 /**
@@ -201,4 +207,31 @@ export interface TableInfo {
     partitionKey?: string | undefined;
     /** True if table statistics are stale (reltuples = -1, needs ANALYZE) */
     statsStale?: boolean | undefined;
+    /** Table indexes */
+    indexes?: {
+        name: string;
+        indexName: string;
+        type: string;
+        isUnique: boolean;
+        isPrimary: boolean;
+        columns: string[];
+        definition: string;
+    }[] | undefined;
+    /** Table constraints (PRIMARY KEY, CHECK, UNIQUE, EXCLUSION, NOT NULL) */
+    constraints?: {
+        name: string;
+        type: string;
+        definition: string;
+        columns?: string[];
+    }[] | undefined;
+    /** Foreign key relationships */
+    foreignKeys?: {
+        name: string;
+        column: string;
+        referencedTable: string;
+        referencedSchema: string;
+        referencedColumn: string;
+        onUpdate: string;
+        onDelete: string;
+    }[] | undefined;
 }

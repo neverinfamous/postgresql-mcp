@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.neverinfamous/postgres-mcp -->
 
-*Last updated December 23, 2025*
+*Last updated January 14, 2026*
 
 A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **202 specialized tools**, **20 resources**, and **19 AI-powered prompts** and includes OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, HypoPG, and advanced PostgreSQL features.
 
@@ -21,7 +21,7 @@ A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 24+ (LTS)
 - PostgreSQL 12-18 (tested with PostgreSQL 18.1)
 - npm or yarn
 

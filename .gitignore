@@ -15,6 +15,7 @@ logs/
 npm-debug.log*
 
 # Editor directories
+.gemini/
 .idea/
 .vscode/
 *.swp

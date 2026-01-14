@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Node.js 24 LTS Baseline** — Upgraded from Node 18 to Node 24 LTS as the project baseline
+  - `package.json` now requires Node.js >=24.0.0 in `engines` field
+  - README prerequisites updated to specify Node.js 24+ (LTS)
+- **Dependency Updates** — Updated npm dependencies to latest versions
+  - `@modelcontextprotocol/sdk`: 1.25.1 → 1.25.2
+  - `@types/node`: 25.0.3 → 25.0.8
+  - `@vitest/coverage-v8`: 4.0.16 → 4.0.17
+  - `globals`: 16.0.0 → 17.0.0 (major version bump)
+  - `pg`: 8.13.0 → 8.17.0 (minor version bump)
+  - `typescript-eslint`: 8.50.0 → 8.53.0
+  - `vitest`: 4.0.15 → 4.0.17
+  - `zod`: 4.2.1 → 4.3.5
+
+### Security
+- **Transitive Dependency Fixes** — Resolved 2 high severity vulnerabilities via npm audit fix
+  - hono <=4.11.3 → upgraded (JWT algorithm confusion vulnerability)
+  - qs <6.14.1 → upgraded (DoS via memory exhaustion vulnerability)
+
 ### Performance
 - **Parallelized Health Queries** — Health resource now executes 5 checks concurrently using `Promise.all()`
   - Expected ~5x latency improvement for `postgres://health` resource

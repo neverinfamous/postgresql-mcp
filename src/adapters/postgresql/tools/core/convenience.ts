@@ -345,6 +345,7 @@ export function createBatchInsertTool(adapter: PostgresAdapter): ToolDefinition 
                     success: true,
                     rowsAffected: totalAffected,
                     affectedRows: totalAffected,
+                    insertedCount: totalAffected,  // Semantic alias for insert operations
                     rowCount: parsed.rows.length,
                     hint: 'Used DEFAULT VALUES for SERIAL-only table (no columns specified)',
                     ...(allRows.length > 0 && { rows: allRows })
@@ -378,6 +379,7 @@ export function createBatchInsertTool(adapter: PostgresAdapter): ToolDefinition 
                 success: true,
                 rowsAffected: result.rowsAffected ?? 0,
                 affectedRows: result.rowsAffected ?? 0,  // Alias for common API naming
+                insertedCount: result.rowsAffected ?? 0,  // Semantic alias for insert operations
                 rowCount: parsed.rows.length,
                 // Only include returned rows when RETURNING clause is used
                 ...(result.rows && result.rows.length > 0 && { rows: result.rows })

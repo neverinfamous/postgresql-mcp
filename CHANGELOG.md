@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **pg_batch_insert insertedCount alias** — Response now includes `insertedCount` as a semantic alias for batch insert operations (alongside `rowsAffected` and `affectedRows`)
+
 ### Changed
+
 - **Node.js 24 LTS Baseline** — Upgraded from Node 18 to Node 24 LTS as the project baseline
   - `package.json` now requires Node.js >=24.0.0 in `engines` field
   - README prerequisites updated to specify Node.js 24+ (LTS)
@@ -22,11 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `zod`: 4.2.1 → 4.3.5
 
 ### Security
+
 - **Transitive Dependency Fixes** — Resolved 2 high severity vulnerabilities via npm audit fix
   - hono <=4.11.3 → upgraded (JWT algorithm confusion vulnerability)
   - qs <6.14.1 → upgraded (DoS via memory exhaustion vulnerability)
 
 ### Performance
+
 - **Parallelized Health Queries** — Health resource now executes 5 checks concurrently using `Promise.all()`
   - Expected ~5x latency improvement for `postgres://health` resource
 - **Batched Index Queries** — `getSchema()` now fetches all indexes in a single query
@@ -39,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Benchmark Tests** — Added performance benchmark test suite (`src/adapters/postgresql/__tests__/performance.test.ts`)
 
 ### Security
+
 - **Identifier Sanitization** — New utility to prevent SQL injection via identifier interpolation
   - `sanitizeIdentifier()`, `sanitizeTableName()`, `sanitizeColumnRef()` functions
   - PostgreSQL-compliant validation and double-quote escaping
@@ -58,8 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Prevents exposure of OAuth configuration data in log output
 - Removed unused `beforeEach` import in middleware tests (js/unused-local-variable)
 
-
 ### Changed
+
 - **Tool File Modularity Refactoring** — Restructured 8 large tool files (500+ lines each) into modular directories
   - `tools/core/` — 6 sub-modules: query, tables, indexes, objects, health, schemas (20 tools)
   - `tools/performance/` — 5 sub-modules: explain, stats, monitoring, analysis, optimization (16 tools)
@@ -77,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full backwards compatibility with existing stdio transport
 
 ### Added
+
 - **OAuth 2.1 Authentication** — Full RFC-compliant OAuth for HTTP/SSE transports
   - RFC 9728 Protected Resource Metadata at `/.well-known/oauth-protected-resource`
   - RFC 8414 Authorization Server Metadata discovery
@@ -212,6 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `extensions` (74 tools) — All extension tools
 
 ### Changed
+
 - Restructured resources into modular files for maintainability
 - Resource count from 6 to 21
 - Prompt count from 7 to 13
@@ -219,6 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool count from 146 to 194 (added pg_cron, pg_partman, pg_stat_kcache, citext, ltree, and pgcrypto tools)
 
 ### Planned
+
 - Verify prompts and resources from old Python server are ported
 - Verify all PostgreSQL extensions are supported
 - Comprehensive testing before v1.0 release
@@ -226,6 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2025-12-14
 
 ### Added
+
 - **146 total tools** — comprehensive PostgreSQL coverage
 - **Core tools** (13): `pg_list_objects`, `pg_object_details`, `pg_analyze_db_health`, `pg_analyze_workload_indexes`, `pg_analyze_query_indexes`
 - **JSONB tools** (19): `pg_jsonb_validate_path`, `pg_jsonb_stats`, `pg_jsonb_merge`, `pg_jsonb_normalize`, `pg_jsonb_diff`, `pg_jsonb_index_suggest`, `pg_jsonb_security_scan`
@@ -239,12 +251,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tool filtering with `TOOL_GROUPS` for all 146 tools
 
 ### Changed
+
 - Status from "Development Preview" to "Initial Implementation Complete"
 - Updated README with accurate tool counts and categories
 
 ## [0.1.0] - 2025-12-13
 
 ### Added
+
 - Initial repository setup
 - Community standards (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY)
 - GitHub automation (CodeQL, Dependabot, issue/PR templates)
@@ -253,4 +267,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Connection pooling with health checks
 - Tool filtering system
 - 6 resources and 7 AI-powered prompts
-

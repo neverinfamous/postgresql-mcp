@@ -1,33 +1,37 @@
 /**
  * pg_partman Setup Prompt
- * 
+ *
  * Complete guide for setting up automated partition management with pg_partman.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createSetupPartmanPrompt(): PromptDefinition {
-    return {
-        name: 'pg_setup_partman',
-        description: 'Complete guide for setting up automated partition lifecycle management with pg_partman including time-based and serial partitioning.',
-        arguments: [
-            {
-                name: 'partitionType',
-                description: 'Partition type: time, serial, id',
-                required: false
-            },
-            {
-                name: 'interval',
-                description: 'Partition interval: daily, weekly, monthly, yearly',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const partitionType = args['partitionType'] ?? 'time';
-            const interval = args['interval'] ?? 'daily';
+  return {
+    name: "pg_setup_partman",
+    description:
+      "Complete guide for setting up automated partition lifecycle management with pg_partman including time-based and serial partitioning.",
+    arguments: [
+      {
+        name: "partitionType",
+        description: "Partition type: time, serial, id",
+        required: false,
+      },
+      {
+        name: "interval",
+        description: "Partition interval: daily, weekly, monthly, yearly",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const partitionType = args["partitionType"] ?? "time";
+      const interval = args["interval"] ?? "daily";
 
-            let content = `# pg_partman Setup Guide - ${partitionType.charAt(0).toUpperCase() + partitionType.slice(1)} Partitioning
+      let content = `# pg_partman Setup Guide - ${partitionType.charAt(0).toUpperCase() + partitionType.slice(1)} Partitioning
 
 ## pg_partman Overview
 
@@ -52,8 +56,8 @@ SELECT * FROM pg_extension WHERE extname = 'pg_partman';
 
 `;
 
-            if (partitionType === 'time') {
-                content += `\`\`\`sql
+      if (partitionType === "time") {
+        content += `\`\`\`sql
 -- Time-based partitioning (${interval})
 CREATE TABLE events (
     id BIGSERIAL,
@@ -74,14 +78,14 @@ SELECT partman.create_parent(
     p_parent_table => 'public.events',
     p_control => 'event_time',
     p_type => 'native',
-    p_interval => '${interval === 'daily' ? '1 day' : interval === 'weekly' ? '1 week' : interval === 'monthly' ? '1 month' : '1 year'}',
+    p_interval => '${interval === "daily" ? "1 day" : interval === "weekly" ? "1 week" : interval === "monthly" ? "1 month" : "1 year"}',
     p_premake => 4,  -- Create 4 future partitions
     p_start_partition => (NOW() - INTERVAL '1 month')::text
 );
 \`\`\`
 `;
-            } else if (partitionType === 'serial' || partitionType === 'id') {
-                content += `\`\`\`sql
+      } else if (partitionType === "serial" || partitionType === "id") {
+        content += `\`\`\`sql
 -- ID/Serial-based partitioning
 CREATE TABLE orders (
     id BIGSERIAL,
@@ -107,14 +111,14 @@ SELECT partman.create_parent(
 );
 \`\`\`
 `;
-            }
+      }
 
-            content += `
+      content += `
 ### 4. Set Retention Policy
 
 \`\`\`sql
 UPDATE partman.part_config
-SET retention = '${interval === 'daily' ? '90 days' : interval === 'weekly' ? '52 weeks' : interval === 'monthly' ? '24 months' : '5 years'}',
+SET retention = '${interval === "daily" ? "90 days" : interval === "weekly" ? "52 weeks" : interval === "monthly" ? "24 months" : "5 years"}',
     retention_keep_table = false,  -- Drop old partitions
     retention_keep_index = false
 WHERE parent_table = 'public.events';
@@ -210,7 +214,7 @@ DROP TABLE events_old;
 
 **Pro Tip:** pg_partman + pg_cron = fully automated partition lifecycle!`;
 
-            return content;
-        }
-    };
+      return content;
+    },
+  };
 }

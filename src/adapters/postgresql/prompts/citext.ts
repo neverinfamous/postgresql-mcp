@@ -1,27 +1,31 @@
 /**
  * citext Setup Prompt
- * 
+ *
  * Complete guide for setting up case-insensitive text with citext.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createSetupCitextPrompt(): PromptDefinition {
-    return {
-        name: 'pg_setup_citext',
-        description: 'Complete guide for setting up case-insensitive text columns with citext for emails, usernames, and tags.',
-        arguments: [
-            {
-                name: 'useCase',
-                description: 'Use case: email, username, tags, domains',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const useCase = args['useCase'] ?? 'email';
+  return {
+    name: "pg_setup_citext",
+    description:
+      "Complete guide for setting up case-insensitive text columns with citext for emails, usernames, and tags.",
+    arguments: [
+      {
+        name: "useCase",
+        description: "Use case: email, username, tags, domains",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const useCase = args["useCase"] ?? "email";
 
-            return `# citext Setup Guide - ${useCase.charAt(0).toUpperCase() + useCase.slice(1)}s
+      return `# citext Setup Guide - ${useCase.charAt(0).toUpperCase() + useCase.slice(1)}s
 
 ## citext Overview
 
@@ -61,7 +65,9 @@ SELECT * FROM pg_extension WHERE extname = 'citext';
 
 ### 2. Create Table with citext
 
-${useCase === 'email' ? `\`\`\`sql
+${
+  useCase === "email"
+    ? `\`\`\`sql
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email CITEXT UNIQUE NOT NULL,
@@ -77,7 +83,9 @@ INSERT INTO users (email, name) VALUES ('user@example.com', 'Test');
 SELECT * FROM users WHERE email = 'USER@EXAMPLE.COM';  -- ✓ Matches
 SELECT * FROM users WHERE email = 'User@Example.Com';  -- ✓ Matches
 \`\`\`
-` : useCase === 'username' ? `\`\`\`sql
+`
+    : useCase === "username"
+      ? `\`\`\`sql
 CREATE TABLE accounts (
     id SERIAL PRIMARY KEY,
     username CITEXT UNIQUE NOT NULL,
@@ -89,7 +97,9 @@ CREATE TABLE accounts (
 INSERT INTO accounts (username, display_name) VALUES ('JohnDoe', 'John Doe');
 INSERT INTO accounts (username, display_name) VALUES ('johndoe', 'Other');  -- ✗ Fails - duplicate!
 \`\`\`
-` : useCase === 'tags' ? `\`\`\`sql
+`
+      : useCase === "tags"
+        ? `\`\`\`sql
 CREATE TABLE posts (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255),
@@ -112,7 +122,8 @@ INSERT INTO tags (name) VALUES ('JavaScript');
 INSERT INTO tags (name) VALUES ('javascript');  -- ✗ Fails - duplicate!
 SELECT * FROM tags WHERE name = 'JAVASCRIPT';  -- ✓ Matches
 \`\`\`
-` : `\`\`\`sql
+`
+        : `\`\`\`sql
 CREATE TABLE websites (
     id SERIAL PRIMARY KEY,
     domain CITEXT UNIQUE NOT NULL,
@@ -124,7 +135,8 @@ CREATE TABLE websites (
 INSERT INTO websites (domain) VALUES ('Example.Com');
 SELECT * FROM websites WHERE domain = 'EXAMPLE.COM';  -- ✓ Matches
 \`\`\`
-`}
+`
+}
 
 ### 3. Migrating Existing Columns
 
@@ -219,6 +231,6 @@ SELECT * FROM users WHERE email LIKE '%@example%';  -- Case-insensitive!
 - Slightly slower than text for exact matches
 
 **Pro Tip:** citext eliminates an entire category of authentication bugs. Always use it for email and username columns!`;
-        }
-    };
+    },
+  };
 }

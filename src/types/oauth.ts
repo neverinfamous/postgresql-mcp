@@ -1,6 +1,6 @@
 /**
  * postgres-mcp - OAuth 2.0 Types
- * 
+ *
  * OAuth 2.0/2.1 authentication and authorization types.
  */
 
@@ -8,84 +8,84 @@
  * OAuth 2.0 configuration
  */
 export interface OAuthConfig {
-    /** Enable OAuth authentication */
-    enabled: boolean;
+  /** Enable OAuth authentication */
+  enabled: boolean;
 
-    /** Authorization server URL */
-    authorizationServerUrl?: string;
+  /** Authorization server URL */
+  authorizationServerUrl?: string;
 
-    /** Token validation endpoint */
-    tokenEndpoint?: string;
+  /** Token validation endpoint */
+  tokenEndpoint?: string;
 
-    /** JWKS URI for token verification */
-    jwksUri?: string;
+  /** JWKS URI for token verification */
+  jwksUri?: string;
 
-    /** Expected audience in tokens */
-    audience?: string;
+  /** Expected audience in tokens */
+  audience?: string;
 
-    /** Expected issuer in tokens */
-    issuer?: string;
+  /** Expected issuer in tokens */
+  issuer?: string;
 
-    /** Clock tolerance for token validation (seconds) */
-    clockTolerance?: number;
+  /** Clock tolerance for token validation (seconds) */
+  clockTolerance?: number;
 
-    /** JWKS cache TTL (seconds) */
-    jwksCacheTtl?: number;
+  /** JWKS cache TTL (seconds) */
+  jwksCacheTtl?: number;
 
-    /** Paths that bypass authentication */
-    publicPaths?: string[];
+  /** Paths that bypass authentication */
+  publicPaths?: string[];
 }
 
 /**
  * OAuth scopes for access control
  */
 export type OAuthScope =
-    | 'read'           // Read-only access to all databases
-    | 'write'          // Read and write access
-    | 'admin'          // Full administrative access
-    | `db:${string}`   // Access to specific database
-    | `schema:${string}` // Access to specific schema
-    | `table:${string}:${string}`; // Access to specific table
+  | "read" // Read-only access to all databases
+  | "write" // Read and write access
+  | "admin" // Full administrative access
+  | `db:${string}` // Access to specific database
+  | `schema:${string}` // Access to specific schema
+  | `table:${string}:${string}`; // Access to specific table
 
 /**
  * Validated OAuth token claims
  */
 export interface TokenClaims {
-    /** Subject (user ID) */
-    sub: string;
+  /** Subject (user ID) */
+  sub: string;
 
-    /** Granted scopes */
-    scopes: OAuthScope[];
+  /** Granted scopes */
+  scopes: OAuthScope[];
 
-    /** Token expiration time */
-    exp: number;
+  /** Token expiration time */
+  exp: number;
 
-    /** Token issued at time */
-    iat: number;
+  /** Token issued at time */
+  iat: number;
 
-    /** Token issuer */
-    iss?: string;
+  /** Token issuer */
+  iss?: string;
 
-    /** Token audience */
-    aud?: string | string[];
+  /** Token audience */
+  aud?: string | string[];
 
-    /** Additional claims */
-    [key: string]: unknown;
+  /** Additional claims */
+  [key: string]: unknown;
 }
 
 /**
  * Request context with authentication info
  */
 export interface RequestContext {
-    /** Validated token claims (if authenticated) */
-    auth?: TokenClaims;
+  /** Validated token claims (if authenticated) */
+  auth?: TokenClaims;
 
-    /** Raw access token */
-    accessToken?: string;
+  /** Raw access token */
+  accessToken?: string;
 
-    /** Request timestamp */
-    timestamp: Date;
+  /** Request timestamp */
+  timestamp: Date;
 
-    /** Request ID for tracing */
-    requestId: string;
+  /** Request ID for tracing */
+  requestId: string;
 }

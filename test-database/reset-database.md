@@ -232,7 +232,7 @@ Stats Group (8 tools +1 for code mode)
 'pg_stats_hypothesis'
 'pg_stats_sampling'
 'pg_execute_code' (codemode, auto-added)
-	
+
 ---
 
 Vector Tool Group (14 tools +1 for code mode)

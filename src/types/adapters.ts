@@ -1,51 +1,51 @@
 /**
  * postgres-mcp - Adapter Types
- * 
+ *
  * Database adapter capabilities and tool/resource/prompt definitions.
  */
 
-import type { OAuthScope, RequestContext } from './oauth.js';
-import type { ToolGroup } from './filtering.js';
+import type { OAuthScope, RequestContext } from "./oauth.js";
+import type { ToolGroup } from "./filtering.js";
 
 /**
  * Capabilities supported by a database adapter
  */
 export interface AdapterCapabilities {
-    /** Supports JSON/JSONB operations */
-    json: boolean;
+  /** Supports JSON/JSONB operations */
+  json: boolean;
 
-    /** Supports full-text search */
-    fullTextSearch: boolean;
+  /** Supports full-text search */
+  fullTextSearch: boolean;
 
-    /** Supports vector/embedding operations (pgvector) */
-    vector: boolean;
+  /** Supports vector/embedding operations (pgvector) */
+  vector: boolean;
 
-    /** Supports geospatial operations (PostGIS) */
-    geospatial: boolean;
+  /** Supports geospatial operations (PostGIS) */
+  geospatial: boolean;
 
-    /** Supports transactions */
-    transactions: boolean;
+  /** Supports transactions */
+  transactions: boolean;
 
-    /** Supports prepared statements */
-    preparedStatements: boolean;
+  /** Supports prepared statements */
+  preparedStatements: boolean;
 
-    /** Supports connection pooling */
-    connectionPooling: boolean;
+  /** Supports connection pooling */
+  connectionPooling: boolean;
 
-    /** Supports partitioning */
-    partitioning: boolean;
+  /** Supports partitioning */
+  partitioning: boolean;
 
-    /** Supports logical replication */
-    replication: boolean;
+  /** Supports logical replication */
+  replication: boolean;
 
-    /** Supports CTE (WITH queries) */
-    cte: boolean;
+  /** Supports CTE (WITH queries) */
+  cte: boolean;
 
-    /** Supports window functions */
-    windowFunctions: boolean;
+  /** Supports window functions */
+  windowFunctions: boolean;
 
-    /** Additional capability flags */
-    [key: string]: boolean;
+  /** Additional capability flags */
+  [key: string]: boolean;
 }
 
 /**
@@ -54,16 +54,16 @@ export interface AdapterCapabilities {
  * present and manage tools appropriately.
  */
 export interface ToolAnnotations {
-    /** Human-readable title for display */
-    title?: string;
-    /** Tool does not modify its environment (default: false) */
-    readOnlyHint?: boolean;
-    /** Tool may perform destructive updates (default: true) */
-    destructiveHint?: boolean;
-    /** Repeated calls with same args have no additional effect */
-    idempotentHint?: boolean;
-    /** Tool may interact with external systems (default: false) */
-    openWorldHint?: boolean;
+  /** Human-readable title for display */
+  title?: string;
+  /** Tool does not modify its environment (default: false) */
+  readOnlyHint?: boolean;
+  /** Tool may perform destructive updates (default: true) */
+  destructiveHint?: boolean;
+  /** Repeated calls with same args have no additional effect */
+  idempotentHint?: boolean;
+  /** Tool may interact with external systems (default: false) */
+  openWorldHint?: boolean;
 }
 
 /**
@@ -71,83 +71,86 @@ export interface ToolAnnotations {
  * Visual representation of a tool for display in client UIs.
  */
 export interface ToolIcon {
-    /** URI for the icon (data:, http:, https:, file://) */
-    src: string;
-    /** MIME type (image/svg+xml, image/png, image/jpeg) */
-    mimeType?: string;
-    /** Size hints (e.g., ["48x48"] or ["any"] for SVG) */
-    sizes?: string[];
+  /** URI for the icon (data:, http:, https:, file://) */
+  src: string;
+  /** MIME type (image/svg+xml, image/png, image/jpeg) */
+  mimeType?: string;
+  /** Size hints (e.g., ["48x48"] or ["any"] for SVG) */
+  sizes?: string[];
 }
 
 /**
  * Tool definition for registration
  */
 export interface ToolDefinition {
-    /** Unique tool name */
-    name: string;
+  /** Unique tool name */
+  name: string;
 
-    /** Human-readable description */
-    description: string;
+  /** Human-readable description */
+  description: string;
 
-    /** Tool group for filtering */
-    group: ToolGroup;
+  /** Tool group for filtering */
+  group: ToolGroup;
 
-    /** Searchable tags for tool discovery (used by lazy hydration) */
-    tags?: string[];
+  /** Searchable tags for tool discovery (used by lazy hydration) */
+  tags?: string[];
 
-    /** Zod schema for input validation */
-    inputSchema: unknown;
+  /** Zod schema for input validation */
+  inputSchema: unknown;
 
-    /** Required OAuth scopes */
-    requiredScopes?: OAuthScope[];
+  /** Required OAuth scopes */
+  requiredScopes?: OAuthScope[];
 
-    /** MCP Tool Annotations for behavior hints */
-    annotations?: ToolAnnotations;
+  /** MCP Tool Annotations for behavior hints */
+  annotations?: ToolAnnotations;
 
-    /** MCP Tool Icons for visual representation */
-    icons?: ToolIcon[];
+  /** MCP Tool Icons for visual representation */
+  icons?: ToolIcon[];
 
-    /** Tool handler function */
-    handler: (params: unknown, context: RequestContext) => Promise<unknown>;
+  /** Tool handler function */
+  handler: (params: unknown, context: RequestContext) => Promise<unknown>;
 }
 
 /**
  * Resource definition for MCP
  */
 export interface ResourceDefinition {
-    /** Resource URI template */
-    uri: string;
+  /** Resource URI template */
+  uri: string;
 
-    /** Human-readable name */
-    name: string;
+  /** Human-readable name */
+  name: string;
 
-    /** Description */
-    description: string;
+  /** Description */
+  description: string;
 
-    /** MIME type */
-    mimeType?: string;
+  /** MIME type */
+  mimeType?: string;
 
-    /** Resource handler */
-    handler: (uri: string, context: RequestContext) => Promise<unknown>;
+  /** Resource handler */
+  handler: (uri: string, context: RequestContext) => Promise<unknown>;
 }
 
 /**
  * Prompt definition for MCP
  */
 export interface PromptDefinition {
-    /** Prompt name */
+  /** Prompt name */
+  name: string;
+
+  /** Description */
+  description: string;
+
+  /** Argument definitions */
+  arguments?: {
     name: string;
-
-    /** Description */
     description: string;
+    required?: boolean;
+  }[];
 
-    /** Argument definitions */
-    arguments?: {
-        name: string;
-        description: string;
-        required?: boolean;
-    }[];
-
-    /** Prompt handler */
-    handler: (args: Record<string, string>, context: RequestContext) => Promise<unknown>;
+  /** Prompt handler */
+  handler: (
+    args: Record<string, string>,
+    context: RequestContext,
+  ) => Promise<unknown>;
 }

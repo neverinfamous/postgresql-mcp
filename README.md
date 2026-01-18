@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.neverinfamous/postgres-mcp -->
 
-*Last updated January 14, 2026*
+_Last updated January 14, 2026_
 
 A **PostgreSQL MCP Server** that enables AI assistants (Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **202 specialized tools**, **20 resources**, and **19 AI-powered prompts** and includes OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, HypoPG, and advanced PostgreSQL features.
 
@@ -69,8 +69,10 @@ node dist/cli.js list-tools
       "command": "node",
       "args": [
         "C:/path/to/postgres-mcp/dist/cli.js",
-        "--postgres", "postgres://user:password@localhost:5432/database",
-        "--tool-filter", "starter"
+        "--postgres",
+        "postgres://user:password@localhost:5432/database",
+        "--tool-filter",
+        "starter"
       ]
     }
   }
@@ -89,7 +91,8 @@ node dist/cli.js list-tools
       "command": "node",
       "args": [
         "C:/path/to/postgres-mcp/dist/cli.js",
-        "--tool-filter", "starter"
+        "--tool-filter",
+        "starter"
       ],
       "env": {
         "POSTGRES_HOST": "localhost",
@@ -107,19 +110,19 @@ node dist/cli.js list-tools
 
 ## 🔗 Database Connection Scenarios
 
-| Scenario | Host to Use | Example Connection String |
-|----------|-------------|---------------------------|
-| **PostgreSQL on host machine** | `localhost` or `host.docker.internal` | `postgres://user:pass@localhost:5432/db` |
-| **PostgreSQL in Docker** | Container name or network | `postgres://user:pass@postgres-container:5432/db` |
-| **Remote/Cloud PostgreSQL** | Hostname or IP | `postgres://user:pass@db.example.com:5432/db` |
+| Scenario                       | Host to Use                           | Example Connection String                         |
+| ------------------------------ | ------------------------------------- | ------------------------------------------------- |
+| **PostgreSQL on host machine** | `localhost` or `host.docker.internal` | `postgres://user:pass@localhost:5432/db`          |
+| **PostgreSQL in Docker**       | Container name or network             | `postgres://user:pass@postgres-container:5432/db` |
+| **Remote/Cloud PostgreSQL**    | Hostname or IP                        | `postgres://user:pass@db.example.com:5432/db`     |
 
-| Provider | Example Hostname |
-|----------|------------------|
+| Provider           | Example Hostname                                 |
+| ------------------ | ------------------------------------------------ |
 | AWS RDS PostgreSQL | `your-instance.xxxx.us-east-1.rds.amazonaws.com` |
-| Google Cloud SQL | `project:region:instance` (via Cloud SQL Proxy) |
-| Azure PostgreSQL | `your-server.postgres.database.azure.com` |
-| Supabase | `db.xxxx.supabase.co` |
-| Neon | `ep-xxx.us-east-1.aws.neon.tech` |
+| Google Cloud SQL   | `project:region:instance` (via Cloud SQL Proxy)  |
+| Azure PostgreSQL   | `your-server.postgres.database.azure.com`        |
+| Supabase           | `db.xxxx.supabase.co`                            |
+| Neon               | `ep-xxx.us-east-1.aws.neon.tech`                 |
 
 ---
 
@@ -139,9 +142,9 @@ If you don't have admin access or prefer individual tool calls, exclude codemode
 
 ### Isolation Modes
 
-| Mode | Isolation | When to Use |
-|------|-----------|-------------|
-| `vm` | Same process | **Default, recommended** |
+| Mode     | Isolation          | When to Use                  |
+| -------- | ------------------ | ---------------------------- |
+| `vm`     | Same process       | **Default, recommended**     |
 | `worker` | Separate V8 thread | Not recommended (incomplete) |
 
 The `vm` mode is fully functional and is the default. No configuration needed.
@@ -165,59 +168,59 @@ The `vm` mode is fully functional and is the default. No configuration needed.
 
 The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names** — mix and match freely:
 
-| Filter Pattern | Example | Tools | Description |
-|----------------|---------|-------|-------------|
-| Shortcut only | `starter` | 58 | Use a predefined bundle |
-| Groups only | `core,jsonb,transactions` | 45 | Combine individual groups |
-| Shortcut + Group | `starter,+text` | 69 | Extend a shortcut |
-| Shortcut - Tool | `starter,-pg_drop_table` | 57 | Remove specific tools |
+| Filter Pattern   | Example                   | Tools | Description               |
+| ---------------- | ------------------------- | ----- | ------------------------- |
+| Shortcut only    | `starter`                 | 58    | Use a predefined bundle   |
+| Groups only      | `core,jsonb,transactions` | 45    | Combine individual groups |
+| Shortcut + Group | `starter,+text`           | 69    | Extend a shortcut         |
+| Shortcut - Tool  | `starter,-pg_drop_table`  | 57    | Remove specific tools     |
 
 All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by default for token-efficient operations. To exclude it, add `-codemode` to your filter: `--tool-filter cron,pgcrypto,-codemode`
 
 ### Shortcuts (Predefined Bundles)
 
-| Shortcut | Tools | Use Case | What's Included |
-|----------|-------|----------|-----------------|
-| `starter` | **58** | 🌟 **Recommended** | Core, trans, JSONB, schema, codemode |
-| `essential` | 46 | Minimal footprint | Core, trans, JSONB, codemode |
-| `dev-power` | 53 | Power Developer | Core, trans, schema, stats, part, codemode |
-| `ai-data` | 59 | AI Data Analyst | Core, JSONB, text, trans, codemode |
-| `ai-vector` | 47 | AI/ML with pgvector | Core, vector, trans, part, codemode |
-| `dba-monitor` | 58 | DBA Monitoring | Core, monitoring, perf, trans, codemode |
-| `dba-manage` | 57 | DBA Management | Core, admin, backup, part, schema, codemode |
-| `dba-stats` | 56 | DBA Stats/Security | Core, admin, monitoring, trans, stats, codemode |
-| `geo` | 42 | Geospatial Workloads | Core, PostGIS, trans, codemode |
-| `base-core` | 58 | Base Building Block | Core, JSONB, trans, schema, codemode |
-| `base-ops` | 51 | Operations Block | Admin, monitoring, backup, part, stats, citext, codemode |
-| `ext-ai` | 24 | Extension: AI/Security | pgvector, pgcrypto, codemode |
-| `ext-geo` | 24 | Extension: Spatial | PostGIS, ltree, codemode |
-| `ext-schedule` | 19 | Extension: Scheduling | pg_cron, pg_partman, codemode |
-| `ext-perf` | 28 | Extension: Perf/Analysis | pg_stat_kcache, performance, codemode |
+| Shortcut       | Tools  | Use Case                 | What's Included                                          |
+| -------------- | ------ | ------------------------ | -------------------------------------------------------- |
+| `starter`      | **58** | 🌟 **Recommended**       | Core, trans, JSONB, schema, codemode                     |
+| `essential`    | 46     | Minimal footprint        | Core, trans, JSONB, codemode                             |
+| `dev-power`    | 53     | Power Developer          | Core, trans, schema, stats, part, codemode               |
+| `ai-data`      | 59     | AI Data Analyst          | Core, JSONB, text, trans, codemode                       |
+| `ai-vector`    | 47     | AI/ML with pgvector      | Core, vector, trans, part, codemode                      |
+| `dba-monitor`  | 58     | DBA Monitoring           | Core, monitoring, perf, trans, codemode                  |
+| `dba-manage`   | 57     | DBA Management           | Core, admin, backup, part, schema, codemode              |
+| `dba-stats`    | 56     | DBA Stats/Security       | Core, admin, monitoring, trans, stats, codemode          |
+| `geo`          | 42     | Geospatial Workloads     | Core, PostGIS, trans, codemode                           |
+| `base-core`    | 58     | Base Building Block      | Core, JSONB, trans, schema, codemode                     |
+| `base-ops`     | 51     | Operations Block         | Admin, monitoring, backup, part, stats, citext, codemode |
+| `ext-ai`       | 24     | Extension: AI/Security   | pgvector, pgcrypto, codemode                             |
+| `ext-geo`      | 24     | Extension: Spatial       | PostGIS, ltree, codemode                                 |
+| `ext-schedule` | 19     | Extension: Scheduling    | pg_cron, pg_partman, codemode                            |
+| `ext-perf`     | 28     | Extension: Perf/Analysis | pg_stat_kcache, performance, codemode                    |
 
 ### Tool Groups (20 Available)
 
-| Group | Tools | Description |
-|-------|-------|-------------|
-| `core` | 20 | Read/write queries, tables, indexes, convenience/drop tools |
-| `transactions` | 8 | BEGIN, COMMIT, ROLLBACK, savepoints |
-| `jsonb` | 20 | JSONB manipulation and queries |
-| `text` | 13 | Full-text search, fuzzy matching |
-| `performance` | 20 | EXPLAIN, query analysis, optimization |
-| `admin` | 11 | VACUUM, ANALYZE, REINDEX |
-| `monitoring` | 12 | Database sizes, connections, status |
-| `backup` | 10 | pg_dump, COPY, restore |
-| `schema` | 13 | Schemas, views, sequences, functions, triggers |
-| `partitioning` | 7 | Native partition management |
-| `stats` | 9 | Statistical analysis |
-| `vector` | 15 | pgvector (AI/ML similarity search) |
-| `postgis` | 16 | PostGIS (geospatial) |
-| `cron` | 9 | pg_cron (job scheduling) |
-| `partman` | 11 | pg_partman (auto-partitioning) |
-| `kcache` | 8 | pg_stat_kcache (OS-level stats) |
-| `citext` | 7 | citext (case-insensitive text) |
-| `ltree` | 9 | ltree (hierarchical data) |
-| `pgcrypto` | 10 | pgcrypto (encryption, UUIDs) |
-| `codemode` | 1 | Code Mode (sandboxed code execution) |
+| Group          | Tools | Description                                                 |
+| -------------- | ----- | ----------------------------------------------------------- |
+| `core`         | 20    | Read/write queries, tables, indexes, convenience/drop tools |
+| `transactions` | 8     | BEGIN, COMMIT, ROLLBACK, savepoints                         |
+| `jsonb`        | 20    | JSONB manipulation and queries                              |
+| `text`         | 13    | Full-text search, fuzzy matching                            |
+| `performance`  | 20    | EXPLAIN, query analysis, optimization                       |
+| `admin`        | 11    | VACUUM, ANALYZE, REINDEX                                    |
+| `monitoring`   | 12    | Database sizes, connections, status                         |
+| `backup`       | 10    | pg_dump, COPY, restore                                      |
+| `schema`       | 13    | Schemas, views, sequences, functions, triggers              |
+| `partitioning` | 7     | Native partition management                                 |
+| `stats`        | 9     | Statistical analysis                                        |
+| `vector`       | 15    | pgvector (AI/ML similarity search)                          |
+| `postgis`      | 16    | PostGIS (geospatial)                                        |
+| `cron`         | 9     | pg_cron (job scheduling)                                    |
+| `partman`      | 11    | pg_partman (auto-partitioning)                              |
+| `kcache`       | 8     | pg_stat_kcache (OS-level stats)                             |
+| `citext`       | 7     | citext (case-insensitive text)                              |
+| `ltree`        | 9     | ltree (hierarchical data)                                   |
+| `pgcrypto`     | 10    | pgcrypto (encryption, UUIDs)                                |
+| `codemode`     | 1     | Code Mode (sandboxed code execution)                        |
 
 ---
 
@@ -226,6 +229,7 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 Add one of these configurations to your IDE's MCP settings file:
 
 #### Option 1: Starter (49 Essential Tools)
+
 **Best for:** General PostgreSQL database work - CRUD operations, JSONB, schema management.
 
 ```json
@@ -253,6 +257,7 @@ Add one of these configurations to your IDE's MCP settings file:
 ```
 
 #### Option 2: AI Vector (46 Tools + pgvector)
+
 **Best for:** AI/ML workloads with semantic search and vector similarity.
 
 > **⚠️ Prerequisites:** Requires pgvector extension installed in your PostgreSQL database.
@@ -292,17 +297,17 @@ Add one of these configurations to your IDE's MCP settings file:
 
 ### Syntax Reference
 
-| Prefix | Target | Example | Effect |
-|--------|--------|---------|--------|
-| *(none)* | Shortcut | `starter` | **Whitelist Mode:** Enable ONLY this shortcut |
-| *(none)* | Group | `core` | **Whitelist Mode:** Enable ONLY this group |
-| `+` | Group | `+vector` | Add tools from this group to current set |
-| `-` | Group | `-admin` | Remove tools in this group from current set |
-| `+` | Tool | `+pg_explain` | Add one specific tool |
-| `-` | Tool | `-pg_drop_table` | Remove one specific tool |
+| Prefix   | Target   | Example          | Effect                                        |
+| -------- | -------- | ---------------- | --------------------------------------------- |
+| _(none)_ | Shortcut | `starter`        | **Whitelist Mode:** Enable ONLY this shortcut |
+| _(none)_ | Group    | `core`           | **Whitelist Mode:** Enable ONLY this group    |
+| `+`      | Group    | `+vector`        | Add tools from this group to current set      |
+| `-`      | Group    | `-admin`         | Remove tools in this group from current set   |
+| `+`      | Tool     | `+pg_explain`    | Add one specific tool                         |
+| `-`      | Tool     | `-pg_drop_table` | Remove one specific tool                      |
 
 **Legacy Syntax (still supported):**
-If you start with a negative filter (e.g., `-base,-extensions`), it assumes you want to start with *all* tools enabled and then subtract.
+If you start with a negative filter (e.g., `-base,-extensions`), it assumes you want to start with _all_ tools enabled and then subtract.
 
 ---
 
@@ -313,6 +318,7 @@ When using HTTP/SSE transport, oauth 2.1 authentication can protect your MCP end
 ### Configuration
 
 **CLI Options:**
+
 ```bash
 node dist/cli.js \
   --transport http \
@@ -323,6 +329,7 @@ node dist/cli.js \
 ```
 
 **Environment Variables:**
+
 ```bash
 # Required
 OAUTH_ENABLED=true
@@ -338,19 +345,20 @@ OAUTH_CLOCK_TOLERANCE=60
 
 Access control is managed through OAuth scopes:
 
-| Scope | Access Level |
-|-------|--------------|
-| `read` | Read-only queries (SELECT, EXPLAIN) |
-| `write` | Read + write operations |
-| `admin` | Full administrative access |
-| `full` | Grants all access |
-| `db:{name}` | Access to specific database |
-| `schema:{name}` | Access to specific schema |
-| `table:{schema}:{table}` | Access to specific table |
+| Scope                    | Access Level                        |
+| ------------------------ | ----------------------------------- |
+| `read`                   | Read-only queries (SELECT, EXPLAIN) |
+| `write`                  | Read + write operations             |
+| `admin`                  | Full administrative access          |
+| `full`                   | Grants all access                   |
+| `db:{name}`              | Access to specific database         |
+| `schema:{name}`          | Access to specific schema           |
+| `table:{schema}:{table}` | Access to specific table            |
 
 ### RFC Compliance
 
 This implementation follows:
+
 - **RFC 9728** — OAuth 2.0 Protected Resource Metadata
 - **RFC 8414** — OAuth 2.0 Authorization Server Metadata
 - **RFC 7591** — OAuth 2.0 Dynamic Client Registration
@@ -361,10 +369,10 @@ The server exposes metadata at `/.well-known/oauth-protected-resource`.
 
 ## ⚡ Performance Tuning
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `METADATA_CACHE_TTL_MS` | `30000` | Cache TTL for schema metadata (milliseconds) |
-| `LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warning`, `error` |
+| Variable                | Default | Description                                        |
+| ----------------------- | ------- | -------------------------------------------------- |
+| `METADATA_CACHE_TTL_MS` | `30000` | Cache TTL for schema metadata (milliseconds)       |
+| `LOG_LEVEL`             | `info`  | Log verbosity: `debug`, `info`, `warning`, `error` |
 
 > **Tip:** Lower `METADATA_CACHE_TTL_MS` for development (e.g., `5000`), or increase it for production with stable schemas (e.g., `300000` = 5 min).
 
@@ -376,27 +384,27 @@ Prompts provide step-by-step guidance for complex database tasks. Instead of fig
 
 This server includes **19 intelligent prompts** for guided workflows:
 
-| Prompt | Description |
-|--------|-------------|
-| `pg_query_builder` | Construct PostgreSQL queries with CTEs and window functions |
-| `pg_schema_design` | Design normalized schemas with constraints and indexes |
-| `pg_performance_analysis` | Analyze queries with EXPLAIN and optimization tips |
-| `pg_migration` | Generate migration scripts with rollback support |
-| `pg_tool_index` | Lazy hydration - compact index of all tools |
-| `pg_quick_query` | Quick SQL query guidance for common operations |
-| `pg_quick_schema` | Quick reference for exploring database schema |
-| `pg_database_health_check` | Comprehensive database health assessment |
-| `pg_backup_strategy` | Enterprise backup planning with RTO/RPO |
-| `pg_index_tuning` | Index analysis and optimization workflow |
-| `pg_extension_setup` | Extension installation and configuration guide |
-| `pg_setup_pgvector` | Complete pgvector setup for semantic search |
-| `pg_setup_postgis` | Complete PostGIS setup for geospatial operations |
-| `pg_setup_pgcron` | Complete pg_cron setup for job scheduling |
-| `pg_setup_partman` | Complete pg_partman setup for partition management |
-| `pg_setup_kcache` | Complete pg_stat_kcache setup for OS-level monitoring |
-| `pg_setup_citext` | Complete citext setup for case-insensitive text |
-| `pg_setup_ltree` | Complete ltree setup for hierarchical data |
-| `pg_setup_pgcrypto` | Complete pgcrypto setup for cryptographic functions |
+| Prompt                     | Description                                                 |
+| -------------------------- | ----------------------------------------------------------- |
+| `pg_query_builder`         | Construct PostgreSQL queries with CTEs and window functions |
+| `pg_schema_design`         | Design normalized schemas with constraints and indexes      |
+| `pg_performance_analysis`  | Analyze queries with EXPLAIN and optimization tips          |
+| `pg_migration`             | Generate migration scripts with rollback support            |
+| `pg_tool_index`            | Lazy hydration - compact index of all tools                 |
+| `pg_quick_query`           | Quick SQL query guidance for common operations              |
+| `pg_quick_schema`          | Quick reference for exploring database schema               |
+| `pg_database_health_check` | Comprehensive database health assessment                    |
+| `pg_backup_strategy`       | Enterprise backup planning with RTO/RPO                     |
+| `pg_index_tuning`          | Index analysis and optimization workflow                    |
+| `pg_extension_setup`       | Extension installation and configuration guide              |
+| `pg_setup_pgvector`        | Complete pgvector setup for semantic search                 |
+| `pg_setup_postgis`         | Complete PostGIS setup for geospatial operations            |
+| `pg_setup_pgcron`          | Complete pg_cron setup for job scheduling                   |
+| `pg_setup_partman`         | Complete pg_partman setup for partition management          |
+| `pg_setup_kcache`          | Complete pg_stat_kcache setup for OS-level monitoring       |
+| `pg_setup_citext`          | Complete citext setup for case-insensitive text             |
+| `pg_setup_ltree`           | Complete ltree setup for hierarchical data                  |
+| `pg_setup_pgcrypto`        | Complete pgcrypto setup for cryptographic functions         |
 
 ---
 
@@ -406,47 +414,47 @@ Resources give you instant snapshots of database state without writing queries. 
 
 This server provides **20 resources** for structured data access:
 
-| Resource | URI | Description |
-|----------|-----|-------------|
-| Schema | `postgres://schema` | Full database schema |
-| Tables | `postgres://tables` | Table listing with sizes |
-| Settings | `postgres://settings` | PostgreSQL configuration |
-| Statistics | `postgres://stats` | Database statistics with stale detection |
-| Activity | `postgres://activity` | Current connections |
-| Pool | `postgres://pool` | Connection pool status |
-| Capabilities | `postgres://capabilities` | Server version, extensions, tool categories |
-| Performance | `postgres://performance` | pg_stat_statements query metrics |
-| Health | `postgres://health` | Comprehensive database health status |
-| Extensions | `postgres://extensions` | Extension inventory with recommendations |
-| Indexes | `postgres://indexes` | Index usage with unused detection |
-| Replication | `postgres://replication` | Replication status and lag monitoring |
-| Vacuum | `postgres://vacuum` | Vacuum stats and wraparound warnings |
-| Locks | `postgres://locks` | Lock contention detection |
-| Cron | `postgres://cron` | pg_cron job status and execution history |
-| Partman | `postgres://partman` | pg_partman partition configuration and health |
-| Kcache | `postgres://kcache` | pg_stat_kcache CPU/I/O metrics summary |
-| Vector | `postgres://vector` | pgvector columns, indexes, and recommendations |
-| PostGIS | `postgres://postgis` | PostGIS spatial columns and index status |
-| Crypto | `postgres://crypto` | pgcrypto availability and security recommendations |
+| Resource     | URI                       | Description                                        |
+| ------------ | ------------------------- | -------------------------------------------------- |
+| Schema       | `postgres://schema`       | Full database schema                               |
+| Tables       | `postgres://tables`       | Table listing with sizes                           |
+| Settings     | `postgres://settings`     | PostgreSQL configuration                           |
+| Statistics   | `postgres://stats`        | Database statistics with stale detection           |
+| Activity     | `postgres://activity`     | Current connections                                |
+| Pool         | `postgres://pool`         | Connection pool status                             |
+| Capabilities | `postgres://capabilities` | Server version, extensions, tool categories        |
+| Performance  | `postgres://performance`  | pg_stat_statements query metrics                   |
+| Health       | `postgres://health`       | Comprehensive database health status               |
+| Extensions   | `postgres://extensions`   | Extension inventory with recommendations           |
+| Indexes      | `postgres://indexes`      | Index usage with unused detection                  |
+| Replication  | `postgres://replication`  | Replication status and lag monitoring              |
+| Vacuum       | `postgres://vacuum`       | Vacuum stats and wraparound warnings               |
+| Locks        | `postgres://locks`        | Lock contention detection                          |
+| Cron         | `postgres://cron`         | pg_cron job status and execution history           |
+| Partman      | `postgres://partman`      | pg_partman partition configuration and health      |
+| Kcache       | `postgres://kcache`       | pg_stat_kcache CPU/I/O metrics summary             |
+| Vector       | `postgres://vector`       | pgvector columns, indexes, and recommendations     |
+| PostGIS      | `postgres://postgis`      | PostGIS spatial columns and index status           |
+| Crypto       | `postgres://crypto`       | pgcrypto availability and security recommendations |
 
 ---
 
 ## 🔧 Extension Support
 
-| Extension | Purpose | Tools |
-|-----------|---------|-------|
-| `pg_stat_statements` | Query performance tracking | `pg_stat_statements` |
-| `pg_trgm` | Text similarity | `pg_trigram_similarity` |
-| `fuzzystrmatch` | Fuzzy matching | `pg_fuzzy_match` |
-| `hypopg` | Hypothetical indexes | `pg_index_recommendations` |
-| `pgvector` | Vector similarity search | 14 vector tools |
-| `PostGIS` | Geospatial operations | 15 postgis tools |
-| `pg_cron` | Job scheduling | 8 cron tools |
-| `pg_partman` | Automated partition management | 10 partman tools |
-| `pg_stat_kcache` | OS-level CPU/memory/I/O stats | 7 kcache tools |
-| `citext` | Case-insensitive text | 6 citext tools |
-| `ltree` | Hierarchical tree labels | 8 ltree tools |
-| `pgcrypto` | Hashing, encryption, UUIDs | 9 pgcrypto tools |
+| Extension            | Purpose                        | Tools                      |
+| -------------------- | ------------------------------ | -------------------------- |
+| `pg_stat_statements` | Query performance tracking     | `pg_stat_statements`       |
+| `pg_trgm`            | Text similarity                | `pg_trigram_similarity`    |
+| `fuzzystrmatch`      | Fuzzy matching                 | `pg_fuzzy_match`           |
+| `hypopg`             | Hypothetical indexes           | `pg_index_recommendations` |
+| `pgvector`           | Vector similarity search       | 14 vector tools            |
+| `PostGIS`            | Geospatial operations          | 15 postgis tools           |
+| `pg_cron`            | Job scheduling                 | 8 cron tools               |
+| `pg_partman`         | Automated partition management | 10 partman tools           |
+| `pg_stat_kcache`     | OS-level CPU/memory/I/O stats  | 7 kcache tools             |
+| `citext`             | Case-insensitive text          | 6 citext tools             |
+| `ltree`              | Hierarchical tree labels       | 8 ltree tools              |
+| `pgcrypto`           | Hashing, encryption, UUIDs     | 9 pgcrypto tools           |
 
 > Extension tools gracefully handle cases where extensions are not installed.
 
@@ -456,13 +464,13 @@ This server provides **20 resources** for structured data access:
 
 All 199 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints to MCP clients about tool behavior:
 
-| Annotation | Description | Example |
-|------------|-------------|---------|
-| `title` | Human-readable tool name | "Execute Query", "Create Index" |
-| `readOnlyHint` | Tool doesn't modify data | `true` for SELECT queries |
-| `destructiveHint` | Tool may delete/modify data | `true` for DROP, DELETE |
-| `idempotentHint` | Safe to retry without side effects | `true` for IF NOT EXISTS |
-| `openWorldHint` | Tool interacts with external systems | `false` for all tools |
+| Annotation        | Description                          | Example                         |
+| ----------------- | ------------------------------------ | ------------------------------- |
+| `title`           | Human-readable tool name             | "Execute Query", "Create Index" |
+| `readOnlyHint`    | Tool doesn't modify data             | `true` for SELECT queries       |
+| `destructiveHint` | Tool may delete/modify data          | `true` for DROP, DELETE         |
+| `idempotentHint`  | Safe to retry without side effects   | `true` for IF NOT EXISTS        |
+| `openWorldHint`   | Tool interacts with external systems | `false` for all tools           |
 
 ---
 
@@ -492,7 +500,7 @@ All 199 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints t
 ✅ **Connection Pooling** - Efficient PostgreSQL connection management  
 ✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements, pg_cron  
 ✅ **Tool Filtering** - Stay within AI IDE tool limits  
-✅ **Modern Architecture** - Built on MCP SDK 1.25+  
+✅ **Modern Architecture** - Built on MCP SDK 1.25+
 
 ---
 

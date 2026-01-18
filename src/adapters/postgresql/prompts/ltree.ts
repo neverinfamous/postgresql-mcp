@@ -1,37 +1,41 @@
 /**
  * ltree Setup Prompt
- * 
+ *
  * Complete guide for setting up hierarchical data with ltree.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createSetupLtreePrompt(): PromptDefinition {
-    return {
-        name: 'pg_setup_ltree',
-        description: 'Complete guide for setting up hierarchical tree-structured data with ltree for categories, org charts, and file paths.',
-        arguments: [
-            {
-                name: 'useCase',
-                description: 'Use case: categories, org_chart, file_paths, taxonomy',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const useCase = args['useCase'] ?? 'categories';
+  return {
+    name: "pg_setup_ltree",
+    description:
+      "Complete guide for setting up hierarchical tree-structured data with ltree for categories, org charts, and file paths.",
+    arguments: [
+      {
+        name: "useCase",
+        description: "Use case: categories, org_chart, file_paths, taxonomy",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const useCase = args["useCase"] ?? "categories";
 
-            let exampleTable = '';
-            let exampleData = '';
+      let exampleTable = "";
+      let exampleData = "";
 
-            if (useCase === 'categories') {
-                exampleTable = `CREATE TABLE categories (
+      if (useCase === "categories") {
+        exampleTable = `CREATE TABLE categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     path LTREE NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );`;
-                exampleData = `INSERT INTO categories (name, path) VALUES
+        exampleData = `INSERT INTO categories (name, path) VALUES
 ('Electronics', 'electronics'),
 ('Computers', 'electronics.computers'),
 ('Laptops', 'electronics.computers.laptops'),
@@ -41,15 +45,15 @@ export function createSetupLtreePrompt(): PromptDefinition {
 ('Clothing', 'clothing'),
 ('Men', 'clothing.men'),
 ('Women', 'clothing.women');`;
-            } else if (useCase === 'org_chart') {
-                exampleTable = `CREATE TABLE employees (
+      } else if (useCase === "org_chart") {
+        exampleTable = `CREATE TABLE employees (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     title VARCHAR(100),
     org_path LTREE NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );`;
-                exampleData = `INSERT INTO employees (name, title, org_path) VALUES
+        exampleData = `INSERT INTO employees (name, title, org_path) VALUES
 ('Alice', 'CEO', 'ceo'),
 ('Bob', 'CTO', 'ceo.cto'),
 ('Carol', 'CFO', 'ceo.cfo'),
@@ -57,8 +61,8 @@ export function createSetupLtreePrompt(): PromptDefinition {
 ('Eve', 'Senior Developer', 'ceo.cto.eng.dev1'),
 ('Frank', 'Junior Developer', 'ceo.cto.eng.dev2'),
 ('Grace', 'Finance Manager', 'ceo.cfo.finance');`;
-            } else if (useCase === 'file_paths') {
-                exampleTable = `CREATE TABLE files (
+      } else if (useCase === "file_paths") {
+        exampleTable = `CREATE TABLE files (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     file_type VARCHAR(50),
@@ -66,22 +70,22 @@ export function createSetupLtreePrompt(): PromptDefinition {
     size_bytes BIGINT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );`;
-                exampleData = `INSERT INTO files (name, file_type, path, size_bytes) VALUES
+        exampleData = `INSERT INTO files (name, file_type, path, size_bytes) VALUES
 ('home', 'directory', 'home', 0),
 ('user1', 'directory', 'home.user1', 0),
 ('documents', 'directory', 'home.user1.documents', 0),
 ('report.pdf', 'file', 'home.user1.documents.report_pdf', 1024),
 ('photos', 'directory', 'home.user1.photos', 0),
 ('vacation.jpg', 'file', 'home.user1.photos.vacation_jpg', 2048);`;
-            } else {
-                exampleTable = `CREATE TABLE species (
+      } else {
+        exampleTable = `CREATE TABLE species (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     scientific_name VARCHAR(255),
     taxonomy LTREE NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );`;
-                exampleData = `INSERT INTO species (name, scientific_name, taxonomy) VALUES
+        exampleData = `INSERT INTO species (name, scientific_name, taxonomy) VALUES
 ('Animals', NULL, 'animalia'),
 ('Mammals', NULL, 'animalia.mammalia'),
 ('Primates', NULL, 'animalia.mammalia.primates'),
@@ -89,9 +93,12 @@ export function createSetupLtreePrompt(): PromptDefinition {
 ('Carnivora', NULL, 'animalia.mammalia.carnivora'),
 ('Dog', 'Canis familiaris', 'animalia.mammalia.carnivora.canis_familiaris'),
 ('Cat', 'Felis catus', 'animalia.mammalia.carnivora.felis_catus');`;
-            }
+      }
 
-            return `# ltree Setup Guide - ${useCase.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+      return `# ltree Setup Guide - ${useCase
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")}
 
 ## ltree Overview
 
@@ -118,7 +125,7 @@ SELECT * FROM pg_extension WHERE extname = 'ltree';
 ${exampleTable}
 
 -- Create GiST index for fast hierarchical queries
-CREATE INDEX idx_path_gist ON ${useCase === 'org_chart' ? 'employees' : useCase === 'file_paths' ? 'files' : useCase === 'taxonomy' ? 'species' : 'categories'} USING GIST (${useCase === 'org_chart' ? 'org_path' : useCase === 'taxonomy' ? 'taxonomy' : 'path'});
+CREATE INDEX idx_path_gist ON ${useCase === "org_chart" ? "employees" : useCase === "file_paths" ? "files" : useCase === "taxonomy" ? "species" : "categories"} USING GIST (${useCase === "org_chart" ? "org_path" : useCase === "taxonomy" ? "taxonomy" : "path"});
 \`\`\`
 
 ### 3. Insert Hierarchical Data
@@ -280,6 +287,6 @@ CREATE INDEX ON categories USING GIN (path);
 | Insert | Simple | Simple |
 
 **Pro Tip:** For ${useCase}, ltree queries are 10-100x faster than recursive CTEs for large hierarchies!`;
-        }
-    };
+    },
+  };
 }

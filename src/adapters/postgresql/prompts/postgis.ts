@@ -1,27 +1,35 @@
 /**
  * PostGIS Setup Prompt
- * 
+ *
  * Complete guide for setting up geospatial operations with PostGIS.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createSetupPostgisPrompt(): PromptDefinition {
-    return {
-        name: 'pg_setup_postgis',
-        description: 'Complete guide for setting up geospatial operations with PostGIS including spatial types, indexing, and queries.',
-        arguments: [
-            {
-                name: 'useCase',
-                description: 'Use case: mapping, distance_calc, spatial_analysis, routing',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const useCase = args['useCase'] ?? 'mapping';
+  return {
+    name: "pg_setup_postgis",
+    description:
+      "Complete guide for setting up geospatial operations with PostGIS including spatial types, indexing, and queries.",
+    arguments: [
+      {
+        name: "useCase",
+        description:
+          "Use case: mapping, distance_calc, spatial_analysis, routing",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const useCase = args["useCase"] ?? "mapping";
 
-            let content = `# PostGIS Setup Guide - ${useCase.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+      let content = `# PostGIS Setup Guide - ${useCase
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")}
 
 ## PostGIS Overview
 
@@ -45,13 +53,13 @@ SELECT PostGIS_Full_Version();
 **Geometry (Planar):** For local/regional mapping, uses projected coordinates
 **Geography (Spherical):** For global mapping, uses lat/lon (WGS84)
 
-**For ${useCase}:** Use ${useCase === 'mapping' || useCase === 'routing' ? 'Geography for global mapping' : 'Geometry for local analysis'}.
+**For ${useCase}:** Use ${useCase === "mapping" || useCase === "routing" ? "Geography for global mapping" : "Geometry for local analysis"}.
 
 ### 3. Create Spatial Table
 `;
 
-            if (useCase === 'mapping') {
-                content += `
+      if (useCase === "mapping") {
+        content += `
 \`\`\`sql
 CREATE TABLE locations (
     id SERIAL PRIMARY KEY,
@@ -65,8 +73,8 @@ INSERT INTO locations (name, location)
 VALUES ('San Francisco', ST_GeographyFromText('POINT(-122.4194 37.7749)'));
 \`\`\`
 `;
-            } else if (useCase === 'distance_calc') {
-                content += `
+      } else if (useCase === "distance_calc") {
+        content += `
 \`\`\`sql
 CREATE TABLE points_of_interest (
     id SERIAL PRIMARY KEY,
@@ -83,8 +91,8 @@ ORDER BY location <-> ST_GeographyFromText('POINT(-122.4194 37.7749)')
 LIMIT 10;
 \`\`\`
 `;
-            } else if (useCase === 'spatial_analysis') {
-                content += `
+      } else if (useCase === "spatial_analysis") {
+        content += `
 \`\`\`sql
 CREATE TABLE regions (
     id SERIAL PRIMARY KEY,
@@ -99,8 +107,8 @@ WHERE ST_Contains(r.boundary::geometry,
     ST_GeographyFromText('POINT(-122.4194 37.7749)')::geometry);
 \`\`\`
 `;
-            } else {
-                content += `
+      } else {
+        content += `
 \`\`\`sql
 CREATE TABLE roads (
     id SERIAL PRIMARY KEY,
@@ -116,9 +124,9 @@ WHERE ST_DWithin(geometry,
     ST_GeographyFromText('POINT(-122.4194 37.7749)'), 1000);
 \`\`\`
 `;
-            }
+      }
 
-            content += `
+      content += `
 ### 4. Create Spatial Index
 
 \`\`\`sql
@@ -194,7 +202,7 @@ FROM locations;
 
 **Pro Tip:** PostGIS is PostgreSQL's GIS superpower - it's the industry standard for spatial databases!`;
 
-            return content;
-        }
-    };
+      return content;
+    },
+  };
 }

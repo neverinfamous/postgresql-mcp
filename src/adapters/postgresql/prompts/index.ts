@@ -1,71 +1,90 @@
 /**
  * PostgreSQL MCP Prompts
- * 
+ *
  * AI-powered prompts for query building, schema design, and optimization.
  * 19 prompts total.
  */
 
-import type { PostgresAdapter } from '../PostgresAdapter.js';
-import type { PromptDefinition, RequestContext, ToolDefinition } from '../../../types/index.js';
+import type { PostgresAdapter } from "../PostgresAdapter.js";
+import type {
+  PromptDefinition,
+  RequestContext,
+  ToolDefinition,
+} from "../../../types/index.js";
 
 // Import modular prompts
-import { createDatabaseHealthCheckPrompt } from './health.js';
-import { createBackupStrategyPrompt } from './backup.js';
-import { createIndexTuningPrompt } from './indexTuning.js';
-import { createExtensionSetupPrompt } from './extensionSetup.js';
-import { createSetupPgvectorPrompt } from './pgvector.js';
-import { createSetupPostgisPrompt } from './postgis.js';
-import { createSetupPgcronPrompt } from './pgcron.js';
-import { createSetupPartmanPrompt } from './partman.js';
-import { createSetupKcachePrompt } from './kcache.js';
-import { createSetupCitextPrompt } from './citext.js';
-import { createSetupLtreePrompt } from './ltree.js';
-import { createSetupPgcryptoPrompt } from './pgcrypto.js';
+import { createDatabaseHealthCheckPrompt } from "./health.js";
+import { createBackupStrategyPrompt } from "./backup.js";
+import { createIndexTuningPrompt } from "./indexTuning.js";
+import { createExtensionSetupPrompt } from "./extensionSetup.js";
+import { createSetupPgvectorPrompt } from "./pgvector.js";
+import { createSetupPostgisPrompt } from "./postgis.js";
+import { createSetupPgcronPrompt } from "./pgcron.js";
+import { createSetupPartmanPrompt } from "./partman.js";
+import { createSetupKcachePrompt } from "./kcache.js";
+import { createSetupCitextPrompt } from "./citext.js";
+import { createSetupLtreePrompt } from "./ltree.js";
+import { createSetupPgcryptoPrompt } from "./pgcrypto.js";
 
 /**
  * Get all PostgreSQL prompts
  */
-export function getPostgresPrompts(adapter: PostgresAdapter): PromptDefinition[] {
-    const allToolDefinitions = adapter.getToolDefinitions();
-    return [
-        // Original prompts
-        createQueryBuilderPrompt(),
-        createSchemaDesignPrompt(),
-        createPerformanceAnalysisPrompt(),
-        createMigrationPrompt(),
-        createToolIndexPrompt(allToolDefinitions),
-        createQuickQueryPrompt(),
-        createQuickSchemaPrompt(),
-        // Migrated prompts from legacy postgres-mcp-server
-        createDatabaseHealthCheckPrompt(),
-        createBackupStrategyPrompt(),
-        createIndexTuningPrompt(),
-        createExtensionSetupPrompt(),
-        createSetupPgvectorPrompt(),
-        createSetupPostgisPrompt(),
-        // Extension setup prompts
-        createSetupPgcronPrompt(),
-        createSetupPartmanPrompt(),
-        createSetupKcachePrompt(),
-        createSetupCitextPrompt(),
-        createSetupLtreePrompt(),
-        createSetupPgcryptoPrompt()
-    ];
+export function getPostgresPrompts(
+  adapter: PostgresAdapter,
+): PromptDefinition[] {
+  const allToolDefinitions = adapter.getToolDefinitions();
+  return [
+    // Original prompts
+    createQueryBuilderPrompt(),
+    createSchemaDesignPrompt(),
+    createPerformanceAnalysisPrompt(),
+    createMigrationPrompt(),
+    createToolIndexPrompt(allToolDefinitions),
+    createQuickQueryPrompt(),
+    createQuickSchemaPrompt(),
+    // Migrated prompts from legacy postgres-mcp-server
+    createDatabaseHealthCheckPrompt(),
+    createBackupStrategyPrompt(),
+    createIndexTuningPrompt(),
+    createExtensionSetupPrompt(),
+    createSetupPgvectorPrompt(),
+    createSetupPostgisPrompt(),
+    // Extension setup prompts
+    createSetupPgcronPrompt(),
+    createSetupPartmanPrompt(),
+    createSetupKcachePrompt(),
+    createSetupCitextPrompt(),
+    createSetupLtreePrompt(),
+    createSetupPgcryptoPrompt(),
+  ];
 }
 
 function createQueryBuilderPrompt(): PromptDefinition {
-    return {
-        name: 'pg_query_builder',
-        description: 'Build a PostgreSQL query based on requirements. Specify tables and operation type.',
-        arguments: [
-            { name: 'tables', description: 'Comma-separated list of tables', required: true },
-            { name: 'operation', description: 'Operation type: SELECT, INSERT, UPDATE, DELETE, JOIN, CTE', required: true }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const tables = args['tables'] ?? '';
-            const operation = args['operation'] ?? '';
-            return `Please construct a PostgreSQL query for the following requirements:
+  return {
+    name: "pg_query_builder",
+    description:
+      "Build a PostgreSQL query based on requirements. Specify tables and operation type.",
+    arguments: [
+      {
+        name: "tables",
+        description: "Comma-separated list of tables",
+        required: true,
+      },
+      {
+        name: "operation",
+        description:
+          "Operation type: SELECT, INSERT, UPDATE, DELETE, JOIN, CTE",
+        required: true,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const tables = args["tables"] ?? "";
+      const operation = args["operation"] ?? "";
+      return `Please construct a PostgreSQL query for the following requirements:
 
 **Tables:** ${tables}
 **Operation:** ${operation}
@@ -79,26 +98,37 @@ Consider these PostgreSQL best practices:
 6. Use proper index hints if performance is critical
 
 Please provide the SQL query with explanations for each part.`;
-        }
-    };
+    },
+  };
 }
 
 function createSchemaDesignPrompt(): PromptDefinition {
-    return {
-        name: 'pg_schema_design',
-        description: 'Design a database schema for a given use case.',
-        arguments: [
-            { name: 'useCase', description: 'Description of the use case or domain', required: true },
-            { name: 'requirements', description: 'Specific requirements or constraints', required: false }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const useCase = args['useCase'] ?? '';
-            const requirements = args['requirements'] ?? '';
-            return `Please design a PostgreSQL database schema for the following use case:
+  return {
+    name: "pg_schema_design",
+    description: "Design a database schema for a given use case.",
+    arguments: [
+      {
+        name: "useCase",
+        description: "Description of the use case or domain",
+        required: true,
+      },
+      {
+        name: "requirements",
+        description: "Specific requirements or constraints",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const useCase = args["useCase"] ?? "";
+      const requirements = args["requirements"] ?? "";
+      return `Please design a PostgreSQL database schema for the following use case:
 
 **Use Case:** ${useCase}
-${requirements ? `**Requirements:** ${requirements}` : ''}
+${requirements ? `**Requirements:** ${requirements}` : ""}
 
 Consider these PostgreSQL-specific features:
 1. Use appropriate data types (JSONB for flexible data, UUID for IDs, TIMESTAMPTZ for dates)
@@ -114,28 +144,39 @@ Please provide:
 - Index recommendations
 - Constraint definitions
 - Any relevant views or functions`;
-        }
-    };
+    },
+  };
 }
 
 function createPerformanceAnalysisPrompt(): PromptDefinition {
-    return {
-        name: 'pg_performance_analysis',
-        description: 'Analyze a slow query and suggest optimizations.',
-        arguments: [
-            { name: 'query', description: 'The SQL query to analyze', required: true },
-            { name: 'context', description: 'Additional context (table sizes, current indexes, etc.)', required: false }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const query = args['query'] ?? '';
-            const context = args['context'] ?? '';
-            return `Please analyze this PostgreSQL query for performance issues:
+  return {
+    name: "pg_performance_analysis",
+    description: "Analyze a slow query and suggest optimizations.",
+    arguments: [
+      {
+        name: "query",
+        description: "The SQL query to analyze",
+        required: true,
+      },
+      {
+        name: "context",
+        description: "Additional context (table sizes, current indexes, etc.)",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const query = args["query"] ?? "";
+      const context = args["context"] ?? "";
+      return `Please analyze this PostgreSQL query for performance issues:
 
 \`\`\`sql
 ${query}
 \`\`\`
-${context ? `\n**Context:** ${context}` : ''}
+${context ? `\n**Context:** ${context}` : ""}
 
 Use these PostgreSQL tools to investigate:
 1. \`pg_explain_analyze\` - Get execution plan with timing
@@ -149,26 +190,33 @@ Please analyze and recommend:
 - Query rewrites
 - Configuration changes
 - Maintenance operations (VACUUM, ANALYZE)`;
-        }
-    };
+    },
+  };
 }
 
 function createMigrationPrompt(): PromptDefinition {
-    return {
-        name: 'pg_migration',
-        description: 'Generate a migration plan for a schema change.',
-        arguments: [
-            { name: 'change', description: 'Description of the change', required: true },
-            { name: 'table', description: 'Target table name', required: false }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const change = args['change'] ?? '';
-            const table = args['table'] ?? '';
-            return `Please create a PostgreSQL migration plan for:
+  return {
+    name: "pg_migration",
+    description: "Generate a migration plan for a schema change.",
+    arguments: [
+      {
+        name: "change",
+        description: "Description of the change",
+        required: true,
+      },
+      { name: "table", description: "Target table name", required: false },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const change = args["change"] ?? "";
+      const table = args["table"] ?? "";
+      return `Please create a PostgreSQL migration plan for:
 
 **Change:** ${change}
-${table ? `**Table:** ${table}` : ''}
+${table ? `**Table:** ${table}` : ""}
 
 Provide:
 1. **Up Migration** - SQL to apply the change
@@ -184,61 +232,73 @@ Use PostgreSQL-specific features like:
 - ALTER TABLE ... ADD COLUMN ... (with DEFAULT for non-nullable)
 - CREATE INDEX CONCURRENTLY
 - Transaction wrappers where appropriate`;
-        }
-    };
+    },
+  };
 }
 
 function createToolIndexPrompt(tools: ToolDefinition[]): PromptDefinition {
-    return {
-        name: 'pg_tool_index',
-        description: 'Get a compact index of all available PostgreSQL tools for discovery.',
-        arguments: [],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (_args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const grouped = new Map<string, { name: string; desc: string }[]>();
+  return {
+    name: "pg_tool_index",
+    description:
+      "Get a compact index of all available PostgreSQL tools for discovery.",
+    arguments: [],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      _args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const grouped = new Map<string, { name: string; desc: string }[]>();
 
-            for (const tool of tools) {
-                const group = tool.group;
-                const groupTools = grouped.get(group) ?? [];
-                const firstSentence = tool.description.split('.')[0] ?? tool.description;
-                groupTools.push({
-                    name: tool.name,
-                    desc: firstSentence
-                });
-                grouped.set(group, groupTools);
-            }
+      for (const tool of tools) {
+        const group = tool.group;
+        const groupTools = grouped.get(group) ?? [];
+        const firstSentence =
+          tool.description.split(".")[0] ?? tool.description;
+        groupTools.push({
+          name: tool.name,
+          desc: firstSentence,
+        });
+        grouped.set(group, groupTools);
+      }
 
-            const lines: string[] = [
-                `# PostgreSQL MCP Tools (${String(tools.length)} total)`,
-                '',
-                'Use specific tool names when needed. Ask for details about any tool.',
-                ''
-            ];
+      const lines: string[] = [
+        `# PostgreSQL MCP Tools (${String(tools.length)} total)`,
+        "",
+        "Use specific tool names when needed. Ask for details about any tool.",
+        "",
+      ];
 
-            for (const [group, groupTools] of grouped) {
-                lines.push(`## ${group} (${String(groupTools.length)})`);
-                for (const t of groupTools) {
-                    lines.push(`- \`${t.name}\`: ${t.desc}`);
-                }
-                lines.push('');
-            }
-
-            return lines.join('\n');
+      for (const [group, groupTools] of grouped) {
+        lines.push(`## ${group} (${String(groupTools.length)})`);
+        for (const t of groupTools) {
+          lines.push(`- \`${t.name}\`: ${t.desc}`);
         }
-    };
+        lines.push("");
+      }
+
+      return lines.join("\n");
+    },
+  };
 }
 
 function createQuickQueryPrompt(): PromptDefinition {
-    return {
-        name: 'pg_quick_query',
-        description: 'Quick SQL query guidance for common operations.',
-        arguments: [
-            { name: 'action', description: 'What you want to do (e.g., "find users by email")', required: true }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const action = args['action'] ?? '';
-            return `To "${action}" in PostgreSQL, use:
+  return {
+    name: "pg_quick_query",
+    description: "Quick SQL query guidance for common operations.",
+    arguments: [
+      {
+        name: "action",
+        description: 'What you want to do (e.g., "find users by email")',
+        required: true,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const action = args["action"] ?? "";
+      return `To "${action}" in PostgreSQL, use:
 
 **Tool:** \`pg_read_query\` for SELECT, \`pg_write_query\` for INSERT/UPDATE/DELETE
 
@@ -254,18 +314,21 @@ DELETE FROM table_name WHERE condition = $1 RETURNING *;
 \`\`\`
 
 Provide your specific requirements and I'll help construct the exact query.`;
-        }
-    };
+    },
+  };
 }
 
 function createQuickSchemaPrompt(): PromptDefinition {
-    return {
-        name: 'pg_quick_schema',
-        description: 'Quick reference for exploring database schema.',
-        arguments: [],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (_args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            return `# Quick Schema Exploration
+  return {
+    name: "pg_quick_schema",
+    description: "Quick reference for exploring database schema.",
+    arguments: [],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      _args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      return `# Quick Schema Exploration
 
 **List all tables:**
 \`pg_list_tables\`
@@ -286,6 +349,6 @@ Access resource: \`postgres://schema\`
 Access resource: \`postgres://stats\`
 
 What would you like to explore?`;
-        }
-    };
+    },
+  };
 }

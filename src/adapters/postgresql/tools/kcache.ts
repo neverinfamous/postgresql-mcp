@@ -1,27 +1,27 @@
 /**
  * PostgreSQL pg_stat_kcache Extension Tools
- * 
+ *
  * OS-level performance visibility: CPU, memory, and I/O statistics per query.
  * 7 tools total.
- * 
+ *
  * pg_stat_kcache extends pg_stat_statements with kernel-level resource metrics:
  * - CPU time (user and system)
  * - Filesystem reads/writes
  * - Page faults (memory pressure indicators)
- * 
+ *
  * Requires pg_stat_statements to be installed.
  */
 
-import type { PostgresAdapter } from '../PostgresAdapter.js';
-import type { ToolDefinition, RequestContext } from '../../../types/index.js';
-import { z } from 'zod';
-import { readOnly, write, destructive } from '../../../utils/annotations.js';
-import { getToolIcons } from '../../../utils/icons.js';
+import type { PostgresAdapter } from "../PostgresAdapter.js";
+import type { ToolDefinition, RequestContext } from "../../../types/index.js";
+import { z } from "zod";
+import { readOnly, write, destructive } from "../../../utils/annotations.js";
+import { getToolIcons } from "../../../utils/icons.js";
 import {
-    KcacheQueryStatsSchema,
-    KcacheDatabaseStatsSchema,
-    KcacheResourceAnalysisSchema
-} from '../schemas/index.js';
+  KcacheQueryStatsSchema,
+  KcacheDatabaseStatsSchema,
+  KcacheResourceAnalysisSchema,
+} from "../schemas/index.js";
 
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
@@ -30,141 +30,146 @@ const defaultToEmpty = (val: unknown): unknown => val ?? {};
  * Column naming in pg_stat_kcache changed in version 2.2:
  * - Old (< 2.2): user_time, system_time, reads, writes
  * - New (>= 2.2): exec_user_time, exec_system_time, exec_reads, exec_writes
- * 
+ *
  * IMPORTANT: The pg_stat_kcache() FUNCTION returns columns like exec_reads (bytes).
  * The pg_stat_kcache VIEW has different columns like exec_reads_blks.
  * This helper returns column names for the FUNCTION (used with queryid joins).
  */
 interface KcacheColumns {
-    userTime: string;
-    systemTime: string;
-    reads: string;  // bytes (not blocks!)
-    writes: string; // bytes (not blocks!)
-    minflts: string;
-    majflts: string;
+  userTime: string;
+  systemTime: string;
+  reads: string; // bytes (not blocks!)
+  writes: string; // bytes (not blocks!)
+  minflts: string;
+  majflts: string;
 }
 
-async function getKcacheColumnNames(adapter: PostgresAdapter): Promise<KcacheColumns> {
-    const result = await adapter.executeQuery(`
+async function getKcacheColumnNames(
+  adapter: PostgresAdapter,
+): Promise<KcacheColumns> {
+  const result = await adapter.executeQuery(`
         SELECT column_name FROM information_schema.columns 
         WHERE table_name = 'pg_stat_kcache' AND column_name = 'exec_user_time'
     `);
-    const isNewVersion = (result.rows?.length ?? 0) > 0;
+  const isNewVersion = (result.rows?.length ?? 0) > 0;
 
-    if (isNewVersion) {
-        return {
-            userTime: 'exec_user_time',
-            systemTime: 'exec_system_time',
-            reads: 'exec_reads',      // function returns bytes, not blocks
-            writes: 'exec_writes',    // function returns bytes, not blocks
-            minflts: 'exec_minflts',
-            majflts: 'exec_majflts'
-        };
-    }
+  if (isNewVersion) {
     return {
-        userTime: 'user_time',
-        systemTime: 'system_time',
-        reads: 'reads',
-        writes: 'writes',
-        minflts: 'minflts',
-        majflts: 'majflts'
+      userTime: "exec_user_time",
+      systemTime: "exec_system_time",
+      reads: "exec_reads", // function returns bytes, not blocks
+      writes: "exec_writes", // function returns bytes, not blocks
+      minflts: "exec_minflts",
+      majflts: "exec_majflts",
     };
+  }
+  return {
+    userTime: "user_time",
+    systemTime: "system_time",
+    reads: "reads",
+    writes: "writes",
+    minflts: "minflts",
+    majflts: "majflts",
+  };
 }
 
 /**
  * Get all pg_stat_kcache tools
  */
 export function getKcacheTools(adapter: PostgresAdapter): ToolDefinition[] {
-    return [
-        createKcacheExtensionTool(adapter),
-        createKcacheQueryStatsTool(adapter),
-        createKcacheTopCpuTool(adapter),
-        createKcacheTopIoTool(adapter),
-        createKcacheDatabaseStatsTool(adapter),
-        createKcacheResourceAnalysisTool(adapter),
-        createKcacheResetTool(adapter)
-    ];
+  return [
+    createKcacheExtensionTool(adapter),
+    createKcacheQueryStatsTool(adapter),
+    createKcacheTopCpuTool(adapter),
+    createKcacheTopIoTool(adapter),
+    createKcacheDatabaseStatsTool(adapter),
+    createKcacheResourceAnalysisTool(adapter),
+    createKcacheResetTool(adapter),
+  ];
 }
 
 /**
  * Enable the pg_stat_kcache extension
  */
 function createKcacheExtensionTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_kcache_create_extension',
-        description: `Enable the pg_stat_kcache extension for OS-level performance metrics. 
+  return {
+    name: "pg_kcache_create_extension",
+    description: `Enable the pg_stat_kcache extension for OS-level performance metrics. 
 Requires pg_stat_statements to be installed first. Both extensions must be in shared_preload_libraries.`,
-        group: 'kcache',
-        inputSchema: z.object({}),
-        annotations: write('Create Kcache Extension'),
-        icons: getToolIcons('kcache', write('Create Kcache Extension')),
-        handler: async (_params: unknown, _context: RequestContext) => {
-            const statementsCheck = await adapter.executeQuery(`
+    group: "kcache",
+    inputSchema: z.object({}),
+    annotations: write("Create Kcache Extension"),
+    icons: getToolIcons("kcache", write("Create Kcache Extension")),
+    handler: async (_params: unknown, _context: RequestContext) => {
+      const statementsCheck = await adapter.executeQuery(`
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'pg_stat_statements'
                 ) as installed
             `);
 
-            const hasStatements = statementsCheck.rows?.[0]?.['installed'] as boolean ?? false;
-            if (!hasStatements) {
-                return {
-                    success: false,
-                    error: 'pg_stat_statements must be installed before pg_stat_kcache',
-                    hint: 'Run: CREATE EXTENSION IF NOT EXISTS pg_stat_statements'
-                };
-            }
+      const hasStatements =
+        (statementsCheck.rows?.[0]?.["installed"] as boolean) ?? false;
+      if (!hasStatements) {
+        return {
+          success: false,
+          error: "pg_stat_statements must be installed before pg_stat_kcache",
+          hint: "Run: CREATE EXTENSION IF NOT EXISTS pg_stat_statements",
+        };
+      }
 
-            await adapter.executeQuery('CREATE EXTENSION IF NOT EXISTS pg_stat_kcache');
-            return {
-                success: true,
-                message: 'pg_stat_kcache extension enabled',
-                note: 'Ensure pg_stat_kcache is in shared_preload_libraries for full functionality'
-            };
-        }
-    };
+      await adapter.executeQuery(
+        "CREATE EXTENSION IF NOT EXISTS pg_stat_kcache",
+      );
+      return {
+        success: true,
+        message: "pg_stat_kcache extension enabled",
+        note: "Ensure pg_stat_kcache is in shared_preload_libraries for full functionality",
+      };
+    },
+  };
 }
 
 /**
  * Query stats with CPU/IO metrics joined from pg_stat_statements
  */
 function createKcacheQueryStatsTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_kcache_query_stats',
-        description: `Get query statistics with OS-level CPU and I/O metrics. 
+  return {
+    name: "pg_kcache_query_stats",
+    description: `Get query statistics with OS-level CPU and I/O metrics. 
 Joins pg_stat_statements with pg_stat_kcache to show what SQL did AND what system resources it consumed.
 
 orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minCalls parameter to filter by call count.`,
-        group: 'kcache',
-        inputSchema: KcacheQueryStatsSchema,
-        annotations: readOnly('Kcache Query Stats'),
-        icons: getToolIcons('kcache', readOnly('Kcache Query Stats')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { limit, orderBy, minCalls } = KcacheQueryStatsSchema.parse(params);
-            const cols = await getKcacheColumnNames(adapter);
+    group: "kcache",
+    inputSchema: KcacheQueryStatsSchema,
+    annotations: readOnly("Kcache Query Stats"),
+    icons: getToolIcons("kcache", readOnly("Kcache Query Stats")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { limit, orderBy, minCalls } = KcacheQueryStatsSchema.parse(params);
+      const cols = await getKcacheColumnNames(adapter);
 
-            const limitVal = limit ?? 25;
-            const orderColumn = orderBy === 'cpu_time'
-                ? `(k.${cols.userTime} + k.${cols.systemTime})`
-                : orderBy === 'reads'
-                    ? `k.${cols.reads}`
-                    : orderBy === 'writes'
-                        ? `k.${cols.writes}`
-                        : 's.total_exec_time';
+      const limitVal = limit ?? 25;
+      const orderColumn =
+        orderBy === "cpu_time"
+          ? `(k.${cols.userTime} + k.${cols.systemTime})`
+          : orderBy === "reads"
+            ? `k.${cols.reads}`
+            : orderBy === "writes"
+              ? `k.${cols.writes}`
+              : "s.total_exec_time";
 
-            const conditions: string[] = [];
-            const queryParams: unknown[] = [];
-            let paramIndex = 1;
+      const conditions: string[] = [];
+      const queryParams: unknown[] = [];
+      let paramIndex = 1;
 
-            if (minCalls !== undefined) {
-                conditions.push(`s.calls >= $${String(paramIndex++)}`);
-                queryParams.push(minCalls);
-            }
+      if (minCalls !== undefined) {
+        conditions.push(`s.calls >= $${String(paramIndex++)}`);
+        queryParams.push(minCalls);
+      }
 
-            const whereClause = conditions.length > 0
-                ? `WHERE ${conditions.join(' AND ')}`
-                : '';
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-            const sql = `
+      const sql = `
                 SELECT 
                     s.queryid,
                     LEFT(s.query, 100) as query_preview,
@@ -189,40 +194,45 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
                 LIMIT ${String(limitVal)}
             `;
 
-            const result = await adapter.executeQuery(sql, queryParams);
+      const result = await adapter.executeQuery(sql, queryParams);
 
-            return {
-                queries: result.rows ?? [],
-                count: result.rows?.length ?? 0,
-                orderBy: orderBy ?? 'total_time'
-            };
-        }
-    };
+      return {
+        queries: result.rows ?? [],
+        count: result.rows?.length ?? 0,
+        orderBy: orderBy ?? "total_time",
+      };
+    },
+  };
 }
 
 /**
  * Top CPU-consuming queries
  */
 function createKcacheTopCpuTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_kcache_top_cpu',
-        description: `Get top CPU-consuming queries. Shows which queries spend the most time 
+  return {
+    name: "pg_kcache_top_cpu",
+    description: `Get top CPU-consuming queries. Shows which queries spend the most time 
 in user CPU (application code) vs system CPU (kernel operations).`,
-        group: 'kcache',
-        inputSchema: z.preprocess(
-            defaultToEmpty,
-            z.object({
-                limit: z.number().optional().describe('Number of top queries to return (default: 10)')
-            })
-        ),
-        annotations: readOnly('Kcache Top CPU'),
-        icons: getToolIcons('kcache', readOnly('Kcache Top CPU')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = z.object({ limit: z.number().optional() }).parse(params ?? {});
-            const limitVal = parsed.limit ?? 10;
-            const cols = await getKcacheColumnNames(adapter);
+    group: "kcache",
+    inputSchema: z.preprocess(
+      defaultToEmpty,
+      z.object({
+        limit: z
+          .number()
+          .optional()
+          .describe("Number of top queries to return (default: 10)"),
+      }),
+    ),
+    annotations: readOnly("Kcache Top CPU"),
+    icons: getToolIcons("kcache", readOnly("Kcache Top CPU")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const parsed = z
+        .object({ limit: z.number().optional() })
+        .parse(params ?? {});
+      const limitVal = parsed.limit ?? 10;
+      const cols = await getKcacheColumnNames(adapter);
 
-            const sql = `
+      const sql = `
                 SELECT 
                     s.queryid,
                     LEFT(s.query, 100) as query_preview,
@@ -250,69 +260,79 @@ in user CPU (application code) vs system CPU (kernel operations).`,
                 LIMIT ${String(limitVal)}
             `;
 
-            const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(sql);
 
-            return {
-                topCpuQueries: result.rows ?? [],
-                count: result.rows?.length ?? 0,
-                description: 'Queries ranked by total CPU time (user + system)'
-            };
-        }
-    };
+      return {
+        topCpuQueries: result.rows ?? [],
+        count: result.rows?.length ?? 0,
+        description: "Queries ranked by total CPU time (user + system)",
+      };
+    },
+  };
 }
 
 /**
  * Top I/O-consuming queries
  */
 function createKcacheTopIoTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_kcache_top_io',
-        description: `Get top I/O-consuming queries. Shows filesystem-level reads and writes, 
+  return {
+    name: "pg_kcache_top_io",
+    description: `Get top I/O-consuming queries. Shows filesystem-level reads and writes, 
 which represent actual disk access (not just shared buffer hits).`,
-        group: 'kcache',
-        inputSchema: z.preprocess(
-            (input) => {
-                const obj = defaultToEmpty(input) as Record<string, unknown>;
-                // Alias: ioType -> type
-                if (obj['ioType'] !== undefined && obj['type'] === undefined) {
-                    obj['type'] = obj['ioType'];
-                }
-                return obj;
-            },
-            z.object({
-                type: z.enum(['reads', 'writes', 'both']).optional()
-                    .describe('I/O type to rank by (default: both)'),
-                ioType: z.enum(['reads', 'writes', 'both']).optional()
-                    .describe('Alias for type'),
-                limit: z.number().optional().describe('Number of top queries to return (default: 10)')
-            })
-        ),
-        annotations: readOnly('Kcache Top IO'),
-        icons: getToolIcons('kcache', readOnly('Kcache Top IO')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            // Apply the same preprocessing as inputSchema
-            const preprocessed = (() => {
-                const obj = (params ?? {}) as Record<string, unknown>;
-                if (obj['ioType'] !== undefined && obj['type'] === undefined) {
-                    return { ...obj, type: obj['ioType'] };
-                }
-                return obj;
-            })();
-            const parsed = z.object({
-                type: z.enum(['reads', 'writes', 'both']).optional(),
-                limit: z.number().optional()
-            }).parse(preprocessed);
-            const ioType = parsed.type ?? 'both';
-            const limitVal = parsed.limit ?? 10;
-            const cols = await getKcacheColumnNames(adapter);
+    group: "kcache",
+    inputSchema: z.preprocess(
+      (input) => {
+        const obj = defaultToEmpty(input) as Record<string, unknown>;
+        // Alias: ioType -> type
+        if (obj["ioType"] !== undefined && obj["type"] === undefined) {
+          obj["type"] = obj["ioType"];
+        }
+        return obj;
+      },
+      z.object({
+        type: z
+          .enum(["reads", "writes", "both"])
+          .optional()
+          .describe("I/O type to rank by (default: both)"),
+        ioType: z
+          .enum(["reads", "writes", "both"])
+          .optional()
+          .describe("Alias for type"),
+        limit: z
+          .number()
+          .optional()
+          .describe("Number of top queries to return (default: 10)"),
+      }),
+    ),
+    annotations: readOnly("Kcache Top IO"),
+    icons: getToolIcons("kcache", readOnly("Kcache Top IO")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      // Apply the same preprocessing as inputSchema
+      const preprocessed = (() => {
+        const obj = (params ?? {}) as Record<string, unknown>;
+        if (obj["ioType"] !== undefined && obj["type"] === undefined) {
+          return { ...obj, type: obj["ioType"] };
+        }
+        return obj;
+      })();
+      const parsed = z
+        .object({
+          type: z.enum(["reads", "writes", "both"]).optional(),
+          limit: z.number().optional(),
+        })
+        .parse(preprocessed);
+      const ioType = parsed.type ?? "both";
+      const limitVal = parsed.limit ?? 10;
+      const cols = await getKcacheColumnNames(adapter);
 
-            const orderColumn = ioType === 'reads'
-                ? `k.${cols.reads}`
-                : ioType === 'writes'
-                    ? `k.${cols.writes}`
-                    : `(k.${cols.reads} + k.${cols.writes})`;
+      const orderColumn =
+        ioType === "reads"
+          ? `k.${cols.reads}`
+          : ioType === "writes"
+            ? `k.${cols.writes}`
+            : `(k.${cols.reads} + k.${cols.writes})`;
 
-            const sql = `
+      const sql = `
                 SELECT 
                     s.queryid,
                     LEFT(s.query, 100) as query_preview,
@@ -332,39 +352,41 @@ which represent actual disk access (not just shared buffer hits).`,
                 LIMIT ${String(limitVal)}
             `;
 
-            const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(sql);
 
-            return {
-                topIoQueries: result.rows ?? [],
-                count: result.rows?.length ?? 0,
-                ioType,
-                description: `Queries ranked by ${ioType === 'both' ? 'total I/O' : ioType}`
-            };
-        }
-    };
+      return {
+        topIoQueries: result.rows ?? [],
+        count: result.rows?.length ?? 0,
+        ioType,
+        description: `Queries ranked by ${ioType === "both" ? "total I/O" : ioType}`,
+      };
+    },
+  };
 }
 
 /**
  * Database-level aggregated stats
  */
-function createKcacheDatabaseStatsTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_kcache_database_stats',
-        description: `Get aggregated OS-level statistics for a database. 
+function createKcacheDatabaseStatsTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  return {
+    name: "pg_kcache_database_stats",
+    description: `Get aggregated OS-level statistics for a database. 
 Shows total CPU time, I/O, and page faults across all queries.`,
-        group: 'kcache',
-        inputSchema: KcacheDatabaseStatsSchema,
-        annotations: readOnly('Kcache Database Stats'),
-        icons: getToolIcons('kcache', readOnly('Kcache Database Stats')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { database } = KcacheDatabaseStatsSchema.parse(params);
-            const cols = await getKcacheColumnNames(adapter);
+    group: "kcache",
+    inputSchema: KcacheDatabaseStatsSchema,
+    annotations: readOnly("Kcache Database Stats"),
+    icons: getToolIcons("kcache", readOnly("Kcache Database Stats")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { database } = KcacheDatabaseStatsSchema.parse(params);
+      const cols = await getKcacheColumnNames(adapter);
 
-            let sql: string;
-            const queryParams: unknown[] = [];
+      let sql: string;
+      const queryParams: unknown[] = [];
 
-            if (database !== undefined) {
-                sql = `
+      if (database !== undefined) {
+        sql = `
                     SELECT 
                         d.datname as database,
                         SUM(k.${cols.userTime}) as total_user_time,
@@ -382,9 +404,9 @@ Shows total CPU time, I/O, and page faults across all queries.`,
                     WHERE d.datname = $1
                     GROUP BY d.datname
                 `;
-                queryParams.push(database);
-            } else {
-                sql = `
+        queryParams.push(database);
+      } else {
+        sql = `
                     SELECT 
                         datname as database,
                         SUM(${cols.userTime}) as total_user_time,
@@ -401,52 +423,56 @@ Shows total CPU time, I/O, and page faults across all queries.`,
                     GROUP BY datname
                     ORDER BY SUM(${cols.userTime} + ${cols.systemTime}) DESC
                 `;
-            }
+      }
 
-            const result = await adapter.executeQuery(sql, queryParams);
+      const result = await adapter.executeQuery(sql, queryParams);
 
-            return {
-                databaseStats: result.rows ?? [],
-                count: result.rows?.length ?? 0
-            };
-        }
-    };
+      return {
+        databaseStats: result.rows ?? [],
+        count: result.rows?.length ?? 0,
+      };
+    },
+  };
 }
 
 /**
  * Classify queries as CPU-bound vs I/O-bound
  */
-function createKcacheResourceAnalysisTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_kcache_resource_analysis',
-        description: `Analyze queries to classify them as CPU-bound, I/O-bound, or balanced.
+function createKcacheResourceAnalysisTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  return {
+    name: "pg_kcache_resource_analysis",
+    description: `Analyze queries to classify them as CPU-bound, I/O-bound, or balanced.
 Helps identify the root cause of performance issues - is the query computation-heavy or disk-heavy?`,
-        group: 'kcache',
-        inputSchema: KcacheResourceAnalysisSchema,
-        annotations: readOnly('Kcache Resource Analysis'),
-        icons: getToolIcons('kcache', readOnly('Kcache Resource Analysis')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { queryId, threshold, limit } = KcacheResourceAnalysisSchema.parse(params);
-            const thresholdVal = threshold ?? 0.5;
-            const limitVal = limit ?? 50;
-            const cols = await getKcacheColumnNames(adapter);
+    group: "kcache",
+    inputSchema: KcacheResourceAnalysisSchema,
+    annotations: readOnly("Kcache Resource Analysis"),
+    icons: getToolIcons("kcache", readOnly("Kcache Resource Analysis")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { queryId, threshold, limit } =
+        KcacheResourceAnalysisSchema.parse(params);
+      const thresholdVal = threshold ?? 0.5;
+      const limitVal = limit ?? 50;
+      const cols = await getKcacheColumnNames(adapter);
 
-            const conditions: string[] = [];
-            const queryParams: unknown[] = [];
-            let paramIndex = 1;
+      const conditions: string[] = [];
+      const queryParams: unknown[] = [];
+      let paramIndex = 1;
 
-            if (queryId !== undefined) {
-                conditions.push(`s.queryid::text = $${String(paramIndex++)}`);
-                queryParams.push(queryId);
-            }
+      if (queryId !== undefined) {
+        conditions.push(`s.queryid::text = $${String(paramIndex++)}`);
+        queryParams.push(queryId);
+      }
 
-            conditions.push(`(k.${cols.userTime} + k.${cols.systemTime} + k.${cols.reads} + k.${cols.writes}) > 0`);
+      conditions.push(
+        `(k.${cols.userTime} + k.${cols.systemTime} + k.${cols.reads} + k.${cols.writes}) > 0`,
+      );
 
-            const whereClause = conditions.length > 0
-                ? `WHERE ${conditions.join(' AND ')}`
-                : '';
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-            const sql = `
+      const sql = `
                 WITH query_metrics AS (
                     SELECT 
                         s.queryid,
@@ -493,56 +519,62 @@ Helps identify the root cause of performance issues - is the query computation-h
                 LIMIT ${String(limitVal)}
             `;
 
-            const result = await adapter.executeQuery(sql, queryParams);
-            const rows = result.rows ?? [];
+      const result = await adapter.executeQuery(sql, queryParams);
+      const rows = result.rows ?? [];
 
-            const cpuBound = rows.filter((r: Record<string, unknown>) =>
-                r['resource_classification'] === 'CPU-bound').length;
-            const ioBound = rows.filter((r: Record<string, unknown>) =>
-                r['resource_classification'] === 'I/O-bound').length;
-            const balanced = rows.filter((r: Record<string, unknown>) =>
-                r['resource_classification'] === 'Balanced').length;
+      const cpuBound = rows.filter(
+        (r: Record<string, unknown>) =>
+          r["resource_classification"] === "CPU-bound",
+      ).length;
+      const ioBound = rows.filter(
+        (r: Record<string, unknown>) =>
+          r["resource_classification"] === "I/O-bound",
+      ).length;
+      const balanced = rows.filter(
+        (r: Record<string, unknown>) =>
+          r["resource_classification"] === "Balanced",
+      ).length;
 
-            return {
-                queries: rows,
-                count: rows.length,
-                summary: {
-                    cpuBound,
-                    ioBound,
-                    balanced,
-                    threshold: thresholdVal
-                },
-                recommendations: [
-                    cpuBound > ioBound
-                        ? 'Most resource-intensive queries are CPU-bound. Consider query optimization or more CPU resources.'
-                        : ioBound > cpuBound
-                            ? 'Most resource-intensive queries are I/O-bound. Consider more memory, faster storage, or better indexing.'
-                            : 'Resource usage is balanced between CPU and I/O.'
-                ]
-            };
-        }
-    };
+      return {
+        queries: rows,
+        count: rows.length,
+        summary: {
+          cpuBound,
+          ioBound,
+          balanced,
+          threshold: thresholdVal,
+        },
+        recommendations: [
+          cpuBound > ioBound
+            ? "Most resource-intensive queries are CPU-bound. Consider query optimization or more CPU resources."
+            : ioBound > cpuBound
+              ? "Most resource-intensive queries are I/O-bound. Consider more memory, faster storage, or better indexing."
+              : "Resource usage is balanced between CPU and I/O.",
+        ],
+      };
+    },
+  };
 }
 
 /**
  * Reset kcache statistics
  */
 function createKcacheResetTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_kcache_reset',
-        description: `Reset pg_stat_kcache statistics. Use this to start fresh measurements. 
+  return {
+    name: "pg_kcache_reset",
+    description: `Reset pg_stat_kcache statistics. Use this to start fresh measurements. 
 Note: This also resets pg_stat_statements statistics.`,
-        group: 'kcache',
-        inputSchema: z.object({}),
-        annotations: destructive('Reset Kcache Stats'),
-        icons: getToolIcons('kcache', destructive('Reset Kcache Stats')),
-        handler: async (_params: unknown, _context: RequestContext) => {
-            await adapter.executeQuery('SELECT pg_stat_kcache_reset()');
-            return {
-                success: true,
-                message: 'pg_stat_kcache statistics reset',
-                note: 'pg_stat_statements statistics were also reset'
-            };
-        }
-    };
+    group: "kcache",
+    inputSchema: z.object({}),
+    annotations: destructive("Reset Kcache Stats"),
+    icons: getToolIcons("kcache", destructive("Reset Kcache Stats")),
+    handler: async (_params: unknown, _context: RequestContext) => {
+      await adapter.executeQuery("SELECT pg_stat_kcache_reset()");
+      return {
+        success: true,
+        message: "pg_stat_kcache statistics reset",
+        note: "pg_stat_statements statistics were also reset",
+      };
+    },
+  };
 }

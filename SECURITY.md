@@ -39,33 +39,39 @@ If you discover a security vulnerability, please report it by emailing **admin@a
 ### SQL Injection Prevention
 
 **Identifier Sanitization** (`src/utils/identifiers.ts`)
+
 - All table, column, schema, and index names are validated and quoted
 - PostgreSQL identifier rules enforced: start with letter/underscore, contain only alphanumerics, underscores, or $ signs
 - Maximum 63-character limit enforced
 - Invalid identifiers throw `InvalidIdentifierError`
 
 Key functions:
+
 - `sanitizeIdentifier(name)` — Validates and double-quotes an identifier
 - `sanitizeTableName(table, schema?)` — Handles schema-qualified table references
 - `sanitizeColumnRef(column, table?)` — Handles column references with optional table qualifier
 - `sanitizeIdentifiers(names[])` — Batch sanitization for column lists
 
 **Parameterized Queries**
+
 - All user-provided values use parameterized queries via `pg` library
 - Identifier sanitization complements parameterized values
 
 ### HTTP Transport Security
 
 **Rate Limiting** (enabled by default)
+
 - 100 requests per minute per IP address
 - Configurable via `rateLimitMaxRequests` and `rateLimitWindowMs`
 - Returns `429 Too Many Requests` when exceeded
 
 **Request Body Limits**
+
 - Maximum 1MB request body (configurable via `maxBodySize`)
 - Prevents memory exhaustion attacks
 
 **Security Headers**
+
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `X-XSS-Protection: 1; mode=block`
@@ -73,10 +79,12 @@ Key functions:
 - `Content-Security-Policy: default-src 'none'`
 
 **HSTS Support**
+
 - Optional `Strict-Transport-Security` header for HTTPS deployments
 - Enable via `enableHSTS: true` configuration
 
 **CORS Configuration**
+
 - Origin whitelist with `Vary: Origin` header for caching
 - Optional credentials support (`corsAllowCredentials`)
 - MCP-specific headers allowed (`X-Session-ID`, `mcp-session-id`)
@@ -91,10 +99,12 @@ Key functions:
 ### Logging Security
 
 **Credential Redaction**
+
 - Sensitive fields automatically redacted in logs: `password`, `secret`, `token`, `apikey`, `issuer`, `audience`, `jwksUri`, `credentials`, etc.
 - Recursive sanitization for nested objects
 
 **Log Injection Prevention**
+
 - Control character sanitization (ASCII 0x00-0x1F except tab/newline, 0x7F, C1 characters)
 - Prevents log forging and escape sequence attacks
 

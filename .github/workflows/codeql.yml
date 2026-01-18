@@ -2,16 +2,16 @@ name: "CodeQL Analysis"
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
     paths:
-      - '**.js'
-      - '**.ts'
-      - '**.tsx'
-      - 'package.json'
+      - "**.js"
+      - "**.ts"
+      - "**.tsx"
+      - "package.json"
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
   schedule:
-    - cron: '0 0 * * 1'
+    - cron: "0 0 * * 1"
   workflow_dispatch:
 
 jobs:
@@ -24,14 +24,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript-typescript' ]
+        language: ["javascript-typescript"]
     steps:
-    - uses: actions/checkout@v6
-    - uses: github/codeql-action/init@v4
-      with:
-        languages: ${{ matrix.language }}
-        queries: security-extended,security-and-quality
-    - uses: github/codeql-action/autobuild@v4
-    - uses: github/codeql-action/analyze@v4
-      with:
-        category: "/language:${{matrix.language}}"
+      - uses: actions/checkout@v6
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{matrix.language}}"

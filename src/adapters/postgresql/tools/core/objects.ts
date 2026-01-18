@@ -1,79 +1,104 @@
 /**
  * PostgreSQL Core Tools - Object Operations
- * 
+ *
  * List and describe database objects (tables, views, functions, etc.).
  */
 
-import type { PostgresAdapter } from '../../PostgresAdapter.js';
-import type { ToolDefinition, RequestContext } from '../../../../types/index.js';
-import { readOnly } from '../../../../utils/annotations.js';
-import { getToolIcons } from '../../../../utils/icons.js';
-import { ListObjectsSchema, ObjectDetailsSchema } from './schemas.js';
+import type { PostgresAdapter } from "../../PostgresAdapter.js";
+import type {
+  ToolDefinition,
+  RequestContext,
+} from "../../../../types/index.js";
+import { readOnly } from "../../../../utils/annotations.js";
+import { getToolIcons } from "../../../../utils/icons.js";
+import { ListObjectsSchema, ObjectDetailsSchema } from "./schemas.js";
 
 /**
  * List database objects
  */
-export function createListObjectsTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_list_objects',
-        description: 'List database objects filtered by type. Use type: "table" (singular) or types: ["table","view"] (array). Supports: table, view, materialized_view, function, procedure, sequence, index, trigger.',
-        group: 'core',
-        annotations: readOnly('List Objects'),
-        icons: getToolIcons('core', readOnly('List Objects')),
-        inputSchema: ListObjectsSchema,
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { schema, types, limit } = ListObjectsSchema.parse(params);
+export function createListObjectsTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  return {
+    name: "pg_list_objects",
+    description:
+      'List database objects filtered by type. Use type: "table" (singular) or types: ["table","view"] (array). Supports: table, view, materialized_view, function, procedure, sequence, index, trigger.',
+    group: "core",
+    annotations: readOnly("List Objects"),
+    icons: getToolIcons("core", readOnly("List Objects")),
+    inputSchema: ListObjectsSchema,
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { schema, types, limit } = ListObjectsSchema.parse(params);
 
-            const schemaFilter = schema
-                ? `AND n.nspname = '${schema}'`
-                : `AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')`;
+      const schemaFilter = schema
+        ? `AND n.nspname = '${schema}'`
+        : `AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')`;
 
-            const typeFilters: string[] = [];
-            const selectedTypes = types ?? ['table', 'view', 'materialized_view', 'function', 'sequence'];
+      const typeFilters: string[] = [];
+      const selectedTypes = types ?? [
+        "table",
+        "view",
+        "materialized_view",
+        "function",
+        "sequence",
+      ];
 
-            if (selectedTypes.includes('table')) typeFilters.push(`('r', 'table')`);
-            if (selectedTypes.includes('view')) typeFilters.push(`('v', 'view')`);
-            if (selectedTypes.includes('materialized_view')) typeFilters.push(`('m', 'materialized_view')`);
-            if (selectedTypes.includes('sequence')) typeFilters.push(`('S', 'sequence')`);
+      if (selectedTypes.includes("table")) typeFilters.push(`('r', 'table')`);
+      if (selectedTypes.includes("view")) typeFilters.push(`('v', 'view')`);
+      if (selectedTypes.includes("materialized_view"))
+        typeFilters.push(`('m', 'materialized_view')`);
+      if (selectedTypes.includes("sequence"))
+        typeFilters.push(`('S', 'sequence')`);
 
-            const objects: { type: string; schema: string; name: string; owner: string }[] = [];
+      const objects: {
+        type: string;
+        schema: string;
+        name: string;
+        owner: string;
+      }[] = [];
 
-            // Get tables, views, materialized views, sequences
-            if (typeFilters.length > 0) {
-                const sql = `
+      // Get tables, views, materialized views, sequences
+      if (typeFilters.length > 0) {
+        const sql = `
                     SELECT 
                         CASE c.relkind 
-                            ${selectedTypes.includes('table') ? `WHEN 'r' THEN 'table'` : ''}
-                            ${selectedTypes.includes('view') ? `WHEN 'v' THEN 'view'` : ''}
-                            ${selectedTypes.includes('materialized_view') ? `WHEN 'm' THEN 'materialized_view'` : ''}
-                            ${selectedTypes.includes('sequence') ? `WHEN 'S' THEN 'sequence'` : ''}
+                            ${selectedTypes.includes("table") ? `WHEN 'r' THEN 'table'` : ""}
+                            ${selectedTypes.includes("view") ? `WHEN 'v' THEN 'view'` : ""}
+                            ${selectedTypes.includes("materialized_view") ? `WHEN 'm' THEN 'materialized_view'` : ""}
+                            ${selectedTypes.includes("sequence") ? `WHEN 'S' THEN 'sequence'` : ""}
                         END as type,
                         n.nspname as schema,
                         c.relname as name,
                         pg_get_userbyid(c.relowner) as owner
                     FROM pg_class c
                     JOIN pg_namespace n ON n.oid = c.relnamespace
-                    WHERE c.relkind IN (${selectedTypes.map(t => {
-                    if (t === 'table') return `'r'`;
-                    if (t === 'view') return `'v'`;
-                    if (t === 'materialized_view') return `'m'`;
-                    if (t === 'sequence') return `'S'`;
-                    return null;
-                }).filter(Boolean).join(', ')})
+                    WHERE c.relkind IN (${selectedTypes
+                      .map((t) => {
+                        if (t === "table") return `'r'`;
+                        if (t === "view") return `'v'`;
+                        if (t === "materialized_view") return `'m'`;
+                        if (t === "sequence") return `'S'`;
+                        return null;
+                      })
+                      .filter(Boolean)
+                      .join(", ")})
                     ${schemaFilter}
                     ORDER BY n.nspname, c.relname
                 `;
-                const result = await adapter.executeQuery(sql);
-                objects.push(...(result.rows as typeof objects));
-            }
+        const result = await adapter.executeQuery(sql);
+        objects.push(...(result.rows as typeof objects));
+      }
 
-            // Get functions
-            if (selectedTypes.includes('function') || selectedTypes.includes('procedure')) {
-                const kindFilter = [];
-                if (selectedTypes.includes('function')) kindFilter.push(`'f'`, `'a'`);
-                if (selectedTypes.includes('procedure')) kindFilter.push(`'p'`);
+      // Get functions
+      if (
+        selectedTypes.includes("function") ||
+        selectedTypes.includes("procedure")
+      ) {
+        const kindFilter = [];
+        if (selectedTypes.includes("function")) kindFilter.push(`'f'`, `'a'`);
+        if (selectedTypes.includes("procedure")) kindFilter.push(`'p'`);
 
-                const sql = `
+        const sql = `
                     SELECT 
                         CASE p.prokind WHEN 'p' THEN 'procedure' ELSE 'function' END as type,
                         n.nspname as schema,
@@ -81,19 +106,21 @@ export function createListObjectsTool(adapter: PostgresAdapter): ToolDefinition 
                         pg_get_userbyid(p.proowner) as owner
                     FROM pg_proc p
                     JOIN pg_namespace n ON n.oid = p.pronamespace
-                    WHERE p.prokind IN (${kindFilter.join(', ')})
-                    ${schema
+                    WHERE p.prokind IN (${kindFilter.join(", ")})
+                    ${
+                      schema
                         ? `AND n.nspname = '${schema}'`
-                        : `AND n.nspname NOT IN ('pg_catalog', 'information_schema')`}
+                        : `AND n.nspname NOT IN ('pg_catalog', 'information_schema')`
+                    }
                     ORDER BY n.nspname, p.proname
                 `;
-                const result = await adapter.executeQuery(sql);
-                objects.push(...(result.rows as typeof objects));
-            }
+        const result = await adapter.executeQuery(sql);
+        objects.push(...(result.rows as typeof objects));
+      }
 
-            // Get indexes
-            if (selectedTypes.includes('index')) {
-                const sql = `
+      // Get indexes
+      if (selectedTypes.includes("index")) {
+        const sql = `
                     SELECT 
                         'index' as type,
                         n.nspname as schema,
@@ -105,13 +132,13 @@ export function createListObjectsTool(adapter: PostgresAdapter): ToolDefinition 
                     ${schemaFilter}
                     ORDER BY n.nspname, c.relname
                 `;
-                const result = await adapter.executeQuery(sql);
-                objects.push(...(result.rows as typeof objects));
-            }
+        const result = await adapter.executeQuery(sql);
+        objects.push(...(result.rows as typeof objects));
+      }
 
-            // Get triggers
-            if (selectedTypes.includes('trigger')) {
-                const sql = `
+      // Get triggers
+      if (selectedTypes.includes("trigger")) {
+        const sql = `
                     SELECT DISTINCT
                         'trigger' as type,
                         n.nspname as schema,
@@ -124,49 +151,53 @@ export function createListObjectsTool(adapter: PostgresAdapter): ToolDefinition 
                     ${schemaFilter}
                     ORDER BY n.nspname, t.tgname
                 `;
-                const result = await adapter.executeQuery(sql);
-                objects.push(...(result.rows as typeof objects));
-            }
+        const result = await adapter.executeQuery(sql);
+        objects.push(...(result.rows as typeof objects));
+      }
 
-            // Apply limit if specified
-            const limitedObjects = limit !== undefined && limit > 0
-                ? objects.slice(0, limit)
-                : objects;
+      // Apply limit if specified
+      const limitedObjects =
+        limit !== undefined && limit > 0 ? objects.slice(0, limit) : objects;
 
-            return {
-                objects: limitedObjects,
-                count: limitedObjects.length,
-                totalCount: objects.length,  // Total before limit
-                byType: limitedObjects.reduce<Record<string, number>>((acc, obj) => {
-                    acc[obj.type] = (acc[obj.type] ?? 0) + 1;
-                    return acc;
-                }, {}),
-                ...(limit !== undefined && limit > 0 && objects.length > limit && {
-                    truncated: true,
-                    hint: `Showing ${String(limit)} of ${String(objects.length)} objects. Remove limit to see all.`
-                })
-            };
-        }
-    };
+      return {
+        objects: limitedObjects,
+        count: limitedObjects.length,
+        totalCount: objects.length, // Total before limit
+        byType: limitedObjects.reduce<Record<string, number>>((acc, obj) => {
+          acc[obj.type] = (acc[obj.type] ?? 0) + 1;
+          return acc;
+        }, {}),
+        ...(limit !== undefined &&
+          limit > 0 &&
+          objects.length > limit && {
+            truncated: true,
+            hint: `Showing ${String(limit)} of ${String(objects.length)} objects. Remove limit to see all.`,
+          }),
+      };
+    },
+  };
 }
 
 /**
  * Get object details
  */
-export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_object_details',
-        description: 'Get detailed metadata for a specific database object (table, view, function, sequence, index).',
-        group: 'core',
-        inputSchema: ObjectDetailsSchema,
-        annotations: readOnly('Object Details'),
-        icons: getToolIcons('core', readOnly('Object Details')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { name, schema, type } = ObjectDetailsSchema.parse(params);
-            const schemaName = schema ?? 'public';
+export function createObjectDetailsTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  return {
+    name: "pg_object_details",
+    description:
+      "Get detailed metadata for a specific database object (table, view, function, sequence, index).",
+    group: "core",
+    inputSchema: ObjectDetailsSchema,
+    annotations: readOnly("Object Details"),
+    icons: getToolIcons("core", readOnly("Object Details")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { name, schema, type } = ObjectDetailsSchema.parse(params);
+      const schemaName = schema ?? "public";
 
-            // Determine the actual object type
-            const detectSql = `
+      // Determine the actual object type
+      const detectSql = `
                 SELECT 
                     CASE 
                         WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
@@ -181,49 +212,61 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
                                     WHERE p.proname = $1 AND n.nspname = $2) THEN 'function'
                     END as object_type
             `;
-            const detectResult = await adapter.executeQuery(detectSql, [name, schemaName]);
-            const detectedType = (detectResult.rows?.[0] as { object_type: string } | undefined)?.object_type as typeof type;
+      const detectResult = await adapter.executeQuery(detectSql, [
+        name,
+        schemaName,
+      ]);
+      const detectedType = (
+        detectResult.rows?.[0] as { object_type: string } | undefined
+      )?.object_type as typeof type;
 
-            // Validate type if specified
-            if (type && detectedType && type !== detectedType) {
-                throw new Error(
-                    `Object '${schemaName}.${name}' is a ${detectedType}, not a ${type}. ` +
-                    `Use type: '${detectedType}' or omit type to auto-detect.`
-                );
-            }
+      // Validate type if specified
+      if (type && detectedType && type !== detectedType) {
+        throw new Error(
+          `Object '${schemaName}.${name}' is a ${detectedType}, not a ${type}. ` +
+            `Use type: '${detectedType}' or omit type to auto-detect.`,
+        );
+      }
 
-            const objectType = type ?? detectedType;
+      const objectType = type ?? detectedType;
 
-            if (!objectType) {
-                throw new Error(`Object '${schemaName}.${name}' not found. Use pg_list_objects to discover available objects.`);
-            }
+      if (!objectType) {
+        throw new Error(
+          `Object '${schemaName}.${name}' not found. Use pg_list_objects to discover available objects.`,
+        );
+      }
 
-            let details: Record<string, unknown> = {
-                name,
-                schema: schemaName,
-                type: objectType
-            };
+      let details: Record<string, unknown> = {
+        name,
+        schema: schemaName,
+        type: objectType,
+      };
 
-            if (objectType === 'table' || objectType === 'view') {
-                const tableDetails = await adapter.describeTable(name, schemaName);
-                details = { ...details, ...tableDetails };
+      if (objectType === "table" || objectType === "view") {
+        const tableDetails = await adapter.describeTable(name, schemaName);
+        details = { ...details, ...tableDetails };
 
-                // For views, also get the view definition SQL
-                if (objectType === 'view') {
-                    const viewDefSql = `
+        // For views, also get the view definition SQL
+        if (objectType === "view") {
+          const viewDefSql = `
                         SELECT pg_get_viewdef(c.oid, true) as definition
                         FROM pg_class c
                         JOIN pg_namespace n ON n.oid = c.relnamespace
                         WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v'
                     `;
-                    const viewDefResult = await adapter.executeQuery(viewDefSql, [name, schemaName]);
-                    if (viewDefResult.rows && viewDefResult.rows.length > 0) {
-                        details['definition'] = viewDefResult.rows[0]?.['definition'] as string;
-                        details['hasDefinition'] = true;
-                    }
-                }
-            } else if (objectType === 'function') {
-                const sql = `
+          const viewDefResult = await adapter.executeQuery(viewDefSql, [
+            name,
+            schemaName,
+          ]);
+          if (viewDefResult.rows && viewDefResult.rows.length > 0) {
+            details["definition"] = viewDefResult.rows[0]?.[
+              "definition"
+            ] as string;
+            details["hasDefinition"] = true;
+          }
+        }
+      } else if (objectType === "function") {
+        const sql = `
                     SELECT 
                         p.proname as name,
                         pg_get_function_arguments(p.oid) as arguments,
@@ -237,19 +280,19 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
                     JOIN pg_language l ON l.oid = p.prolang
                     WHERE p.proname = $1 AND n.nspname = $2
                 `;
-                const result = await adapter.executeQuery(sql, [name, schemaName]);
-                const funcRow = result.rows?.[0];
-                if (funcRow) {
-                    details = {
-                        ...details,
-                        ...funcRow,
-                        // Add camelCase aliases
-                        returnType: funcRow['return_type'] as string
-                    };
-                }
-            } else if (objectType === 'sequence') {
-                // Get sequence metadata from pg_sequence catalog
-                const metaSql = `
+        const result = await adapter.executeQuery(sql, [name, schemaName]);
+        const funcRow = result.rows?.[0];
+        if (funcRow) {
+          details = {
+            ...details,
+            ...funcRow,
+            // Add camelCase aliases
+            returnType: funcRow["return_type"] as string,
+          };
+        }
+      } else if (objectType === "sequence") {
+        // Get sequence metadata from pg_sequence catalog
+        const metaSql = `
                     SELECT 
                         s.seqstart as start_value,
                         s.seqmin as min_value,
@@ -263,29 +306,35 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE n.nspname = $1 AND c.relname = $2
                 `;
-                const metaResult = await adapter.executeQuery(metaSql, [schemaName, name]);
-                if (metaResult.rows && metaResult.rows.length > 0) {
-                    details = { ...details, ...metaResult.rows[0] };
-                }
+        const metaResult = await adapter.executeQuery(metaSql, [
+          schemaName,
+          name,
+        ]);
+        if (metaResult.rows && metaResult.rows.length > 0) {
+          details = { ...details, ...metaResult.rows[0] };
+        }
 
-                // Get current value by querying the sequence directly
-                try {
-                    const valueSql = `SELECT last_value, is_called FROM "${schemaName}"."${name}"`;
-                    const valueResult = await adapter.executeQuery(valueSql);
-                    if (valueResult.rows && valueResult.rows.length > 0) {
-                        const seqRow = valueResult.rows[0] as { last_value: number; is_called: boolean };
-                        details['last_value'] = seqRow.last_value;
-                        details['is_called'] = seqRow.is_called;
-                        // Add human-readable current value explanation
-                        details['current_value'] = seqRow.is_called
-                            ? seqRow.last_value
-                            : `${String(seqRow.last_value)} (not yet used, next call returns this value)`;
-                    }
-                } catch {
-                    // Sequence might not be accessible, skip current value
-                }
-            } else if (objectType === 'index') {
-                const sql = `
+        // Get current value by querying the sequence directly
+        try {
+          const valueSql = `SELECT last_value, is_called FROM "${schemaName}"."${name}"`;
+          const valueResult = await adapter.executeQuery(valueSql);
+          if (valueResult.rows && valueResult.rows.length > 0) {
+            const seqRow = valueResult.rows[0] as {
+              last_value: number;
+              is_called: boolean;
+            };
+            details["last_value"] = seqRow.last_value;
+            details["is_called"] = seqRow.is_called;
+            // Add human-readable current value explanation
+            details["current_value"] = seqRow.is_called
+              ? seqRow.last_value
+              : `${String(seqRow.last_value)} (not yet used, next call returns this value)`;
+          }
+        } catch {
+          // Sequence might not be accessible, skip current value
+        }
+      } else if (objectType === "index") {
+        const sql = `
                     SELECT 
                         i.relname as index_name,
                         t.relname as table_name,
@@ -301,13 +350,13 @@ export function createObjectDetailsTool(adapter: PostgresAdapter): ToolDefinitio
                     JOIN pg_namespace n ON n.oid = i.relnamespace
                     WHERE i.relname = $1 AND n.nspname = $2
                 `;
-                const result = await adapter.executeQuery(sql, [name, schemaName]);
-                if (result.rows && result.rows.length > 0) {
-                    details = { ...details, ...result.rows[0] };
-                }
-            }
-
-            return details;
+        const result = await adapter.executeQuery(sql, [name, schemaName]);
+        if (result.rows && result.rows.length > 0) {
+          details = { ...details, ...result.rows[0] };
         }
-    };
+      }
+
+      return details;
+    },
+  };
 }

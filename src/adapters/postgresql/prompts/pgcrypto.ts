@@ -1,27 +1,34 @@
 /**
  * pgcrypto Setup Prompt
- * 
+ *
  * Complete guide for setting up cryptographic functions with pgcrypto.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createSetupPgcryptoPrompt(): PromptDefinition {
-    return {
-        name: 'pg_setup_pgcrypto',
-        description: 'Complete guide for setting up cryptographic functions with pgcrypto including hashing, encryption, and secure password storage.',
-        arguments: [
-            {
-                name: 'useCase',
-                description: 'Use case: password_hashing, encryption, uuid, hmac',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const useCase = args['useCase'] ?? 'password_hashing';
+  return {
+    name: "pg_setup_pgcrypto",
+    description:
+      "Complete guide for setting up cryptographic functions with pgcrypto including hashing, encryption, and secure password storage.",
+    arguments: [
+      {
+        name: "useCase",
+        description: "Use case: password_hashing, encryption, uuid, hmac",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const useCase = args["useCase"] ?? "password_hashing";
 
-            return `# pgcrypto Setup Guide - ${useCase.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+      return `# pgcrypto Setup Guide - ${useCase
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")}
 
 ## pgcrypto Overview
 
@@ -41,7 +48,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 SELECT * FROM pg_extension WHERE extname = 'pgcrypto';
 \`\`\`
 
-${useCase === 'password_hashing' ? `
+${
+  useCase === "password_hashing"
+    ? `
 ### 2. Secure Password Storage
 
 **The RIGHT way: bcrypt with crypt()**
@@ -100,7 +109,9 @@ CREATE TRIGGER hash_password_trigger
     BEFORE INSERT OR UPDATE OF password_hash ON users
     FOR EACH ROW EXECUTE FUNCTION hash_password();
 \`\`\`
-` : useCase === 'encryption' ? `
+`
+    : useCase === "encryption"
+      ? `
 ### 2. Symmetric Encryption (AES)
 
 **Encrypt sensitive data:**
@@ -145,7 +156,9 @@ SELECT pgp_sym_encrypt('data', 'key', 'cipher-algo=aes256');
 - Use environment variables or key management service
 - Rotate keys periodically
 - Consider column-level encryption only for truly sensitive data
-` : useCase === 'uuid' ? `
+`
+      : useCase === "uuid"
+        ? `
 ### 2. Secure UUID Generation
 
 **Generate UUID v4 (random):**
@@ -182,7 +195,8 @@ SELECT translate(
     '+/', '-_'
 ) as token;
 \`\`\`
-` : `
+`
+        : `
 ### 2. HMAC for Message Authentication
 
 **Sign data with HMAC:**
@@ -221,7 +235,8 @@ WHERE verify_webhook_signature(body, header_signature, webhook_secret);
 | SHA-256 | \`hmac(data, key, 'sha256')\` | 32 bytes |
 | SHA-512 | \`hmac(data, key, 'sha512')\` | 64 bytes |
 | SHA-384 | \`hmac(data, key, 'sha384')\` | 48 bytes |
-`}
+`
+}
 
 ### 3. Data Hashing
 
@@ -288,6 +303,6 @@ SELECT encode(digest('data', 'md5'), 'hex');
 | Session tokens | \`gen_random_bytes(32)\` |
 
 **Pro Tip:** pgcrypto + citext = secure authentication done right!`;
-        }
-    };
+    },
+  };
 }

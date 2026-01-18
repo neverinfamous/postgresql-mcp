@@ -1,33 +1,37 @@
 /**
  * Index Tuning Prompt
- * 
+ *
  * Comprehensive index analysis and optimization workflow.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createIndexTuningPrompt(): PromptDefinition {
-    return {
-        name: 'pg_index_tuning',
-        description: 'Comprehensive index analysis covering unused, missing, and duplicate indexes.',
-        arguments: [
-            {
-                name: 'schema',
-                description: 'Schema name to analyze (default: public)',
-                required: false
-            },
-            {
-                name: 'focus',
-                description: 'Focus area: all, unused, missing, duplicate',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const schema = args['schema'] ?? 'public';
-            const focus = args['focus'] ?? 'all';
+  return {
+    name: "pg_index_tuning",
+    description:
+      "Comprehensive index analysis covering unused, missing, and duplicate indexes.",
+    arguments: [
+      {
+        name: "schema",
+        description: "Schema name to analyze (default: public)",
+        required: false,
+      },
+      {
+        name: "focus",
+        description: "Focus area: all, unused, missing, duplicate",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const schema = args["schema"] ?? "public";
+      const focus = args["focus"] ?? "all";
 
-            let content = `# Index Tuning Workflow - Schema: ${schema}
+      let content = `# Index Tuning Workflow - Schema: ${schema}
 
 Focus Area: **${focus.charAt(0).toUpperCase() + focus.slice(1)}**
 
@@ -54,8 +58,8 @@ Use \`pg_index_stats\` for detailed analysis.
 - Large indexes with low scan counts → Expensive but rarely useful
 `;
 
-            if (focus === 'unused' || focus === 'all') {
-                content += `
+      if (focus === "unused" || focus === "all") {
+        content += `
 ### 2. Unused Indexes
 
 \`\`\`sql
@@ -69,10 +73,10 @@ WHERE idx_scan = 0 AND schemaname = '${schema}';
 - Check with application team
 - Calculate storage savings
 `;
-            }
+      }
 
-            if (focus === 'missing' || focus === 'all') {
-                content += `
+      if (focus === "missing" || focus === "all") {
+        content += `
 ### 3. Missing Indexes
 
 Use \`pg_analyze_workload_indexes\` to find:
@@ -82,10 +86,10 @@ Use \`pg_analyze_workload_indexes\` to find:
 
 Test recommendations with \`pg_explain_analyze\` and hypothetical indexes.
 `;
-            }
+      }
 
-            if (focus === 'duplicate' || focus === 'all') {
-                content += `
+      if (focus === "duplicate" || focus === "all") {
+        content += `
 ### 4. Duplicate/Redundant Indexes
 
 \`\`\`sql
@@ -104,9 +108,9 @@ HAVING COUNT(*) > 1;
 - Index on (a, b) makes index on (a) redundant
 - Multiple indexes with same columns in different order
 `;
-            }
+      }
 
-            content += `
+      content += `
 ### 5. Action Plan
 
 **High Priority:**
@@ -132,7 +136,7 @@ COMMIT; -- or ROLLBACK if issues
 
 **Pro Tip:** Use CONCURRENTLY when creating indexes on production databases!`;
 
-            return content;
-        }
-    };
+      return content;
+    },
+  };
 }

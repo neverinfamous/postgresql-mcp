@@ -2,58 +2,63 @@
  * PostgreSQL Performance Tools - Statistics
  */
 
-import type { PostgresAdapter } from '../../PostgresAdapter.js';
-import type { ToolDefinition, RequestContext } from '../../../../types/index.js';
-import { z } from 'zod';
-import { readOnly } from '../../../../utils/annotations.js';
-import { getToolIcons } from '../../../../utils/icons.js';
-import { IndexStatsSchema, TableStatsSchema } from '../../schemas/index.js';
+import type { PostgresAdapter } from "../../PostgresAdapter.js";
+import type {
+  ToolDefinition,
+  RequestContext,
+} from "../../../../types/index.js";
+import { z } from "zod";
+import { readOnly } from "../../../../utils/annotations.js";
+import { getToolIcons } from "../../../../utils/icons.js";
+import { IndexStatsSchema, TableStatsSchema } from "../../schemas/index.js";
 
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
 
 export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_index_stats',
-        description: 'Get index usage statistics.',
-        group: 'performance',
-        inputSchema: IndexStatsSchema,
-        annotations: readOnly('Index Stats'),
-        icons: getToolIcons('performance', readOnly('Index Stats')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { table, schema } = IndexStatsSchema.parse(params);
-            let whereClause = "schemaname NOT IN ('pg_catalog', 'information_schema')";
-            if (schema) whereClause += ` AND schemaname = '${schema}'`;
-            if (table) whereClause += ` AND relname = '${table}'`;
+  return {
+    name: "pg_index_stats",
+    description: "Get index usage statistics.",
+    group: "performance",
+    inputSchema: IndexStatsSchema,
+    annotations: readOnly("Index Stats"),
+    icons: getToolIcons("performance", readOnly("Index Stats")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { table, schema } = IndexStatsSchema.parse(params);
+      let whereClause =
+        "schemaname NOT IN ('pg_catalog', 'information_schema')";
+      if (schema) whereClause += ` AND schemaname = '${schema}'`;
+      if (table) whereClause += ` AND relname = '${table}'`;
 
-            const sql = `SELECT schemaname, relname as table_name, indexrelname as index_name,
+      const sql = `SELECT schemaname, relname as table_name, indexrelname as index_name,
                         idx_scan as scans, idx_tup_read as tuples_read, idx_tup_fetch as tuples_fetched,
                         pg_size_pretty(pg_relation_size(indexrelid)) as size
                         FROM pg_stat_user_indexes
                         WHERE ${whereClause}
                         ORDER BY idx_scan DESC`;
 
-            const result = await adapter.executeQuery(sql);
-            return { indexes: result.rows };
-        }
-    };
+      const result = await adapter.executeQuery(sql);
+      return { indexes: result.rows };
+    },
+  };
 }
 
 export function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_table_stats',
-        description: 'Get table access statistics.',
-        group: 'performance',
-        inputSchema: TableStatsSchema,
-        annotations: readOnly('Table Stats'),
-        icons: getToolIcons('performance', readOnly('Table Stats')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { table, schema } = TableStatsSchema.parse(params);
-            let whereClause = "schemaname NOT IN ('pg_catalog', 'information_schema')";
-            if (schema) whereClause += ` AND schemaname = '${schema}'`;
-            if (table) whereClause += ` AND relname = '${table}'`;
+  return {
+    name: "pg_table_stats",
+    description: "Get table access statistics.",
+    group: "performance",
+    inputSchema: TableStatsSchema,
+    annotations: readOnly("Table Stats"),
+    icons: getToolIcons("performance", readOnly("Table Stats")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { table, schema } = TableStatsSchema.parse(params);
+      let whereClause =
+        "schemaname NOT IN ('pg_catalog', 'information_schema')";
+      if (schema) whereClause += ` AND schemaname = '${schema}'`;
+      if (table) whereClause += ` AND relname = '${table}'`;
 
-            const sql = `SELECT schemaname, relname as table_name,
+      const sql = `SELECT schemaname, relname as table_name,
                         seq_scan, seq_tup_read, idx_scan, idx_tup_fetch,
                         n_tup_ins as inserts, n_tup_upd as updates, n_tup_del as deletes,
                         n_live_tup as live_tuples, n_dead_tup as dead_tuples,
@@ -62,66 +67,72 @@ export function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
                         WHERE ${whereClause}
                         ORDER BY seq_scan DESC`;
 
-            const result = await adapter.executeQuery(sql);
-            return { tables: result.rows };
-        }
-    };
+      const result = await adapter.executeQuery(sql);
+      return { tables: result.rows };
+    },
+  };
 }
 
-export function createStatStatementsTool(adapter: PostgresAdapter): ToolDefinition {
-    const StatStatementsSchema = z.preprocess(
-        defaultToEmpty,
-        z.object({
-            limit: z.number().optional(),
-            orderBy: z.enum(['total_time', 'calls', 'mean_time', 'rows']).optional()
-        })
-    );
+export function createStatStatementsTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  const StatStatementsSchema = z.preprocess(
+    defaultToEmpty,
+    z.object({
+      limit: z.number().optional(),
+      orderBy: z.enum(["total_time", "calls", "mean_time", "rows"]).optional(),
+    }),
+  );
 
-    return {
-        name: 'pg_stat_statements',
-        description: 'Get query statistics from pg_stat_statements (requires extension).',
-        group: 'performance',
-        inputSchema: StatStatementsSchema,
-        annotations: readOnly('Query Statistics'),
-        icons: getToolIcons('performance', readOnly('Query Statistics')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = StatStatementsSchema.parse(params);
-            const limit = parsed.limit ?? 20;
-            const orderBy = parsed.orderBy ?? 'total_time';
+  return {
+    name: "pg_stat_statements",
+    description:
+      "Get query statistics from pg_stat_statements (requires extension).",
+    group: "performance",
+    inputSchema: StatStatementsSchema,
+    annotations: readOnly("Query Statistics"),
+    icons: getToolIcons("performance", readOnly("Query Statistics")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const parsed = StatStatementsSchema.parse(params);
+      const limit = parsed.limit ?? 20;
+      const orderBy = parsed.orderBy ?? "total_time";
 
-            const sql = `SELECT query, calls, total_exec_time as total_time, 
+      const sql = `SELECT query, calls, total_exec_time as total_time, 
                         mean_exec_time as mean_time, rows,
                         shared_blks_hit, shared_blks_read
                         FROM pg_stat_statements
-                        ORDER BY ${orderBy === 'total_time' ? 'total_exec_time' : orderBy} DESC
+                        ORDER BY ${orderBy === "total_time" ? "total_exec_time" : orderBy} DESC
                         LIMIT ${String(limit)}`;
 
-            const result = await adapter.executeQuery(sql);
-            return { statements: result.rows };
-        }
-    };
+      const result = await adapter.executeQuery(sql);
+      return { statements: result.rows };
+    },
+  };
 }
 
-export function createStatActivityTool(adapter: PostgresAdapter): ToolDefinition {
-    const StatActivitySchema = z.preprocess(
-        defaultToEmpty,
-        z.object({
-            includeIdle: z.boolean().optional()
-        })
-    );
+export function createStatActivityTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  const StatActivitySchema = z.preprocess(
+    defaultToEmpty,
+    z.object({
+      includeIdle: z.boolean().optional(),
+    }),
+  );
 
-    return {
-        name: 'pg_stat_activity',
-        description: 'Get currently running queries and connections.',
-        group: 'performance',
-        inputSchema: StatActivitySchema,
-        annotations: readOnly('Activity Stats'),
-        icons: getToolIcons('performance', readOnly('Activity Stats')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = StatActivitySchema.parse(params);
-            const idleClause = parsed.includeIdle === true ? '' : "AND state != 'idle'";
+  return {
+    name: "pg_stat_activity",
+    description: "Get currently running queries and connections.",
+    group: "performance",
+    inputSchema: StatActivitySchema,
+    annotations: readOnly("Activity Stats"),
+    icons: getToolIcons("performance", readOnly("Activity Stats")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const parsed = StatActivitySchema.parse(params);
+      const idleClause =
+        parsed.includeIdle === true ? "" : "AND state != 'idle'";
 
-            const sql = `SELECT pid, usename, datname, client_addr, state,
+      const sql = `SELECT pid, usename, datname, client_addr, state,
                         query_start, state_change,
                         now() - query_start as duration,
                         query
@@ -129,75 +140,93 @@ export function createStatActivityTool(adapter: PostgresAdapter): ToolDefinition
                         WHERE pid != pg_backend_pid() ${idleClause}
                         ORDER BY query_start`;
 
-            const result = await adapter.executeQuery(sql);
-            return { connections: result.rows, count: result.rows?.length ?? 0 };
-        }
-    };
+      const result = await adapter.executeQuery(sql);
+      return { connections: result.rows, count: result.rows?.length ?? 0 };
+    },
+  };
 }
 
-export function createUnusedIndexesTool(adapter: PostgresAdapter): ToolDefinition {
-    const UnusedIndexesSchema = z.preprocess(
-        defaultToEmpty,
-        z.object({
-            schema: z.string().optional().describe('Schema to filter (default: all user schemas)'),
-            minSize: z.string().optional().describe('Minimum index size to include (e.g., "1 MB")')
-        })
-    );
+export function createUnusedIndexesTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  const UnusedIndexesSchema = z.preprocess(
+    defaultToEmpty,
+    z.object({
+      schema: z
+        .string()
+        .optional()
+        .describe("Schema to filter (default: all user schemas)"),
+      minSize: z
+        .string()
+        .optional()
+        .describe('Minimum index size to include (e.g., "1 MB")'),
+    }),
+  );
 
-    return {
-        name: 'pg_unused_indexes',
-        description: 'Find indexes that have never been used (idx_scan = 0). Candidates for removal.',
-        group: 'performance',
-        inputSchema: UnusedIndexesSchema,
-        annotations: readOnly('Unused Indexes'),
-        icons: getToolIcons('performance', readOnly('Unused Indexes')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = UnusedIndexesSchema.parse(params);
-            let whereClause = "schemaname NOT IN ('pg_catalog', 'information_schema') AND idx_scan = 0";
-            if (parsed.schema !== undefined) whereClause += ` AND schemaname = '${parsed.schema}'`;
+  return {
+    name: "pg_unused_indexes",
+    description:
+      "Find indexes that have never been used (idx_scan = 0). Candidates for removal.",
+    group: "performance",
+    inputSchema: UnusedIndexesSchema,
+    annotations: readOnly("Unused Indexes"),
+    icons: getToolIcons("performance", readOnly("Unused Indexes")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const parsed = UnusedIndexesSchema.parse(params);
+      let whereClause =
+        "schemaname NOT IN ('pg_catalog', 'information_schema') AND idx_scan = 0";
+      if (parsed.schema !== undefined)
+        whereClause += ` AND schemaname = '${parsed.schema}'`;
 
-            const sql = `SELECT schemaname, relname as table_name, indexrelname as index_name,
+      const sql = `SELECT schemaname, relname as table_name, indexrelname as index_name,
                         idx_scan as scans, idx_tup_read as tuples_read,
                         pg_size_pretty(pg_relation_size(indexrelid)) as size,
                         pg_relation_size(indexrelid) as size_bytes
                         FROM pg_stat_user_indexes
                         WHERE ${whereClause}
-                        ${parsed.minSize !== undefined ? `AND pg_relation_size(indexrelid) >= pg_size_bytes('${parsed.minSize}')` : ''}
+                        ${parsed.minSize !== undefined ? `AND pg_relation_size(indexrelid) >= pg_size_bytes('${parsed.minSize}')` : ""}
                         ORDER BY pg_relation_size(indexrelid) DESC`;
 
-            const result = await adapter.executeQuery(sql);
-            return {
-                unusedIndexes: result.rows,
-                count: result.rows?.length ?? 0,
-                hint: 'These indexes have never been used. Consider removing them to save disk space and improve write performance.'
-            };
-        }
-    };
+      const result = await adapter.executeQuery(sql);
+      return {
+        unusedIndexes: result.rows,
+        count: result.rows?.length ?? 0,
+        hint: "These indexes have never been used. Consider removing them to save disk space and improve write performance.",
+      };
+    },
+  };
 }
 
-export function createDuplicateIndexesTool(adapter: PostgresAdapter): ToolDefinition {
-    const DuplicateIndexesSchema = z.preprocess(
-        defaultToEmpty,
-        z.object({
-            schema: z.string().optional().describe('Schema to filter (default: all user schemas)')
-        })
-    );
+export function createDuplicateIndexesTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  const DuplicateIndexesSchema = z.preprocess(
+    defaultToEmpty,
+    z.object({
+      schema: z
+        .string()
+        .optional()
+        .describe("Schema to filter (default: all user schemas)"),
+    }),
+  );
 
-    return {
-        name: 'pg_duplicate_indexes',
-        description: 'Find duplicate or overlapping indexes (same leading columns). Candidates for consolidation.',
-        group: 'performance',
-        inputSchema: DuplicateIndexesSchema,
-        annotations: readOnly('Duplicate Indexes'),
-        icons: getToolIcons('performance', readOnly('Duplicate Indexes')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = DuplicateIndexesSchema.parse(params);
-            const schemaFilter = parsed.schema !== undefined
-                ? `AND n.nspname = '${parsed.schema}'`
-                : "AND n.nspname NOT IN ('pg_catalog', 'information_schema')";
+  return {
+    name: "pg_duplicate_indexes",
+    description:
+      "Find duplicate or overlapping indexes (same leading columns). Candidates for consolidation.",
+    group: "performance",
+    inputSchema: DuplicateIndexesSchema,
+    annotations: readOnly("Duplicate Indexes"),
+    icons: getToolIcons("performance", readOnly("Duplicate Indexes")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const parsed = DuplicateIndexesSchema.parse(params);
+      const schemaFilter =
+        parsed.schema !== undefined
+          ? `AND n.nspname = '${parsed.schema}'`
+          : "AND n.nspname NOT IN ('pg_catalog', 'information_schema')";
 
-            // Find indexes with the same leading column(s) on the same table
-            const sql = `WITH index_cols AS (
+      // Find indexes with the same leading column(s) on the same table
+      const sql = `WITH index_cols AS (
                 SELECT
                     n.nspname as schemaname,
                     t.relname as tablename,
@@ -232,39 +261,45 @@ export function createDuplicateIndexesTool(adapter: PostgresAdapter): ToolDefini
                     OR b.columns[1:array_length(a.columns, 1)] = a.columns)
             ORDER BY a.schemaname, a.tablename, a.size_bytes DESC`;
 
-            const result = await adapter.executeQuery(sql);
-            return {
-                duplicateIndexes: result.rows,
-                count: result.rows?.length ?? 0,
-                hint: 'EXACT_DUPLICATE: Remove one. OVERLAPPING/SUBSET: Smaller index may be redundant.'
-            };
-        }
-    };
+      const result = await adapter.executeQuery(sql);
+      return {
+        duplicateIndexes: result.rows,
+        count: result.rows?.length ?? 0,
+        hint: "EXACT_DUPLICATE: Remove one. OVERLAPPING/SUBSET: Smaller index may be redundant.",
+      };
+    },
+  };
 }
 
-export function createVacuumStatsTool(adapter: PostgresAdapter): ToolDefinition {
-    const VacuumStatsSchema = z.preprocess(
-        defaultToEmpty,
-        z.object({
-            schema: z.string().optional().describe('Schema to filter'),
-            table: z.string().optional().describe('Table name to filter')
-        })
-    );
+export function createVacuumStatsTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  const VacuumStatsSchema = z.preprocess(
+    defaultToEmpty,
+    z.object({
+      schema: z.string().optional().describe("Schema to filter"),
+      table: z.string().optional().describe("Table name to filter"),
+    }),
+  );
 
-    return {
-        name: 'pg_vacuum_stats',
-        description: 'Get detailed vacuum statistics including dead tuples, last vacuum times, and wraparound risk.',
-        group: 'performance',
-        inputSchema: VacuumStatsSchema,
-        annotations: readOnly('Vacuum Stats'),
-        icons: getToolIcons('performance', readOnly('Vacuum Stats')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = VacuumStatsSchema.parse(params);
-            let whereClause = "schemaname NOT IN ('pg_catalog', 'information_schema')";
-            if (parsed.schema !== undefined) whereClause += ` AND schemaname = '${parsed.schema}'`;
-            if (parsed.table !== undefined) whereClause += ` AND relname = '${parsed.table}'`;
+  return {
+    name: "pg_vacuum_stats",
+    description:
+      "Get detailed vacuum statistics including dead tuples, last vacuum times, and wraparound risk.",
+    group: "performance",
+    inputSchema: VacuumStatsSchema,
+    annotations: readOnly("Vacuum Stats"),
+    icons: getToolIcons("performance", readOnly("Vacuum Stats")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const parsed = VacuumStatsSchema.parse(params);
+      let whereClause =
+        "schemaname NOT IN ('pg_catalog', 'information_schema')";
+      if (parsed.schema !== undefined)
+        whereClause += ` AND schemaname = '${parsed.schema}'`;
+      if (parsed.table !== undefined)
+        whereClause += ` AND relname = '${parsed.table}'`;
 
-            const sql = `SELECT
+      const sql = `SELECT
                 s.schemaname, s.relname as table_name,
                 s.n_live_tup as live_tuples, s.n_dead_tup as dead_tuples,
                 CASE WHEN s.n_live_tup > 0 THEN round((100.0 * s.n_dead_tup / s.n_live_tup)::numeric, 2) ELSE 0 END as dead_pct,
@@ -281,39 +316,45 @@ export function createVacuumStatsTool(adapter: PostgresAdapter): ToolDefinition 
                 FROM pg_stat_user_tables s
                 JOIN pg_class c ON c.relname = s.relname
                     AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = s.schemaname)
-                WHERE ${whereClause.replace(/schemaname/g, 's.schemaname').replace(/relname/g, 's.relname')}
+                WHERE ${whereClause.replace(/schemaname/g, "s.schemaname").replace(/relname/g, "s.relname")}
                 ORDER BY s.n_dead_tup DESC`;
 
-            const result = await adapter.executeQuery(sql);
-            return {
-                vacuumStats: result.rows,
-                count: result.rows?.length ?? 0
-            };
-        }
-    };
+      const result = await adapter.executeQuery(sql);
+      return {
+        vacuumStats: result.rows,
+        count: result.rows?.length ?? 0,
+      };
+    },
+  };
 }
 
-export function createQueryPlanStatsTool(adapter: PostgresAdapter): ToolDefinition {
-    const QueryPlanStatsSchema = z.preprocess(
-        defaultToEmpty,
-        z.object({
-            limit: z.number().optional().describe('Number of queries to return (default: 20)')
-        })
-    );
+export function createQueryPlanStatsTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  const QueryPlanStatsSchema = z.preprocess(
+    defaultToEmpty,
+    z.object({
+      limit: z
+        .number()
+        .optional()
+        .describe("Number of queries to return (default: 20)"),
+    }),
+  );
 
-    return {
-        name: 'pg_query_plan_stats',
-        description: 'Get query plan statistics showing planning time vs execution time (requires pg_stat_statements).',
-        group: 'performance',
-        inputSchema: QueryPlanStatsSchema,
-        annotations: readOnly('Query Plan Stats'),
-        icons: getToolIcons('performance', readOnly('Query Plan Stats')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = QueryPlanStatsSchema.parse(params);
-            const limit = parsed.limit ?? 20;
+  return {
+    name: "pg_query_plan_stats",
+    description:
+      "Get query plan statistics showing planning time vs execution time (requires pg_stat_statements).",
+    group: "performance",
+    inputSchema: QueryPlanStatsSchema,
+    annotations: readOnly("Query Plan Stats"),
+    icons: getToolIcons("performance", readOnly("Query Plan Stats")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const parsed = QueryPlanStatsSchema.parse(params);
+      const limit = parsed.limit ?? 20;
 
-            // Check if pg_stat_statements is available with planning time columns
-            const sql = `SELECT
+      // Check if pg_stat_statements is available with planning time columns
+      const sql = `SELECT
                 query,
                 calls,
                 total_plan_time,
@@ -337,13 +378,12 @@ export function createQueryPlanStatsTool(adapter: PostgresAdapter): ToolDefiniti
                 ORDER BY total_plan_time + total_exec_time DESC
                 LIMIT ${String(limit)}`;
 
-            const result = await adapter.executeQuery(sql);
-            return {
-                queryPlanStats: result.rows,
-                count: result.rows?.length ?? 0,
-                hint: 'High plan_pct indicates queries spending significant time in planning. Consider prepared statements.'
-            };
-        }
-    };
+      const result = await adapter.executeQuery(sql);
+      return {
+        queryPlanStats: result.rows,
+        count: result.rows?.length ?? 0,
+        hint: "High plan_pct indicates queries spending significant time in planning. Consider prepared statements.",
+      };
+    },
+  };
 }
-

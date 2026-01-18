@@ -1,27 +1,31 @@
 /**
  * pg_cron Setup Prompt
- * 
+ *
  * Complete guide for setting up job scheduling with pg_cron.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createSetupPgcronPrompt(): PromptDefinition {
-    return {
-        name: 'pg_setup_pgcron',
-        description: 'Complete guide for setting up job scheduling with pg_cron including cron syntax, common patterns, and monitoring.',
-        arguments: [
-            {
-                name: 'useCase',
-                description: 'Use case: maintenance, cleanup, reporting, etl, backup',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const useCase = args['useCase'] ?? 'maintenance';
+  return {
+    name: "pg_setup_pgcron",
+    description:
+      "Complete guide for setting up job scheduling with pg_cron including cron syntax, common patterns, and monitoring.",
+    arguments: [
+      {
+        name: "useCase",
+        description: "Use case: maintenance, cleanup, reporting, etl, backup",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const useCase = args["useCase"] ?? "maintenance";
 
-            let content = `# pg_cron Setup Guide - ${useCase.charAt(0).toUpperCase() + useCase.slice(1)}
+      let content = `# pg_cron Setup Guide - ${useCase.charAt(0).toUpperCase() + useCase.slice(1)}
 
 ## pg_cron Overview
 
@@ -71,8 +75,8 @@ cron.database_name = 'postgres'  -- Database where cron runs
 
 `;
 
-            if (useCase === 'maintenance') {
-                content += `### 3. Maintenance Jobs
+      if (useCase === "maintenance") {
+        content += `### 3. Maintenance Jobs
 
 \`\`\`sql
 -- Daily VACUUM ANALYZE at 3 AM
@@ -88,8 +92,8 @@ SELECT cron.schedule('refresh-stats', '0 * * * *',
     'ANALYZE');
 \`\`\`
 `;
-            } else if (useCase === 'cleanup') {
-                content += `### 3. Cleanup Jobs
+      } else if (useCase === "cleanup") {
+        content += `### 3. Cleanup Jobs
 
 \`\`\`sql
 -- Delete old logs daily at 2 AM
@@ -106,8 +110,8 @@ SELECT cron.schedule('cleanup-cron-history', '0 5 * * 0',
       WHERE end_time < NOW() - INTERVAL '7 days'$$);
 \`\`\`
 `;
-            } else if (useCase === 'reporting') {
-                content += `### 3. Reporting Jobs
+      } else if (useCase === "reporting") {
+        content += `### 3. Reporting Jobs
 
 \`\`\`sql
 -- Daily summary at 6 AM
@@ -125,8 +129,8 @@ SELECT cron.schedule('monthly-report', '0 0 1 * *',
     $$CALL generate_monthly_report()$$);
 \`\`\`
 `;
-            } else if (useCase === 'etl') {
-                content += `### 3. ETL Jobs
+      } else if (useCase === "etl") {
+        content += `### 3. ETL Jobs
 
 \`\`\`sql
 -- Incremental data load every 15 minutes
@@ -142,8 +146,8 @@ SELECT cron.schedule('refresh-staging', '0 5 * * 1-5',
     $$TRUNCATE staging_tables; CALL populate_staging()$$);
 \`\`\`
 `;
-            } else {
-                content += `### 3. Backup Jobs
+      } else {
+        content += `### 3. Backup Jobs
 
 \`\`\`sql
 -- Note: pg_cron runs SQL, not shell commands
@@ -158,9 +162,9 @@ SELECT cron.schedule('request-backup', '0 3 * * *',
       VALUES (NOW(), 'pending')$$);
 \`\`\`
 `;
-            }
+      }
 
-            content += `
+      content += `
 ### 4. Managing Jobs
 
 **List jobs:** Use \`pg_cron_list_jobs\`
@@ -229,7 +233,7 @@ SELECT cron.schedule_in_database(
 
 **Pro Tip:** Combine pg_cron with pg_partman for automatic partition maintenance!`;
 
-            return content;
-        }
-    };
+      return content;
+    },
+  };
 }

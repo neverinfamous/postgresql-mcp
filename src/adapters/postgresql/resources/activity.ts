@@ -1,38 +1,44 @@
 /**
  * Activity Resource
- * 
+ *
  * Current database connections and running queries with blocking detection.
  */
 
-import type { PostgresAdapter } from '../PostgresAdapter.js';
-import type { ResourceDefinition, RequestContext } from '../../../types/index.js';
+import type { PostgresAdapter } from "../PostgresAdapter.js";
+import type {
+  ResourceDefinition,
+  RequestContext,
+} from "../../../types/index.js";
 
 /** Safely convert unknown value to string */
 function toStr(value: unknown): string {
-    if (typeof value === 'string') return value;
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'number') return value.toString();
-    if (typeof value === 'object') return JSON.stringify(value);
-    return '';
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") return value.toString();
+  if (typeof value === "object") return JSON.stringify(value);
+  return "";
 }
 
 interface BlockingRelationship {
-    blockerPid: number;
-    blockerQuery: string;
-    blockedPid: number;
-    blockedQuery: string;
-    blockedDuration: string;
+  blockerPid: number;
+  blockerQuery: string;
+  blockedPid: number;
+  blockedQuery: string;
+  blockedDuration: string;
 }
 
-export function createActivityResource(adapter: PostgresAdapter): ResourceDefinition {
-    return {
-        uri: 'postgres://activity',
-        name: 'Active Connections',
-        description: 'Current database connections, running queries with duration, and blocking relationship detection',
-        mimeType: 'application/json',
-        handler: async (_uri: string, _context: RequestContext) => {
-            // Get connections with formatted duration
-            const result = await adapter.executeQuery(`
+export function createActivityResource(
+  adapter: PostgresAdapter,
+): ResourceDefinition {
+  return {
+    uri: "postgres://activity",
+    name: "Active Connections",
+    description:
+      "Current database connections, running queries with duration, and blocking relationship detection",
+    mimeType: "application/json",
+    handler: async (_uri: string, _context: RequestContext) => {
+      // Get connections with formatted duration
+      const result = await adapter.executeQuery(`
                 SELECT pid, usename, datname, client_addr, state,
                        query_start, state_change,
                        now() - query_start as duration,
@@ -55,21 +61,21 @@ export function createActivityResource(adapter: PostgresAdapter): ResourceDefini
                 ORDER BY query_start NULLS LAST
             `);
 
-            // Connection counts by state
-            const counts = await adapter.executeQuery(`
+      // Connection counts by state
+      const counts = await adapter.executeQuery(`
                 SELECT state, count(*) as count
                 FROM pg_stat_activity
                 WHERE pid != pg_backend_pid()
                 GROUP BY state
             `);
 
-            // Detect blocking relationships
-            let blockingRelationships: BlockingRelationship[] = [];
-            let blockingCount = 0;
-            let blockedCount = 0;
+      // Detect blocking relationships
+      let blockingRelationships: BlockingRelationship[] = [];
+      let blockingCount = 0;
+      let blockedCount = 0;
 
-            try {
-                const blockingResult = await adapter.executeQuery(`
+      try {
+        const blockingResult = await adapter.executeQuery(`
                     SELECT 
                         blocker.pid as blocker_pid,
                         LEFT(blocker.query, 100) as blocker_query,
@@ -89,43 +95,53 @@ export function createActivityResource(adapter: PostgresAdapter): ResourceDefini
                     LIMIT 20
                 `);
 
-                if (blockingResult.rows && blockingResult.rows.length > 0) {
-                    blockingRelationships = blockingResult.rows.map(row => ({
-                        blockerPid: Number(row['blocker_pid']),
-                        blockerQuery: toStr(row['blocker_query']),
-                        blockedPid: Number(row['blocked_pid']),
-                        blockedQuery: toStr(row['blocked_query']),
-                        blockedDuration: toStr(row['blocked_duration'])
-                    }));
+        if (blockingResult.rows && blockingResult.rows.length > 0) {
+          blockingRelationships = blockingResult.rows.map((row) => ({
+            blockerPid: Number(row["blocker_pid"]),
+            blockerQuery: toStr(row["blocker_query"]),
+            blockedPid: Number(row["blocked_pid"]),
+            blockedQuery: toStr(row["blocked_query"]),
+            blockedDuration: toStr(row["blocked_duration"]),
+          }));
 
-                    // Count unique blockers and blocked
-                    const blockers = new Set(blockingRelationships.map(r => r.blockerPid));
-                    const blocked = new Set(blockingRelationships.map(r => r.blockedPid));
-                    blockingCount = blockers.size;
-                    blockedCount = blocked.size;
-                }
-            } catch {
-                // pg_blocking_pids might not be available in older versions
-            }
-
-            // Generate summary
-            const activeCount = result.rows?.filter((r: Record<string, unknown>) => r['state'] === 'active').length ?? 0;
-            const idleCount = result.rows?.filter((r: Record<string, unknown>) => r['state'] === 'idle').length ?? 0;
-
-            return {
-                connections: result.rows,
-                total: result.rows?.length ?? 0,
-                byState: counts.rows,
-                activeQueries: activeCount,
-                idleConnections: idleCount,
-                blockingRelationships,
-                blockingCount,
-                blockedCount,
-                summary: blockedCount > 0
-                    ? `${String(result.rows?.length ?? 0)} connections (${String(activeCount)} active). ${String(blockedCount)} queries blocked by ${String(blockingCount)} blocker(s).`
-                    : `${String(result.rows?.length ?? 0)} connections (${String(activeCount)} active, ${String(idleCount)} idle). No blocking detected.`
-            };
+          // Count unique blockers and blocked
+          const blockers = new Set(
+            blockingRelationships.map((r) => r.blockerPid),
+          );
+          const blocked = new Set(
+            blockingRelationships.map((r) => r.blockedPid),
+          );
+          blockingCount = blockers.size;
+          blockedCount = blocked.size;
         }
-    };
-}
+      } catch {
+        // pg_blocking_pids might not be available in older versions
+      }
 
+      // Generate summary
+      const activeCount =
+        result.rows?.filter(
+          (r: Record<string, unknown>) => r["state"] === "active",
+        ).length ?? 0;
+      const idleCount =
+        result.rows?.filter(
+          (r: Record<string, unknown>) => r["state"] === "idle",
+        ).length ?? 0;
+
+      return {
+        connections: result.rows,
+        total: result.rows?.length ?? 0,
+        byState: counts.rows,
+        activeQueries: activeCount,
+        idleConnections: idleCount,
+        blockingRelationships,
+        blockingCount,
+        blockedCount,
+        summary:
+          blockedCount > 0
+            ? `${String(result.rows?.length ?? 0)} connections (${String(activeCount)} active). ${String(blockedCount)} queries blocked by ${String(blockingCount)} blocker(s).`
+            : `${String(result.rows?.length ?? 0)} connections (${String(activeCount)} active, ${String(idleCount)} idle). No blocking detected.`,
+      };
+    },
+  };
+}

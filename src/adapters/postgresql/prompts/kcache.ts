@@ -1,27 +1,31 @@
 /**
  * pg_stat_kcache Setup Prompt
- * 
+ *
  * Complete guide for setting up OS-level performance monitoring with pg_stat_kcache.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createSetupKcachePrompt(): PromptDefinition {
-    return {
-        name: 'pg_setup_kcache',
-        description: 'Complete guide for setting up OS-level CPU and I/O performance monitoring with pg_stat_kcache.',
-        arguments: [
-            {
-                name: 'focus',
-                description: 'Analysis focus: cpu, io, memory, all',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const focus = args['focus'] ?? 'all';
+  return {
+    name: "pg_setup_kcache",
+    description:
+      "Complete guide for setting up OS-level CPU and I/O performance monitoring with pg_stat_kcache.",
+    arguments: [
+      {
+        name: "focus",
+        description: "Analysis focus: cpu, io, memory, all",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const focus = args["focus"] ?? "all";
 
-            return `# pg_stat_kcache Setup Guide - ${focus.toUpperCase()} Analysis
+      return `# pg_stat_kcache Setup Guide - ${focus.toUpperCase()} Analysis
 
 ## pg_stat_kcache Overview
 
@@ -76,7 +80,9 @@ SELECT * FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_stat_kcac
 | \`minflts\` | Minor page faults (soft) | count |
 | \`majflts\` | Major page faults (hard) | count |
 
-${focus === 'cpu' || focus === 'all' ? `
+${
+  focus === "cpu" || focus === "all"
+    ? `
 ### 4. CPU Analysis
 
 **Find CPU-intensive queries:**
@@ -98,9 +104,13 @@ Or use: \`pg_kcache_top_cpu\`
 - High user_time + system_time
 - Low reads/writes relative to CPU
 - Common causes: complex calculations, string operations, JSON processing
-` : ''}
+`
+    : ""
+}
 
-${focus === 'io' || focus === 'all' ? `
+${
+  focus === "io" || focus === "all"
+    ? `
 ### 5. I/O Analysis
 
 **Find I/O-intensive queries:**
@@ -123,9 +133,13 @@ Or use: \`pg_kcache_top_io\`
 - High reads/writes
 - Lower CPU time relative to I/O
 - Common causes: sequential scans, missing indexes, large result sets
-` : ''}
+`
+    : ""
+}
 
-${focus === 'memory' || focus === 'all' ? `
+${
+  focus === "memory" || focus === "all"
+    ? `
 ### 6. Memory Analysis
 
 **Find queries with memory pressure:**
@@ -146,7 +160,9 @@ LIMIT 10;
 - High major page faults (disk access for memory)
 - High minor faults relative to data size
 - Common causes: insufficient shared_buffers, work_mem too low
-` : ''}
+`
+    : ""
+}
 
 ### 7. Resource Classification
 
@@ -219,6 +235,6 @@ GROUP BY 1;
 - ❌ Ignoring the difference between user and system CPU
 
 **Pro Tip:** Combine pg_stat_kcache with EXPLAIN (ANALYZE, BUFFERS) for complete query diagnostics!`;
-        }
-    };
+    },
+  };
 }

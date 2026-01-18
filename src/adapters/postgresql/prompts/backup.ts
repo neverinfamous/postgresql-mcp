@@ -1,33 +1,37 @@
 /**
  * Backup Strategy Prompt
- * 
+ *
  * Enterprise backup planning with RTO/RPO considerations.
  */
 
-import type { PromptDefinition, RequestContext } from '../../../types/index.js';
+import type { PromptDefinition, RequestContext } from "../../../types/index.js";
 
 export function createBackupStrategyPrompt(): PromptDefinition {
-    return {
-        name: 'pg_backup_strategy',
-        description: 'Design enterprise backup strategy with logical, physical, and continuous archiving options.',
-        arguments: [
-            {
-                name: 'backupType',
-                description: 'Backup type: logical, physical, or continuous',
-                required: false
-            },
-            {
-                name: 'retentionDays',
-                description: 'Retention period in days (default: 30)',
-                required: false
-            }
-        ],
-        // eslint-disable-next-line @typescript-eslint/require-await
-        handler: async (args: Record<string, string>, _context: RequestContext): Promise<string> => {
-            const backupType = args['backupType'] ?? 'logical';
-            const retentionDays = args['retentionDays'] ?? '30';
+  return {
+    name: "pg_backup_strategy",
+    description:
+      "Design enterprise backup strategy with logical, physical, and continuous archiving options.",
+    arguments: [
+      {
+        name: "backupType",
+        description: "Backup type: logical, physical, or continuous",
+        required: false,
+      },
+      {
+        name: "retentionDays",
+        description: "Retention period in days (default: 30)",
+        required: false,
+      },
+    ],
+    // eslint-disable-next-line @typescript-eslint/require-await
+    handler: async (
+      args: Record<string, string>,
+      _context: RequestContext,
+    ): Promise<string> => {
+      const backupType = args["backupType"] ?? "logical";
+      const retentionDays = args["retentionDays"] ?? "30";
 
-            let content = `# Enterprise Backup Strategy - ${backupType.charAt(0).toUpperCase() + backupType.slice(1)} Backup
+      let content = `# Enterprise Backup Strategy - ${backupType.charAt(0).toUpperCase() + backupType.slice(1)} Backup
 
 Retention Period: **${retentionDays} days**
 
@@ -61,8 +65,8 @@ Use \`pg_capacity_planning\` to analyze growth patterns.
 ### 2. Backup Schedule
 `;
 
-            if (backupType === 'logical') {
-                content += `
+      if (backupType === "logical") {
+        content += `
 **Logical Backup Schedule:**
 
 - **Full Backup:** Daily at 2:00 AM
@@ -75,8 +79,8 @@ Use \`pg_capacity_planning\` to analyze growth patterns.
   pg_dump --schema-only -f /backup/schema_$(date +%Y%m%d).sql dbname
   \`\`\`
 `;
-            } else if (backupType === 'physical') {
-                content += `
+      } else if (backupType === "physical") {
+        content += `
 **Physical Backup Schedule:**
 
 - **Base Backup:** Weekly on Sunday at 2:00 AM
@@ -90,17 +94,17 @@ Use \`pg_capacity_planning\` to analyze growth patterns.
   archive_command = 'cp %p /backup/wal/%f'
   \`\`\`
 `;
-            } else {
-                content += `
+      } else {
+        content += `
 **Continuous Archiving Schedule:**
 
 - **Base Backup:** Weekly on Sunday at 2:00 AM
 - **WAL Archiving:** Continuous (every 16MB or 1 minute)
 - **PITR:** Available to any point in time
 `;
-            }
+      }
 
-            content += `
+      content += `
 ### 3. Implement Backup
 
 Use \`pg_backup_logical\` or \`pg_backup_physical\` tool.
@@ -130,7 +134,7 @@ pg_restore -d dbname /backup/latest.dump
 
 **Pro Tip:** The best backup is the one you've successfully restored - test your backups regularly!`;
 
-            return content;
-        }
-    };
+      return content;
+    },
+  };
 }

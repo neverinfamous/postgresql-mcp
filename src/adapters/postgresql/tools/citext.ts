@@ -1,119 +1,130 @@
 /**
  * PostgreSQL citext Extension Tools
- * 
+ *
  * Case-insensitive text type for preventing subtle bugs in auth systems,
  * emails, and usernames. 6 tools total.
- * 
+ *
  * citext provides a case-insensitive character string type at the type level:
  * - Comparisons are case-insensitive (e.g., 'HELLO' = 'hello')
  * - Sorting is case-insensitive
  * - Ideal for email, username, and other identifier columns
  */
 
-import type { PostgresAdapter } from '../PostgresAdapter.js';
-import type { ToolDefinition, RequestContext } from '../../../types/index.js';
-import { z } from 'zod';
-import { readOnly, write } from '../../../utils/annotations.js';
-import { getToolIcons } from '../../../utils/icons.js';
+import type { PostgresAdapter } from "../PostgresAdapter.js";
+import type { ToolDefinition, RequestContext } from "../../../types/index.js";
+import { z } from "zod";
+import { readOnly, write } from "../../../utils/annotations.js";
+import { getToolIcons } from "../../../utils/icons.js";
 import {
-    CitextConvertColumnSchema,
-    CitextConvertColumnSchemaBase,
-    CitextListColumnsSchema,
-    CitextAnalyzeCandidatesSchema,
-    CitextSchemaAdvisorSchema,
-    CitextSchemaAdvisorSchemaBase
-} from '../schemas/index.js';
+  CitextConvertColumnSchema,
+  CitextConvertColumnSchemaBase,
+  CitextListColumnsSchema,
+  CitextAnalyzeCandidatesSchema,
+  CitextSchemaAdvisorSchema,
+  CitextSchemaAdvisorSchemaBase,
+} from "../schemas/index.js";
 
 /**
  * Get all citext tools
  */
 export function getCitextTools(adapter: PostgresAdapter): ToolDefinition[] {
-    return [
-        createCitextExtensionTool(adapter),
-        createCitextConvertColumnTool(adapter),
-        createCitextListColumnsTool(adapter),
-        createCitextAnalyzeCandidatesTool(adapter),
-        createCitextCompareTool(adapter),
-        createCitextSchemaAdvisorTool(adapter)
-    ];
+  return [
+    createCitextExtensionTool(adapter),
+    createCitextConvertColumnTool(adapter),
+    createCitextListColumnsTool(adapter),
+    createCitextAnalyzeCandidatesTool(adapter),
+    createCitextCompareTool(adapter),
+    createCitextSchemaAdvisorTool(adapter),
+  ];
 }
 
 /**
  * Enable the citext extension
  */
 function createCitextExtensionTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_citext_create_extension',
-        description: `Enable the citext extension for case-insensitive text columns.
+  return {
+    name: "pg_citext_create_extension",
+    description: `Enable the citext extension for case-insensitive text columns.
 citext is ideal for emails, usernames, and other identifiers where case shouldn't matter.`,
-        group: 'citext',
-        inputSchema: z.object({}),
-        annotations: write('Create Citext Extension'),
-        icons: getToolIcons('citext', write('Create Citext Extension')),
-        handler: async (_params: unknown, _context: RequestContext) => {
-            await adapter.executeQuery('CREATE EXTENSION IF NOT EXISTS citext');
-            return {
-                success: true,
-                message: 'citext extension enabled',
-                usage: 'Create columns with type CITEXT instead of TEXT for case-insensitive comparisons'
-            };
-        }
-    };
+    group: "citext",
+    inputSchema: z.object({}),
+    annotations: write("Create Citext Extension"),
+    icons: getToolIcons("citext", write("Create Citext Extension")),
+    handler: async (_params: unknown, _context: RequestContext) => {
+      await adapter.executeQuery("CREATE EXTENSION IF NOT EXISTS citext");
+      return {
+        success: true,
+        message: "citext extension enabled",
+        usage:
+          "Create columns with type CITEXT instead of TEXT for case-insensitive comparisons",
+      };
+    },
+  };
 }
 
 /**
  * Convert an existing text column to citext
  */
-function createCitextConvertColumnTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_citext_convert_column',
-        description: `Convert an existing TEXT column to CITEXT for case-insensitive comparisons.
+function createCitextConvertColumnTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  return {
+    name: "pg_citext_convert_column",
+    description: `Convert an existing TEXT column to CITEXT for case-insensitive comparisons.
 This is useful for retrofitting case-insensitivity to existing columns like email or username.
 Note: If views depend on this column, you must drop and recreate them manually before conversion.`,
-        group: 'citext',
-        inputSchema: CitextConvertColumnSchemaBase,
-        annotations: write('Convert to Citext'),
-        icons: getToolIcons('citext', write('Convert to Citext')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const parsed = CitextConvertColumnSchema.parse(params ?? {});
-            const { table, column, schema: schemaOpt } = parsed;
-            const schemaName = schemaOpt ?? 'public';
-            const qualifiedTable = `"${schemaName}"."${table}"`;
+    group: "citext",
+    inputSchema: CitextConvertColumnSchemaBase,
+    annotations: write("Convert to Citext"),
+    icons: getToolIcons("citext", write("Convert to Citext")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const parsed = CitextConvertColumnSchema.parse(params ?? {});
+      const { table, column, schema: schemaOpt } = parsed;
+      const schemaName = schemaOpt ?? "public";
+      const qualifiedTable = `"${schemaName}"."${table}"`;
 
-            const extCheck = await adapter.executeQuery(`
+      const extCheck = await adapter.executeQuery(`
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'citext'
                 ) as installed
             `);
 
-            const hasExt = extCheck.rows?.[0]?.['installed'] as boolean ?? false;
-            if (!hasExt) {
-                throw new Error('citext extension is not installed. Run pg_citext_create_extension first.');
-            }
+      const hasExt = (extCheck.rows?.[0]?.["installed"] as boolean) ?? false;
+      if (!hasExt) {
+        throw new Error(
+          "citext extension is not installed. Run pg_citext_create_extension first.",
+        );
+      }
 
-            const colCheck = await adapter.executeQuery(`
+      const colCheck = await adapter.executeQuery(
+        `
                 SELECT data_type 
                 FROM information_schema.columns 
                 WHERE table_schema = $1 
                   AND table_name = $2 
                   AND column_name = $3
-            `, [schemaName, table, column]);
+            `,
+        [schemaName, table, column],
+      );
 
-            if (!colCheck.rows || colCheck.rows.length === 0) {
-                throw new Error(`Column "${column}" not found in table ${qualifiedTable}. Verify the table and column names.`);
-            }
+      if (!colCheck.rows || colCheck.rows.length === 0) {
+        throw new Error(
+          `Column "${column}" not found in table ${qualifiedTable}. Verify the table and column names.`,
+        );
+      }
 
-            const currentType = colCheck.rows[0]?.['data_type'] as string;
-            if (currentType === 'citext') {
-                return {
-                    success: true,
-                    message: `Column ${column} is already citext`,
-                    wasAlreadyCitext: true
-                };
-            }
+      const currentType = colCheck.rows[0]?.["data_type"] as string;
+      if (currentType === "citext") {
+        return {
+          success: true,
+          message: `Column ${column} is already citext`,
+          wasAlreadyCitext: true,
+        };
+      }
 
-            // Check for dependent views before attempting the conversion
-            const depCheck = await adapter.executeQuery(`
+      // Check for dependent views before attempting the conversion
+      const depCheck = await adapter.executeQuery(
+        `
                 SELECT DISTINCT 
                     c.relname as dependent_view,
                     n.nspname as view_schema
@@ -128,73 +139,91 @@ Note: If views depend on this column, you must drop and recreate them manually b
                   AND tn.nspname = $1
                   AND t.relname = $2
                   AND a.attname = $3
-            `, [schemaName, table, column]);
+            `,
+        [schemaName, table, column],
+      );
 
-            const dependentViews = depCheck.rows ?? [];
+      const dependentViews = depCheck.rows ?? [];
 
-            if (dependentViews.length > 0) {
-                return {
-                    success: false,
-                    error: 'Column has dependent views that must be dropped before conversion',
-                    dependentViews: dependentViews.map(v => `${v['view_schema'] as string}.${v['dependent_view'] as string}`),
-                    hint: 'Drop the listed views, run this conversion, then recreate the views. PostgreSQL cannot ALTER COLUMN TYPE when views depend on it.'
-                };
-            }
+      if (dependentViews.length > 0) {
+        return {
+          success: false,
+          error:
+            "Column has dependent views that must be dropped before conversion",
+          dependentViews: dependentViews.map(
+            (v) =>
+              `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
+          ),
+          hint: "Drop the listed views, run this conversion, then recreate the views. PostgreSQL cannot ALTER COLUMN TYPE when views depend on it.",
+        };
+      }
 
-            try {
-                await adapter.executeQuery(`
+      try {
+        await adapter.executeQuery(`
                     ALTER TABLE ${qualifiedTable}
                     ALTER COLUMN "${column}" TYPE citext USING "${column}"::citext
                 `);
 
-                return {
-                    success: true,
-                    message: `Column ${column} converted from ${currentType} to citext`,
-                    table: qualifiedTable,
-                    previousType: currentType,
-                    affectedViews: dependentViews.length > 0 ? dependentViews.map(v => `${v['view_schema'] as string}.${v['dependent_view'] as string}`) : undefined
-                };
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                return {
-                    success: false,
-                    error: `Failed to convert column: ${errorMessage}`,
-                    hint: 'If views depend on this column, they may need to be dropped and recreated',
-                    dependentViews: dependentViews.length > 0 ? dependentViews.map(v => `${v['view_schema'] as string}.${v['dependent_view'] as string}`) : undefined
-                };
-            }
-        }
-    };
+        return {
+          success: true,
+          message: `Column ${column} converted from ${currentType} to citext`,
+          table: qualifiedTable,
+          previousType: currentType,
+          affectedViews:
+            dependentViews.length > 0
+              ? dependentViews.map(
+                  (v) =>
+                    `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
+                )
+              : undefined,
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          error: `Failed to convert column: ${errorMessage}`,
+          hint: "If views depend on this column, they may need to be dropped and recreated",
+          dependentViews:
+            dependentViews.length > 0
+              ? dependentViews.map(
+                  (v) =>
+                    `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
+                )
+              : undefined,
+        };
+      }
+    },
+  };
 }
-
 
 /**
  * List all citext columns in the database
  */
 function createCitextListColumnsTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_citext_list_columns',
-        description: `List all columns using the citext type in the database.
+  return {
+    name: "pg_citext_list_columns",
+    description: `List all columns using the citext type in the database.
 Useful for auditing case-insensitive columns.`,
-        group: 'citext',
-        inputSchema: CitextListColumnsSchema,
-        annotations: readOnly('List Citext Columns'),
-        icons: getToolIcons('citext', readOnly('List Citext Columns')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { schema } = CitextListColumnsSchema.parse(params);
+    group: "citext",
+    inputSchema: CitextListColumnsSchema,
+    annotations: readOnly("List Citext Columns"),
+    icons: getToolIcons("citext", readOnly("List Citext Columns")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { schema } = CitextListColumnsSchema.parse(params);
 
-            const conditions: string[] = [
-                "udt_name = 'citext'",
-                "table_schema NOT IN ('pg_catalog', 'information_schema')"
-            ];
-            const queryParams: unknown[] = [];
+      const conditions: string[] = [
+        "udt_name = 'citext'",
+        "table_schema NOT IN ('pg_catalog', 'information_schema')",
+      ];
+      const queryParams: unknown[] = [];
 
-            if (schema !== undefined) {
-                conditions.push(`table_schema = $1`);
-                queryParams.push(schema);
-            }
+      if (schema !== undefined) {
+        conditions.push(`table_schema = $1`);
+        queryParams.push(schema);
+      }
 
-            const sql = `
+      const sql = `
                 SELECT 
                     table_schema,
                     table_name,
@@ -202,63 +231,76 @@ Useful for auditing case-insensitive columns.`,
                     is_nullable,
                     column_default
                 FROM information_schema.columns
-                WHERE ${conditions.join(' AND ')}
+                WHERE ${conditions.join(" AND ")}
                 ORDER BY table_schema, table_name, ordinal_position
             `;
 
-            const result = await adapter.executeQuery(sql, queryParams);
+      const result = await adapter.executeQuery(sql, queryParams);
 
-            return {
-                columns: result.rows ?? [],
-                count: result.rows?.length ?? 0
-            };
-        }
-    };
+      return {
+        columns: result.rows ?? [],
+        count: result.rows?.length ?? 0,
+      };
+    },
+  };
 }
 
 /**
  * Analyze text columns that could benefit from citext
  */
-function createCitextAnalyzeCandidatesTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_citext_analyze_candidates',
-        description: `Find TEXT columns that may benefit from case-insensitive comparisons.
+function createCitextAnalyzeCandidatesTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  return {
+    name: "pg_citext_analyze_candidates",
+    description: `Find TEXT columns that may benefit from case-insensitive comparisons.
 Looks for common patterns like email, username, name, slug, etc.`,
-        group: 'citext',
-        inputSchema: CitextAnalyzeCandidatesSchema,
-        annotations: readOnly('Analyze Citext Candidates'),
-        icons: getToolIcons('citext', readOnly('Analyze Citext Candidates')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { patterns, schema } = CitextAnalyzeCandidatesSchema.parse(params);
+    group: "citext",
+    inputSchema: CitextAnalyzeCandidatesSchema,
+    annotations: readOnly("Analyze Citext Candidates"),
+    icons: getToolIcons("citext", readOnly("Analyze Citext Candidates")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { patterns, schema } = CitextAnalyzeCandidatesSchema.parse(params);
 
-            const searchPatterns = patterns ?? [
-                'email', 'e_mail', 'mail',
-                'username', 'user_name', 'login',
-                'name', 'first_name', 'last_name', 'full_name',
-                'slug', 'handle', 'nickname',
-                'code', 'sku', 'identifier'
-            ];
+      const searchPatterns = patterns ?? [
+        "email",
+        "e_mail",
+        "mail",
+        "username",
+        "user_name",
+        "login",
+        "name",
+        "first_name",
+        "last_name",
+        "full_name",
+        "slug",
+        "handle",
+        "nickname",
+        "code",
+        "sku",
+        "identifier",
+      ];
 
-            const conditions: string[] = [
-                "data_type IN ('text', 'character varying')",
-                "table_schema NOT IN ('pg_catalog', 'information_schema')"
-            ];
-            const queryParams: unknown[] = [];
-            let paramIndex = 1;
+      const conditions: string[] = [
+        "data_type IN ('text', 'character varying')",
+        "table_schema NOT IN ('pg_catalog', 'information_schema')",
+      ];
+      const queryParams: unknown[] = [];
+      let paramIndex = 1;
 
-            if (schema !== undefined) {
-                conditions.push(`table_schema = $${String(paramIndex++)}`);
-                queryParams.push(schema);
-            }
+      if (schema !== undefined) {
+        conditions.push(`table_schema = $${String(paramIndex++)}`);
+        queryParams.push(schema);
+      }
 
-            const patternConditions = searchPatterns.map(p => {
-                const idx = paramIndex++;
-                queryParams.push(`%${p}%`);
-                return `LOWER(column_name) LIKE $${String(idx)}`;
-            });
-            conditions.push(`(${patternConditions.join(' OR ')})`);
+      const patternConditions = searchPatterns.map((p) => {
+        const idx = paramIndex++;
+        queryParams.push(`%${p}%`);
+        return `LOWER(column_name) LIKE $${String(idx)}`;
+      });
+      conditions.push(`(${patternConditions.join(" OR ")})`);
 
-            const sql = `
+      const sql = `
                 SELECT 
                     table_schema,
                     table_name,
@@ -267,140 +309,159 @@ Looks for common patterns like email, username, name, slug, etc.`,
                     character_maximum_length,
                     is_nullable
                 FROM information_schema.columns
-                WHERE ${conditions.join(' AND ')}
+                WHERE ${conditions.join(" AND ")}
                 ORDER BY table_schema, table_name, ordinal_position
             `;
 
-            const result = await adapter.executeQuery(sql, queryParams);
-            const candidates = result.rows ?? [];
+      const result = await adapter.executeQuery(sql, queryParams);
+      const candidates = result.rows ?? [];
 
-            const highConfidence: Record<string, unknown>[] = [];
-            const mediumConfidence: Record<string, unknown>[] = [];
+      const highConfidence: Record<string, unknown>[] = [];
+      const mediumConfidence: Record<string, unknown>[] = [];
 
-            for (const row of candidates) {
-                const colName = (row['column_name'] as string).toLowerCase();
-                if (colName.includes('email') || colName.includes('username') || colName === 'login') {
-                    highConfidence.push(row);
-                } else {
-                    mediumConfidence.push(row);
-                }
-            }
-
-            return {
-                candidates,
-                count: candidates.length,
-                summary: {
-                    highConfidence: highConfidence.length,
-                    mediumConfidence: mediumConfidence.length
-                },
-                highConfidenceCandidates: highConfidence,
-                mediumConfidenceCandidates: mediumConfidence,
-                recommendation: candidates.length > 0
-                    ? 'Consider converting these columns to citext for case-insensitive comparisons'
-                    : 'No obvious candidates found. Use custom patterns if needed.'
-            };
+      for (const row of candidates) {
+        const colName = (row["column_name"] as string).toLowerCase();
+        if (
+          colName.includes("email") ||
+          colName.includes("username") ||
+          colName === "login"
+        ) {
+          highConfidence.push(row);
+        } else {
+          mediumConfidence.push(row);
         }
-    };
+      }
+
+      return {
+        candidates,
+        count: candidates.length,
+        summary: {
+          highConfidence: highConfidence.length,
+          mediumConfidence: mediumConfidence.length,
+        },
+        highConfidenceCandidates: highConfidence,
+        mediumConfidenceCandidates: mediumConfidence,
+        recommendation:
+          candidates.length > 0
+            ? "Consider converting these columns to citext for case-insensitive comparisons"
+            : "No obvious candidates found. Use custom patterns if needed.",
+      };
+    },
+  };
 }
 
 /**
  * Compare values case-insensitively
  */
 function createCitextCompareTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_citext_compare',
-        description: `Compare two values using case-insensitive semantics.
+  return {
+    name: "pg_citext_compare",
+    description: `Compare two values using case-insensitive semantics.
 Useful for testing citext behavior before converting columns.`,
-        group: 'citext',
-        inputSchema: z.object({
-            value1: z.string().describe('First value to compare'),
-            value2: z.string().describe('Second value to compare')
-        }),
-        annotations: readOnly('Compare Citext Values'),
-        icons: getToolIcons('citext', readOnly('Compare Citext Values')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            // Use the schema for proper validation
-            const schema = z.object({
-                value1: z.string(),
-                value2: z.string()
-            });
-            const { value1, value2 } = schema.parse(params);
+    group: "citext",
+    inputSchema: z.object({
+      value1: z.string().describe("First value to compare"),
+      value2: z.string().describe("Second value to compare"),
+    }),
+    annotations: readOnly("Compare Citext Values"),
+    icons: getToolIcons("citext", readOnly("Compare Citext Values")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      // Use the schema for proper validation
+      const schema = z.object({
+        value1: z.string(),
+        value2: z.string(),
+      });
+      const { value1, value2 } = schema.parse(params);
 
-            const extCheck = await adapter.executeQuery(`
+      const extCheck = await adapter.executeQuery(`
                 SELECT EXISTS(
                     SELECT 1 FROM pg_extension WHERE extname = 'citext'
                 ) as installed
             `);
 
-            const hasExt = extCheck.rows?.[0]?.['installed'] as boolean ?? false;
+      const hasExt = (extCheck.rows?.[0]?.["installed"] as boolean) ?? false;
 
-            if (hasExt) {
-                const result = await adapter.executeQuery(`
+      if (hasExt) {
+        const result = await adapter.executeQuery(
+          `
                     SELECT 
                         $1::citext = $2::citext as citext_equal,
                         $1::text = $2::text as text_equal,
                         LOWER($1) = LOWER($2) as lower_equal
-                `, [value1, value2]);
+                `,
+          [value1, value2],
+        );
 
-                const row = result.rows?.[0];
-                return {
-                    value1,
-                    value2,
-                    citextEqual: row?.['citext_equal'] as boolean,
-                    textEqual: row?.['text_equal'] as boolean,
-                    lowerEqual: row?.['lower_equal'] as boolean,
-                    extensionInstalled: true
-                };
-            } else {
-                const result = await adapter.executeQuery(`
+        const row = result.rows?.[0];
+        return {
+          value1,
+          value2,
+          citextEqual: row?.["citext_equal"] as boolean,
+          textEqual: row?.["text_equal"] as boolean,
+          lowerEqual: row?.["lower_equal"] as boolean,
+          extensionInstalled: true,
+        };
+      } else {
+        const result = await adapter.executeQuery(
+          `
                     SELECT 
                         $1::text = $2::text as text_equal,
                         LOWER($1) = LOWER($2) as lower_equal
-                `, [value1, value2]);
+                `,
+          [value1, value2],
+        );
 
-                const row = result.rows?.[0];
-                return {
-                    value1,
-                    value2,
-                    textEqual: row?.['text_equal'] as boolean,
-                    lowerEqual: row?.['lower_equal'] as boolean,
-                    extensionInstalled: false,
-                    hint: 'Install citext extension for native case-insensitive comparisons'
-                };
-            }
-        }
-    };
+        const row = result.rows?.[0];
+        return {
+          value1,
+          value2,
+          textEqual: row?.["text_equal"] as boolean,
+          lowerEqual: row?.["lower_equal"] as boolean,
+          extensionInstalled: false,
+          hint: "Install citext extension for native case-insensitive comparisons",
+        };
+      }
+    },
+  };
 }
 
 /**
  * Schema advisor for citext columns
  */
-function createCitextSchemaAdvisorTool(adapter: PostgresAdapter): ToolDefinition {
-    return {
-        name: 'pg_citext_schema_advisor',
-        description: `Analyze a specific table and recommend which columns should use citext.
+function createCitextSchemaAdvisorTool(
+  adapter: PostgresAdapter,
+): ToolDefinition {
+  return {
+    name: "pg_citext_schema_advisor",
+    description: `Analyze a specific table and recommend which columns should use citext.
 Provides schema design recommendations based on column names and existing data patterns.
 Requires the 'table' parameter to specify which table to analyze.`,
-        group: 'citext',
-        inputSchema: CitextSchemaAdvisorSchemaBase,
-        annotations: readOnly('Citext Schema Advisor'),
-        icons: getToolIcons('citext', readOnly('Citext Schema Advisor')),
-        handler: async (params: unknown, _context: RequestContext) => {
-            const { table, schema } = CitextSchemaAdvisorSchema.parse(params);
-            const schemaName = schema ?? 'public';
-            const qualifiedTable = `"${schemaName}"."${table}"`;
+    group: "citext",
+    inputSchema: CitextSchemaAdvisorSchemaBase,
+    annotations: readOnly("Citext Schema Advisor"),
+    icons: getToolIcons("citext", readOnly("Citext Schema Advisor")),
+    handler: async (params: unknown, _context: RequestContext) => {
+      const { table, schema } = CitextSchemaAdvisorSchema.parse(params);
+      const schemaName = schema ?? "public";
+      const qualifiedTable = `"${schemaName}"."${table}"`;
 
-            // First check if table exists
-            const tableCheck = await adapter.executeQuery(`
+      // First check if table exists
+      const tableCheck = await adapter.executeQuery(
+        `
                 SELECT 1 FROM information_schema.tables
                 WHERE table_schema = $1 AND table_name = $2
-            `, [schemaName, table]);
+            `,
+        [schemaName, table],
+      );
 
-            if (!tableCheck.rows || tableCheck.rows.length === 0) {
-                throw new Error(`Table ${qualifiedTable} not found. Verify the table name and schema.`);
-            }
+      if (!tableCheck.rows || tableCheck.rows.length === 0) {
+        throw new Error(
+          `Table ${qualifiedTable} not found. Verify the table name and schema.`,
+        );
+      }
 
-            const colResult = await adapter.executeQuery(`
+      const colResult = await adapter.executeQuery(
+        `
                 SELECT 
                     column_name,
                     data_type,
@@ -412,86 +473,112 @@ Requires the 'table' parameter to specify which table to analyze.`,
                   AND table_name = $2
                   AND data_type IN ('text', 'character varying', 'USER-DEFINED')
                 ORDER BY ordinal_position
-            `, [schemaName, table]);
+            `,
+        [schemaName, table],
+      );
 
-            const columns = colResult.rows ?? [];
-            const recommendations: {
-                column: string;
-                currentType: string;
-                recommendation: 'convert' | 'keep' | 'already_citext';
-                confidence: 'high' | 'medium' | 'low';
-                reason: string;
-            }[] = [];
+      const columns = colResult.rows ?? [];
+      const recommendations: {
+        column: string;
+        currentType: string;
+        recommendation: "convert" | "keep" | "already_citext";
+        confidence: "high" | "medium" | "low";
+        reason: string;
+      }[] = [];
 
-            const highConfidencePatterns = ['email', 'username', 'login', 'user_name'];
-            const mediumConfidencePatterns = ['name', 'slug', 'handle', 'code', 'sku', 'identifier', 'nickname'];
+      const highConfidencePatterns = [
+        "email",
+        "username",
+        "login",
+        "user_name",
+      ];
+      const mediumConfidencePatterns = [
+        "name",
+        "slug",
+        "handle",
+        "code",
+        "sku",
+        "identifier",
+        "nickname",
+      ];
 
-            for (const col of columns) {
-                const colName = (col['column_name'] as string).toLowerCase();
-                const dataType = col['data_type'] as string;
-                const udtName = col['udt_name'] as string;
+      for (const col of columns) {
+        const colName = (col["column_name"] as string).toLowerCase();
+        const dataType = col["data_type"] as string;
+        const udtName = col["udt_name"] as string;
 
-                if (udtName === 'citext') {
-                    recommendations.push({
-                        column: col['column_name'] as string,
-                        currentType: 'citext',
-                        recommendation: 'already_citext',
-                        confidence: 'high',
-                        reason: 'Column is already using citext'
-                    });
-                    continue;
-                }
-
-                const isHighConfidence = highConfidencePatterns.some(p => colName.includes(p));
-                const isMediumConfidence = mediumConfidencePatterns.some(p => colName.includes(p));
-
-                if (isHighConfidence) {
-                    recommendations.push({
-                        column: col['column_name'] as string,
-                        currentType: dataType,
-                        recommendation: 'convert',
-                        confidence: 'high',
-                        reason: `Column name suggests case-insensitive data (${colName} matches common identifier patterns)`
-                    });
-                } else if (isMediumConfidence) {
-                    recommendations.push({
-                        column: col['column_name'] as string,
-                        currentType: dataType,
-                        recommendation: 'convert',
-                        confidence: 'medium',
-                        reason: `Column name may benefit from case-insensitivity (${colName})`
-                    });
-                } else {
-                    recommendations.push({
-                        column: col['column_name'] as string,
-                        currentType: dataType,
-                        recommendation: 'keep',
-                        confidence: 'low',
-                        reason: 'No obvious case-insensitivity pattern detected'
-                    });
-                }
-            }
-
-            const convertCount = recommendations.filter(r => r.recommendation === 'convert').length;
-            const highCount = recommendations.filter(r => r.recommendation === 'convert' && r.confidence === 'high').length;
-
-            return {
-                table: `${schemaName}.${table}`,
-                recommendations,
-                summary: {
-                    totalTextColumns: columns.length,
-                    recommendConvert: convertCount,
-                    highConfidence: highCount,
-                    alreadyCitext: recommendations.filter(r => r.recommendation === 'already_citext').length
-                },
-                nextSteps: convertCount > 0
-                    ? [
-                        'Review recommendations above',
-                        `Use pg_citext_convert_column to convert recommended columns`,
-                        'Update application queries if they rely on case-sensitive comparisons'
-                    ]
-                    : ['No columns require conversion']
-            };
+        if (udtName === "citext") {
+          recommendations.push({
+            column: col["column_name"] as string,
+            currentType: "citext",
+            recommendation: "already_citext",
+            confidence: "high",
+            reason: "Column is already using citext",
+          });
+          continue;
         }
-    };
+
+        const isHighConfidence = highConfidencePatterns.some((p) =>
+          colName.includes(p),
+        );
+        const isMediumConfidence = mediumConfidencePatterns.some((p) =>
+          colName.includes(p),
+        );
+
+        if (isHighConfidence) {
+          recommendations.push({
+            column: col["column_name"] as string,
+            currentType: dataType,
+            recommendation: "convert",
+            confidence: "high",
+            reason: `Column name suggests case-insensitive data (${colName} matches common identifier patterns)`,
+          });
+        } else if (isMediumConfidence) {
+          recommendations.push({
+            column: col["column_name"] as string,
+            currentType: dataType,
+            recommendation: "convert",
+            confidence: "medium",
+            reason: `Column name may benefit from case-insensitivity (${colName})`,
+          });
+        } else {
+          recommendations.push({
+            column: col["column_name"] as string,
+            currentType: dataType,
+            recommendation: "keep",
+            confidence: "low",
+            reason: "No obvious case-insensitivity pattern detected",
+          });
+        }
+      }
+
+      const convertCount = recommendations.filter(
+        (r) => r.recommendation === "convert",
+      ).length;
+      const highCount = recommendations.filter(
+        (r) => r.recommendation === "convert" && r.confidence === "high",
+      ).length;
+
+      return {
+        table: `${schemaName}.${table}`,
+        recommendations,
+        summary: {
+          totalTextColumns: columns.length,
+          recommendConvert: convertCount,
+          highConfidence: highCount,
+          alreadyCitext: recommendations.filter(
+            (r) => r.recommendation === "already_citext",
+          ).length,
+        },
+        nextSteps:
+          convertCount > 0
+            ? [
+                "Review recommendations above",
+                `Use pg_citext_convert_column to convert recommended columns`,
+                "Update application queries if they rely on case-sensitive comparisons",
+              ]
+            : ["No columns require conversion"],
+      };
+    },
+  };
 }

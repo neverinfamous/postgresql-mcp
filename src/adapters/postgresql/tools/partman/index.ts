@@ -1,62 +1,62 @@
 /**
  * PostgreSQL pg_partman Extension Tools
- * 
+ *
  * Automated partition lifecycle management using pg_partman.
  * 10 tools total.
- * 
+ *
  * pg_partman provides automated creation, maintenance, and retention
  * of partitioned tables. Supports time-based and integer-based partitioning.
  */
 
-import type { PostgresAdapter } from '../../PostgresAdapter.js';
-import type { ToolDefinition } from '../../../../types/index.js';
+import type { PostgresAdapter } from "../../PostgresAdapter.js";
+import type { ToolDefinition } from "../../../../types/index.js";
 
 // Management tools
 import {
-    createPartmanExtensionTool,
-    createPartmanCreateParentTool,
-    createPartmanRunMaintenanceTool,
-    createPartmanShowPartitionsTool,
-    createPartmanShowConfigTool
-} from './management.js';
+  createPartmanExtensionTool,
+  createPartmanCreateParentTool,
+  createPartmanRunMaintenanceTool,
+  createPartmanShowPartitionsTool,
+  createPartmanShowConfigTool,
+} from "./management.js";
 
 // Operations tools
 import {
-    createPartmanCheckDefaultTool,
-    createPartmanPartitionDataTool,
-    createPartmanSetRetentionTool,
-    createPartmanUndoPartitionTool,
-    createPartmanAnalyzeHealthTool
-} from './operations.js';
+  createPartmanCheckDefaultTool,
+  createPartmanPartitionDataTool,
+  createPartmanSetRetentionTool,
+  createPartmanUndoPartitionTool,
+  createPartmanAnalyzeHealthTool,
+} from "./operations.js";
 
 /**
  * Get all pg_partman tools
  */
 export function getPartmanTools(adapter: PostgresAdapter): ToolDefinition[] {
-    return [
-        createPartmanExtensionTool(adapter),
-        createPartmanCreateParentTool(adapter),
-        createPartmanRunMaintenanceTool(adapter),
-        createPartmanShowPartitionsTool(adapter),
-        createPartmanShowConfigTool(adapter),
-        createPartmanCheckDefaultTool(adapter),
-        createPartmanPartitionDataTool(adapter),
-        createPartmanSetRetentionTool(adapter),
-        createPartmanUndoPartitionTool(adapter),
-        createPartmanAnalyzeHealthTool(adapter)
-    ];
+  return [
+    createPartmanExtensionTool(adapter),
+    createPartmanCreateParentTool(adapter),
+    createPartmanRunMaintenanceTool(adapter),
+    createPartmanShowPartitionsTool(adapter),
+    createPartmanShowConfigTool(adapter),
+    createPartmanCheckDefaultTool(adapter),
+    createPartmanPartitionDataTool(adapter),
+    createPartmanSetRetentionTool(adapter),
+    createPartmanUndoPartitionTool(adapter),
+    createPartmanAnalyzeHealthTool(adapter),
+  ];
 }
 
 // Re-export individual tool creators
 export {
-    createPartmanExtensionTool,
-    createPartmanCreateParentTool,
-    createPartmanRunMaintenanceTool,
-    createPartmanShowPartitionsTool,
-    createPartmanShowConfigTool,
-    createPartmanCheckDefaultTool,
-    createPartmanPartitionDataTool,
-    createPartmanSetRetentionTool,
-    createPartmanUndoPartitionTool,
-    createPartmanAnalyzeHealthTool
+  createPartmanExtensionTool,
+  createPartmanCreateParentTool,
+  createPartmanRunMaintenanceTool,
+  createPartmanShowPartitionsTool,
+  createPartmanShowConfigTool,
+  createPartmanCheckDefaultTool,
+  createPartmanPartitionDataTool,
+  createPartmanSetRetentionTool,
+  createPartmanUndoPartitionTool,
+  createPartmanAnalyzeHealthTool,
 };

@@ -207,25 +207,41 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
 
       const tableName = sanitizeTableName(name, schema);
 
-      // Validate table-level primaryKey includes partition key
+      // Parse partition key columns (may be comma-separated for multi-column keys)
+      // Handles: 'col1', 'col1, col2', '(col1, col2)', etc.
+      const partitionKeyColumns = partitionKey
+        .replace(/^\(|\)$/g, "") // Remove surrounding parentheses if present
+        .split(",")
+        .map((col) => col.trim())
+        .filter((col) => col.length > 0);
+
+      // Validate table-level primaryKey includes ALL partition key columns
       if (primaryKey && primaryKey.length > 0) {
-        if (!primaryKey.includes(partitionKey)) {
+        const missingColumns = partitionKeyColumns.filter(
+          (col) => !primaryKey.includes(col),
+        );
+        if (missingColumns.length > 0) {
           throw new Error(
-            `Primary key must include partition key column '${partitionKey}'. ` +
-              `Got: [${primaryKey.join(", ")}]. ` +
+            `Primary key must include all partition key columns. ` +
+              `Missing: [${missingColumns.join(", ")}]. ` +
+              `Got primaryKey: [${primaryKey.join(", ")}], partitionKey columns: [${partitionKeyColumns.join(", ")}]. ` +
               `PostgreSQL requires all partition key columns to be part of primary key constraints on partitioned tables.`,
           );
         }
       }
 
-      // Validate column-level primaryKey includes partition key
+      // Validate column-level primaryKey includes ALL partition key columns
       const columnsWithPK = columns.filter((col) => col.primaryKey === true);
       if (columnsWithPK.length > 0 && !primaryKey) {
         const pkColumnNames = columnsWithPK.map((col) => col.name);
-        if (!pkColumnNames.includes(partitionKey)) {
+        const missingCols = partitionKeyColumns.filter(
+          (col) => !pkColumnNames.includes(col),
+        );
+        if (missingCols.length > 0) {
           throw new Error(
-            `Primary key must include partition key column '${partitionKey}'. ` +
-              `Columns with primaryKey: true: [${pkColumnNames.join(", ")}]. ` +
+            `Primary key must include all partition key columns. ` +
+              `Missing: [${missingCols.join(", ")}]. ` +
+              `Columns with primaryKey: true: [${pkColumnNames.join(", ")}], partitionKey columns: [${partitionKeyColumns.join(", ")}]. ` +
               `PostgreSQL requires all partition key columns to be part of primary key constraints on partitioned tables.`,
           );
         }

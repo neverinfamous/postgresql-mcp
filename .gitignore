@@ -42,3 +42,7 @@ temp/
 # Lock files (keep package-lock.json)
 yarn.lock
 pnpm-lock.yaml
+
+# Legacy Reference
+_legacy_reference/
+

@@ -11,6 +11,10 @@
   "files": [
     "dist"
   ],
+  "workspaces": [
+    "packages/*",
+    "shared"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

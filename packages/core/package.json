@@ -1,0 +1,22 @@
+{
+    "name": "@pg-mcp/core",
+    "version": "0.1.0",
+    "type": "module",
+    "private": true,
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.25.2",
+        "@pg-mcp/shared": "*",
+        "commander": "^14.0.0",
+        "pg": "^8.17.0",
+        "zod": "^4.3.5"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.6",
+        "@types/node": "^25.0.9",
+        "@types/pg": "^8.16.0",
+        "vitest": "^4.0.17"
+    },
+    "scripts": {
+        "test": "vitest run"
+    }
+}

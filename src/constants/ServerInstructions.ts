@@ -116,8 +116,12 @@ Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSetting
 - \`connectionStats()\`: Returns \`{byDatabaseAndState, totalConnections: number, maxConnections: number}\`
 - \`showSettings({setting: 'work_mem'})\`: Accepts \`pattern\`, \`setting\`, or \`name\`. Exact names auto-match; \`%\` for LIKE patterns
 - \`capacityPlanning({days: 90})\`: \`days\` = \`projectionDays\`. Returns \`{current, growth, projection, recommendations}\` with numeric fields
+- \`uptime()\`: Returns \`{start_time: string, uptime: {hours, minutes, seconds, milliseconds}}\`
+- \`serverVersion()\`: Returns \`{full_version: string, version: string, version_num: number}\`
+- \`recoveryStatus()\`: Returns \`{in_recovery: boolean, last_replay_timestamp: string|null}\`
+- \`replicationStatus()\`: Returns \`{role: 'primary'|'replica', replicas: [...]}\` for primary, or \`{role: 'replica', replay_lag, ...}\` for replica
 - \`resourceUsageAnalyze()\`: Returns \`{backgroundWriter, checkpoints, connectionDistribution, bufferUsage, activity, analysis}\` with all counts as numbers
-- \`alertThresholdSet({metric?: 'connection_usage'})\`: Returns recommended thresholds. Metrics: connection_usage, cache_hit_ratio, replication_lag, dead_tuples, long_running_queries, lock_wait_time
+- \`alertThresholdSet({metric?: 'connection_usage'})\`: Returns recommended thresholds. ⛔ Invalid metric throws validation error. Valid metrics: connection_usage, cache_hit_ratio, replication_lag, dead_tuples, long_running_queries, lock_wait_time
 
 Aliases: \`connections\`→\`connectionStats\`, \`settings\`/\`config\`→\`showSettings\`, \`alerts\`/\`thresholds\`→\`alertThresholdSet\`
 

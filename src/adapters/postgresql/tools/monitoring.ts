@@ -738,7 +738,24 @@ function createAlertThresholdSetTool(
     icons: getToolIcons("monitoring", readOnly("Get Alert Thresholds")),
     // eslint-disable-next-line @typescript-eslint/require-await
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = (params ?? {}) as { metric?: string };
+      // Schema with validated enum for metric
+      const AlertThresholdSchema = z.object({
+        metric: z
+          .enum([
+            "connection_usage",
+            "cache_hit_ratio",
+            "replication_lag",
+            "dead_tuples",
+            "long_running_queries",
+            "lock_wait_time",
+          ])
+          .optional()
+          .describe(
+            "Specific metric to get thresholds for, or all if not specified",
+          ),
+      });
+
+      const parsed = AlertThresholdSchema.parse(params ?? {});
 
       const thresholds: Record<
         string,

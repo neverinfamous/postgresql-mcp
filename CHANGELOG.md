@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **dumpTable table parameter validation** — `dumpTable()` now validates that the `table` parameter is provided and throws a descriptive error if missing (previously created invalid DDL for "undefined")
+- **dumpTable schema.table format parsing** — `dumpTable()` now correctly parses `schema.table` format (e.g., `'public.users'` → schema='public', table='users') consistent with other tools like `pg_upsert`
+- **scheduleOptimize numeric type coercion** — `scheduleOptimize()` now returns `activityByHour[].hour` and `activityByHour[].connection_count` as JavaScript numbers instead of strings
 - **uptime() component breakdown** — `uptime()` now returns all time components (`days`, `hours`, `minutes`, `seconds`, `milliseconds`) instead of a raw PostgreSQL interval string. Documentation updated to reflect accurate output structure
 - **capacityPlanning() negative days validation** — `capacityPlanning()` now validates and rejects negative `days`/`projectionDays` values with a descriptive Zod error message
 - **Numeric type coercion in monitoring tools** — All monitoring tool outputs now consistently return JavaScript numbers instead of strings for numeric fields (affects `databaseSize`, `tableSizes`, `connectionStats`, `serverVersion`, `capacityPlanning`, `resourceUsageAnalyze`)

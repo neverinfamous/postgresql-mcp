@@ -40,13 +40,29 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
         schema?: string;
         includeData?: boolean;
       };
-      const schemaName = parsed.schema ?? "public";
+
+      // Validate required table parameter
+      if (!parsed.table || parsed.table.trim() === "") {
+        throw new Error("table parameter is required");
+      }
+
+      // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
+      let tableName = parsed.table;
+      let schemaName = parsed.schema ?? "public";
+
+      if (!parsed.schema && parsed.table.includes(".")) {
+        const parts = parsed.table.split(".");
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          schemaName = parts[0];
+          tableName = parts[1];
+        }
+      }
 
       // Check if it's a sequence by querying pg_class
       const relkindResult = await adapter.executeQuery(`
                 SELECT relkind FROM pg_class c
                 JOIN pg_namespace n ON c.relnamespace = n.oid
-                WHERE n.nspname = '${schemaName}' AND c.relname = '${parsed.table}'
+                WHERE n.nspname = '${schemaName}' AND c.relname = '${tableName}'
             `);
       const relkind = relkindResult.rows?.[0]?.["relkind"];
 
@@ -61,7 +77,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
                         FROM pg_sequence s
                         JOIN pg_class c ON s.seqrelid = c.oid
                         JOIN pg_namespace n ON c.relnamespace = n.oid
-                        WHERE n.nspname = '${schemaName}' AND c.relname = '${parsed.table}'
+                        WHERE n.nspname = '${schemaName}' AND c.relname = '${tableName}'
                     `);
           const seq = seqInfo.rows?.[0];
           if (seq !== undefined) {
@@ -94,7 +110,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
             const minValue = minVal !== null ? ` MINVALUE ${minVal}` : "";
             const maxValue = maxVal !== null ? ` MAXVALUE ${maxVal}` : "";
             const cycle = seq["cycle"] === true ? " CYCLE" : "";
-            const ddl = `CREATE SEQUENCE "${schemaName}"."${parsed.table}"${startValue}${increment}${minValue}${maxValue}${cycle};`;
+            const ddl = `CREATE SEQUENCE "${schemaName}"."${tableName}"${startValue}${increment}${minValue}${maxValue}${cycle};`;
             return {
               ddl,
               type: "sequence",
@@ -110,7 +126,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
         }
         // Fallback if pg_sequence query fails
         return {
-          ddl: `CREATE SEQUENCE "${schemaName}"."${parsed.table}";`,
+          ddl: `CREATE SEQUENCE "${schemaName}"."${tableName}";`,
           type: "sequence",
           note: "Basic CREATE SEQUENCE. Use pg_list_sequences for details.",
           ...(parsed.includeData === true && {
@@ -125,12 +141,12 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
         try {
           const viewDefResult = await adapter.executeQuery(`
                         SELECT definition FROM pg_views
-                        WHERE schemaname = '${schemaName}' AND viewname = '${parsed.table}'
+                        WHERE schemaname = '${schemaName}' AND viewname = '${tableName}'
                     `);
           const definition = viewDefResult.rows?.[0]?.["definition"];
           if (typeof definition === "string") {
             const createType = relkind === "m" ? "MATERIALIZED VIEW" : "VIEW";
-            const ddl = `CREATE ${createType} "${schemaName}"."${parsed.table}" AS\n${definition.trim()}`;
+            const ddl = `CREATE ${createType} "${schemaName}"."${tableName}" AS\n${definition.trim()}`;
             return {
               ddl,
               type: relkind === "m" ? "materialized_view" : "view",
@@ -143,13 +159,13 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
         // Fallback for views
         const createType = relkind === "m" ? "MATERIALIZED VIEW" : "VIEW";
         return {
-          ddl: `-- Unable to retrieve ${createType.toLowerCase()} definition\nCREATE ${createType} "${schemaName}"."${parsed.table}" AS SELECT ...;`,
+          ddl: `-- Unable to retrieve ${createType.toLowerCase()} definition\nCREATE ${createType} "${schemaName}"."${tableName}" AS SELECT ...;`,
           type: relkind === "m" ? "materialized_view" : "view",
           note: "View definition could not be retrieved. Use pg_list_views for details.",
         };
       }
 
-      const tableInfo = await adapter.describeTable(parsed.table, schemaName);
+      const tableInfo = await adapter.describeTable(tableName, schemaName);
 
       const columns =
         tableInfo.columns
@@ -175,7 +191,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
           })
           .join(",\n") ?? "";
 
-      const createTable = `CREATE TABLE "${schemaName}"."${parsed.table}" (\n${columns}\n);`;
+      const createTable = `CREATE TABLE "${schemaName}"."${tableName}" (\n${columns}\n);`;
 
       const result: {
         ddl: string;
@@ -190,7 +206,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
 
       if (parsed.includeData) {
         const dataResult = await adapter.executeQuery(
-          `SELECT * FROM "${schemaName}"."${parsed.table}" LIMIT 1000`,
+          `SELECT * FROM "${schemaName}"."${tableName}" LIMIT 1000`,
         );
         if (dataResult.rows !== undefined && dataResult.rows.length > 0) {
           const firstRow = dataResult.rows[0];
@@ -232,7 +248,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
                   return `'${JSON.stringify(value).replace(/\\/g, "\\\\").replace(/'/g, "''")}'::jsonb`;
                 })
                 .join(", ");
-              return `INSERT INTO "${schemaName}"."${parsed.table}" (${cols}) VALUES (${vals});`;
+              return `INSERT INTO "${schemaName}"."${tableName}" (${cols}) VALUES (${vals});`;
             })
             .join("\n");
           result.insertStatements = inserts;

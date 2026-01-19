@@ -171,10 +171,21 @@ Defaults: \`threshold\`=0.3 (use 0.1-0.2 for partial), \`maxDistance\`=3 (use 5+
 
 ## Schema Tools
 
-- \`pg_list_views\`: Returns \`{views, count, hasMatViews}\`
-- \`pg_create_view({orReplace: true})\`: ⛔ OR REPLACE cannot change column names/count—PostgreSQL limitation
+Core: \`listSchemas()\`, \`createSchema()\`, \`dropSchema()\`, \`listViews()\`, \`createView()\`, \`dropView()\`, \`listSequences()\`, \`createSequence()\`, \`dropSequence()\`, \`listFunctions()\`, \`listTriggers()\`, \`listConstraints()\`
+
+Response Structures:
+- \`listSchemas()\`: \`{schemas: string[], count}\`
+- \`listViews({ includeMaterialized? })\`: \`{views: [{schema, name, type, definition}], count, hasMatViews}\`
+- \`listSequences({ schema? })\`: \`{sequences: [{schema, name, owned_by}], count}\`
+- \`listFunctions({ schema?, limit?, exclude? })\`: \`{functions: [{schema, name, arguments, returns, language, volatility}], count, limit, note?}\`
+- \`listTriggers({ schema?, table? })\`: \`{triggers: [{schema, table_name, name, timing, events, function_name, enabled}], count}\`
+- \`listConstraints({ schema?, table?, type? })\`: \`{constraints: [{schema, table_name, name, type, definition}], count}\`. Type codes: \`p\`=primary_key, \`f\`=foreign_key, \`u\`=unique, \`c\`=check
+- \`dropSchema({ ifExists: true })\`: Returns \`{existed: true/false}\`
+
+- \`pg_create_view\`: Supports \`schema.name\` format (auto-parsed). \`checkOption\`: 'cascaded', 'local', 'none'. ⛔ OR REPLACE cannot change column names/count—PostgreSQL limitation
+- \`pg_create_sequence\`: Supports \`schema.name\` format. Parameters: \`start\`, \`increment\`, \`minValue\`, \`maxValue\`, \`cache\`, \`cycle\`, \`ownedBy\`, \`ifNotExists\`
 - \`pg_list_functions\`: Default limit=500. Use \`schema: 'public'\`, \`limit: 2000\`, or \`exclude: ['postgis']\` to filter
-- \`pg_drop_schema({ifExists: true})\`: Returns \`{existed: true/false}\`
+
 
 ## Partitioning Tools
 

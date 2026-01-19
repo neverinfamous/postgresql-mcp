@@ -307,7 +307,7 @@ function createCreateViewTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: write("Create View"),
     icons: getToolIcons("schema", write("Create View")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { name, schema, query, materialized, orReplace } =
+      const { name, schema, query, materialized, orReplace, checkOption } =
         CreateViewSchema.parse(params);
 
       const schemaPrefix = schema ? `${sanitizeIdentifier(schema)}.` : "";
@@ -315,7 +315,13 @@ function createCreateViewTool(adapter: PostgresAdapter): ToolDefinition {
       const matClause = materialized ? "MATERIALIZED " : "";
       const viewName = sanitizeIdentifier(name);
 
-      const sql = `CREATE ${replaceClause}${matClause}VIEW ${schemaPrefix}${viewName} AS ${query}`;
+      // WITH CHECK OPTION clause (not available for materialized views)
+      let checkClause = "";
+      if (checkOption && checkOption !== "none" && !materialized) {
+        checkClause = ` WITH ${checkOption.toUpperCase()} CHECK OPTION`;
+      }
+
+      const sql = `CREATE ${replaceClause}${matClause}VIEW ${schemaPrefix}${viewName} AS ${query}${checkClause}`;
       await adapter.executeQuery(sql);
       return {
         success: true,

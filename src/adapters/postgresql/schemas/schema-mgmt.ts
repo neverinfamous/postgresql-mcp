@@ -90,9 +90,15 @@ export const CreateSequenceSchema = z.preprocess(
   }),
 );
 
+// Valid checkOption values for views
+const CHECK_OPTION_VALUES = ["cascaded", "local", "none"] as const;
+
 // Base schema for MCP visibility (shows both name and viewName, query/sql/definition)
 const CreateViewSchemaBase = z.object({
-  name: z.string().optional().describe("View name"),
+  name: z
+    .string()
+    .optional()
+    .describe("View name (supports schema.name format)"),
   viewName: z.string().optional().describe("Alias for name"),
   schema: z.string().optional().describe("Schema name"),
   query: z.string().optional().describe("SELECT query for view"),
@@ -100,16 +106,47 @@ const CreateViewSchemaBase = z.object({
   definition: z.string().optional().describe("Alias for query"),
   materialized: z.boolean().optional().describe("Create materialized view"),
   orReplace: z.boolean().optional().describe("Replace if exists"),
+  checkOption: z
+    .enum(CHECK_OPTION_VALUES)
+    .optional()
+    .describe("WITH CHECK OPTION: 'cascaded', 'local', or 'none'"),
 });
 
-// Transformed schema with alias resolution
-export const CreateViewSchema = CreateViewSchemaBase.transform((data) => ({
-  name: data.name ?? data.viewName ?? "",
-  schema: data.schema,
-  query: data.query ?? data.sql ?? data.definition ?? "",
-  materialized: data.materialized,
-  orReplace: data.orReplace,
-}))
+/**
+ * Preprocess view create params to handle schema.name format
+ */
+function preprocessCreateViewParams(input: unknown): unknown {
+  if (typeof input !== "object" || input === null) return input;
+  const result = { ...(input as Record<string, unknown>) };
+
+  // Get the name from either name or viewName
+  const nameVal = result["name"] ?? result["viewName"];
+  if (
+    typeof nameVal === "string" &&
+    nameVal.includes(".") &&
+    result["schema"] === undefined
+  ) {
+    const parts = nameVal.split(".");
+    if (parts.length === 2) {
+      result["schema"] = parts[0];
+      result["name"] = parts[1];
+    }
+  }
+
+  return result;
+}
+
+// Transformed schema with alias resolution and schema.name preprocessing
+export const CreateViewSchema = z
+  .preprocess(preprocessCreateViewParams, CreateViewSchemaBase)
+  .transform((data) => ({
+    name: data.name ?? data.viewName ?? "",
+    schema: data.schema,
+    query: data.query ?? data.sql ?? data.definition ?? "",
+    materialized: data.materialized,
+    orReplace: data.orReplace,
+    checkOption: data.checkOption,
+  }))
   .refine((data) => data.name !== "", {
     message: "name (or viewName alias) is required",
   })

@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **copyExport limit parameter** — `copyExport()` now supports `limit: N` parameter to cap the number of exported rows (works with both `table` and `query` modes)
 - **Comprehensive Backup tools documentation** — Enhanced ServerInstructions.ts with complete documentation for all 9 backup tools including parameters, usage notes, binary format limitation for `copyExport`, and response structures (`dumpTable`, `copyExport`, `copyImport`, `createBackupPlan`, `restoreCommand`, `physical`, `scheduleOptimize`). Documents that `dumpTable({ includeData: true })` returns INSERT statements in a separate `insertStatements` field
 - **scheduleOptimize changeVelocity numeric field** — `scheduleOptimize()` now returns both `changeVelocity` (number) and `changeVelocityRatio` (formatted string with %) for type consistency with other tools
+- **createView schema.name format support** — `createView()` now supports `schema.name` format (e.g., `'myschema.myview'`) with auto-parsing, consistent with other tools like `createTable` and `upsert`
+- **createView checkOption validation** — `createView()` now validates `checkOption` with enum: `'cascaded'`, `'local'`, `'none'`. Invalid values are rejected with a descriptive Zod error instead of being silently passed to PostgreSQL
+- **Comprehensive Schema tools documentation** — Enhanced ServerInstructions.ts with complete documentation for all 12 schema tools including response structures (`listSchemas`, `listViews`, `listSequences`, `listFunctions`, `listTriggers`, `listConstraints`), parameters, and constraint type codes
 
 ### Fixed
 

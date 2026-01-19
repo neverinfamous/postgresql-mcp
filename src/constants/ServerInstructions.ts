@@ -142,7 +142,7 @@ Aliases: \`tableName\`→\`table\`, \`indexName\`→\`index\`, \`param\`/\`setti
 
 Core: \`dumpTable()\`, \`dumpSchema()\`, \`copyExport()\`, \`copyImport()\`, \`createBackupPlan()\`, \`restoreCommand()\`, \`physical()\`, \`restoreValidate()\`, \`scheduleOptimize()\`
 
-- \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Supports \`schema.table\` format (auto-parsed). Format: \`csv\` (default), \`text\`, \`binary\`. Use \`limit: N\` to cap rows. Optional \`header\` (default: true), \`delimiter\`
+- \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Supports \`schema.table\` format (auto-parsed). Format: \`csv\` (default), \`text\`. ⛔ \`binary\` not supported via MCP—use \`pg_dump_schema\` for binary exports. Use \`limit: N\` to cap rows. Optional \`header\` (default: true), \`delimiter\`
 - \`pg_dump_table\`: Returns basic CREATE TABLE only. **PRIMARY KEYS, INDEXES, CONSTRAINTS NOT included**—use \`pg_get_indexes\`/\`pg_get_constraints\`. Supports sequences (\`type: 'sequence'\`) and views
 - \`pg_dump_schema\`: Generates pg_dump command. Optional \`schema\`, \`table\`, \`filename\`
 - \`pg_copy_import\`: Generates COPY FROM command. Supports \`columns\` array, \`filePath\`, \`format\`, \`header\`, \`delimiter\`

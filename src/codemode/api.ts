@@ -624,7 +624,8 @@ function createGroupApi(
 
     api[methodName] = async (...args: unknown[]) => {
       // Normalize positional arguments to object parameters
-      const normalizedParams = normalizeParams(methodName, args);
+      // Use empty object when no args provided to match direct tool call behavior
+      const normalizedParams = normalizeParams(methodName, args) ?? {};
       const context = adapter.createContext();
       return tool.handler(normalizedParams, context);
     };

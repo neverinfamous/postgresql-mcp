@@ -95,6 +95,9 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 ## Performance Tools
 
 Core: \`explain()\`, \`explainAnalyze()\`, \`indexStats()\`, \`tableStats()\`, \`statStatements()\`, \`locks()\`, \`bloatCheck()\`, \`cacheHitRatio()\`, \`indexRecommendations()\`
+- \`explain({ sql, format? })\`: Supports \`format: 'text'|'json'|'yaml'|'xml'\`. Default: text
+- \`explainAnalyze({ sql, format? })\`: Same format options as explain
+- \`explainBuffers({ sql })\`: Always returns JSON format (includes buffer statistics)
 
 Aliases: \`cacheStats\`→\`cacheHitRatio\`, \`queryStats\`→\`statStatements\`, \`activity\`→\`statActivity\`, \`vacuum\`→\`vacuumStats\`
 

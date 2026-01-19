@@ -183,8 +183,21 @@ export function createConnectionPoolOptimizeTool(
         }
       }
 
+      // Coerce numeric fields to JavaScript numbers
+      const current = conn
+        ? {
+            total_connections: Number(conn["total_connections"] ?? 0),
+            active: Number(conn["active"] ?? 0),
+            idle: Number(conn["idle"] ?? 0),
+            idle_in_transaction: Number(conn["idle_in_transaction"] ?? 0),
+            waiting: Number(conn["waiting"] ?? 0),
+            max_connection_age_seconds: conn["max_connection_age_seconds"],
+            avg_connection_age_seconds: conn["avg_connection_age_seconds"],
+          }
+        : null;
+
       return {
-        current: conn,
+        current,
         config,
         waitEvents: waitEvents.rows,
         recommendations:

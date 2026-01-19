@@ -15,6 +15,10 @@ import { IndexStatsSchema, TableStatsSchema } from "../../schemas/index.js";
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
 
+// Helper to coerce string numbers to JavaScript numbers (PostgreSQL returns BIGINT as strings)
+const toNum = (val: unknown): number | null =>
+  val === null || val === undefined ? null : Number(val);
+
 export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_index_stats",
@@ -38,7 +42,14 @@ export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
                         ORDER BY idx_scan DESC`;
 
       const result = await adapter.executeQuery(sql);
-      return { indexes: result.rows };
+      // Coerce numeric fields to JavaScript numbers
+      const indexes = (result.rows ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        scans: toNum(row["scans"]),
+        tuples_read: toNum(row["tuples_read"]),
+        tuples_fetched: toNum(row["tuples_fetched"]),
+      }));
+      return { indexes };
     },
   };
 }
@@ -68,7 +79,20 @@ export function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
                         ORDER BY seq_scan DESC`;
 
       const result = await adapter.executeQuery(sql);
-      return { tables: result.rows };
+      // Coerce numeric fields to JavaScript numbers
+      const tables = (result.rows ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        seq_scan: toNum(row["seq_scan"]),
+        seq_tup_read: toNum(row["seq_tup_read"]),
+        idx_scan: toNum(row["idx_scan"]),
+        idx_tup_fetch: toNum(row["idx_tup_fetch"]),
+        inserts: toNum(row["inserts"]),
+        updates: toNum(row["updates"]),
+        deletes: toNum(row["deletes"]),
+        live_tuples: toNum(row["live_tuples"]),
+        dead_tuples: toNum(row["dead_tuples"]),
+      }));
+      return { tables };
     },
   };
 }
@@ -105,7 +129,15 @@ export function createStatStatementsTool(
                         LIMIT ${String(limit)}`;
 
       const result = await adapter.executeQuery(sql);
-      return { statements: result.rows };
+      // Coerce numeric fields to JavaScript numbers
+      const statements = (result.rows ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        calls: toNum(row["calls"]),
+        rows: toNum(row["rows"]),
+        shared_blks_hit: toNum(row["shared_blks_hit"]),
+        shared_blks_read: toNum(row["shared_blks_read"]),
+      }));
+      return { statements };
     },
   };
 }
@@ -188,9 +220,16 @@ export function createUnusedIndexesTool(
                         ORDER BY pg_relation_size(indexrelid) DESC`;
 
       const result = await adapter.executeQuery(sql);
+      // Coerce numeric fields to JavaScript numbers
+      const unusedIndexes = (result.rows ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        scans: toNum(row["scans"]),
+        tuples_read: toNum(row["tuples_read"]),
+        size_bytes: toNum(row["size_bytes"]),
+      }));
       return {
-        unusedIndexes: result.rows,
-        count: result.rows?.length ?? 0,
+        unusedIndexes,
+        count: unusedIndexes.length,
         hint: "These indexes have never been used. Consider removing them to save disk space and improve write performance.",
       };
     },
@@ -320,9 +359,19 @@ export function createVacuumStatsTool(
                 ORDER BY s.n_dead_tup DESC`;
 
       const result = await adapter.executeQuery(sql);
+      // Coerce numeric fields to JavaScript numbers
+      const vacuumStats = (result.rows ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        live_tuples: toNum(row["live_tuples"]),
+        dead_tuples: toNum(row["dead_tuples"]),
+        vacuum_count: toNum(row["vacuum_count"]),
+        autovacuum_count: toNum(row["autovacuum_count"]),
+        analyze_count: toNum(row["analyze_count"]),
+        autoanalyze_count: toNum(row["autoanalyze_count"]),
+      }));
       return {
-        vacuumStats: result.rows,
-        count: result.rows?.length ?? 0,
+        vacuumStats,
+        count: vacuumStats.length,
       };
     },
   };

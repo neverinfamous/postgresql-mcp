@@ -207,8 +207,12 @@ export function createConnectionPoolOptimizeTool(
             idle: toNum(conn["idle"]),
             idle_in_transaction: toNum(conn["idle_in_transaction"]),
             waiting: toNum(conn["waiting"]),
-            max_connection_age_seconds: toNum(conn["max_connection_age_seconds"]),
-            avg_connection_age_seconds: toNum(conn["avg_connection_age_seconds"]),
+            max_connection_age_seconds: toNum(
+              conn["max_connection_age_seconds"],
+            ),
+            avg_connection_age_seconds: toNum(
+              conn["avg_connection_age_seconds"],
+            ),
           }
         : null;
 
@@ -253,7 +257,15 @@ export function createPartitionStrategySuggestTool(
     icons: getToolIcons("performance", readOnly("Partition Strategy Suggest")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = PartitionStrategySchema.parse(params);
-      const schemaName = parsed.schema ?? "public";
+
+      // Parse schema from table if it contains a dot (e.g., 'public.users')
+      let schemaName = parsed.schema ?? "public";
+      let tableName = parsed.table;
+      if (tableName.includes(".")) {
+        const parts = tableName.split(".");
+        schemaName = parts[0] ?? "public";
+        tableName = parts[1] ?? tableName;
+      }
 
       const [tableInfo, columnInfo, tableSize] = await Promise.all([
         adapter.executeQuery(
@@ -264,7 +276,7 @@ export function createPartitionStrategySuggestTool(
                     FROM pg_stat_user_tables
                     WHERE relname = $1 AND schemaname = $2
                 `,
-          [parsed.table, schemaName],
+          [tableName, schemaName],
         ),
         adapter.executeQuery(
           `
@@ -284,14 +296,14 @@ export function createPartitionStrategySuggestTool(
                         AND a.attnum > 0 AND NOT a.attisdropped
                     ORDER BY a.attnum
                 `,
-          [parsed.table, schemaName],
+          [tableName, schemaName],
         ),
         adapter.executeQuery(
           `
                     SELECT pg_size_pretty(pg_table_size($1::regclass)) as table_size,
                            pg_table_size($1::regclass) as size_bytes
                 `,
-          [`"${schemaName}"."${parsed.table}"`],
+          [`"${schemaName}"."${tableName}"`],
         ),
       ]);
 
@@ -376,7 +388,7 @@ export function createPartitionStrategySuggestTool(
         : null;
 
       return {
-        table: `${schemaName}.${parsed.table}`,
+        table: `${schemaName}.${tableName}`,
         tableStats: coercedTableStats,
         tableSize: coercedTableSize,
         partitioningRecommended,

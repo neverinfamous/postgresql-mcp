@@ -239,8 +239,8 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
     'pg.jsonb.extract({ table: "docs", column: "data", path: "name", select: ["id"], limit: 10 })',
     'pg.jsonb.set({ table: "docs", column: "data", path: "status", value: "active", where: "id=1" })',
     'pg.jsonb.contains({ table: "docs", column: "data", value: { type: "admin" } })',
-    'pg.jsonb.merge({ base: { a: 1 }, overlay: { b: 2 }, deep: true })',
-    'pg.jsonb.diff({ doc1: { a: 1 }, doc2: { a: 2, b: 3 } })',
+    "pg.jsonb.merge({ base: { a: 1 }, overlay: { b: 2 }, deep: true })",
+    "pg.jsonb.diff({ doc1: { a: 1 }, doc2: { a: 2, b: 3 } })",
     'pg.jsonb.agg({ table: "docs", select: ["id"], orderBy: "id DESC", limit: 5 })',
   ],
   text: [
@@ -672,7 +672,10 @@ function createGroupApi(
         } else if (typeof arg0 === "object" && arg0 !== null) {
           const obj = arg0 as Record<string, unknown>;
           const secVal =
-            obj["seconds"] ?? obj["threshold"] ?? obj["minSeconds"];
+            obj["seconds"] ??
+            obj["threshold"] ??
+            obj["minSeconds"] ??
+            obj["minDuration"];
           if (typeof secVal === "number") {
             minSeconds = secVal;
           }
@@ -725,10 +728,21 @@ function createGroupApi(
         const obj = arg0 as Record<string, unknown>;
         const tableVal = obj["table"] ?? obj["name"];
         if (typeof tableVal === "string") {
-          tableName = tableVal;
+          // Handle schema.table format in object form too
+          if (tableVal.includes(".")) {
+            const parts = tableVal.split(".");
+            schemaName = parts[0] ?? "public";
+            tableName = parts[1] ?? "";
+          } else {
+            tableName = tableVal;
+          }
         }
+        // Only use explicit schema if table didn't contain schema prefix
         const schemaVal = obj["schema"];
-        if (typeof schemaVal === "string") {
+        if (
+          typeof schemaVal === "string" &&
+          !tableVal?.toString().includes(".")
+        ) {
           schemaName = schemaVal;
         }
       }

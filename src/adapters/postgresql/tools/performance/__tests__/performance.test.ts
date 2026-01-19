@@ -789,6 +789,7 @@ describe("pg_query_plan_compare", () => {
 
     expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
       expect.stringContaining("ANALYZE"),
+      [],
     );
   });
 });
@@ -1589,10 +1590,12 @@ describe("Parameter Aliases", () => {
     expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining("SELECT * FROM users"),
+      [],
     );
     expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
       2,
       expect.stringContaining("SELECT id FROM users"),
+      [],
     );
   });
 });

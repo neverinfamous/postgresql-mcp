@@ -11,10 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **pg_batch_insert insertedCount alias** — Response now includes `insertedCount` as a semantic alias for batch insert operations (alongside `rowsAffected` and `affectedRows`)
 - **Parameter binding for performance tools** — `indexRecommendations()`, `explain()`, `explainAnalyze()`, and `explainBuffers()` now accept `params` array for parameterized query support (e.g., `sql: 'SELECT * FROM orders WHERE id = $1', params: [5]`)
+- **queryPlanCompare parameter support** — `queryPlanCompare()` now accepts `params1` and `params2` arrays for comparing parameterized queries
 
 ### Fixed
 
 - **Expression index column display** — `pg_get_indexes`, `pg_describe_table`, and `pg_object_details` now correctly display expression columns (e.g., `lower((name)::text)`) instead of `NULL` for expression-based indexes
+- **Double schema prefix in performance tools** — `partitionStrategySuggest()` and `analyzeTable()` now correctly handle `schema.table` format without creating `public.public.table` errors
+- **longRunningQueries minDuration alias** — Now recognizes `minDuration` as a parameter alias alongside `seconds`, `threshold`, and `minSeconds`
 
 ### Changed
 

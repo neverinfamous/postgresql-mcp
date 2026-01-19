@@ -378,6 +378,14 @@ export function createQueryPlanCompareTool(
     z.object({
       query1: z.string().describe("First SQL query"),
       query2: z.string().describe("Second SQL query"),
+      params1: z
+        .array(z.unknown())
+        .optional()
+        .describe("Parameters for first query ($1, $2, etc.)"),
+      params2: z
+        .array(z.unknown())
+        .optional()
+        .describe("Parameters for second query ($1, $2, etc.)"),
       analyze: z
         .boolean()
         .optional()
@@ -401,8 +409,14 @@ export function createQueryPlanCompareTool(
           : "EXPLAIN (FORMAT JSON)";
 
       const [result1, result2] = await Promise.all([
-        adapter.executeQuery(`${explainType} ${parsed.query1}`),
-        adapter.executeQuery(`${explainType} ${parsed.query2}`),
+        adapter.executeQuery(
+          `${explainType} ${parsed.query1}`,
+          parsed.params1 ?? [],
+        ),
+        adapter.executeQuery(
+          `${explainType} ${parsed.query2}`,
+          parsed.params2 ?? [],
+        ),
       ]);
 
       const row1 = result1.rows?.[0];

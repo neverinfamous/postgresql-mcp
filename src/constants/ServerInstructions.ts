@@ -99,11 +99,13 @@ Core: \`explain()\`, \`explainAnalyze()\`, \`indexStats()\`, \`tableStats()\`, \
 - \`explainAnalyze({ sql, format?, params? })\`: Same format/params options as explain
 - \`explainBuffers({ sql, params? })\`: Always returns JSON format (includes buffer statistics)
 - \`indexRecommendations({ sql?, params? })\`: Pass \`params: [value]\` for parameterized queries (e.g., \`sql: 'SELECT * FROM orders WHERE id = $1', params: [5]\`)
+- \`queryPlanCompare({ query1, query2, params1?, params2? })\`: Compare two query plans. Use \`params1\`/\`params2\` for parameterized queries
+- \`partitionStrategySuggest({ table })\`: Accepts \`schema.table\` format (auto-parsed) or separate \`table\` + \`schema\` params
 - ⚠️ **Data Type Awareness**: Query literals must match column types exactly—\`WHERE sensor_id = 1\` (integer), not \`'sensor_1'\` (string)
 
 Aliases: \`cacheStats\`→\`cacheHitRatio\`, \`queryStats\`→\`statStatements\`, \`activity\`→\`statActivity\`, \`vacuum\`→\`vacuumStats\`
 
-Wrappers: \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQueries(seconds?)\` filters by duration
+Wrappers: \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQueries({ seconds | minDuration }?)\` filters by duration, \`analyzeTable({ table })\` runs ANALYZE (accepts \`schema.table\` format)
 
 ## Monitoring Tools
 

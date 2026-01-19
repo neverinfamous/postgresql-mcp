@@ -85,27 +85,45 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: readOnly("List Partitions"),
     icons: getToolIcons("partitioning", readOnly("List Partitions")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as { table: string; schema?: string };
-      const schemaName = parsed.schema ?? "public";
+      const parsed = params as {
+        table?: string;
+        parent?: string;
+        parentTable?: string;
+        name?: string;
+        schema?: string;
+      };
+
+      // Resolve table name from aliases
+      let tableName =
+        parsed.table ?? parsed.parent ?? parsed.parentTable ?? parsed.name;
+
+      // Parse schema.table format if present
+      let schemaName = parsed.schema ?? "public";
+      if (tableName?.includes(".")) {
+        const parts = tableName.split(".");
+        schemaName = parts[0] ?? "public";
+        tableName = parts[1] ?? tableName;
+      }
 
       // Check table existence and partition status
+      const resolvedTable = tableName ?? "";
       const tableStatus = await checkTablePartitionStatus(
         adapter,
-        parsed.table,
+        resolvedTable,
         schemaName,
       );
       if (tableStatus === "not_found") {
         return {
           partitions: [],
           count: 0,
-          warning: `Table '${schemaName}.${parsed.table}' does not exist.`,
+          warning: `Table '${schemaName}.${resolvedTable}' does not exist.`,
         };
       }
       if (tableStatus === "not_partitioned") {
         return {
           partitions: [],
           count: 0,
-          warning: `Table '${schemaName}.${parsed.table}' exists but is not partitioned. Use pg_create_partitioned_table to create a partitioned table.`,
+          warning: `Table '${schemaName}.${resolvedTable}' exists but is not partitioned. Use pg_create_partitioned_table to create a partitioned table.`,
         };
       }
 
@@ -122,7 +140,7 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
 
       const result = await adapter.executeQuery(sql, [
         schemaName,
-        parsed.table,
+        resolvedTable,
       ]);
 
       // Format sizes consistently and coerce size_bytes to number
@@ -351,13 +369,31 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: readOnly("Partition Info"),
     icons: getToolIcons("partitioning", readOnly("Partition Info")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as { table: string; schema?: string };
-      const schemaName = parsed.schema ?? "public";
+      const parsed = params as {
+        table?: string;
+        parent?: string;
+        parentTable?: string;
+        name?: string;
+        schema?: string;
+      };
+
+      // Resolve table name from aliases
+      let tableName =
+        parsed.table ?? parsed.parent ?? parsed.parentTable ?? parsed.name;
+
+      // Parse schema.table format if present
+      let schemaName = parsed.schema ?? "public";
+      if (tableName?.includes(".")) {
+        const parts = tableName.split(".");
+        schemaName = parts[0] ?? "public";
+        tableName = parts[1] ?? tableName;
+      }
 
       // Check table existence and partition status
+      const resolvedTable = tableName ?? "";
       const tableStatus = await checkTablePartitionStatus(
         adapter,
-        parsed.table,
+        resolvedTable,
         schemaName,
       );
       if (tableStatus === "not_found") {
@@ -365,7 +401,7 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
           tableInfo: null,
           partitions: [],
           totalSizeBytes: 0,
-          warning: `Table '${schemaName}.${parsed.table}' does not exist.`,
+          warning: `Table '${schemaName}.${resolvedTable}' does not exist.`,
         };
       }
       if (tableStatus === "not_partitioned") {
@@ -373,7 +409,7 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
           tableInfo: null,
           partitions: [],
           totalSizeBytes: 0,
-          warning: `Table '${schemaName}.${parsed.table}' exists but is not partitioned. Use pg_create_partitioned_table to create a partitioned table.`,
+          warning: `Table '${schemaName}.${resolvedTable}' exists but is not partitioned. Use pg_create_partitioned_table to create a partitioned table.`,
         };
       }
 
@@ -392,7 +428,7 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
                         WHERE c.relname = $1 AND n.nspname = $2`;
 
       const partInfo = await adapter.executeQuery(partInfoSql, [
-        parsed.table,
+        resolvedTable,
         schemaName,
       ]);
 
@@ -408,7 +444,7 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
 
       const partitionsResult = await adapter.executeQuery(partitionsSql, [
         schemaName,
-        parsed.table,
+        resolvedTable,
       ]);
 
       // Calculate total size before mapping

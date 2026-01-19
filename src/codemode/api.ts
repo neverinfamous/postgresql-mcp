@@ -302,7 +302,7 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
   ],
   partitioning: [
     "pg.partitioning.createPartitionedTable({ name: 'events', columns: [...], partitionBy: 'RANGE', partitionKey: 'created_at' })",
-    "pg.partitioning.createPartition({ parent: 'events', name: 'events_2024_q1', forValues: { from: '2024-01-01', to: '2024-04-01' } })",
+    "pg.partitioning.createPartition({ parent: 'events', name: 'events_2024_q1', forValues: \"FROM ('2024-01-01') TO ('2024-04-01')\" })",
     "pg.partitioning.listPartitions({ table: 'events' })",
   ],
   stats: [

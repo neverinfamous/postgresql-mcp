@@ -193,6 +193,7 @@ Response Structures:
 
 - \`pg_create_partitioned_table\`: \`partitionBy\` case-insensitive. \`primaryKey\`/\`unique\` must include partition key. ⛔ Does NOT support \`schema.table\` format—use separate \`schema\` param
 - \`pg_create_partition\`: Use \`parent\`/\`table\`/\`parentTable\`. \`forValues\` is a raw SQL string: \`"FROM ('2024-01-01') TO ('2024-07-01')"\`, \`"IN ('US', 'CA')"\`, \`"WITH (MODULUS 4, REMAINDER 0)"\`. For DEFAULT partition, use \`isDefault: true\` (separate boolean param)
+- \`pg_list_partitions\`/\`pg_partition_info\`: Support \`schema.table\` format (auto-parsed). Accepts \`table\`, \`parent\`, \`parentTable\`, or \`name\` aliases
 - 📍 Code Mode: \`pg.partitioning.create()\` = \`createPartition\`, NOT \`createPartitionedTable\`
 
 ## pg_partman Tools

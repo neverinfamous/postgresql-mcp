@@ -368,7 +368,7 @@ export function createVacuumStatsTool(
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
-      const vacuumStats = (result.rows ?? []).map(
+      const tables = (result.rows ?? []).map(
         (row: Record<string, unknown>) => ({
           ...row,
           live_tuples: toNum(row["live_tuples"]),
@@ -381,8 +381,8 @@ export function createVacuumStatsTool(
         }),
       );
       return {
-        vacuumStats,
-        count: vacuumStats.length,
+        tables,
+        count: tables.length,
       };
     },
   };

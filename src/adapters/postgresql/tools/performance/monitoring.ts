@@ -95,7 +95,7 @@ export function createBloatCheckTool(adapter: PostgresAdapter): ToolDefinition {
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
-      const bloatedTables = (result.rows ?? []).map(
+      const tables = (result.rows ?? []).map(
         (row: Record<string, unknown>) => ({
           ...row,
           live_tuples: toNum(row["live_tuples"]),
@@ -104,8 +104,8 @@ export function createBloatCheckTool(adapter: PostgresAdapter): ToolDefinition {
         }),
       );
       return {
-        bloatedTables,
-        count: bloatedTables.length,
+        tables,
+        count: tables.length,
       };
     },
   };

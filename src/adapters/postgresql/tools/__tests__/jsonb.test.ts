@@ -29,7 +29,7 @@ describe("JSONB Tools", () => {
   describe("pg_jsonb_extract", () => {
     it("should extract value using path expression", async () => {
       mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ value: "John" }],
+        rows: [{ extracted_value: "John" }],
       });
 
       const tool = findTool("pg_jsonb_extract");
@@ -51,7 +51,7 @@ describe("JSONB Tools", () => {
 
     it("should handle array paths", async () => {
       mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ value: "item1" }],
+        rows: [{ extracted_value: "item1" }],
       });
 
       const tool = findTool("pg_jsonb_extract");

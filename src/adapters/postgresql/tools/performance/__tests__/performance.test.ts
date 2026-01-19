@@ -530,13 +530,13 @@ describe("pg_bloat_check", () => {
 
     const tool = tools.find((t) => t.name === "pg_bloat_check")!;
     const result = (await tool.handler({}, mockContext)) as {
-      bloatedTables: unknown[];
+      tables: unknown[];
     };
 
     expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
       expect.stringContaining("n_dead_tup"),
     );
-    expect(result.bloatedTables).toHaveLength(1);
+    expect(result.tables).toHaveLength(1);
   });
 });
 
@@ -1306,10 +1306,10 @@ describe("Performance Tools Edge Cases", () => {
 
     const tool = tools.find((t) => t.name === "pg_bloat_check")!;
     const result = (await tool.handler({}, mockContext)) as {
-      bloatedTables: unknown[];
+      tables: unknown[];
     };
 
-    expect(result.bloatedTables).toHaveLength(0);
+    expect(result.tables).toHaveLength(0);
   });
 
   it("pg_performance_baseline should use custom name when provided", async () => {

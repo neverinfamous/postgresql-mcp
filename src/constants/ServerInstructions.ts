@@ -142,8 +142,17 @@ Aliases: \`tableName\`→\`table\`, \`indexName\`→\`index\`, \`param\`/\`setti
 
 Core: \`dumpTable()\`, \`dumpSchema()\`, \`copyExport()\`, \`copyImport()\`, \`createBackupPlan()\`, \`restoreCommand()\`, \`physical()\`, \`restoreValidate()\`, \`scheduleOptimize()\`
 
+Response Structures:
+- \`dumpTable\`: \`{ddl, type, note, insertStatements?}\` — \`insertStatements\` only with \`includeData: true\` (separate field from \`ddl\`)
+- \`copyExport\`: \`{data, rowCount}\` — \`data\` contains CSV/text content
+- \`copyImport\`: \`{command, stdinCommand, notes}\` — Both file and stdin COPY commands
+- \`createBackupPlan\`: \`{strategy: {fullBackup, walArchiving}, estimates}\`
+- \`restoreCommand\`: \`{command, warnings?, notes}\` — Warnings when \`database\` omitted
+- \`physical\`: \`{command, notes, requirements}\`
+- \`scheduleOptimize\`: \`{analysis, recommendation, commands}\`
+
 - \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). Format: \`csv\` (default), \`text\`. ⛔ \`binary\` not supported via MCP—use \`pg_dump_schema\` for binary exports. Use \`limit: N\` to cap rows. Optional \`header\` (default: true), \`delimiter\`
-- \`pg_dump_table\`: Returns basic CREATE TABLE only. **PRIMARY KEYS, INDEXES, CONSTRAINTS NOT included**—use \`pg_get_indexes\`/\`pg_get_constraints\`. Supports sequences, views, and \`schema.table\` format
+- \`pg_dump_table\`: Returns \`ddl\` (basic CREATE TABLE only) + \`insertStatements\` when \`includeData: true\`. **PRIMARY KEYS, INDEXES, CONSTRAINTS NOT included**—use \`pg_get_indexes\`/\`pg_get_constraints\`. Supports sequences, views, and \`schema.table\` format
 - \`pg_dump_schema\`: Generates pg_dump command. Optional \`schema\`, \`table\`, \`filename\`
 - \`pg_copy_import\`: Generates COPY FROM command. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). \`columns\` array, \`filePath\`, \`format\`, \`header\`, \`delimiter\`
 - \`pg_restore_command\`: Include \`database\` parameter for complete command. Optional \`schemaOnly\`, \`dataOnly\`

@@ -115,8 +115,8 @@ Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSetting
 - \`tableSizes({ limit?, schema? })\`: Returns \`{tables: [{schema, table_name, table_size, indexes_size, total_size, total_bytes}]}\`. All \`total_bytes\` are numbers
 - \`connectionStats()\`: Returns \`{byDatabaseAndState, totalConnections: number, maxConnections: number}\`
 - \`showSettings({setting: 'work_mem'})\`: Accepts \`pattern\`, \`setting\`, or \`name\`. Exact names auto-match; \`%\` for LIKE patterns
-- \`capacityPlanning({days: 90})\`: \`days\` = \`projectionDays\`. Returns \`{current, growth, projection, recommendations}\` with numeric fields
-- \`uptime()\`: Returns \`{start_time: string, uptime: {hours, minutes, seconds, milliseconds}}\`
+- \`capacityPlanning({days: 90})\`: \`days\` = \`projectionDays\`. Returns \`{current, growth, projection, recommendations}\` with numeric fields. ⛔ Negative days rejected
+- \`uptime()\`: Returns \`{start_time: string, uptime: {days, hours, minutes, seconds, milliseconds}}\`
 - \`serverVersion()\`: Returns \`{full_version: string, version: string, version_num: number}\`
 - \`recoveryStatus()\`: Returns \`{in_recovery: boolean, last_replay_timestamp: string|null}\`
 - \`replicationStatus()\`: Returns \`{role: 'primary'|'replica', replicas: [...]}\` for primary, or \`{role: 'replica', replay_lag, ...}\` for replica

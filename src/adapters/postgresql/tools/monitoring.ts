@@ -282,10 +282,33 @@ function createUptimeTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: readOnly("Server Uptime"),
     icons: getToolIcons("monitoring", readOnly("Server Uptime")),
     handler: async (_params: unknown, _context: RequestContext) => {
-      const sql = `SELECT pg_postmaster_start_time() as start_time,
-                        now() - pg_postmaster_start_time() as uptime`;
+      const sql = `SELECT 
+                        pg_postmaster_start_time() as start_time,
+                        EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time())) as total_seconds`;
       const result = await adapter.executeQuery(sql);
-      return result.rows?.[0];
+      const row = result.rows?.[0] as
+        | { start_time: string; total_seconds: string | number }
+        | undefined;
+      if (!row) return row;
+
+      // Parse total seconds into components
+      const totalSeconds = Number(row.total_seconds);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      const milliseconds = parseFloat(((totalSeconds % 1) * 1000).toFixed(3));
+
+      return {
+        start_time: row.start_time,
+        uptime: {
+          days,
+          hours,
+          minutes,
+          seconds,
+          milliseconds,
+        },
+      };
     },
   };
 }
@@ -314,7 +337,7 @@ function createRecoveryStatusTool(adapter: PostgresAdapter): ToolDefinition {
  * Capacity planning analysis
  */
 function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
-  // Schema with alias support
+  // Schema with alias support and validation for non-negative days
   const CapacityPlanningSchema = z
     .object({
       projectionDays: z
@@ -323,6 +346,16 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
         .describe("Days to project growth (default: 90)"),
       days: z.number().optional().describe("Alias for projectionDays"),
     })
+    .refine(
+      (data) => {
+        const val = data.projectionDays ?? data.days;
+        return val === undefined || val >= 0;
+      },
+      {
+        message: "Projection days must be a non-negative number",
+        path: ["days"],
+      },
+    )
     .transform((data) => ({
       projectionDays: data.projectionDays ?? data.days ?? 90,
     }));

@@ -266,11 +266,12 @@ describe("pg_uptime", () => {
   });
 
   it("should return uptime information", async () => {
+    // Mock returns total_seconds (30.5 days = 2635200 + 43200 = 2678856.789 seconds)
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
         {
           start_time: "2024-01-01T00:00:00Z",
-          uptime: "30 days 12:34:56",
+          total_seconds: 2678856.789,
         },
       ],
     });
@@ -278,11 +279,26 @@ describe("pg_uptime", () => {
     const tool = tools.find((t) => t.name === "pg_uptime")!;
     const result = (await tool.handler({}, mockContext)) as {
       start_time: string;
-      uptime: string;
+      uptime: {
+        days: number;
+        hours: number;
+        minutes: number;
+        seconds: number;
+        milliseconds: number;
+      };
     };
 
-    expect(result).toHaveProperty("start_time");
-    expect(result).toHaveProperty("uptime");
+    expect(result.start_time).toBe("2024-01-01T00:00:00Z");
+    expect(result.uptime).toHaveProperty("days");
+    expect(result.uptime).toHaveProperty("hours");
+    expect(result.uptime).toHaveProperty("minutes");
+    expect(result.uptime).toHaveProperty("seconds");
+    expect(result.uptime).toHaveProperty("milliseconds");
+    expect(result.uptime.days).toBe(31);
+    expect(result.uptime.hours).toBe(0);
+    expect(result.uptime.minutes).toBe(7);
+    expect(result.uptime.seconds).toBe(36);
+    expect(result.uptime.milliseconds).toBe(789);
   });
 });
 
@@ -566,6 +582,12 @@ describe("pg_capacity_planning", () => {
     expect(result.recommendations).toContainEqual(
       expect.stringContaining("Connection usage is high"),
     );
+  });
+
+  it("should reject negative projection days", async () => {
+    const tool = tools.find((t) => t.name === "pg_capacity_planning")!;
+
+    await expect(tool.handler({ days: -5 }, mockContext)).rejects.toThrow();
   });
 });
 

@@ -22,6 +22,24 @@ import {
 } from "../schemas/index.js";
 
 /**
+ * Parse schema.table format identifier
+ * Returns { table, schema } with schema extracted from prefix if present
+ */
+function parseSchemaTable(
+  identifier: string,
+  defaultSchema?: string,
+): { table: string; schema: string } {
+  if (identifier.includes(".")) {
+    const parts = identifier.split(".");
+    return {
+      schema: parts[0] ?? defaultSchema ?? "public",
+      table: parts[1] ?? identifier,
+    };
+  }
+  return { table: identifier, schema: defaultSchema ?? "public" };
+}
+
+/**
  * Format bytes to human-readable string with consistent formatting
  */
 function formatBytes(bytes: number): string {
@@ -259,8 +277,15 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         );
       }
 
-      const partitionName = sanitizeTableName(name, schema);
-      const parentName = sanitizeTableName(parent, schema);
+      // Parse schema.table format from parent (takes priority over explicit schema)
+      const parsedParent = parseSchemaTable(parent, schema);
+      const resolvedSchema = parsedParent.schema;
+
+      const partitionName = sanitizeTableName(name, resolvedSchema);
+      const parentName = sanitizeTableName(
+        parsedParent.table,
+        parsedParent.schema,
+      );
 
       // Build the SQL
       let sql = `CREATE TABLE ${partitionName} PARTITION OF ${parentName}`;
@@ -284,8 +309,8 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
 
       const result: Record<string, unknown> = {
         success: true,
-        partition: `${schema ?? "public"}.${name}`,
-        parent,
+        partition: `${resolvedSchema}.${name}`,
+        parent: parsedParent.table,
         bounds: boundsDescription,
       };
 
@@ -317,13 +342,34 @@ function createAttachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
           schema?: string;
         };
 
-      const parentName = sanitizeTableName(parent, schema);
-      const partitionName = sanitizeTableName(partition, schema);
+      // Parse schema.table format from parent and partition (takes priority over explicit schema)
+      const parsedParent = parseSchemaTable(parent, schema);
+      const parsedPartition = parseSchemaTable(partition, schema);
 
-      // Handle DEFAULT partition (forValues === "__DEFAULT__" is set by preprocessor when isDefault: true)
+      // Use parent's schema if partition doesn't have schema prefix and no explicit schema
+      const resolvedPartitionSchema = partition.includes(".")
+        ? parsedPartition.schema
+        : (schema ?? parsedParent.schema);
+
+      const parentName = sanitizeTableName(
+        parsedParent.table,
+        parsedParent.schema,
+      );
+      const partitionName = sanitizeTableName(
+        parsedPartition.table,
+        resolvedPartitionSchema,
+      );
+
+      // Handle DEFAULT partition
+      // Accept both "__DEFAULT__" (from preprocessor when isDefault: true) and explicit "DEFAULT"
+      const isDefaultPartition =
+        forValues === "__DEFAULT__" ||
+        forValues.toUpperCase() === "DEFAULT" ||
+        forValues.toUpperCase().trim() === "DEFAULT";
+
       let sql: string;
       let boundsDescription: string;
-      if (forValues === "__DEFAULT__") {
+      if (isDefaultPartition) {
         sql = `ALTER TABLE ${parentName} ATTACH PARTITION ${partitionName} DEFAULT`;
         boundsDescription = "DEFAULT";
       } else {
@@ -333,7 +379,12 @@ function createAttachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
 
       await adapter.executeQuery(sql);
 
-      return { success: true, parent, partition, bounds: boundsDescription };
+      return {
+        success: true,
+        parent: parsedParent.table,
+        partition: parsedPartition.table,
+        bounds: boundsDescription,
+      };
     },
   };
 }
@@ -357,8 +408,23 @@ function createDetachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
           schema?: string;
         };
 
-      const parentName = sanitizeTableName(parent, schema);
-      const partitionName = sanitizeTableName(partition, schema);
+      // Parse schema.table format from parent and partition (takes priority over explicit schema)
+      const parsedParent = parseSchemaTable(parent, schema);
+      const parsedPartition = parseSchemaTable(partition, schema);
+
+      // Use parent's schema if partition doesn't have schema prefix and no explicit schema
+      const resolvedPartitionSchema = partition.includes(".")
+        ? parsedPartition.schema
+        : (schema ?? parsedParent.schema);
+
+      const parentName = sanitizeTableName(
+        parsedParent.table,
+        parsedParent.schema,
+      );
+      const partitionName = sanitizeTableName(
+        parsedPartition.table,
+        resolvedPartitionSchema,
+      );
 
       // Build the appropriate clause
       let clause = "";
@@ -372,7 +438,11 @@ function createDetachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
       const sql = `ALTER TABLE ${parentName} DETACH PARTITION ${partitionName}${clause}`;
       await adapter.executeQuery(sql);
 
-      return { success: true, parent, detached: partition };
+      return {
+        success: true,
+        parent: parsedParent.table,
+        detached: parsedPartition.table,
+      };
     },
   };
 }

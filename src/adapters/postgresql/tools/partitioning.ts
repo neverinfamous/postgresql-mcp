@@ -309,16 +309,31 @@ function createAttachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: write("Attach Partition"),
     icons: getToolIcons("partitioning", write("Attach Partition")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { parent, partition, forValues } =
-        AttachPartitionSchema.parse(params);
+      const { parent, partition, forValues, schema } =
+        AttachPartitionSchema.parse(params) as {
+          parent: string;
+          partition: string;
+          forValues: string;
+          schema?: string;
+        };
 
-      const parentName = sanitizeTableName(parent);
-      const partitionName = sanitizeTableName(partition);
+      const parentName = sanitizeTableName(parent, schema);
+      const partitionName = sanitizeTableName(partition, schema);
 
-      const sql = `ALTER TABLE ${parentName} ATTACH PARTITION ${partitionName} FOR VALUES ${forValues}`;
+      // Handle DEFAULT partition (forValues === "__DEFAULT__" is set by preprocessor when isDefault: true)
+      let sql: string;
+      let boundsDescription: string;
+      if (forValues === "__DEFAULT__") {
+        sql = `ALTER TABLE ${parentName} ATTACH PARTITION ${partitionName} DEFAULT`;
+        boundsDescription = "DEFAULT";
+      } else {
+        sql = `ALTER TABLE ${parentName} ATTACH PARTITION ${partitionName} FOR VALUES ${forValues}`;
+        boundsDescription = forValues;
+      }
+
       await adapter.executeQuery(sql);
 
-      return { success: true, parent, partition, bounds: forValues };
+      return { success: true, parent, partition, bounds: boundsDescription };
     },
   };
 }
@@ -333,11 +348,17 @@ function createDetachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: destructive("Detach Partition"),
     icons: getToolIcons("partitioning", destructive("Detach Partition")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { parent, partition, concurrently, finalize } =
-        DetachPartitionSchema.parse(params);
+      const { parent, partition, concurrently, finalize, schema } =
+        DetachPartitionSchema.parse(params) as {
+          parent: string;
+          partition: string;
+          concurrently?: boolean;
+          finalize?: boolean;
+          schema?: string;
+        };
 
-      const parentName = sanitizeTableName(parent);
-      const partitionName = sanitizeTableName(partition);
+      const parentName = sanitizeTableName(parent, schema);
+      const partitionName = sanitizeTableName(partition, schema);
 
       // Build the appropriate clause
       let clause = "";

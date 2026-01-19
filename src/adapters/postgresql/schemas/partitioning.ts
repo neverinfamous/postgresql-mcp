@@ -8,6 +8,21 @@
 import { z } from "zod";
 
 /**
+ * Parse schema from schema.table format identifier
+ * Returns { name, schema? } or undefined if input is undefined
+ */
+function parseSchemaFromIdentifier(
+  value: string | undefined,
+): { name: string; schema: string | undefined } | undefined {
+  if (!value) return undefined;
+  if (value.includes(".")) {
+    const parts = value.split(".");
+    return { name: parts[1] ?? value, schema: parts[0] };
+  }
+  return { name: value, schema: undefined };
+}
+
+/**
  * Helper type for raw partition input with common aliases
  */
 interface RawPartitionInput {
@@ -52,7 +67,37 @@ function preprocessPartitionParams(input: unknown): unknown {
   }
 
   const raw = input as RawPartitionInput;
-  const result: RawPartitionInput = { ...raw };
+  const result: RawPartitionInput & { schema?: string } = { ...raw };
+
+  // Parse schema.table format from parent parameter
+  const parsedParent = parseSchemaFromIdentifier(
+    raw.parent ?? raw.parentTable ?? raw.table,
+  );
+  if (parsedParent?.schema && result.schema === undefined) {
+    result.schema = parsedParent.schema;
+    // Update the resolved parent to just the table name
+    if (raw.parent?.includes(".")) result.parent = parsedParent.name;
+    if (raw.parentTable?.includes(".")) result.parentTable = parsedParent.name;
+    if (raw.table?.includes(".")) result.table = parsedParent.name;
+  }
+
+  // Parse schema.table format from partition parameter
+  const parsedPartition = parseSchemaFromIdentifier(
+    raw.partition ?? raw.partitionTable ?? raw.partitionName,
+  );
+  if (parsedPartition?.schema && result.schema === undefined) {
+    result.schema = parsedPartition.schema;
+  }
+  // Update resolved partition to just the table name
+  if (raw.partition?.includes(".") && parsedPartition) {
+    result.partition = parsedPartition.name;
+  }
+  if (raw.partitionTable?.includes(".") && parsedPartition) {
+    result.partitionTable = parsedPartition.name;
+  }
+  if (raw.partitionName?.includes(".") && parsedPartition) {
+    result.partitionName = parsedPartition.name;
+  }
 
   // Alias: parentTable → parent
   if (result.parentTable !== undefined && result.parent === undefined) {
@@ -253,6 +298,10 @@ export const AttachPartitionSchema = z.preprocess(
     partition: z
       .string()
       .describe("Table to attach (aliases: partitionTable, partitionName)"),
+    schema: z
+      .string()
+      .optional()
+      .describe("Schema name (auto-parsed from schema.table format)"),
     forValues: z
       .string()
       .describe(
@@ -270,6 +319,10 @@ export const DetachPartitionSchema = z.preprocess(
     partition: z
       .string()
       .describe("Partition to detach (aliases: partitionTable, partitionName)"),
+    schema: z
+      .string()
+      .optional()
+      .describe("Schema name (auto-parsed from schema.table format)"),
     concurrently: z
       .boolean()
       .optional()

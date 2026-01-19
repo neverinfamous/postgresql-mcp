@@ -85,9 +85,10 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 ## Stats Tools
 
+- All stats tools support \`schema.table\` format (auto-parsed, embedded schema takes priority over explicit \`schema\` param)
 - \`timeSeries\`: \`timeColumn\` must be timestamp, \`valueColumn\` numeric. \`interval\` accepts: keywords, PostgreSQL format, or plurals
 - \`distribution\`: Returns \`skewness\`, \`kurtosis\` (excess). \`buckets\` must be > 0
-- \`sampling\`: Defaults to random/100 rows. \`sampleSize\` takes precedence over \`percentage\`
+- \`sampling\`: Defaults to \`random\` method with 100 rows. \`sampleSize\` always takes precedence over \`percentage\`. ⚠️ \`percentage\` param only works with \`bernoulli\`/\`system\` methods—ignored for default \`random\` method
 - \`percentiles\`: Accepts 0-1 or 0-100 (auto-normalized). Empty array → defaults [0.25, 0.5, 0.75]
 - ⛔ LIMITATION: \`hypothesis\` returns testStatistic only, NOT p-values
 - ⚠️ WARNING: \`sampling\` with \`system\` method unreliable for small tables—use \`bernoulli\` or \`random\`

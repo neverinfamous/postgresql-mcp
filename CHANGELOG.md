@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **createPartitionedTable schema.table support** — `pg_create_partitioned_table` now supports `schema.table` format for `name` parameter (e.g., `'myschema.events'` → schema='myschema', name='events'). Auto-parsed, eliminating the need for separate `schema` parameter
 - **createPartitionedTable table-level primaryKey** — `pg_create_partitioned_table` now supports `primaryKey: ['col1', 'col2']` array for composite primary keys, matching the behavior of `pg_create_table`
 - **createPartitionedTable primaryKey validation** — `pg_create_partitioned_table` now validates that `primaryKey` array includes the partition key column. Throws a descriptive error if validation fails (e.g., "Primary key must include partition key column 'event_date'") instead of silently skipping the primary key constraint
+- **Stats tools schema.table support** — All 8 stats tools (`descriptive`, `percentiles`, `correlation`, `regression`, `timeSeries`, `distribution`, `hypothesis`, `sampling`) now support `schema.table` format for the `table` parameter (auto-parsed, embedded schema takes priority over explicit `schema` param). Consistent with other tool groups
+- **Enhanced Stats tools documentation** — Updated ServerInstructions.ts to clarify `sampling` behavior: `percentage` param only works with `bernoulli`/`system` methods and is ignored for default `random` method
 
 ### Fixed
 

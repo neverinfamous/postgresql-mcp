@@ -14,6 +14,31 @@ import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
 
 // =============================================================================
+// Schema.Table Parsing
+// =============================================================================
+
+/**
+ * Parse schema.table format from table name.
+ * Returns { table, schema } with schema extracted from prefix if present.
+ * Embedded schema takes priority over explicit schema parameter.
+ */
+function parseSchemaTable(
+  table: string,
+  explicitSchema?: string,
+): { table: string; schema: string } {
+  if (table.includes(".")) {
+    const parts = table.split(".");
+    if (parts.length === 2 && parts[0] && parts[1]) {
+      return {
+        schema: parts[0],
+        table: parts[1],
+      };
+    }
+  }
+  return { table, schema: explicitSchema ?? "public" };
+}
+
+// =============================================================================
 // Parameter Preprocessing
 // =============================================================================
 
@@ -113,6 +138,16 @@ function preprocessTimeSeriesParams(input: unknown): unknown {
     result["where"] = result["filter"];
   }
 
+  // Parse schema.table format (embedded schema takes priority)
+  if (typeof result["table"] === "string" && result["table"].includes(".")) {
+    const parsed = parseSchemaTable(
+      result["table"],
+      result["schema"] as string | undefined,
+    );
+    result["table"] = parsed.table;
+    result["schema"] = parsed.schema;
+  }
+
   return result;
 }
 
@@ -168,6 +203,16 @@ function preprocessHypothesisParams(input: unknown): unknown {
     result["where"] = result["filter"];
   }
 
+  // Parse schema.table format (embedded schema takes priority)
+  if (typeof result["table"] === "string" && result["table"].includes(".")) {
+    const parsed = parseSchemaTable(
+      result["table"],
+      result["schema"] as string | undefined,
+    );
+    result["table"] = parsed.table;
+    result["schema"] = parsed.schema;
+  }
+
   return result;
 }
 
@@ -192,6 +237,15 @@ function preprocessDistributionParams(input: unknown): unknown {
   if (result["filter"] !== undefined && result["where"] === undefined) {
     result["where"] = result["filter"];
   }
+  // Parse schema.table format (embedded schema takes priority)
+  if (typeof result["table"] === "string" && result["table"].includes(".")) {
+    const parsed = parseSchemaTable(
+      result["table"],
+      result["schema"] as string | undefined,
+    );
+    result["table"] = parsed.table;
+    result["schema"] = parsed.schema;
+  }
   return result;
 }
 
@@ -215,6 +269,15 @@ function preprocessSamplingParams(input: unknown): unknown {
   // Alias: filter → where
   if (result["filter"] !== undefined && result["where"] === undefined) {
     result["where"] = result["filter"];
+  }
+  // Parse schema.table format (embedded schema takes priority)
+  if (typeof result["table"] === "string" && result["table"].includes(".")) {
+    const parsed = parseSchemaTable(
+      result["table"],
+      result["schema"] as string | undefined,
+    );
+    result["table"] = parsed.table;
+    result["schema"] = parsed.schema;
   }
   return result;
 }

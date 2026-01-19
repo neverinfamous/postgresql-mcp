@@ -14,6 +14,10 @@ import { getToolIcons } from "../../../../utils/icons.js";
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
 
+// Helper to coerce string numbers to JavaScript numbers (PostgreSQL returns BIGINT as strings)
+const toNum = (val: unknown): number | null =>
+  val === null || val === undefined ? null : Number(val);
+
 // Preprocess partition strategy params with tableName/name aliases
 function preprocessPartitionStrategyParams(input: unknown): unknown {
   const normalized = defaultToEmpty(input) as Record<string, unknown>;
@@ -89,15 +93,27 @@ export function createPerformanceBaselineTool(
           ),
         ]);
 
+      // Helper to coerce all numeric string values in an object to numbers
+      const coerceRow = (
+        row: Record<string, unknown> | undefined,
+      ): Record<string, unknown> | null => {
+        if (!row) return null;
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(row)) {
+          result[key] = toNum(value) ?? value;
+        }
+        return result;
+      };
+
       return {
         name: baselineName,
         timestamp: new Date().toISOString(),
         metrics: {
-          cache: cacheHit.rows?.[0],
-          tables: tableStats.rows?.[0],
-          indexes: indexStats.rows?.[0],
-          connections: connections.rows?.[0],
-          databaseSize: dbSize.rows?.[0],
+          cache: coerceRow(cacheHit.rows?.[0]),
+          tables: coerceRow(tableStats.rows?.[0]),
+          indexes: coerceRow(indexStats.rows?.[0]),
+          connections: coerceRow(connections.rows?.[0]),
+          databaseSize: coerceRow(dbSize.rows?.[0]),
         },
       };
     },
@@ -196,10 +212,18 @@ export function createConnectionPoolOptimizeTool(
           }
         : null;
 
+      // Coerce waitEvents count to numbers
+      const coercedWaitEvents = (waitEvents.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          count: toNum(row["count"]),
+        }),
+      );
+
       return {
         current,
         config,
-        waitEvents: waitEvents.rows,
+        waitEvents: coercedWaitEvents,
         recommendations:
           recommendations.length > 0
             ? recommendations

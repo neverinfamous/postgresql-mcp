@@ -43,12 +43,14 @@ export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
-      const indexes = (result.rows ?? []).map((row: Record<string, unknown>) => ({
-        ...row,
-        scans: toNum(row["scans"]),
-        tuples_read: toNum(row["tuples_read"]),
-        tuples_fetched: toNum(row["tuples_fetched"]),
-      }));
+      const indexes = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          scans: toNum(row["scans"]),
+          tuples_read: toNum(row["tuples_read"]),
+          tuples_fetched: toNum(row["tuples_fetched"]),
+        }),
+      );
       return { indexes };
     },
   };
@@ -80,18 +82,20 @@ export function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
-      const tables = (result.rows ?? []).map((row: Record<string, unknown>) => ({
-        ...row,
-        seq_scan: toNum(row["seq_scan"]),
-        seq_tup_read: toNum(row["seq_tup_read"]),
-        idx_scan: toNum(row["idx_scan"]),
-        idx_tup_fetch: toNum(row["idx_tup_fetch"]),
-        inserts: toNum(row["inserts"]),
-        updates: toNum(row["updates"]),
-        deletes: toNum(row["deletes"]),
-        live_tuples: toNum(row["live_tuples"]),
-        dead_tuples: toNum(row["dead_tuples"]),
-      }));
+      const tables = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          seq_scan: toNum(row["seq_scan"]),
+          seq_tup_read: toNum(row["seq_tup_read"]),
+          idx_scan: toNum(row["idx_scan"]),
+          idx_tup_fetch: toNum(row["idx_tup_fetch"]),
+          inserts: toNum(row["inserts"]),
+          updates: toNum(row["updates"]),
+          deletes: toNum(row["deletes"]),
+          live_tuples: toNum(row["live_tuples"]),
+          dead_tuples: toNum(row["dead_tuples"]),
+        }),
+      );
       return { tables };
     },
   };
@@ -130,13 +134,15 @@ export function createStatStatementsTool(
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
-      const statements = (result.rows ?? []).map((row: Record<string, unknown>) => ({
-        ...row,
-        calls: toNum(row["calls"]),
-        rows: toNum(row["rows"]),
-        shared_blks_hit: toNum(row["shared_blks_hit"]),
-        shared_blks_read: toNum(row["shared_blks_read"]),
-      }));
+      const statements = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          calls: toNum(row["calls"]),
+          rows: toNum(row["rows"]),
+          shared_blks_hit: toNum(row["shared_blks_hit"]),
+          shared_blks_read: toNum(row["shared_blks_read"]),
+        }),
+      );
       return { statements };
     },
   };
@@ -221,12 +227,14 @@ export function createUnusedIndexesTool(
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
-      const unusedIndexes = (result.rows ?? []).map((row: Record<string, unknown>) => ({
-        ...row,
-        scans: toNum(row["scans"]),
-        tuples_read: toNum(row["tuples_read"]),
-        size_bytes: toNum(row["size_bytes"]),
-      }));
+      const unusedIndexes = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          scans: toNum(row["scans"]),
+          tuples_read: toNum(row["tuples_read"]),
+          size_bytes: toNum(row["size_bytes"]),
+        }),
+      );
       return {
         unusedIndexes,
         count: unusedIndexes.length,
@@ -360,15 +368,17 @@ export function createVacuumStatsTool(
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
-      const vacuumStats = (result.rows ?? []).map((row: Record<string, unknown>) => ({
-        ...row,
-        live_tuples: toNum(row["live_tuples"]),
-        dead_tuples: toNum(row["dead_tuples"]),
-        vacuum_count: toNum(row["vacuum_count"]),
-        autovacuum_count: toNum(row["autovacuum_count"]),
-        analyze_count: toNum(row["analyze_count"]),
-        autoanalyze_count: toNum(row["autoanalyze_count"]),
-      }));
+      const vacuumStats = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          live_tuples: toNum(row["live_tuples"]),
+          dead_tuples: toNum(row["dead_tuples"]),
+          vacuum_count: toNum(row["vacuum_count"]),
+          autovacuum_count: toNum(row["autovacuum_count"]),
+          analyze_count: toNum(row["analyze_count"]),
+          autoanalyze_count: toNum(row["autoanalyze_count"]),
+        }),
+      );
       return {
         vacuumStats,
         count: vacuumStats.length,
@@ -428,9 +438,19 @@ export function createQueryPlanStatsTool(
                 LIMIT ${String(limit)}`;
 
       const result = await adapter.executeQuery(sql);
+      // Coerce numeric fields to JavaScript numbers
+      const queryPlanStats = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          calls: toNum(row["calls"]),
+          rows: toNum(row["rows"]),
+          shared_blks_hit: toNum(row["shared_blks_hit"]),
+          shared_blks_read: toNum(row["shared_blks_read"]),
+        }),
+      );
       return {
-        queryPlanStats: result.rows,
-        count: result.rows?.length ?? 0,
+        queryPlanStats,
+        count: queryPlanStats.length,
         hint: "High plan_pct indicates queries spending significant time in planning. Consider prepared statements.",
       };
     },

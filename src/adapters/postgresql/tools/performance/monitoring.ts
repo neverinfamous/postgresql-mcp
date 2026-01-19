@@ -11,6 +11,10 @@ import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
 
+// Helper to coerce string numbers to JavaScript numbers (PostgreSQL returns BIGINT as strings)
+const toNum = (val: unknown): number | null =>
+  val === null || val === undefined ? null : Number(val);
+
 export function createLocksTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_locks",
@@ -90,9 +94,18 @@ export function createBloatCheckTool(adapter: PostgresAdapter): ToolDefinition {
                         LIMIT 20`;
 
       const result = await adapter.executeQuery(sql);
+      // Coerce numeric fields to JavaScript numbers
+      const bloatedTables = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          live_tuples: toNum(row["live_tuples"]),
+          dead_tuples: toNum(row["dead_tuples"]),
+          dead_pct: toNum(row["dead_pct"]),
+        }),
+      );
       return {
-        bloatedTables: result.rows,
-        count: result.rows?.length ?? 0,
+        bloatedTables,
+        count: bloatedTables.length,
       };
     },
   };
@@ -118,7 +131,15 @@ export function createCacheHitRatioTool(
                         FROM pg_statio_user_tables`;
 
       const result = await adapter.executeQuery(sql);
-      return result.rows?.[0];
+      const row = result.rows?.[0];
+      // Coerce numeric fields to JavaScript numbers
+      return row
+        ? {
+            heap_read: toNum(row["heap_read"]),
+            heap_hit: toNum(row["heap_hit"]),
+            cache_hit_ratio: toNum(row["cache_hit_ratio"]),
+          }
+        : null;
     },
   };
 }

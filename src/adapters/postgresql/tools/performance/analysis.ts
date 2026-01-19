@@ -11,6 +11,10 @@ import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
 
+// Helper to coerce string numbers to JavaScript numbers (PostgreSQL returns BIGINT as strings)
+const toNum = (val: unknown): number | null =>
+  val === null || val === undefined ? null : Number(val);
+
 export function createSeqScanTablesTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
@@ -51,9 +55,20 @@ export function createSeqScanTablesTool(
                         ORDER BY seq_scan DESC`;
 
       const result = await adapter.executeQuery(sql);
+      // Coerce numeric fields to JavaScript numbers
+      const tables = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          seq_scan: toNum(row["seq_scan"]),
+          seq_tup_read: toNum(row["seq_tup_read"]),
+          idx_scan: toNum(row["idx_scan"]),
+          idx_tup_fetch: toNum(row["idx_tup_fetch"]),
+          seq_scan_pct: toNum(row["seq_scan_pct"]),
+        }),
+      );
       return {
-        tables: result.rows,
-        count: result.rows?.length ?? 0,
+        tables,
+        count: tables.length,
         minScans,
         hint: "High seq_scan_pct indicates tables that could benefit from indexes.",
       };
@@ -317,9 +332,18 @@ export function createIndexRecommendationsTool(
                         LIMIT 20`;
 
       const result = await adapter.executeQuery(sql);
+      // Coerce numeric fields to JavaScript numbers
+      const recommendations = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          seq_scan: toNum(row["seq_scan"]),
+          idx_scan: toNum(row["idx_scan"]),
+          row_count: toNum(row["row_count"]),
+        }),
+      );
       return {
         queryAnalysis: false,
-        recommendations: result.rows,
+        recommendations,
         hint: "Based on table statistics. Provide a SQL query for query-specific recommendations.",
       };
     },

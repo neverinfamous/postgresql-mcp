@@ -114,6 +114,19 @@ Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSetting
 - \`showSettings({setting: 'work_mem'})\`: Accepts \`pattern\`, \`setting\`, or \`name\`. Exact names auto-match; \`%\` for LIKE patterns
 - \`capacityPlanning({days: 90})\`: \`days\` = \`projectionDays\`. Growth based on stats since last reset
 
+## Admin Tools
+
+Core: \`vacuum()\`, \`vacuumAnalyze()\`, \`analyze()\`, \`reindex()\`, \`cluster()\`, \`setConfig()\`, \`reloadConf()\`, \`resetStats()\`, \`cancelBackend()\`, \`terminateBackend()\`
+
+- \`vacuum({ table?, full?, analyze?, verbose? })\`: Without \`table\`, vacuums ALL tables. \`verbose\` output goes to PostgreSQL server logs
+- \`reindex({ target, name?, concurrently? })\`: Targets: 'table', 'index', 'schema', 'database'. \`database\` target defaults to current db when \`name\` omitted
+- \`cluster()\`: Without args, re-clusters all previously-clustered tables. With args, requires BOTH \`table\` AND \`index\`
+- \`setConfig({ name, value, isLocal? })\`: \`isLocal: true\` applies only to current transaction
+- \`cancelBackend({ pid })\`: Graceful query cancellation—returns \`{success: false}\` for invalid PID (no error thrown)
+- \`terminateBackend({ pid })\`: Forceful connection termination—use with caution
+
+Aliases: \`tableName\`→\`table\`, \`indexName\`→\`index\`, \`param\`/\`setting\`→\`name\`, \`processId\`→\`pid\`
+
 ## Backup Tools
 
 - \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Format: \`csv\` (default), \`text\`, \`binary\`

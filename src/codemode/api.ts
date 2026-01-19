@@ -256,8 +256,12 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
   ],
   admin: [
     "pg.admin.vacuum({ table: 'orders' })",
-    "pg.admin.analyze({ table: 'orders' })",
-    "pg.admin.reindex({ table: 'orders' })",
+    "pg.admin.vacuum({ table: 'orders', full: true, analyze: true })",
+    "pg.admin.analyze({ table: 'orders', columns: ['created_at', 'status'] })",
+    "pg.admin.reindex({ target: 'table', name: 'orders', concurrently: true })",
+    "pg.admin.cluster({ table: 'orders', index: 'idx_orders_date' })",
+    "pg.admin.setConfig({ name: 'work_mem', value: '256MB' })",
+    "pg.admin.cancelBackend({ pid: 12345 })",
   ],
   monitoring: [
     "pg.monitoring.databaseSize()",

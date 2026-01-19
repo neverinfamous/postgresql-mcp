@@ -1,0 +1,132 @@
+
+> @pg-mcp/core@0.1.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90m/home/coldaine/postgresql-mcp/packages/core[39m
+
+ [31m❯[39m test/tools/pg-monitor.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 84[2mms[22m[39m
+     [32m✓[39m should handle health check[32m 42[2mms[22m[39m
+     [32m✓[39m should handle connections[32m 8[2mms[22m[39m
+     [32m✓[39m should handle locks[32m 8[2mms[22m[39m
+[31m     [31m×[31m should handle size[39m[32m 23[2mms[22m[39m
+ [31m❯[39m test/tools/pg-admin.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[32m 99[2mms[22m[39m
+[31m     [31m×[31m should handle vacuum[39m[32m 72[2mms[22m[39m
+[31m     [31m×[31m should handle analyze[39m[32m 7[2mms[22m[39m
+[31m     [31m×[31m should handle reindex[39m[32m 5[2mms[22m[39m
+[31m     [31m×[31m should handle stats[39m[32m 9[2mms[22m[39m
+ [32m✓[39m test/tools/pg-query.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m test/tools/pg-tx.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 83[2mms[22m[39m
+ [32m✓[39m test/tools/pg-schema.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 115[2mms[22m[39m
+ [32m✓[39m test/integration/core.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1084[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 5 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-admin.test.ts[2m > [22mpg_admin (live)[2m > [22mshould handle vacuum
+[31m[1mAssertionError[22m: expected undefined to be 'success' // Object.is equality[39m
+
+[32m- Expected:[39m 
+"success"
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m test/tools/pg-admin.test.ts:[2m27:31[22m[39m
+    [90m 25| [39m        }[33m,[39m context)[33m;[39m
+    [90m 26| [39m
+    [90m 27| [39m        [34mexpect[39m(result[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"success"[39m)[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m 28| [39m    })[33m;[39m
+    [90m 29| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-admin.test.ts[2m > [22mpg_admin (live)[2m > [22mshould handle analyze
+[31m[1mAssertionError[22m: expected undefined to be 'success' // Object.is equality[39m
+
+[32m- Expected:[39m 
+"success"
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m test/tools/pg-admin.test.ts:[2m37:31[22m[39m
+    [90m 35| [39m        } [35mas[39m any[33m,[39m context)[33m;[39m
+    [90m 36| [39m
+    [90m 37| [39m        [34mexpect[39m(result[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"success"[39m)[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m 38| [39m    })[33m;[39m
+    [90m 39| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-admin.test.ts[2m > [22mpg_admin (live)[2m > [22mshould handle reindex
+[31m[1mAssertionError[22m: expected undefined to be 'success' // Object.is equality[39m
+
+[32m- Expected:[39m 
+"success"
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m test/tools/pg-admin.test.ts:[2m46:31[22m[39m
+    [90m 44| [39m        } [35mas[39m any[33m,[39m context)[33m;[39m
+    [90m 45| [39m
+    [90m 46| [39m        [34mexpect[39m(result[33m.[39mstatus)[33m.[39m[34mtoBe[39m([32m"success"[39m)[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m 47| [39m    })[33m;[39m
+    [90m 48| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-admin.test.ts[2m > [22mpg_admin (live)[2m > [22mshould handle stats
+[31m[1mAssertionError[22m: expected undefined to be 'test_products' // Object.is equality[39m
+
+[32m- Expected:[39m 
+"test_products"
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m test/tools/pg-admin.test.ts:[2m57:43[22m[39m
+    [90m 55| [39m        [34mexpect[39m(result[33m.[39mrows)[33m.[39m[34mtoBeDefined[39m()[33m;[39m
+    [90m 56| [39m        [34mexpect[39m(result[33m.[39mrows[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m 57| [39m        [34mexpect[39m(result[33m.[39mrows[[34m0[39m][33m.[39mtable_name)[33m.[39m[34mtoBe[39m([32m"test_products"[39m)[33m;[39m
+    [90m   | [39m                                          [31m^[39m
+    [90m 58| [39m    })[33m;[39m
+    [90m 59| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-monitor.test.ts[2m > [22mpg_monitor (live)[2m > [22mshould handle size
+[31m[1mAssertionError[22m: expected undefined to be 'mcp_test' // Object.is equality[39m
+
+[32m- Expected:[39m 
+"mcp_test"
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m test/tools/pg-monitor.test.ts:[2m53:37[22m[39m
+    [90m 51| [39m        [34mexpect[39m(result[33m.[39mrows)[33m.[39m[34mtoBeDefined[39m()[33m;[39m
+    [90m 52| [39m        [34mexpect[39m(result[33m.[39mrows[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m 53| [39m        [34mexpect[39m(result[33m.[39mrows[[34m0[39m][33m.[39mname)[33m.[39m[34mtoBe[39m([32m"mcp_test"[39m)[33m;[39m
+    [90m   | [39m                                    [31m^[39m
+    [90m 54| [39m    })[33m;[39m
+    [90m 55| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m4 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m18 passed[39m[22m[90m (23)[39m
+[2m   Start at [22m 23:53:25
+[2m   Duration [22m 1.79s[2m (transform 438ms, setup 0ms, import 1.68s, tests 1.54s, environment 2ms)[22m
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/coldaine/postgresql-mcp/packages/core
+npm error workspace @pg-mcp/core@0.1.0
+npm error location /home/coldaine/postgresql-mcp/packages/core
+npm error command failed
+npm error command sh -c vitest run

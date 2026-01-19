@@ -1,0 +1,19 @@
+
+> @pg-mcp/core@0.1.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90m/home/coldaine/postgresql-mcp/packages/core[39m
+
+ [32m✓[39m test/tools/pg-tx.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m test/tools/pg-monitor.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 95[2mms[22m[39m
+ [32m✓[39m test/tools/pg-admin.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 122[2mms[22m[39m
+ [32m✓[39m test/tools/pg-query.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 98[2mms[22m[39m
+ [32m✓[39m test/tools/pg-schema.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 148[2mms[22m[39m
+ [32m✓[39m test/integration/core.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1110[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[32m23 passed[39m[22m[90m (23)[39m
+[2m   Start at [22m 23:53:47
+[2m   Duration [22m 1.75s[2m (transform 512ms, setup 0ms, import 1.74s, tests 1.62s, environment 2ms)[22m
+

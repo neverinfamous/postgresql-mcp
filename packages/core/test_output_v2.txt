@@ -1,0 +1,149 @@
+
+> @pg-mcp/core@0.1.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90m/home/coldaine/postgresql-mcp/packages/core[39m
+
+ [31m❯[39m test/tools/pg-schema.test.ts [2m([22m[2m6 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 137[2mms[22m[39m
+[31m     [31m×[31m should handle list tables[39m[32m 68[2mms[22m[39m
+     [32m✓[39m should handle list tables with pagination[32m 5[2mms[22m[39m
+[31m     [31m×[31m should handle describe table[39m[32m 17[2mms[22m[39m
+     [32m✓[39m should handle create table[32m 17[2mms[22m[39m
+     [32m✓[39m should handle alter table[32m 17[2mms[22m[39m
+     [32m✓[39m should handle drop table[32m 9[2mms[22m[39m
+ [32m✓[39m test/tools/pg-query.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+ [31m❯[39m test/tools/pg-monitor.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 81[2mms[22m[39m
+     [32m✓[39m should handle health check[32m 41[2mms[22m[39m
+     [32m✓[39m should handle connections[32m 8[2mms[22m[39m
+     [32m✓[39m should handle locks[32m 7[2mms[22m[39m
+[31m     [31m×[31m should handle size[39m[32m 21[2mms[22m[39m
+ [32m✓[39m test/tools/pg-tx.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [31m❯[39m test/tools/pg-admin.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[32m 65[2mms[22m[39m
+[31m     [31m×[31m should handle vacuum[39m[32m 42[2mms[22m[39m
+[31m     [31m×[31m should handle analyze[39m[32m 4[2mms[22m[39m
+[31m     [31m×[31m should handle reindex[39m[32m 4[2mms[22m[39m
+[31m     [31m×[31m should handle stats[39m[32m 10[2mms[22m[39m
+ [32m✓[39m test/integration/core.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 1057[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 7 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-admin.test.ts[2m > [22mpg_admin (live)[2m > [22mshould handle vacuum
+[31m[1merror[22m: relation "test_products" does not exist[39m
+[90m [2m❯[22m ../../node_modules/pg/lib/client.js:[2m588:17[22m[39m
+[36m [2m❯[22m PostgresSessionExecutor.execute ../../shared/executor/postgres.ts:[2m13:28[22m[39m
+    [90m 11| [39m
+    [90m 12| [39m        [35mtry[39m {
+    [90m 13| [39m            [35mconst[39m result [33m=[39m [35mawait[39m [35mthis[39m[33m.[39mclient[33m.[39m[34mquery[39m(sql[33m,[39m params)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 14| [39m            [35mreturn[39m {
+    [90m 15| [39m                rows[33m:[39m result[33m.[39mrows[33m,[39m
+[90m [2m❯[22m PostgresExecutor.execute ../../shared/executor/postgres.ts:[2m46:20[22m[39m
+[90m [2m❯[22m Object.handler src/actions/admin/maintenance.ts:[2m40:16[22m[39m
+[90m [2m❯[22m pgAdminHandler src/tools/pg-admin.ts:[2m23:12[22m[39m
+[90m [2m❯[22m test/tools/pg-admin.test.ts:[2m21:24[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-admin.test.ts[2m > [22mpg_admin (live)[2m > [22mshould handle analyze
+[31m[1merror[22m: relation "test_products" does not exist[39m
+[90m [2m❯[22m ../../node_modules/pg/lib/client.js:[2m588:17[22m[39m
+[36m [2m❯[22m PostgresSessionExecutor.execute ../../shared/executor/postgres.ts:[2m13:28[22m[39m
+    [90m 11| [39m
+    [90m 12| [39m        [35mtry[39m {
+    [90m 13| [39m            [35mconst[39m result [33m=[39m [35mawait[39m [35mthis[39m[33m.[39mclient[33m.[39m[34mquery[39m(sql[33m,[39m params)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 14| [39m            [35mreturn[39m {
+    [90m 15| [39m                rows[33m:[39m result[33m.[39mrows[33m,[39m
+[90m [2m❯[22m PostgresExecutor.execute ../../shared/executor/postgres.ts:[2m46:20[22m[39m
+[90m [2m❯[22m Object.handler src/actions/admin/maintenance.ts:[2m40:16[22m[39m
+[90m [2m❯[22m pgAdminHandler src/tools/pg-admin.ts:[2m23:12[22m[39m
+[90m [2m❯[22m test/tools/pg-admin.test.ts:[2m31:24[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-admin.test.ts[2m > [22mpg_admin (live)[2m > [22mshould handle reindex
+[31m[1merror[22m: relation "test_products" does not exist[39m
+[90m [2m❯[22m ../../node_modules/pg/lib/client.js:[2m588:17[22m[39m
+[36m [2m❯[22m PostgresSessionExecutor.execute ../../shared/executor/postgres.ts:[2m13:28[22m[39m
+    [90m 11| [39m
+    [90m 12| [39m        [35mtry[39m {
+    [90m 13| [39m            [35mconst[39m result [33m=[39m [35mawait[39m [35mthis[39m[33m.[39mclient[33m.[39m[34mquery[39m(sql[33m,[39m params)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m 14| [39m            [35mreturn[39m {
+    [90m 15| [39m                rows[33m:[39m result[33m.[39mrows[33m,[39m
+[90m [2m❯[22m PostgresExecutor.execute ../../shared/executor/postgres.ts:[2m46:20[22m[39m
+[90m [2m❯[22m Object.handler src/actions/admin/maintenance.ts:[2m40:16[22m[39m
+[90m [2m❯[22m pgAdminHandler src/tools/pg-admin.ts:[2m23:12[22m[39m
+[90m [2m❯[22m test/tools/pg-admin.test.ts:[2m41:24[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-admin.test.ts[2m > [22mpg_admin (live)[2m > [22mshould handle stats
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m test/tools/pg-admin.test.ts:[2m56:36[22m[39m
+    [90m 54| [39m
+    [90m 55| [39m        [34mexpect[39m(result[33m.[39mrows)[33m.[39m[34mtoBeDefined[39m()[33m;[39m
+    [90m 56| [39m        [34mexpect[39m(result[33m.[39mrows[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m 57| [39m        [34mexpect[39m(result[33m.[39mrows[[34m0[39m][33m.[39mtable_name)[33m.[39m[34mtoBe[39m([32m"test_products"[39m)[33m;[39m
+    [90m 58| [39m    })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-monitor.test.ts[2m > [22mpg_monitor (live)[2m > [22mshould handle size
+[31m[1mAssertionError[22m: expected undefined to be 'mcp_test' // Object.is equality[39m
+
+[32m- Expected:[39m 
+"mcp_test"
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m test/tools/pg-monitor.test.ts:[2m53:37[22m[39m
+    [90m 51| [39m        [34mexpect[39m(result[33m.[39mrows)[33m.[39m[34mtoBeDefined[39m()[33m;[39m
+    [90m 52| [39m        [34mexpect[39m(result[33m.[39mrows[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m 53| [39m        [34mexpect[39m(result[33m.[39mrows[[34m0[39m][33m.[39mname)[33m.[39m[34mtoBe[39m([32m"mcp_test"[39m)[33m;[39m
+    [90m   | [39m                                    [31m^[39m
+    [90m 54| [39m    })[33m;[39m
+    [90m 55| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-schema.test.ts[2m > [22mpg_schema (live)[2m > [22mshould handle list tables
+[31m[1mAssertionError[22m: expected undefined to be defined[39m
+[36m [2m❯[22m test/tools/pg-schema.test.ts:[2m29:74[22m[39m
+    [90m 27| [39m        [34mexpect[39m(result[33m.[39mrows)[33m.[39m[34mtoBeDefined[39m()[33m;[39m
+    [90m 28| [39m        [34mexpect[39m(result[33m.[39mrows[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m 29| [39m        expect(result.rows.find((r: any) => r.name === "test_products"…
+    [90m   | [39m                                                                         [31m^[39m
+    [90m 30| [39m    })[33m;[39m
+    [90m 31| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m test/tools/pg-schema.test.ts[2m > [22mpg_schema (live)[2m > [22mshould handle describe table
+[31m[1mAssertionError[22m: expected undefined to be defined[39m
+[36m [2m❯[22m test/tools/pg-schema.test.ts:[2m51:66[22m[39m
+    [90m 49| [39m
+    [90m 50| [39m        [34mexpect[39m(result[33m.[39mname)[33m.[39m[34mtoBe[39m([32m"test_products"[39m)[33m;[39m
+    [90m 51| [39m        expect(result.columns.find((c: any) => c.name === "id")).toBeD…
+    [90m   | [39m                                                                 [31m^[39m
+    [90m 52| [39m        [90m// Since we created an index in test-database.sql if any[39m
+    [90m 53| [39m        [90m// Just verify it returns structure[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[31m7 failed[39m[22m[2m | [22m[1m[32m16 passed[39m[22m[90m (23)[39m
+[2m   Start at [22m 23:53:07
+[2m   Duration [22m 1.75s[2m (transform 305ms, setup 0ms, import 1.30s, tests 1.49s, environment 2ms)[22m
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /home/coldaine/postgresql-mcp/packages/core
+npm error workspace @pg-mcp/core@0.1.0
+npm error location /home/coldaine/postgresql-mcp/packages/core
+npm error command failed
+npm error command sh -c vitest run

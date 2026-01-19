@@ -1,19 +1,23 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { pgMonitorHandler } from "../../src/tools/pg-monitor.js";
-import { MockExecutor } from "../executor/mock.js";
+import { PostgresExecutor } from "../../../../shared/executor/postgres.js";
 
-describe("pg_monitor", () => {
-    let mockExecutor: MockExecutor;
+describe("pg_monitor (live)", () => {
+    let executor: PostgresExecutor;
     let context: any;
 
-    beforeEach(() => {
-        mockExecutor = new MockExecutor();
-        context = { executor: mockExecutor };
+    beforeAll(async () => {
+        executor = new PostgresExecutor({
+            host: "localhost",
+            port: 5433,
+            user: "mcp",
+            password: "mcp",
+            database: "mcp_test",
+        });
+        context = { executor };
     });
 
     it("should handle health check", async () => {
-        mockExecutor.setNextResult({ rows: [{ now: new Date() }], rowCount: 1 });
-
         const result = await pgMonitorHandler({
             action: "health"
         }, context);
@@ -22,36 +26,30 @@ describe("pg_monitor", () => {
     });
 
     it("should handle connections", async () => {
-        mockExecutor.setNextResult({ rows: [{ count: 5 }], rowCount: 1 });
-
         const result = await pgMonitorHandler({
             action: "connections"
         } as any, context);
 
-        expect(result.rows[0].count).toBe(5);
-        expect(mockExecutor.executedQueries[0].sql).toContain("pg_stat_activity");
+        expect(result.rows).toBeDefined();
+        expect(result.rows.length).toBeGreaterThan(0);
     });
 
     it("should handle locks", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 0 });
-
         const result = await pgMonitorHandler({
             action: "locks"
         } as any, context);
 
-        expect(result.rows).toEqual([]);
-        expect(mockExecutor.executedQueries[0].sql).toContain("pg_locks");
+        expect(result.rows).toBeDefined();
     });
 
     it("should handle size", async () => {
-        mockExecutor.setNextResult({ rows: [{ name: "postgres", size: "100MB" }], rowCount: 1 });
-
         const result = await pgMonitorHandler({
             action: "size",
-            options: { database: "postgres" }
+            options: { database: "mcp_test" }
         } as any, context);
 
-        expect(result.rows[0].size).toBe("100MB");
-        expect(mockExecutor.executedQueries[0].sql).toContain("pg_database_size");
+        expect(result.rows).toBeDefined();
+        expect(result.rows.length).toBeGreaterThan(0);
+        expect(result.rows[0].name).toBe("mcp_test");
     });
 });

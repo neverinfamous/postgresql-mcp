@@ -20,9 +20,11 @@ export const listHandler: ActionHandler<typeof ListSchema> = {
         let { sql, args } = await getListQuery(params);
 
         if (params.options?.limit) {
+            sql = sql.trim().replace(/;$/, "");
             sql += ` LIMIT ${params.options.limit}`;
         }
         if (params.options?.offset) {
+            sql = sql.trim().replace(/;$/, "");
             sql += ` OFFSET ${params.options.offset}`;
         }
 

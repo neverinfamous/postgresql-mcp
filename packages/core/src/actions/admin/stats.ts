@@ -31,6 +31,13 @@ export const statsHandler: ActionHandler<typeof StatsSchema> = {
             `;
         }
 
-        return await context.executor.execute(sql, args);
+        const result = await context.executor.execute(sql, args);
+        return {
+            ...result,
+            rows: result.rows.map(r => ({
+                ...r,
+                table_name: r.relname
+            }))
+        };
     },
 };

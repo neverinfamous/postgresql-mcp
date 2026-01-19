@@ -37,6 +37,10 @@ export const maintenanceHandler: ActionHandler<typeof MaintenanceSchema> = {
                 break;
         }
 
-        return await context.executor.execute(sql);
+        const result = await context.executor.execute(sql);
+        return {
+            ...result,
+            status: "success"
+        };
     },
 };

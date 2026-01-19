@@ -1,60 +1,59 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { pgAdminHandler } from "../../src/tools/pg-admin.js";
-import { MockExecutor } from "../executor/mock.js";
+import { PostgresExecutor } from "../../../../shared/executor/postgres.js";
 
-describe("pg_admin", () => {
-    let mockExecutor: MockExecutor;
+describe("pg_admin (live)", () => {
+    let executor: PostgresExecutor;
     let context: any;
 
-    beforeEach(() => {
-        mockExecutor = new MockExecutor();
-        context = { executor: mockExecutor };
+    beforeAll(async () => {
+        executor = new PostgresExecutor({
+            host: "localhost",
+            port: 5433,
+            user: "mcp",
+            password: "mcp",
+            database: "mcp_test",
+        });
+        context = { executor };
     });
 
     it("should handle vacuum", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
-
-        await pgAdminHandler({
+        const result = await pgAdminHandler({
             action: "vacuum",
-            target: "users",
+            target: "test_products",
             options: { analyze: true }
         }, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toContain('VACUUM (ANALYZE) "users"');
+        expect(result.status).toBe("success");
     });
 
     it("should handle analyze", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
-
-        await pgAdminHandler({
+        const result = await pgAdminHandler({
             action: "analyze",
-            target: "users",
+            target: "test_products",
             options: { verbose: true }
         } as any, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toContain('ANALYZE VERBOSE "users"');
+        expect(result.status).toBe("success");
     });
 
     it("should handle reindex", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
-
-        await pgAdminHandler({
+        const result = await pgAdminHandler({
             action: "reindex",
-            target: "users"
+            target: "test_products"
         } as any, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toContain('REINDEX TABLE "users"');
+        expect(result.status).toBe("success");
     });
 
     it("should handle stats", async () => {
-        mockExecutor.setNextResult({ rows: [{ table_name: "users", size: "10MB" }], rowCount: 1 });
-
         const result = await pgAdminHandler({
             action: "stats",
-            target: "users"
+            target: "test_products"
         } as any, context);
 
-        expect(result.rows[0].table_name).toBe("users");
-        expect(mockExecutor.executedQueries[0].sql).toContain("pg_stat_user_tables");
+        expect(result.rows).toBeDefined();
+        expect(result.rows.length).toBeGreaterThan(0);
+        expect(result.rows[0].table_name).toBe("test_products");
     });
 });

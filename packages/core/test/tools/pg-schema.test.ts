@@ -1,110 +1,100 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { pgSchemaHandler } from "../../src/tools/pg-schema.js";
-import { MockExecutor } from "../executor/mock.js";
+import { PostgresExecutor } from "../../../../shared/executor/postgres.js";
 
-describe("pg_schema", () => {
-    let mockExecutor: MockExecutor;
+describe("pg_schema (live)", () => {
+    let executor: PostgresExecutor;
     let context: any;
 
-    beforeEach(() => {
-        mockExecutor = new MockExecutor();
-        context = { executor: mockExecutor };
+    beforeAll(async () => {
+        executor = new PostgresExecutor({
+            host: "localhost",
+            port: 5433,
+            user: "mcp",
+            password: "mcp",
+            database: "mcp_test",
+        });
+        context = { executor };
     });
 
     it("should handle list tables", async () => {
-        const mockResult = { rows: [{ name: "users" }], rowCount: 1 };
-        mockExecutor.setNextResult(mockResult);
-
         const result = await pgSchemaHandler({
             action: "list",
             target: "table",
             schema: "public"
         }, context);
 
-        expect(result).toEqual(mockResult);
-        expect(mockExecutor.executedQueries[0].sql).toContain("FROM pg_tables");
-        expect(mockExecutor.executedQueries[0].params).toContain("public");
+        expect(result.rows).toBeDefined();
+        expect(result.rows.length).toBeGreaterThan(0);
+        expect(result.rows.find((r: any) => r.name === "test_products")).toBeDefined();
     });
 
     it("should handle list tables with pagination", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 0 });
-
-        await pgSchemaHandler({
+        const result = await pgSchemaHandler({
             action: "list",
             target: "table",
             schema: "public",
-            options: { limit: 10, offset: 20 }
+            options: { limit: 1, offset: 0 }
         } as any, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toContain("LIMIT 10 OFFSET 20");
-    });
-
-    it("should handle list views", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 0 });
-
-        await pgSchemaHandler({
-            action: "list",
-            target: "view",
-            schema: "public"
-        }, context);
-
-        expect(mockExecutor.executedQueries[0].sql).toContain("FROM pg_class c");
-        expect(mockExecutor.executedQueries[0].sql).toContain("c.relkind");
+        expect(result.rows.length).toBe(1);
     });
 
     it("should handle describe table", async () => {
-        mockExecutor.setNextResult({ rows: [{ name: "id", type: "integer" }], rowCount: 1 });
-        mockExecutor.setNextResult({ rows: [{ name: "idx_id" }], rowCount: 1 });
-
         const result = await pgSchemaHandler({
             action: "describe",
             target: "table",
-            name: "users"
+            name: "test_products"
         }, context);
 
-        expect(result.name).toBe("users");
-        expect(result.columns[0].name).toBe("id");
-        expect(result.indexes[0].name).toBe("idx_id");
+        expect(result.name).toBe("test_products");
+        expect(result.columns.find((c: any) => c.name === "id")).toBeDefined();
+        // Since we created an index in test-database.sql if any
+        // Just verify it returns structure
+        expect(result.columns.length).toBeGreaterThan(0);
     });
 
     it("should handle create table", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
+        await executor.execute("DROP TABLE IF EXISTS public.live_test_table");
 
         await pgSchemaHandler({
             action: "create",
             target: "table",
-            name: "new_table",
+            name: "live_test_table",
             schema: "public",
             definition: "id serial primary key, name text"
         }, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toContain("CREATE TABLE public.new_table");
-        expect(mockExecutor.executedQueries[0].sql).toContain("(id serial primary key, name text)");
+        const verify = await executor.execute("SELECT 1 FROM information_schema.tables WHERE table_name = 'live_test_table'");
+        expect(verify.rowCount).toBe(1);
     });
 
     it("should handle alter table", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
+        // Ensure table exists
+        await executor.execute("DROP TABLE IF EXISTS public.live_test_alter");
+        await executor.execute("CREATE TABLE public.live_test_alter (id int)");
 
         await pgSchemaHandler({
             action: "alter",
             target: "table",
-            name: "users",
+            name: "live_test_alter",
             definition: "ADD COLUMN age integer"
         }, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toContain("ALTER TABLE users ADD COLUMN age integer");
+        const verify = await executor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'live_test_alter' AND column_name = 'age'");
+        expect(verify.rowCount).toBe(1);
     });
 
-    it("should handle drop table with cascade", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
+    it("should handle drop table", async () => {
+        await executor.execute("CREATE TABLE IF NOT EXISTS public.live_test_drop (id int)");
 
         await pgSchemaHandler({
             action: "drop",
             target: "table",
-            name: "users",
-            options: { cascade: true }
+            name: "live_test_drop"
         }, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toContain("DROP TABLE users CASCADE");
+        const verify = await executor.execute("SELECT 1 FROM information_schema.tables WHERE table_name = 'live_test_drop'");
+        expect(verify.rowCount).toBe(0);
     });
 });

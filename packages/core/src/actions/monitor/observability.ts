@@ -62,6 +62,13 @@ export const observabilityHandler: ActionHandler<typeof ObservabilitySchema> = {
                 break;
         }
 
-        return await context.executor.execute(sql, args);
+        const result = await context.executor.execute(sql, args);
+        if (params.action === "size" && params.options?.database) {
+            return {
+                ...result,
+                rows: [{ name: params.options.database, size: result.rows[0].size }]
+            };
+        }
+        return result;
     },
 };

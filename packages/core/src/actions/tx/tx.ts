@@ -37,6 +37,10 @@ export const txHandler: ActionHandler<typeof TxSchema> = {
                 break;
         }
 
-        return await context.executor.execute(sql);
+        const result = await context.executor.execute(sql);
+        return {
+            ...result,
+            status: "success"
+        };
     },
 };

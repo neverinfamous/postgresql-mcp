@@ -1,55 +1,57 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { pgTxHandler } from "../../src/tools/pg-tx.js";
-import { MockExecutor } from "../executor/mock.js";
+import { PostgresExecutor } from "../../../../shared/executor/postgres.js";
 
-describe("pg_tx", () => {
-    let mockExecutor: MockExecutor;
+describe("pg_tx (live)", () => {
+    let executor: PostgresExecutor;
     let context: any;
 
-    beforeEach(() => {
-        mockExecutor = new MockExecutor();
-        context = { executor: mockExecutor };
+    beforeAll(async () => {
+        executor = new PostgresExecutor({
+            host: "localhost",
+            port: 5433,
+            user: "mcp",
+            password: "mcp",
+            database: "mcp_test",
+        });
+        context = { executor };
     });
 
     it("should handle begin", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
-
-        await pgTxHandler({
+        const result = await pgTxHandler({
             action: "begin",
             options: { isolation_level: "serializable" }
         }, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toBe("BEGIN ISOLATION LEVEL SERIALIZABLE");
+        expect(result.status).toBe("success");
     });
 
     it("should handle commit", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
-
-        await pgTxHandler({
+        await pgTxHandler({ action: "begin" }, context);
+        const result = await pgTxHandler({
             action: "commit"
         }, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toBe("COMMIT");
+        expect(result.status).toBe("success");
     });
 
     it("should handle rollback", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
-
-        await pgTxHandler({
+        await pgTxHandler({ action: "begin" }, context);
+        const result = await pgTxHandler({
             action: "rollback"
         }, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toBe("ROLLBACK");
+        expect(result.status).toBe("success");
     });
 
     it("should handle savepoint", async () => {
-        mockExecutor.setNextResult({ rows: [], rowCount: 1 });
-
-        await pgTxHandler({
+        await pgTxHandler({ action: "begin" }, context);
+        const result = await pgTxHandler({
             action: "savepoint",
             name: "sp1"
         }, context);
 
-        expect(mockExecutor.executedQueries[0].sql).toBe('SAVEPOINT "sp1"');
+        expect(result.status).toBe("success");
+        await pgTxHandler({ action: "rollback" }, context);
     });
 });

@@ -215,6 +215,113 @@ const METHOD_ALIASES: Record<string, Record<string, string>> = {
     remove: "detachPartition", // remove() → detachPartition()
   },
 };
+
+/**
+ * Usage examples for each group's help() output.
+ * Provides quick-reference examples for common operations.
+ */
+const GROUP_EXAMPLES: Record<string, string[]> = {
+  core: [
+    'pg.core.readQuery("SELECT * FROM users LIMIT 10")',
+    'pg.core.exists("users", "email=$1", { params: ["test@example.com"] })',
+    'pg.core.createTable("orders", [{ name: "id", type: "SERIAL PRIMARY KEY" }])',
+    'pg.core.batchInsert("products", [{ name: "A" }, { name: "B" }])',
+  ],
+  transactions: [
+    "const { transactionId } = await pg.transactions.begin()",
+    'await pg.transactions.savepoint({ transactionId, name: "sp1" })',
+    'await pg.transactions.rollbackTo({ transactionId, name: "sp1" })',
+    "await pg.transactions.commit({ transactionId })",
+    'await pg.transactions.execute({ statements: [{ sql: "INSERT..." }, { sql: "UPDATE..." }] })',
+  ],
+  jsonb: [
+    'pg.jsonb.extract({ table: "docs", column: "data", path: "user.name" })',
+    'pg.jsonb.set({ table: "docs", column: "data", path: "status", value: "active" })',
+    'pg.jsonb.contains({ table: "docs", column: "data", value: { type: "admin" } })',
+  ],
+  text: [
+    'pg.text.search({ table: "articles", column: "content", query: "database" })',
+    'pg.text.fuzzyMatch({ table: "users", column: "name", value: "john", maxDistance: 2 })',
+    'pg.text.trigramSimilarity({ table: "products", column: "name", value: "widget" })',
+  ],
+  performance: [
+    "pg.performance.explain({ sql: 'SELECT * FROM orders' })",
+    "pg.performance.cacheHitRatio()",
+    "pg.performance.indexStats({ table: 'orders' })",
+    "pg.performance.bloatCheck()",
+  ],
+  admin: [
+    "pg.admin.vacuum({ table: 'orders' })",
+    "pg.admin.analyze({ table: 'orders' })",
+    "pg.admin.reindex({ table: 'orders' })",
+  ],
+  monitoring: [
+    "pg.monitoring.databaseSize()",
+    "pg.monitoring.tableSizes({ limit: 10 })",
+    "pg.monitoring.connectionStats()",
+    "pg.monitoring.showSettings({ pattern: 'work_mem' })",
+  ],
+  backup: [
+    "pg.backup.dumpTable({ table: 'users' })",
+    "pg.backup.copyExport({ table: 'orders', format: 'csv' })",
+    "pg.backup.restoreCommand({ filename: 'backup.sql', database: 'mydb' })",
+  ],
+  schema: [
+    "pg.schema.createView({ name: 'active_users', sql: 'SELECT * FROM users WHERE active' })",
+    "pg.schema.listViews()",
+    "pg.schema.createSequence({ name: 'order_seq' })",
+  ],
+  vector: [
+    "pg.vector.search({ table: 'embeddings', column: 'vector', queryVector: [...], limit: 10 })",
+    "pg.vector.createIndex({ table: 'embeddings', column: 'vector', method: 'ivfflat' })",
+    "pg.vector.aggregate({ table: 'embeddings', column: 'vector', groupBy: 'category' })",
+  ],
+  postgis: [
+    "pg.postgis.distance({ table: 'locations', column: 'geom', point: { lat: 40.7, lng: -74 } })",
+    "pg.postgis.buffer({ table: 'areas', column: 'geom', distance: 1000 })",
+    "pg.postgis.pointInPolygon({ table: 'zones', column: 'geom', point: { lat: 40.7, lng: -74 } })",
+  ],
+  partitioning: [
+    "pg.partitioning.createPartitionedTable({ name: 'events', columns: [...], partitionBy: 'RANGE', partitionKey: 'created_at' })",
+    "pg.partitioning.createPartition({ parent: 'events', name: 'events_2024_q1', forValues: { from: '2024-01-01', to: '2024-04-01' } })",
+    "pg.partitioning.listPartitions({ table: 'events' })",
+  ],
+  stats: [
+    "pg.stats.descriptive({ table: 'orders', column: 'amount' })",
+    "pg.stats.percentiles({ table: 'orders', column: 'amount', percentiles: [0.5, 0.95, 0.99] })",
+    "pg.stats.timeSeries({ table: 'metrics', timeColumn: 'ts', valueColumn: 'value', interval: '1 hour' })",
+  ],
+  cron: [
+    "pg.cron.schedule({ name: 'cleanup', schedule: '0 3 * * *', command: 'DELETE FROM logs WHERE created_at < NOW() - INTERVAL 30 day' })",
+    "pg.cron.listJobs()",
+    "pg.cron.unschedule({ jobId: 1 })",
+  ],
+  partman: [
+    "pg.partman.createParent({ table: 'events', column: 'created_at', interval: '1 month' })",
+    "pg.partman.runMaintenance()",
+    "pg.partman.showPartitions({ parentTable: 'events' })",
+  ],
+  kcache: [
+    "pg.kcache.queryStats({ orderBy: 'total_time', limit: 10 })",
+    "pg.kcache.topQueries({ limit: 5 })",
+    "pg.kcache.ioPatterns()",
+  ],
+  citext: [
+    "pg.citext.convertColumn({ table: 'users', column: 'email' })",
+    "pg.citext.listColumns()",
+    "pg.citext.analyzeCandidates({ table: 'users' })",
+  ],
+  ltree: [
+    "pg.ltree.query({ table: 'categories', column: 'path', pattern: 'root.electronics.*' })",
+    "pg.ltree.subpath({ table: 'categories', column: 'path', offset: 1, length: 2 })",
+    "pg.ltree.lca({ table: 'categories', column: 'path', paths: ['root.a.b', 'root.a.c'] })",
+  ],
+  pgcrypto: [
+    "pg.pgcrypto.hash({ data: 'password123', algorithm: 'sha256' })",
+    "pg.pgcrypto.encrypt({ data: 'secret', key: 'mykey', algorithm: 'aes' })",
+    "pg.pgcrypto.genRandomUuid()",
+  ],
+};
 /**
  * Mapping of method names to their parameter names for positional argument support.
  * Single string = first positional arg maps to this key
@@ -907,10 +1014,11 @@ export class PgApi {
       // Add all methods plus a 'help' property that lists them
       bindings[groupName] = {
         ...groupApi,
-        // Help returns all methods - canonical first, then aliases
+        // Help returns all methods - canonical first, then aliases, plus examples
         help: () => ({
           methods: canonicalMethodNames,
           aliases: aliasMethodNames.length > 0 ? aliasMethodNames : undefined,
+          examples: GROUP_EXAMPLES[groupName],
         }),
       };
     }

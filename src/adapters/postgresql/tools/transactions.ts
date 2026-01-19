@@ -198,7 +198,10 @@ function createTransactionExecuteTool(
           );
           results.push({
             sql: stmt.sql,
-            rowsAffected: result.rowsAffected,
+            rowsAffected:
+              typeof result.rowsAffected === "string"
+                ? parseInt(result.rowsAffected, 10)
+                : (result.rowsAffected ?? 0),
             rowCount: result.rows?.length ?? 0,
             // Include returned rows when using RETURNING clause
             ...(result.rows && result.rows.length > 0 && { rows: result.rows }),

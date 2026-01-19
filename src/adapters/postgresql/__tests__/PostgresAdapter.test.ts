@@ -38,15 +38,13 @@ const mockPoolMethods = {
     .fn()
     .mockImplementation(() => Promise.resolve(mockPoolClient as PoolClient)),
   releaseConnection: vi.fn(),
-  getStats: vi
-    .fn()
-    .mockReturnValue({
-      total: 5,
-      active: 1,
-      idle: 4,
-      waiting: 0,
-      totalQueries: 100,
-    }),
+  getStats: vi.fn().mockReturnValue({
+    total: 5,
+    active: 1,
+    idle: 4,
+    waiting: 0,
+    totalQueries: 100,
+  }),
 };
 
 // Mock ConnectionPool as a class

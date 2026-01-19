@@ -16,7 +16,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 1. **Transactions**: Use \`pg.transactions.execute({statements})\` for atomic ops, OR pass \`transactionId\` to individual queries
 2. **pg_write_query**: ⛔ Throws for SELECT—use \`pg_read_query\` for SELECT statements
 3. **pg_upsert/pg_create_table**: \`schema.table\` format auto-parses (e.g., \`'myschema.users'\` → schema: 'myschema', table: 'users')
-4. **pg_create_table columns**: \`notNull\`, \`defaultValue\`, \`check\`, \`references\` (object or string \`"table(column)"\` syntax)
+4. **pg_create_table columns**: \`notNull\`, \`defaultValue\` (numbers/booleans auto-coerced to string), \`check\`, \`references\` (object or string \`"table(column)"\` syntax)
 5. **pg_create_index expression**: Columns can be expressions like \`LOWER(name)\` or \`name::text\`—auto-detected
 6. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`
 7. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint
@@ -40,7 +40,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | \`pg_list_objects\` | \`{objects, count, totalCount, byType}\` | Use \`limit\` to cap results, \`type\`/\`types\` to filter |
 | \`pg_object_details\` | \`{name, schema, type, returnType?, ...}\` | Functions: \`returnType\` alias. Views: \`definition\` |
 | \`pg_analyze_db_health\` | \`{cacheHitRatio: {ratio, heap, index, status}}\` | \`ratio\` = primary numeric %. \`bloat\` available |
-| \`pg_describe_table\` | \`{columns, indexes, constraints, foreignKeys}\` | Columns include \`foreignKey\` field. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL |
+| \`pg_describe_table\` | \`{columns, indexes, constraints, foreignKeys}\` | Columns include \`notNull\` (alias for \`!nullable\`), \`foreignKey\`. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL |
 | \`pg_analyze_query_indexes\` | \`{plan, explainPlan, executionPlan, issues}\` | \`explainPlan\`/\`executionPlan\` = aliases for \`plan\` |
 | \`pg_list_tables\` | \`{tables, count}\` | Use \`schema\` to filter, \`limit\` to cap results |
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |

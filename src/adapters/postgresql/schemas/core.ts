@@ -152,10 +152,17 @@ const CreateTableSchemaBase = z.object({
         primaryKey: z.boolean().optional(),
         unique: z.boolean().optional(),
         default: z
-          .string()
+          .union([z.string(), z.number(), z.boolean()])
           .optional()
-          .describe("Default value (raw SQL expression)"),
-        defaultValue: z.string().optional().describe("Alias for default"),
+          .describe(
+            "Default value (raw SQL expression). Numbers/booleans auto-coerced to string.",
+          ),
+        defaultValue: z
+          .union([z.string(), z.number(), z.boolean()])
+          .optional()
+          .describe(
+            "Alias for default. Numbers/booleans auto-coerced to string.",
+          ),
         check: z.string().optional().describe("CHECK constraint expression"),
         // Support both object {table, column} and string 'table(column)' syntax
         references: z
@@ -279,6 +286,14 @@ export const CreateTableSchema = z
         references = col.references as RefType;
       }
 
+      // Auto-coerce numbers/booleans to strings for defaultValue
+      const rawDefault = col.default ?? col.defaultValue;
+      let defaultValue: string | undefined;
+      if (rawDefault !== undefined && rawDefault !== null) {
+        defaultValue =
+          typeof rawDefault === "string" ? rawDefault : String(rawDefault);
+      }
+
       return {
         name: col.name,
         type: col.type,
@@ -286,8 +301,8 @@ export const CreateTableSchema = z
         nullable: col.nullable ?? (col.notNull === true ? false : undefined),
         primaryKey: col.primaryKey,
         unique: col.unique,
-        // Support defaultValue alias
-        default: col.default ?? col.defaultValue,
+        // Support defaultValue alias with auto-coercion
+        default: defaultValue,
         check: col.check,
         references,
       };

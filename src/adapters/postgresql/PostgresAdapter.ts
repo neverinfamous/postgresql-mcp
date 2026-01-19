@@ -446,6 +446,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     const indexes = (result.rows ?? []).map((row) => {
       const rawColumns = this.parseColumnsArray(row["columns"]);
       const definition = row["definition"] as string;
+      const indexType = row["type"] as IndexInfo["type"];
       return {
         name: row["name"] as string,
         indexName: row["name"] as string, // Alias for consistency
@@ -453,7 +454,8 @@ export class PostgresAdapter extends DatabaseAdapter {
         schemaName: row["schema_name"] as string,
         columns: this.extractIndexColumns(rawColumns, definition),
         unique: row["is_unique"] as boolean,
-        type: row["type"] as IndexInfo["type"],
+        type: indexType,
+        indexType, // Alias for consistency with different API contexts
         sizeBytes: Number(row["size_bytes"]) || undefined,
         numberOfScans: Number(row["num_scans"]) || undefined,
         tuplesRead: Number(row["tuples_read"]) || undefined,
@@ -688,10 +690,12 @@ export class PostgresAdapter extends DatabaseAdapter {
         schema: string;
         column: string;
       } | null;
+      const nullable = row["nullable"] as boolean;
       return {
         name: row["name"] as string,
         type: row["type"] as string,
-        nullable: row["nullable"] as boolean,
+        nullable,
+        notNull: !nullable, // Alias for consistency with createTable API
         primaryKey: row["primary_key"] as boolean,
         defaultValue: row["default_value"],
         isGenerated,
@@ -873,6 +877,10 @@ export class PostgresAdapter extends DatabaseAdapter {
       onDelete: row["on_delete"] as string,
     }));
 
+    // Extract primary key columns from constraints for convenience
+    const pkConstraint = constraints.find((c) => c.type === "primary_key");
+    const primaryKey = pkConstraint?.columns ?? null;
+
     return {
       name: tableName,
       schema: schemaName,
@@ -883,6 +891,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       isPartitioned: tableRow?.["is_partitioned"] as boolean,
       partitionKey: tableRow?.["partition_key"] as string | undefined,
       columns,
+      primaryKey,
       indexes,
       constraints: [...constraints, ...notNullConstraints],
       foreignKeys,
@@ -938,6 +947,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     return (result.rows ?? []).map((row) => {
       const rawColumns = this.parseColumnsArray(row["columns"]);
       const definition = row["definition"] as string;
+      const indexType = row["type"] as IndexInfo["type"];
       return {
         name: row["name"] as string,
         indexName: row["name"] as string, // Alias for consistency
@@ -945,7 +955,8 @@ export class PostgresAdapter extends DatabaseAdapter {
         schemaName,
         columns: this.extractIndexColumns(rawColumns, definition),
         unique: row["is_unique"] as boolean,
-        type: row["type"] as IndexInfo["type"],
+        type: indexType,
+        indexType, // Alias for consistency with different API contexts
         sizeBytes: Number(row["size_bytes"]) || undefined,
         numberOfScans: Number(row["num_scans"]) || undefined,
         tuplesRead: Number(row["tuples_read"]) || undefined,

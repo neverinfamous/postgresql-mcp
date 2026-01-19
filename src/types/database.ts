@@ -160,6 +160,8 @@ export interface ColumnInfo {
   name: string;
   type: string;
   nullable?: boolean | undefined;
+  /** Alias for !nullable - for consistency with createTable API */
+  notNull?: boolean | undefined;
   primaryKey?: boolean | undefined;
   defaultValue?: unknown;
   isSerial?: boolean | undefined;
@@ -216,6 +218,8 @@ export interface TableInfo {
   partitionKey?: string | undefined;
   /** True if table statistics are stale (reltuples = -1, needs ANALYZE) */
   statsStale?: boolean | undefined;
+  /** Primary key column(s) - convenience field extracted from constraints */
+  primaryKey?: string[] | null | undefined;
   /** Table indexes */
   indexes?:
     | {

@@ -246,12 +246,19 @@ function createDropSequenceTool(adapter: PostgresAdapter): ToolDefinition {
         DropSequenceSchema.parse(params);
 
       const schemaName = schema ?? "public";
+
+      // Check if sequence exists before dropping (for accurate response)
+      const existsResult = await adapter.executeQuery(
+        `SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND n.nspname = '${schemaName}' AND c.relname = '${name}'`,
+      );
+      const existed = (existsResult.rows?.length ?? 0) > 0;
+
       const ifExistsClause = ifExists === true ? "IF EXISTS " : "";
       const cascadeClause = cascade === true ? " CASCADE" : "";
 
       const sql = `DROP SEQUENCE ${ifExistsClause}"${schemaName}"."${name}"${cascadeClause}`;
       await adapter.executeQuery(sql);
-      return { success: true, sequence: `${schemaName}.${name}` };
+      return { success: true, sequence: `${schemaName}.${name}`, existed };
     },
   };
 }
@@ -383,6 +390,14 @@ function createDropViewTool(adapter: PostgresAdapter): ToolDefinition {
         DropViewSchema.parse(params);
 
       const schemaName = schema ?? "public";
+
+      // Check if view exists before dropping (for accurate response)
+      const relkind = materialized === true ? "'m'" : "'v'";
+      const existsResult = await adapter.executeQuery(
+        `SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = ${relkind} AND n.nspname = '${schemaName}' AND c.relname = '${name}'`,
+      );
+      const existed = (existsResult.rows?.length ?? 0) > 0;
+
       const matClause = materialized === true ? "MATERIALIZED " : "";
       const ifExistsClause = ifExists === true ? "IF EXISTS " : "";
       const cascadeClause = cascade === true ? " CASCADE" : "";
@@ -393,6 +408,7 @@ function createDropViewTool(adapter: PostgresAdapter): ToolDefinition {
         success: true,
         view: `${schemaName}.${name}`,
         materialized: materialized ?? false,
+        existed,
       };
     },
   };

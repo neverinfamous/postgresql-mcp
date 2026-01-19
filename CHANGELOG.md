@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **listPartitions/partitionInfo schema.table support** — `pg_list_partitions` and `pg_partition_info` now support `schema.table` format (auto-parsed) and accept `table`, `parent`, `parentTable`, or `name` aliases for ergonomic consistency with other partitioning tools
 - **attachPartition/detachPartition schema.table support** — `pg_attach_partition` and `pg_detach_partition` now support `schema.table` format for `parent` and `partition` parameters (auto-parsed). Explicit `schema` parameter also now works correctly
 - **createPartition schema.table support** — `pg_create_partition` now supports `schema.table` format for `parent` parameter (auto-parsed)
+- **createPartitionedTable schema.table support** — `pg_create_partitioned_table` now supports `schema.table` format for `name` parameter (e.g., `'myschema.events'` → schema='myschema', name='events'). Auto-parsed, eliminating the need for separate `schema` parameter
+- **createPartitionedTable table-level primaryKey** — `pg_create_partitioned_table` now supports `primaryKey: ['col1', 'col2']` array for composite primary keys, matching the behavior of `pg_create_table`
+- **createPartitionedTable primaryKey validation** — `pg_create_partitioned_table` now validates that `primaryKey` array includes the partition key column. Throws a descriptive error if validation fails (e.g., "Primary key must include partition key column 'event_date'") instead of silently skipping the primary key constraint
 
 ### Fixed
 

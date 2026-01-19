@@ -197,6 +197,7 @@ function preprocessPartitionParams(input: unknown): unknown {
 
 /**
  * Preprocess CreatePartitionedTable parameters:
+ * - Parse schema.table format from name (e.g., 'myschema.events' → schema: 'myschema', name: 'events')
  * - Normalize partitionBy to lowercase (RANGE → range)
  * - Alias: table → name
  * - Alias: key → partitionKey
@@ -211,6 +212,16 @@ function preprocessCreatePartitionedTable(input: unknown): unknown {
   // Alias: table → name
   if (result["table"] !== undefined && result["name"] === undefined) {
     result["name"] = result["table"];
+  }
+
+  // Parse schema.table format from name parameter
+  const nameValue = result["name"];
+  if (typeof nameValue === "string" && nameValue.includes(".")) {
+    const parsed = parseSchemaFromIdentifier(nameValue);
+    if (parsed?.schema && result["schema"] === undefined) {
+      result["schema"] = parsed.schema;
+      result["name"] = parsed.name;
+    }
   }
 
   // Alias: key → partitionKey
@@ -257,6 +268,12 @@ export const CreatePartitionedTableSchema = z.preprocess(
       .enum(["range", "list", "hash"])
       .describe("Partition strategy (range, list, or hash)"),
     partitionKey: z.string().describe("Partition key column(s)"),
+    primaryKey: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Table-level primary key columns. Must include partition key column.",
+      ),
   }),
 );
 

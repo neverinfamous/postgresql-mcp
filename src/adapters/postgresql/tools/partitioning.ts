@@ -186,10 +186,53 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: write("Create Partitioned Table"),
     icons: getToolIcons("partitioning", write("Create Partitioned Table")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { name, schema, columns, partitionBy, partitionKey } =
-        CreatePartitionedTableSchema.parse(params);
+      const parsed = CreatePartitionedTableSchema.parse(params) as {
+        name: string;
+        schema?: string;
+        columns: {
+          name: string;
+          type: string;
+          nullable?: boolean;
+          notNull?: boolean;
+          primaryKey?: boolean;
+          unique?: boolean;
+          default?: string | number | boolean | null;
+        }[];
+        partitionBy: "range" | "list" | "hash";
+        partitionKey: string;
+        primaryKey?: string[];
+      };
+      const { name, schema, columns, partitionBy, partitionKey, primaryKey } =
+        parsed;
 
       const tableName = sanitizeTableName(name, schema);
+
+      // Validate table-level primaryKey includes partition key
+      if (primaryKey && primaryKey.length > 0) {
+        if (!primaryKey.includes(partitionKey)) {
+          throw new Error(
+            `Primary key must include partition key column '${partitionKey}'. ` +
+              `Got: [${primaryKey.join(", ")}]. ` +
+              `PostgreSQL requires all partition key columns to be part of primary key constraints on partitioned tables.`,
+          );
+        }
+      }
+
+      // Validate column-level primaryKey includes partition key
+      const columnsWithPK = columns.filter((col) => col.primaryKey === true);
+      if (columnsWithPK.length > 0 && !primaryKey) {
+        const pkColumnNames = columnsWithPK.map((col) => col.name);
+        if (!pkColumnNames.includes(partitionKey)) {
+          throw new Error(
+            `Primary key must include partition key column '${partitionKey}'. ` +
+              `Columns with primaryKey: true: [${pkColumnNames.join(", ")}]. ` +
+              `PostgreSQL requires all partition key columns to be part of primary key constraints on partitioned tables.`,
+          );
+        }
+      }
+
+      // Determine if we need a table-level PRIMARY KEY constraint
+      const useTableLevelPK = primaryKey && primaryKey.length > 0;
 
       // Build column definitions with full constraint support
       const columnDefs = columns
@@ -222,13 +265,13 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
             }
           }
 
-          // Handle unique constraint
+          // Handle unique constraint (skip if table-level PK will cover this column)
           if (col.unique === true) {
             def += " UNIQUE";
           }
 
-          // Handle primary key
-          if (col.primaryKey === true) {
+          // Handle column-level primary key (only if NOT using table-level PK)
+          if (col.primaryKey === true && !useTableLevelPK) {
             def += " PRIMARY KEY";
           }
 
@@ -236,8 +279,17 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
         })
         .join(",\n  ");
 
+      // Build table-level PRIMARY KEY constraint if primaryKey array provided
+      let tableConstraints = "";
+      if (primaryKey !== undefined && primaryKey.length > 0) {
+        const pkColumnList = primaryKey
+          .map((col) => sanitizeIdentifier(col))
+          .join(", ");
+        tableConstraints = `,\n  PRIMARY KEY (${pkColumnList})`;
+      }
+
       const sql = `CREATE TABLE ${tableName} (
-  ${columnDefs}
+  ${columnDefs}${tableConstraints}
 ) PARTITION BY ${partitionBy.toUpperCase()} (${partitionKey})`;
 
       await adapter.executeQuery(sql);
@@ -246,6 +298,7 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
         table: `${schema ?? "public"}.${name}`,
         partitionBy,
         partitionKey,
+        ...(useTableLevelPK && { primaryKey }),
       };
     },
   };

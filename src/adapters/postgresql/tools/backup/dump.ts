@@ -47,10 +47,11 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
+      // If table contains a dot, always parse it as schema.table (embedded schema takes priority)
       let tableName = parsed.table;
       let schemaName = parsed.schema ?? "public";
 
-      if (!parsed.schema && parsed.table.includes(".")) {
+      if (parsed.table.includes(".")) {
         const parts = parsed.table.split(".");
         if (parts.length === 2 && parts[0] && parts[1]) {
           schemaName = parts[0];
@@ -517,10 +518,11 @@ export function createCopyImportTool(
       };
 
       // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
+      // If table contains a dot, always parse it as schema.table (embedded schema takes priority)
       let tableNamePart = parsed.table;
       let schemaNamePart = parsed.schema;
 
-      if (!parsed.schema && parsed.table.includes(".")) {
+      if (parsed.table.includes(".")) {
         const parts = parsed.table.split(".");
         if (parts.length === 2 && parts[0] && parts[1]) {
           schemaNamePart = parts[0];

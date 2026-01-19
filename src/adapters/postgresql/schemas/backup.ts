@@ -57,10 +57,11 @@ export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
   // Auto-generate query from table if provided
   if ((query === undefined || query === "") && input.table !== undefined) {
     // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
+    // If table contains a dot, always parse it as schema.table (embedded schema takes priority)
     let tableName = input.table;
     let schemaName = input.schema ?? "public";
 
-    if (input.schema === undefined && input.table.includes(".")) {
+    if (input.table.includes(".")) {
       const parts = input.table.split(".");
       if (parts.length === 2 && parts[0] && parts[1]) {
         schemaName = parts[0];

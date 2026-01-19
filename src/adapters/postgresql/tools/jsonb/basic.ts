@@ -38,7 +38,7 @@ export function createJsonbExtractTool(
   return {
     name: "pg_jsonb_extract",
     description:
-      "Extract value from JSONB at specified path. Returns null if path does not exist in data structure.",
+      "Extract value from JSONB at specified path. Returns null if path does not exist in data structure. Use select param to include identifying columns.",
     group: "jsonb",
     inputSchema: JsonbExtractSchema,
     annotations: readOnly("JSONB Extract"),
@@ -46,11 +46,59 @@ export function createJsonbExtractTool(
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = JsonbExtractSchema.parse(params);
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
+      const limitClause =
+        parsed.limit !== undefined ? ` LIMIT ${String(parsed.limit)}` : "";
       // Use normalizePathToArray for PostgreSQL #> operator
       const pathArray = normalizePathToArray(parsed.path);
-      const sql = `SELECT "${parsed.column}" #> $1 as value FROM "${parsed.table}"${whereClause}`;
+
+      // Build select expression with optional additional columns
+      let selectExpr = `"${parsed.column}" #> $1 as extracted_value`;
+      if (parsed.select !== undefined && parsed.select.length > 0) {
+        const additionalCols = parsed.select
+          .map((c) => {
+            // Handle expressions vs simple column names
+            const needsQuote =
+              !c.includes("->") &&
+              !c.includes("(") &&
+              !c.includes("::") &&
+              /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(c);
+            return needsQuote ? `"${c}"` : c;
+          })
+          .join(", ");
+        selectExpr = `${additionalCols}, ${selectExpr}`;
+      }
+
+      const sql = `SELECT ${selectExpr} FROM "${parsed.table}"${whereClause}${limitClause}`;
       const result = await adapter.executeQuery(sql, [pathArray]);
-      const results = result.rows?.map((r) => r["value"]);
+
+      // If select columns were provided, return full row objects
+      if (parsed.select !== undefined && parsed.select.length > 0) {
+        const rows = result.rows?.map((r) => {
+          // Rename extracted_value back to 'value' for consistency
+          const row: Record<string, unknown> = {};
+          for (const [key, val] of Object.entries(r)) {
+            if (key === "extracted_value") {
+              row["value"] = val;
+            } else {
+              row[key] = val;
+            }
+          }
+          return row;
+        });
+        const allNulls = rows?.every((r) => r["value"] === null) ?? false;
+        const response: { rows: unknown; count: number; hint?: string } = {
+          rows,
+          count: rows?.length ?? 0,
+        };
+        if (allNulls && (rows?.length ?? 0) > 0) {
+          response.hint =
+            "All values are null - path may not exist in data. Use pg_jsonb_typeof to check.";
+        }
+        return response;
+      }
+
+      // Original behavior: return just the extracted values
+      const results = result.rows?.map((r) => r["extracted_value"]);
       // Check if all results are null (path may not exist)
       const allNulls = results?.every((v) => v === null) ?? false;
       const response: { results: unknown; count: number; hint?: string } = {
@@ -427,6 +475,11 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         .describe(
           "Column or expression to group by. Returns {groups: [{group_key, items}], count}",
         ),
+      orderBy: z
+        .string()
+        .optional()
+        .describe('ORDER BY clause (e.g., "id DESC", "name ASC")'),
+      limit: z.number().optional().describe("Maximum number of rows to aggregate"),
     }),
     annotations: readOnly("JSONB Aggregate"),
     icons: getToolIcons("jsonb", readOnly("JSONB Aggregate")),
@@ -436,6 +489,8 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         select?: string[];
         where?: string;
         groupBy?: string;
+        orderBy?: string;
+        limit?: number;
       };
 
       // Build select expression with proper alias handling
@@ -459,16 +514,22 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
+      const orderByClause = parsed.orderBy ? ` ORDER BY ${parsed.orderBy}` : "";
+      const limitClause =
+        parsed.limit !== undefined ? ` LIMIT ${String(parsed.limit)}` : "";
       // Support raw JSONB expressions (containing -> or ->> operators) without quoting
       const hasJsonbOperator = parsed.groupBy?.includes("->") ?? false;
 
       if (parsed.groupBy) {
         // Return all groups with their aggregated items
+        // For grouped queries, we use a subquery to apply ordering before aggregation
         const groupExpr = hasJsonbOperator
           ? parsed.groupBy
           : `"${parsed.groupBy}"`;
         const groupClause = ` GROUP BY ${groupExpr}`;
-        const sql = `SELECT ${groupExpr} as group_key, jsonb_agg(${selectExpr}) as items FROM "${parsed.table}" t${whereClause}${groupClause}`;
+        // Apply ordering within each group using ORDER BY inside jsonb_agg
+        const aggOrderBy = parsed.orderBy ? ` ORDER BY ${parsed.orderBy}` : "";
+        const sql = `SELECT ${groupExpr} as group_key, jsonb_agg(${selectExpr}${aggOrderBy}) as items FROM "${parsed.table}" t${whereClause}${groupClause}${limitClause}`;
         const result = await adapter.executeQuery(sql);
         // Return result (groups is deprecated alias for backward compat)
         return {
@@ -477,7 +538,9 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
           grouped: true,
         };
       } else {
-        const sql = `SELECT jsonb_agg(${selectExpr}) as result FROM "${parsed.table}" t${whereClause}`;
+        // For non-grouped, use subquery to apply limit/order before aggregation
+        const innerSql = `SELECT * FROM "${parsed.table}" t${whereClause}${orderByClause}${limitClause}`;
+        const sql = `SELECT jsonb_agg(${selectExpr.replace(/\bt\./g, "sub.")}) as result FROM (${innerSql}) sub`;
         const result = await adapter.executeQuery(sql);
         const arr = result.rows?.[0]?.["result"] ?? [];
         const count = Array.isArray(arr) ? arr.length : 0;
@@ -552,25 +615,42 @@ export function createJsonbObjectTool(
   };
 }
 
+// Schema for pg_jsonb_array - accepts values or elements (alias)
+const JsonbArraySchema = z
+  .object({
+    values: z.array(z.unknown()).optional().describe("Array elements to build"),
+    elements: z
+      .array(z.unknown())
+      .optional()
+      .describe("Array elements (alias for values)"),
+  })
+  .refine((data) => data.values !== undefined || data.elements !== undefined, {
+    message: "Either 'values' or 'elements' must be provided",
+  });
+
 export function createJsonbArrayTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_jsonb_array",
-    description: "Build a JSONB array from values. Returns {array: [...]}.",
+    description:
+      "Build a JSONB array from values. Accepts {values: [...]} or {elements: [...]}. Returns {array: [...]}.",
     group: "jsonb",
-    inputSchema: z.object({
-      values: z.array(z.unknown()),
-    }),
+    inputSchema: JsonbArraySchema,
     annotations: readOnly("JSONB Array"),
     icons: getToolIcons("jsonb", readOnly("JSONB Array")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as { values: unknown[] };
-      const placeholders = parsed.values
+      const parsed = params as { values?: unknown[]; elements?: unknown[] };
+      // Support both 'values' and 'elements' parameter names
+      const values = parsed.values ?? parsed.elements ?? [];
+      if (values.length === 0) {
+        return { array: [] };
+      }
+      const placeholders = values
         .map((_, i) => `$${String(i + 1)}::jsonb`)
         .join(", ");
       const sql = `SELECT jsonb_build_array(${placeholders}) as result`;
       const result = await adapter.executeQuery(
         sql,
-        parsed.values.map((v) => toJsonString(v)),
+        values.map((v) => toJsonString(v)),
       );
       return { array: result.rows?.[0]?.["result"] };
     },

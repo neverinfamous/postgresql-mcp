@@ -236,8 +236,12 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
   ],
   jsonb: [
     'pg.jsonb.extract({ table: "docs", column: "data", path: "user.name" })',
-    'pg.jsonb.set({ table: "docs", column: "data", path: "status", value: "active" })',
+    'pg.jsonb.extract({ table: "docs", column: "data", path: "name", select: ["id"], limit: 10 })',
+    'pg.jsonb.set({ table: "docs", column: "data", path: "status", value: "active", where: "id=1" })',
     'pg.jsonb.contains({ table: "docs", column: "data", value: { type: "admin" } })',
+    'pg.jsonb.merge({ base: { a: 1 }, overlay: { b: 2 }, deep: true })',
+    'pg.jsonb.diff({ doc1: { a: 1 }, doc2: { a: 2, b: 3 } })',
+    'pg.jsonb.agg({ table: "docs", select: ["id"], orderBy: "id DESC", limit: 5 })',
   ],
   text: [
     'pg.text.search({ table: "articles", column: "content", query: "database" })',
@@ -447,8 +451,9 @@ const POSITIONAL_PARAM_MAP: Record<string, string | string[]> = {
 const ARRAY_WRAP_MAP: Record<string, string> = {
   transactionExecute: "statements",
   execute: "statements",
-  // JSONB builders
+  // JSONB builders - support both 'values' and 'elements'
   array: "values",
+  jsonbArray: "values",
 };
 
 /**

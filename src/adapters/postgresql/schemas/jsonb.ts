@@ -123,7 +123,14 @@ export const JsonbExtractSchema = z.object({
     .describe(
       "Path to extract. Accepts both string and array formats with numeric indices.",
     ),
+  select: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Additional columns to include in result for row identification (e.g., ["id"])',
+    ),
   where: z.string().optional().describe("WHERE clause"),
+  limit: z.number().optional().describe("Maximum number of rows to return"),
 });
 
 // ============== SET SCHEMA ==============

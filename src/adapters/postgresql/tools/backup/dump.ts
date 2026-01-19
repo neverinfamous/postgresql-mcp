@@ -504,9 +504,21 @@ export function createCopyImportTool(
         columns?: string[];
       };
 
-      const tableName = parsed.schema
-        ? `"${parsed.schema}"."${parsed.table}"`
-        : `"${parsed.table}"`;
+      // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
+      let tableNamePart = parsed.table;
+      let schemaNamePart = parsed.schema;
+
+      if (!parsed.schema && parsed.table.includes(".")) {
+        const parts = parsed.table.split(".");
+        if (parts.length === 2 && parts[0] && parts[1]) {
+          schemaNamePart = parts[0];
+          tableNamePart = parts[1];
+        }
+      }
+
+      const tableName = schemaNamePart
+        ? `"${schemaNamePart}"."${tableNamePart}"`
+        : `"${tableNamePart}"`;
 
       const columnClause =
         parsed.columns !== undefined && parsed.columns.length > 0

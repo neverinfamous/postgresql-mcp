@@ -440,6 +440,7 @@ export function createBackupScheduleOptimizeTool(
           databaseSize: dbSize.rows?.[0]?.["size"],
           totalChanges,
           // This is change velocity (total DML operations / current rows) - can exceed 100% for high-churn tables
+          changeVelocity: Number(changePercent.toFixed(2)),
           changeVelocityRatio: changePercent.toFixed(2) + "%",
           activityByHour: connActivity.rows?.map((row) => ({
             hour: Number(row["hour"]),

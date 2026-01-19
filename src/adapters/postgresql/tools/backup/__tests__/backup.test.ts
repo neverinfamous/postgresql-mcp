@@ -892,6 +892,21 @@ describe("pg_copy_import", () => {
     expect(result.command).toContain('"name"');
     expect(result.command).toContain('"email"');
   });
+
+  it("should parse schema.table format", async () => {
+    const tool = tools.find((t) => t.name === "pg_copy_import")!;
+    const result = (await tool.handler(
+      {
+        table: "inventory.products",
+      },
+      mockContext,
+    )) as {
+      command: string;
+    };
+
+    expect(result.command).toContain('"inventory"."products"');
+    expect(result.command).not.toContain('"inventory.products"');
+  });
 });
 
 describe("pg_create_backup_plan", () => {
@@ -1095,6 +1110,30 @@ describe("pg_backup_schedule_optimize", () => {
 
     expect(result.analysis).toBeDefined();
     expect(result.recommendation).toBeDefined();
+  });
+
+  it("should return changeVelocity as number and changeVelocityRatio as string", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({
+        rows: [{ size_bytes: 10737418240, size: "10 GB" }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ total_changes: 25000, total_rows: 100000 }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_backup_schedule_optimize")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      analysis: {
+        changeVelocity: number;
+        changeVelocityRatio: string;
+      };
+    };
+
+    expect(typeof result.analysis.changeVelocity).toBe("number");
+    expect(result.analysis.changeVelocity).toBe(25);
+    expect(typeof result.analysis.changeVelocityRatio).toBe("string");
+    expect(result.analysis.changeVelocityRatio).toBe("25.00%");
   });
 
   it("should recommend large database strategy for databases > 100GB", async () => {

@@ -202,13 +202,13 @@ export function createConnectionPoolOptimizeTool(
       // Coerce numeric fields to JavaScript numbers
       const current = conn
         ? {
-            total_connections: Number(conn["total_connections"] ?? 0),
-            active: Number(conn["active"] ?? 0),
-            idle: Number(conn["idle"] ?? 0),
-            idle_in_transaction: Number(conn["idle_in_transaction"] ?? 0),
-            waiting: Number(conn["waiting"] ?? 0),
-            max_connection_age_seconds: conn["max_connection_age_seconds"],
-            avg_connection_age_seconds: conn["avg_connection_age_seconds"],
+            total_connections: toNum(conn["total_connections"]),
+            active: toNum(conn["active"]),
+            idle: toNum(conn["idle"]),
+            idle_in_transaction: toNum(conn["idle_in_transaction"]),
+            waiting: toNum(conn["waiting"]),
+            max_connection_age_seconds: toNum(conn["max_connection_age_seconds"]),
+            avg_connection_age_seconds: toNum(conn["avg_connection_age_seconds"]),
           }
         : null;
 
@@ -356,10 +356,29 @@ export function createPartitionStrategySuggestTool(
           "Table is over 1GB - partitioning can improve query performance and maintenance";
       }
 
+      // Coerce tableStats numeric fields
+      const coercedTableStats = table
+        ? {
+            ...table,
+            n_live_tup: toNum(table["n_live_tup"]),
+            n_dead_tup: toNum(table["n_dead_tup"]),
+            seq_scan: toNum(table["seq_scan"]),
+            idx_scan: toNum(table["idx_scan"]),
+          }
+        : null;
+
+      // Coerce tableSize numeric fields
+      const coercedTableSize = size
+        ? {
+            ...size,
+            size_bytes: toNum(size["size_bytes"]),
+          }
+        : null;
+
       return {
         table: `${schemaName}.${parsed.table}`,
-        tableStats: table,
-        tableSize: size,
+        tableStats: coercedTableStats,
+        tableSize: coercedTableSize,
         partitioningRecommended,
         reason,
         suggestions: suggestions.slice(0, 5),

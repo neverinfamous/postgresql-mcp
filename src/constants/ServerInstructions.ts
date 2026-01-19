@@ -109,10 +109,17 @@ Wrappers: \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQu
 
 ## Monitoring Tools
 
-Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSettings()\`, \`capacityPlanning()\`
+Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSettings()\`, \`capacityPlanning()\`, \`uptime()\`, \`serverVersion()\`, \`recoveryStatus()\`, \`replicationStatus()\`, \`resourceUsageAnalyze()\`, \`alertThresholdSet()\`
 
+- \`databaseSize()\`: Returns \`{bytes: number, size: string}\`. Optional \`database\` param for specific db
+- \`tableSizes({ limit?, schema? })\`: Returns \`{tables: [{schema, table_name, table_size, indexes_size, total_size, total_bytes}]}\`. All \`total_bytes\` are numbers
+- \`connectionStats()\`: Returns \`{byDatabaseAndState, totalConnections: number, maxConnections: number}\`
 - \`showSettings({setting: 'work_mem'})\`: Accepts \`pattern\`, \`setting\`, or \`name\`. Exact names auto-match; \`%\` for LIKE patterns
-- \`capacityPlanning({days: 90})\`: \`days\` = \`projectionDays\`. Growth based on stats since last reset
+- \`capacityPlanning({days: 90})\`: \`days\` = \`projectionDays\`. Returns \`{current, growth, projection, recommendations}\` with numeric fields
+- \`resourceUsageAnalyze()\`: Returns \`{backgroundWriter, checkpoints, connectionDistribution, bufferUsage, activity, analysis}\` with all counts as numbers
+- \`alertThresholdSet({metric?: 'connection_usage'})\`: Returns recommended thresholds. Metrics: connection_usage, cache_hit_ratio, replication_lag, dead_tuples, long_running_queries, lock_wait_time
+
+Aliases: \`connections\`→\`connectionStats\`, \`settings\`/\`config\`→\`showSettings\`, \`alerts\`/\`thresholds\`→\`alertThresholdSet\`
 
 ## Admin Tools
 

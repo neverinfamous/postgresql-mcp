@@ -118,7 +118,7 @@ export function createJsonbSetTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_jsonb_set",
     description:
-      'Set value in JSONB at path. Uses dot-notation by default; for literal dots in keys use array format ["key.with.dots"]. Use empty path (\'\' or []) to replace entire column value.',
+      "Set value in JSONB at path. Uses dot-notation by default; for literal dots in keys use array format [\"key.with.dots\"]. Use empty path ('' or []) to replace entire column value.",
     group: "jsonb",
     inputSchema: JsonbSetSchema,
     annotations: write("JSONB Set"),
@@ -448,9 +448,13 @@ function parseSelectAlias(selectItem: string): { expr: string; alias: string } {
   }
   // No alias - use the expression as-is for both
   // For simple column names, use them directly; for expressions, use a sanitized key
-  const cleanKey = selectItem.includes("->") || selectItem.includes("(")
-    ? selectItem.replace(/[^\w]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")
-    : selectItem;
+  const cleanKey =
+    selectItem.includes("->") || selectItem.includes("(")
+      ? selectItem
+          .replace(/[^\w]/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_|_$/g, "")
+      : selectItem;
   return { expr: selectItem, alias: cleanKey };
 }
 
@@ -479,7 +483,10 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         .string()
         .optional()
         .describe('ORDER BY clause (e.g., "id DESC", "name ASC")'),
-      limit: z.number().optional().describe("Maximum number of rows to aggregate"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Maximum number of rows to aggregate"),
     }),
     annotations: readOnly("JSONB Aggregate"),
     icons: getToolIcons("jsonb", readOnly("JSONB Aggregate")),

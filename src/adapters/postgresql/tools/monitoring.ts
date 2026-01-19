@@ -52,7 +52,14 @@ function createDatabaseSizeTool(adapter: PostgresAdapter): ToolDefinition {
         sql,
         database ? [database] : [],
       );
-      return result.rows?.[0];
+      const row = result.rows?.[0] as
+        | { bytes: string | number; size: string }
+        | undefined;
+      if (!row) return row;
+      return {
+        ...row,
+        bytes: parseInt(String(row.bytes), 10),
+      };
     },
   };
 }
@@ -86,7 +93,20 @@ function createTableSizesTool(adapter: PostgresAdapter): ToolDefinition {
                         ORDER BY pg_total_relation_size(c.oid) DESC${limitClause}`;
 
       const result = await adapter.executeQuery(sql);
-      return { tables: result.rows };
+      // Coerce total_bytes to number for each table row
+      const tables = (result.rows ?? []).map((row: Record<string, unknown>) => {
+        const totalBytes = row["total_bytes"];
+        return {
+          ...row,
+          total_bytes:
+            typeof totalBytes === "number"
+              ? totalBytes
+              : typeof totalBytes === "string"
+                ? parseInt(totalBytes, 10)
+                : 0,
+        };
+      });
+      return { tables };
     },
   };
 }
@@ -115,10 +135,39 @@ function createConnectionStatsTool(adapter: PostgresAdapter): ToolDefinition {
         `SELECT count(*) as total FROM pg_stat_activity`,
       );
 
+      // Coerce connection counts to numbers
+      const byDatabaseAndState = (result.rows ?? []).map(
+        (row: Record<string, unknown>) => {
+          const connCount = row["connections"];
+          return {
+            ...row,
+            connections:
+              typeof connCount === "number"
+                ? connCount
+                : typeof connCount === "string"
+                  ? parseInt(connCount, 10)
+                  : 0,
+          };
+        },
+      );
+
+      const totalRaw = totalResult.rows?.[0]?.["total"];
+      const maxRaw = maxConnections;
+
       return {
-        byDatabaseAndState: result.rows,
-        totalConnections: totalResult.rows?.[0]?.["total"],
-        maxConnections,
+        byDatabaseAndState,
+        totalConnections:
+          typeof totalRaw === "number"
+            ? totalRaw
+            : typeof totalRaw === "string"
+              ? parseInt(totalRaw, 10)
+              : 0,
+        maxConnections:
+          typeof maxRaw === "number"
+            ? maxRaw
+            : typeof maxRaw === "string"
+              ? parseInt(maxRaw, 10)
+              : 0,
       };
     },
   };
@@ -169,7 +218,14 @@ function createServerVersionTool(adapter: PostgresAdapter): ToolDefinition {
                         current_setting('server_version') as version,
                         current_setting('server_version_num') as version_num`;
       const result = await adapter.executeQuery(sql);
-      return result.rows?.[0];
+      const row = result.rows?.[0] as
+        | { full_version: string; version: string; version_num: string }
+        | undefined;
+      if (!row) return row;
+      return {
+        ...row,
+        version_num: parseInt(row.version_num, 10),
+      };
     },
   };
 }
@@ -357,18 +413,59 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
               ? "Good confidence - more than 1 week of data"
               : "High confidence - more than 30 days of data";
 
+      // Coerce numeric fields
+      const dbSizeRow = dbSize.rows?.[0] as
+        | { current_size_bytes: string | number; current_size: string }
+        | undefined;
+      const coercedDbSize = dbSizeRow
+        ? {
+            current_size_bytes:
+              typeof dbSizeRow.current_size_bytes === "number"
+                ? dbSizeRow.current_size_bytes
+                : typeof dbSizeRow.current_size_bytes === "string"
+                  ? parseInt(dbSizeRow.current_size_bytes, 10)
+                  : 0,
+            current_size: dbSizeRow.current_size,
+          }
+        : undefined;
+
+      const tableCountRaw = tableData?.["table_count"];
+      const totalRowsRaw = tableData?.["total_rows"];
+      const totalInsertsRaw = tableData?.["total_inserts"];
+      const totalDeletesRaw = tableData?.["total_deletes"];
+
       return {
         current: {
-          databaseSize: dbSize.rows?.[0],
-          tableCount: tableData?.["table_count"],
-          totalRows: tableData?.["total_rows"],
+          databaseSize: coercedDbSize,
+          tableCount:
+            typeof tableCountRaw === "number"
+              ? tableCountRaw
+              : typeof tableCountRaw === "string"
+                ? parseInt(tableCountRaw, 10)
+                : 0,
+          totalRows:
+            typeof totalRowsRaw === "number"
+              ? totalRowsRaw
+              : typeof totalRowsRaw === "string"
+                ? parseInt(totalRowsRaw, 10)
+                : 0,
           connections: `${String(Number(connData?.["current_connections"] ?? 0))}/${String(Number(connData?.["max_connections"] ?? 0))}`,
         },
         growth: {
-          totalInserts: tableData?.["total_inserts"],
-          totalDeletes: tableData?.["total_deletes"],
+          totalInserts:
+            typeof totalInsertsRaw === "number"
+              ? totalInsertsRaw
+              : typeof totalInsertsRaw === "string"
+                ? parseInt(totalInsertsRaw, 10)
+                : 0,
+          totalDeletes:
+            typeof totalDeletesRaw === "number"
+              ? totalDeletesRaw
+              : typeof totalDeletesRaw === "string"
+                ? parseInt(totalDeletesRaw, 10)
+                : 0,
           netRowGrowth,
-          daysOfData: daysOfData.toFixed(1),
+          daysOfData: parseFloat(daysOfData.toFixed(1)),
           statsSince: ageData?.["stats_since"],
           estimatedDailyRowGrowth: Math.round(dailyRowGrowth),
           estimatedDailyGrowthBytes: Math.round(dailyGrowthBytes),
@@ -380,8 +477,10 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
           projectedSizePretty: `${(projectedTotalBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`,
           growthPercentage:
             currentBytes > 0
-              ? ((projectedGrowthBytes / currentBytes) * 100).toFixed(1)
-              : "0.0",
+              ? parseFloat(
+                  ((projectedGrowthBytes / currentBytes) * 100).toFixed(1),
+                )
+              : 0.0,
         },
         recommendations: [
           projectedTotalBytes > 100 * 1024 * 1024 * 1024
@@ -513,33 +612,95 @@ function createResourceUsageAnalyzeTool(
         return `Poor (${rate.toFixed(2)}%) - significant disk I/O; increase shared_buffers or optimize queries`;
       };
 
+      // Helper to coerce value to number
+      const toNum = (val: unknown): number =>
+        typeof val === "number"
+          ? val
+          : typeof val === "string"
+            ? parseInt(val, 10)
+            : 0;
+
+      // Coerce backgroundWriter fields
+      const bgWriterRaw = bgWriter.rows?.[0];
+      const coercedBgWriter = bgWriterRaw
+        ? {
+            buffers_clean: toNum(bgWriterRaw["buffers_clean"]),
+            maxwritten_clean: toNum(bgWriterRaw["maxwritten_clean"]),
+            buffers_alloc: toNum(bgWriterRaw["buffers_alloc"]),
+            ...(bgWriterRaw["buffers_checkpoint"] !== undefined && {
+              buffers_checkpoint: toNum(bgWriterRaw["buffers_checkpoint"]),
+            }),
+            ...(bgWriterRaw["buffers_backend"] !== undefined && {
+              buffers_backend: toNum(bgWriterRaw["buffers_backend"]),
+            }),
+          }
+        : undefined;
+
+      // Coerce checkpoints fields
+      const checkpointsRaw = checkpoints.rows?.[0];
+      const coercedCheckpoints = checkpointsRaw
+        ? {
+            checkpoints_timed: toNum(checkpointsRaw["checkpoints_timed"]),
+            checkpoints_req: toNum(checkpointsRaw["checkpoints_req"]),
+            checkpoint_write_time: toNum(
+              checkpointsRaw["checkpoint_write_time"],
+            ),
+            checkpoint_sync_time: toNum(checkpointsRaw["checkpoint_sync_time"]),
+            ...(checkpointsRaw["buffers_checkpoint"] !== undefined && {
+              buffers_checkpoint: toNum(checkpointsRaw["buffers_checkpoint"]),
+            }),
+          }
+        : undefined;
+
+      // Coerce connectionDistribution count fields
+      const coercedConnDist = (connections.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          count: toNum(row["count"]),
+        }),
+      );
+
+      // Coerce activity fields
+      const activityRaw = activity.rows?.[0];
+      const coercedActivity = activityRaw
+        ? {
+            active_queries: toNum(activityRaw["active_queries"]),
+            idle_connections: toNum(activityRaw["idle_connections"]),
+            lock_waiting: toNum(activityRaw["lock_waiting"]),
+            io_waiting: toNum(activityRaw["io_waiting"]),
+          }
+        : undefined;
+
       return {
-        backgroundWriter: bgWriter.rows?.[0],
-        checkpoints: checkpoints.rows?.[0],
-        connectionDistribution: connections.rows,
+        backgroundWriter: coercedBgWriter,
+        checkpoints: coercedCheckpoints,
+        connectionDistribution: coercedConnDist,
         bufferUsage: {
-          ...bufferData,
+          heap_reads: heapReads,
+          heap_hits: heapHits,
+          index_reads: indexReads,
+          index_hits: indexHits,
           heapHitRate:
             heapHitRate !== null ? heapHitRate.toFixed(2) + "%" : "N/A",
           indexHitRate:
             indexHitRate !== null ? indexHitRate.toFixed(2) + "%" : "N/A",
         },
-        activity: activity.rows?.[0],
+        activity: coercedActivity,
         analysis: {
           heapCachePerformance: getHitRateAnalysis(heapHitRate, "heap"),
           indexCachePerformance: getHitRateAnalysis(indexHitRate, "index"),
           checkpointPressure:
-            Number(checkpoints.rows?.[0]?.["checkpoints_req"] ?? 0) >
-            Number(checkpoints.rows?.[0]?.["checkpoints_timed"] ?? 0)
+            (coercedCheckpoints?.checkpoints_req ?? 0) >
+            (coercedCheckpoints?.checkpoints_timed ?? 0)
               ? "HIGH - More forced checkpoints than scheduled"
               : "Normal",
           ioPattern:
-            Number(activity.rows?.[0]?.["io_waiting"] ?? 0) > 0
+            (coercedActivity?.io_waiting ?? 0) > 0
               ? "Some queries waiting on I/O"
               : "No I/O wait bottlenecks detected",
           lockContention:
-            Number(activity.rows?.[0]?.["lock_waiting"] ?? 0) > 0
-              ? `${String(Number(activity.rows?.[0]?.["lock_waiting"] ?? 0))} queries waiting on locks`
+            (coercedActivity?.lock_waiting ?? 0) > 0
+              ? `${String(coercedActivity?.lock_waiting ?? 0)} queries waiting on locks`
               : "No lock contention",
         },
       };

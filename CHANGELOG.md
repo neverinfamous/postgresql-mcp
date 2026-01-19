@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Numeric type coercion in monitoring tools** — All monitoring tool outputs now consistently return JavaScript numbers instead of strings for numeric fields (affects `databaseSize`, `tableSizes`, `connectionStats`, `serverVersion`, `capacityPlanning`, `resourceUsageAnalyze`)
 - **Numeric type coercion in performance tools** — All performance tool outputs now consistently return JavaScript numbers instead of strings for numeric fields (affects `tableStats`, `indexStats`, `vacuumStats`, `statStatements`, `bloatCheck`, `cacheHitRatio`, `seqScanTables`, `indexRecommendations`, `baseline`, `connectionPoolOptimize`, `queryPlanStats`, `partitionStrategySuggest`, `unusedIndexes`)
 - **Output key standardization** — `vacuumStats()` now returns data under the `tables` key (previously `vacuumStats`) and `bloatCheck()` returns `tables` (previously `bloatedTables`) for consistency with other tools
 - **Expression index column display** — `pg_get_indexes`, `pg_describe_table`, and `pg_object_details` now correctly display expression columns (e.g., `lower((name)::text)`) instead of `NULL` for expression-based indexes

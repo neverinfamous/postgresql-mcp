@@ -268,6 +268,11 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
     "pg.monitoring.tableSizes({ limit: 10 })",
     "pg.monitoring.connectionStats()",
     "pg.monitoring.showSettings({ pattern: 'work_mem' })",
+    "pg.monitoring.capacityPlanning({ days: 30 })",
+    "pg.monitoring.uptime()",
+    "pg.monitoring.serverVersion()",
+    "pg.monitoring.resourceUsageAnalyze()",
+    "pg.monitoring.alertThresholdSet({ metric: 'connection_usage' })",
   ],
   backup: [
     "pg.backup.dumpTable({ table: 'users' })",

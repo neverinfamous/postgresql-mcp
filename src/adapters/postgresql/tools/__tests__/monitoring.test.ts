@@ -211,11 +211,11 @@ describe("pg_connection_stats", () => {
     const result = (await tool.handler({}, mockContext)) as {
       byDatabaseAndState: unknown[];
       totalConnections: number;
-      maxConnections: string;
+      maxConnections: number;
     };
 
     expect(result.byDatabaseAndState).toHaveLength(2);
-    expect(result.maxConnections).toBe("100");
+    expect(result.maxConnections).toBe(100);
   });
 });
 
@@ -245,11 +245,11 @@ describe("pg_server_version", () => {
     const tool = tools.find((t) => t.name === "pg_server_version")!;
     const result = (await tool.handler({}, mockContext)) as {
       version: string;
-      version_num: string;
+      version_num: number;
     };
 
     expect(result.version).toBe("16.1");
-    expect(result.version_num).toBe("160001");
+    expect(result.version_num).toBe(160001);
   });
 });
 

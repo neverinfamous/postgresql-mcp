@@ -70,7 +70,7 @@ export function createJsonbSetTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_jsonb_set",
     description:
-      'Set value in JSONB at path. Uses dot-notation by default; for literal dots in keys use array format ["key.with.dots"].',
+      'Set value in JSONB at path. Uses dot-notation by default; for literal dots in keys use array format ["key.with.dots"]. Use empty path (\'\' or []) to replace entire column value.',
     group: "jsonb",
     inputSchema: JsonbSetSchema,
     annotations: write("JSONB Set"),
@@ -97,6 +97,16 @@ export function createJsonbSetTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       const createFlag = createMissing !== false;
+
+      // Handle empty path - replace entire column value
+      if (path.length === 0) {
+        const sql = `UPDATE "${table}" SET "${column}" = $1::jsonb WHERE ${where}`;
+        const result = await adapter.executeQuery(sql, [toJsonString(value)]);
+        return {
+          rowsAffected: result.rowsAffected,
+          hint: "Replaced entire column value (empty path)",
+        };
+      }
 
       // For deep nested paths with createMissing=true, build intermediate objects
       // PostgreSQL's jsonb_set only creates one level, so we nest calls for deep paths
@@ -376,6 +386,26 @@ export function createJsonbPathQueryTool(
   };
 }
 
+/**
+ * Parse a select expression and extract the alias if present.
+ * Handles: "column", "expression AS alias", "expression as alias"
+ * Returns: { expr: string, alias: string }
+ */
+function parseSelectAlias(selectItem: string): { expr: string; alias: string } {
+  // Match " AS " or " as " (case-insensitive) with word boundaries
+  const aliasRegex = /^(.+?)\s+[Aa][Ss]\s+([\w]+)$/;
+  const aliasMatch = aliasRegex.exec(selectItem);
+  if (aliasMatch?.[1] !== undefined && aliasMatch[2] !== undefined) {
+    return { expr: aliasMatch[1].trim(), alias: aliasMatch[2].trim() };
+  }
+  // No alias - use the expression as-is for both
+  // For simple column names, use them directly; for expressions, use a sanitized key
+  const cleanKey = selectItem.includes("->") || selectItem.includes("(")
+    ? selectItem.replace(/[^\w]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "")
+    : selectItem;
+  return { expr: selectItem, alias: cleanKey };
+}
+
 export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_jsonb_agg",
@@ -384,7 +414,12 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
     group: "jsonb",
     inputSchema: z.object({
       table: z.string(),
-      select: z.array(z.string()).optional(),
+      select: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Columns or expressions to include. Supports AS aliases: ["id", "metadata->\'name\' AS name"]',
+        ),
       where: z.string().optional(),
       groupBy: z
         .string()
@@ -402,10 +437,27 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         where?: string;
         groupBy?: string;
       };
-      const selectExpr =
-        parsed.select !== undefined && parsed.select.length > 0
-          ? `jsonb_build_object(${parsed.select.map((c) => `'${c}', "${c}"`).join(", ")})`
-          : "to_jsonb(t.*)";
+
+      // Build select expression with proper alias handling
+      let selectExpr: string;
+      if (parsed.select !== undefined && parsed.select.length > 0) {
+        // Parse each select item for potential aliases
+        const selectParts = parsed.select.map((item) => {
+          const { expr, alias } = parseSelectAlias(item);
+          // Detect if expression needs quoting (simple column names vs expressions)
+          const needsQuote =
+            !expr.includes("->") &&
+            !expr.includes("(") &&
+            !expr.includes("::") &&
+            /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(expr);
+          const exprStr = needsQuote ? `"${expr}"` : expr;
+          return `'${alias}', ${exprStr}`;
+        });
+        selectExpr = `jsonb_build_object(${selectParts.join(", ")})`;
+      } else {
+        selectExpr = "to_jsonb(t.*)";
+      }
+
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
       // Support raw JSONB expressions (containing -> or ->> operators) without quoting
       const hasJsonbOperator = parsed.groupBy?.includes("->") ?? false;

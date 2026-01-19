@@ -61,18 +61,23 @@ export function normalizePathToArray(
  * Normalize path for jsonb_insert - converts numeric path segments to numbers
  * PostgreSQL jsonb_insert requires integer indices for array access
  * 'tags.0' → ['tags', 0] (number, not string)
+ * 0 → [0] (bare number wrapped in array)
  */
 export function normalizePathForInsert(
-  path: string | (string | number)[],
+  path: string | number | (string | number)[],
 ): (string | number)[] {
+  // Handle bare numbers (e.g., 0, -1 for array positions)
+  if (typeof path === "number") {
+    return [path];
+  }
   if (typeof path === "string") {
     const segments = stringPathToArray(path);
     // Convert numeric strings to numbers for array access
-    return segments.map((p) => (/^\d+$/.test(p) ? parseInt(p, 10) : p));
+    return segments.map((p) => (/^-?\d+$/.test(p) ? parseInt(p, 10) : p));
   }
   // Already mixed types - ensure numbers stay as numbers
   return path.map((p) =>
-    typeof p === "number" ? p : /^\d+$/.test(p) ? parseInt(p, 10) : p,
+    typeof p === "number" ? p : /^-?\d+$/.test(p) ? parseInt(p, 10) : p,
   );
 }
 
@@ -184,6 +189,7 @@ export const JsonbInsertSchema = z.object({
   path: z
     .union([
       z.string().describe('Path as string (e.g., "tags.0")'),
+      z.number().describe("Array index position (e.g., 0, -1)"),
       z
         .array(z.union([z.string(), z.number()]))
         .describe('Path as array (e.g., ["tags", 0])'),

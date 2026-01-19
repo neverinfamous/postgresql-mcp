@@ -140,9 +140,17 @@ Aliases: \`tableName\`→\`table\`, \`indexName\`→\`index\`, \`param\`/\`setti
 
 ## Backup Tools
 
-- \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Format: \`csv\` (default), \`text\`, \`binary\`
-- \`pg_dump_table\`: Returns basic CREATE TABLE only. **PRIMARY KEYS, INDEXES, CONSTRAINTS NOT included**—use \`pg_get_indexes\`/\`pg_get_constraints\`
-- \`pg_restore_command\`: Include \`database\` parameter for complete command
+Core: \`dumpTable()\`, \`dumpSchema()\`, \`copyExport()\`, \`copyImport()\`, \`createBackupPlan()\`, \`restoreCommand()\`, \`physical()\`, \`restoreValidate()\`, \`scheduleOptimize()\`
+
+- \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Supports \`schema.table\` format (auto-parsed). Format: \`csv\` (default), \`text\`, \`binary\`. Use \`limit: N\` to cap rows. Optional \`header\` (default: true), \`delimiter\`
+- \`pg_dump_table\`: Returns basic CREATE TABLE only. **PRIMARY KEYS, INDEXES, CONSTRAINTS NOT included**—use \`pg_get_indexes\`/\`pg_get_constraints\`. Supports sequences (\`type: 'sequence'\`) and views
+- \`pg_dump_schema\`: Generates pg_dump command. Optional \`schema\`, \`table\`, \`filename\`
+- \`pg_copy_import\`: Generates COPY FROM command. Supports \`columns\` array, \`filePath\`, \`format\`, \`header\`, \`delimiter\`
+- \`pg_restore_command\`: Include \`database\` parameter for complete command. Optional \`schemaOnly\`, \`dataOnly\`
+- \`pg_create_backup_plan\`: Generates backup strategy with cron schedule. \`frequency\`: 'hourly'|'daily'|'weekly', \`retention\` count
+- \`pg_backup_physical\`: Generates pg_basebackup command. \`format\`: 'plain'|'tar', \`checkpoint\`: 'fast'|'spread', \`compress\`: 0-9
+- \`pg_restore_validate\`: Generates validation commands. \`backupType\`: 'pg_dump' (default)|'pg_basebackup'
+- \`pg_backup_schedule_optimize\`: Analyzes database activity patterns and recommends optimal backup schedule
 
 ## Text Tools
 

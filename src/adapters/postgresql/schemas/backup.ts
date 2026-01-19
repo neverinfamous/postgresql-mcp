@@ -16,7 +16,9 @@ export const CopyExportSchemaBase = z.object({
   table: z
     .string()
     .optional()
-    .describe("Table name to export (auto-generates SELECT *)"),
+    .describe(
+      "Table name to export (auto-generates SELECT *). Supports 'schema.table' format",
+    ),
   schema: z
     .string()
     .optional()
@@ -27,10 +29,16 @@ export const CopyExportSchemaBase = z.object({
     .describe("Output format (default: csv)"),
   header: z.boolean().optional().describe("Include header row (default: true)"),
   delimiter: z.string().optional().describe("Field delimiter"),
+  limit: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Maximum number of rows to export"),
 });
 
 /**
- * Transformed schema with alias resolution and table shortcut.
+ * Transformed schema with alias resolution, table shortcut, and schema.table parsing.
  */
 export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
   // Apply alias: sql → query
@@ -48,8 +56,29 @@ export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
 
   // Auto-generate query from table if provided
   if ((query === undefined || query === "") && input.table !== undefined) {
-    const schemaName = input.schema ?? "public";
-    query = `SELECT * FROM "${schemaName}"."${input.table}"`;
+    // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
+    let tableName = input.table;
+    let schemaName = input.schema ?? "public";
+
+    if (input.schema === undefined && input.table.includes(".")) {
+      const parts = input.table.split(".");
+      if (parts.length === 2 && parts[0] && parts[1]) {
+        schemaName = parts[0];
+        tableName = parts[1];
+      }
+    }
+
+    // Build query with optional LIMIT
+    query = `SELECT * FROM "${schemaName}"."${tableName}"`;
+    if (input.limit !== undefined) {
+      query += ` LIMIT ${String(input.limit)}`;
+    }
+  } else if (query !== undefined && input.limit !== undefined) {
+    // If a custom query is provided and limit is specified, wrap or append LIMIT
+    // Only append if query doesn't already have LIMIT
+    if (!/\bLIMIT\s+\d+\s*$/i.test(query)) {
+      query += ` LIMIT ${String(input.limit)}`;
+    }
   }
 
   if (query === undefined || query === "") {

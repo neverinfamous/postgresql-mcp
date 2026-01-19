@@ -275,9 +275,12 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
     "pg.monitoring.alertThresholdSet({ metric: 'connection_usage' })",
   ],
   backup: [
-    "pg.backup.dumpTable({ table: 'users' })",
-    "pg.backup.copyExport({ table: 'orders', format: 'csv' })",
-    "pg.backup.restoreCommand({ filename: 'backup.sql', database: 'mydb' })",
+    "pg.backup.dumpTable({ table: 'users', includeData: true })",
+    "pg.backup.copyExport({ table: 'orders', format: 'csv', limit: 100 })",
+    "pg.backup.copyExport({ table: 'public.products' })", // schema.table format
+    "pg.backup.restoreCommand({ backupFile: 'backup.dump', database: 'mydb' })",
+    "pg.backup.createBackupPlan({ frequency: 'daily', retention: 7 })",
+    "pg.backup.scheduleOptimize()",
   ],
   schema: [
     "pg.schema.createView({ name: 'active_users', sql: 'SELECT * FROM users WHERE active' })",

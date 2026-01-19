@@ -406,20 +406,31 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
       };
       const cfg = parsed.config ?? "english";
       const defaultIndexName = `idx_${parsed.table}_${parsed.column}_fts`;
-      const indexName = sanitizeIdentifier(parsed.name ?? defaultIndexName);
+      const resolvedIndexName = parsed.name ?? defaultIndexName;
+      const indexName = sanitizeIdentifier(resolvedIndexName);
       const ifNotExists = parsed.ifNotExists === true ? "IF NOT EXISTS " : "";
 
       const tableName = sanitizeTableName(parsed.table);
       const columnName = sanitizeIdentifier(parsed.column);
+
+      // Check if index exists before creation (to accurately report 'skipped')
+      let existedBefore = false;
+      if (parsed.ifNotExists === true) {
+        const checkResult = await adapter.executeQuery(
+          `SELECT 1 FROM pg_indexes WHERE indexname = $1 LIMIT 1`,
+          [resolvedIndexName],
+        );
+        existedBefore = (checkResult.rows?.length ?? 0) > 0;
+      }
 
       const sql = `CREATE INDEX ${ifNotExists}${indexName} ON ${tableName} USING gin(to_tsvector('${cfg}', ${columnName}))`;
       await adapter.executeQuery(sql);
 
       return {
         success: true,
-        index: parsed.name ?? defaultIndexName,
+        index: resolvedIndexName,
         config: cfg,
-        skipped: parsed.ifNotExists === true,
+        skipped: existedBefore,
       };
     },
   };

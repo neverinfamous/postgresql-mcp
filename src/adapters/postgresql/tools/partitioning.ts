@@ -344,8 +344,15 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
       let sql = `CREATE TABLE ${partitionName} PARTITION OF ${parentName}`;
 
       // Add partition bounds
+      // Handle DEFAULT partition: accept both "__DEFAULT__" (from preprocessor when isDefault: true)
+      // and explicit "DEFAULT" string for API consistency with attachPartition
+      const isDefaultPartition =
+        forValues === "__DEFAULT__" ||
+        forValues.toUpperCase() === "DEFAULT" ||
+        forValues.toUpperCase().trim() === "DEFAULT";
+
       let boundsDescription: string;
-      if (forValues === "__DEFAULT__") {
+      if (isDefaultPartition) {
         sql += " DEFAULT";
         boundsDescription = "DEFAULT";
       } else {

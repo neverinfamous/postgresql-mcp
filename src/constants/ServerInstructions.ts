@@ -95,9 +95,11 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 ## Performance Tools
 
 Core: \`explain()\`, \`explainAnalyze()\`, \`indexStats()\`, \`tableStats()\`, \`statStatements()\`, \`locks()\`, \`bloatCheck()\`, \`cacheHitRatio()\`, \`indexRecommendations()\`
-- \`explain({ sql, format? })\`: Supports \`format: 'text'|'json'|'yaml'|'xml'\`. Default: text
-- \`explainAnalyze({ sql, format? })\`: Same format options as explain
-- \`explainBuffers({ sql })\`: Always returns JSON format (includes buffer statistics)
+- \`explain({ sql, format?, params? })\`: Supports \`format: 'text'|'json'|'yaml'|'xml'\`. Default: text. Use \`params: [value]\` for \`$1, $2\` placeholders
+- \`explainAnalyze({ sql, format?, params? })\`: Same format/params options as explain
+- \`explainBuffers({ sql, params? })\`: Always returns JSON format (includes buffer statistics)
+- \`indexRecommendations({ sql?, params? })\`: Pass \`params: [value]\` for parameterized queries (e.g., \`sql: 'SELECT * FROM orders WHERE id = $1', params: [5]\`)
+- ⚠️ **Data Type Awareness**: Query literals must match column types exactly—\`WHERE sensor_id = 1\` (integer), not \`'sensor_1'\` (string)
 
 Aliases: \`cacheStats\`→\`cacheHitRatio\`, \`queryStats\`→\`statStatements\`, \`activity\`→\`statActivity\`, \`vacuum\`→\`vacuumStats\`
 

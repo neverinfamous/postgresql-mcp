@@ -96,6 +96,10 @@ export function createIndexRecommendationsTool(
         .string()
         .optional()
         .describe("SQL query to analyze for index recommendations"),
+      params: z
+        .array(z.unknown())
+        .optional()
+        .describe("Query parameters for $1, $2, etc. placeholders"),
       schema: z.string().optional().describe("Schema name (default: public)"),
     }),
   );
@@ -178,14 +182,16 @@ export function createIndexRecommendationsTool(
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = IndexRecommendationsSchema.parse(params);
       const schemaName = parsed.schema ?? "public";
+      const queryParams = parsed.params ?? [];
 
       // If SQL query provided, perform query-specific analysis
       if (parsed.sql !== undefined && parsed.sql.trim() !== "") {
         const hypopgAvailable = await checkHypoPG();
 
-        // Get baseline EXPLAIN plan
+        // Get baseline EXPLAIN plan (with parameter binding support)
         const baselineResult = await adapter.executeQuery(
           `EXPLAIN (FORMAT JSON) ${parsed.sql}`,
+          queryParams,
         );
         const baselinePlanRow = baselineResult.rows?.[0] as
           | { "QUERY PLAN"?: unknown[] }
@@ -232,9 +238,10 @@ export function createIndexRecommendationsTool(
                   `SELECT hypopg_create_index('${candidate.indexDDL.replace(/'/g, "''")}')`,
                 );
 
-                // Re-run EXPLAIN with hypothetical index
+                // Re-run EXPLAIN with hypothetical index (with parameter binding)
                 const improvedResult = await adapter.executeQuery(
                   `EXPLAIN (FORMAT JSON) ${parsed.sql}`,
+                  queryParams,
                 );
                 const improvedPlanRow = improvedResult.rows?.[0] as
                   | { "QUERY PLAN"?: unknown[] }

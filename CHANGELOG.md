@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **dropView/dropSequence `existed` field** — `dropView()` and `dropSequence()` now return `existed: boolean` field for consistency with `dropSchema()`, indicating whether the object existed before the drop operation
 - **Schema tools discovery documentation** — Added note that `pg.schema.help()` returns `{methods: string[], examples: string[]}` object with available methods and usage examples
 - **createView `orReplace` parameter documentation** — Clarified that the parameter name is `orReplace: true` (not `replace`) for CREATE OR REPLACE functionality in `createView()`
+- **Partitioning tools documentation** — Updated ServerInstructions.ts to clarify: `forValues` requires raw SQL string format (e.g., `"FROM ('2024-01-01') TO ('2024-07-01')"`), `isDefault: true` is a separate boolean param for DEFAULT partitions, and `createPartitionedTable` does NOT support `schema.table` format (requires separate `schema` param)
 
 ### Fixed
 
@@ -42,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Code mode no-argument handling** — Code mode methods (e.g., `pg.backup.dumpSchema()`) now work correctly when called without arguments, matching direct tool call behavior. Previously threw "Invalid input: expected object, received undefined"
 - **copyImport tableName alias** — `copyImport()` now correctly resolves `tableName` as an alias for `table` parameter. Previously threw "Cannot read properties of undefined" when using the alias
 - **Backup tools code mode positional arguments** — Added positional argument support for backup tools in code mode: `copyExport('table_name')`, `copyImport('table_name')`, `dumpTable('table_name')`, `restoreCommand('backup.dump')`, `physical('/backups/dir')`, `restoreValidate('backup.dump')` now work with single string arguments
+- **Numeric type coercion in partitioning tools** — `pg_list_partitions` and `pg_partition_info` now return `size_bytes` as a JavaScript number instead of string. `pg_partition_info` also returns `partition_count` as a number for consistency with other tools
 
 ### Changed
 

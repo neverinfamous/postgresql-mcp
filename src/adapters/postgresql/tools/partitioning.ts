@@ -125,11 +125,15 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.table,
       ]);
 
-      // Format sizes consistently
-      const partitions = (result.rows ?? []).map((row) => ({
-        ...row,
-        size: formatBytes(Number(row["size_bytes"] ?? 0)),
-      }));
+      // Format sizes consistently and coerce size_bytes to number
+      const partitions = (result.rows ?? []).map((row) => {
+        const sizeBytes = Number(row["size_bytes"] ?? 0);
+        return {
+          ...row,
+          size_bytes: sizeBytes,
+          size: formatBytes(sizeBytes),
+        };
+      });
 
       return { partitions, count: partitions.length };
     },
@@ -413,18 +417,28 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
         0,
       );
 
-      // Format sizes consistently and ensure approx_rows is a number
+      // Format sizes consistently and coerce numeric fields
       const partitions = (partitionsResult.rows ?? []).map((row) => {
         const sizeBytes = Number(row["size_bytes"] ?? 0);
         return {
           ...row,
+          size_bytes: sizeBytes,
           size: formatBytes(sizeBytes),
           approx_rows: Number(row["approx_rows"] ?? 0),
         };
       });
 
+      // Coerce tableInfo numeric fields
+      const tableInfoRaw = partInfo.rows?.[0];
+      const tableInfo = tableInfoRaw
+        ? {
+            ...tableInfoRaw,
+            partition_count: Number(tableInfoRaw["partition_count"] ?? 0),
+          }
+        : null;
+
       return {
-        tableInfo: partInfo.rows?.[0],
+        tableInfo,
         partitions,
         totalSizeBytes,
       };

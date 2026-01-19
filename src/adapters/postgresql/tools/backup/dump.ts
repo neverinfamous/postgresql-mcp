@@ -494,14 +494,26 @@ export function createCopyImportTool(
     icons: getToolIcons("backup", write("Copy Import")),
     // eslint-disable-next-line @typescript-eslint/require-await
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
+      const rawParams = params as {
+        table?: string;
+        tableName?: string; // Alias for table
         schema?: string;
         filePath?: string;
         format?: string;
         header?: boolean;
         delimiter?: string;
         columns?: string[];
+      };
+
+      // Resolve tableName alias to table
+      const tableValue = rawParams.table ?? rawParams.tableName;
+      if (!tableValue) {
+        throw new Error("table parameter is required");
+      }
+
+      const parsed = {
+        ...rawParams,
+        table: tableValue,
       };
 
       // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')

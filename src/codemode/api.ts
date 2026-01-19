@@ -278,8 +278,11 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
     "pg.backup.dumpTable({ table: 'users', includeData: true })",
     "pg.backup.copyExport({ table: 'orders', format: 'csv', limit: 100 })",
     "pg.backup.copyExport({ table: 'public.products' })", // schema.table format
+    "pg.backup.copyImport({ table: 'orders', filePath: '/data/orders.csv', format: 'csv' })",
     "pg.backup.restoreCommand({ backupFile: 'backup.dump', database: 'mydb' })",
     "pg.backup.createBackupPlan({ frequency: 'daily', retention: 7 })",
+    "pg.backup.physical({ targetDir: '/backups/base', format: 'tar', compress: 6 })",
+    "pg.backup.restoreValidate({ backupFile: 'backup.dump', backupType: 'pg_dump' })",
     "pg.backup.scheduleOptimize()",
   ],
   schema: [
@@ -445,6 +448,15 @@ const POSITIONAL_PARAM_MAP: Record<string, string | string[]> = {
   statsHypothesis: ["table", "column", "test", "hypothesizedMean"],
   statsSampling: ["table", "sampleSize"],
   statsRegression: ["table", "xColumn", "yColumn"],
+
+  // ============ BACKUP GROUP ============
+  copyExport: "table",
+  copyImport: "table",
+  dumpTable: "table",
+  dumpSchema: "schema",
+  restoreCommand: "backupFile",
+  physical: "targetDir",
+  restoreValidate: "backupFile",
 
   // ============ TEXT GROUP ============
   // New tools

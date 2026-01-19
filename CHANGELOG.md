@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **longRunningQueries minDuration alias** — Now recognizes `minDuration` as a parameter alias alongside `seconds`, `threshold`, and `minSeconds`
 - **alertThresholdSet metric validation** — Invalid metric values now throw a Zod validation error instead of silently falling back to returning all thresholds
 - **Code mode no-argument handling** — Code mode methods (e.g., `pg.backup.dumpSchema()`) now work correctly when called without arguments, matching direct tool call behavior. Previously threw "Invalid input: expected object, received undefined"
+- **copyImport tableName alias** — `copyImport()` now correctly resolves `tableName` as an alias for `table` parameter. Previously threw "Cannot read properties of undefined" when using the alias
+- **Backup tools code mode positional arguments** — Added positional argument support for backup tools in code mode: `copyExport('table_name')`, `copyImport('table_name')`, `dumpTable('table_name')`, `restoreCommand('backup.dump')`, `physical('/backups/dir')`, `restoreValidate('backup.dump')` now work with single string arguments
 
 ### Changed
 

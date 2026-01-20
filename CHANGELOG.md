@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **timeSeries second-level granularity** — `pg_stats_time_series` now supports `second` as an interval option for sub-minute time series analysis. Valid intervals: `second`, `minute`, `hour`, `day`, `week`, `month`, `year`
 - **timeSeries time/value aliases** — `pg_stats_time_series` now accepts `time` as alias for `timeColumn` and `value` as alias for `valueColumn` for ergonomic consistency
 - **correlation x/y aliases** — `pg_stats_correlation` now accepts `x`/`y` as aliases for `column1`/`column2`, matching `pg_stats_regression` for API consistency
+- **timeSeries valueColumn upfront validation** — `pg_stats_time_series` now validates `valueColumn` exists and is numeric upfront, matching the validation behavior for `timeColumn`. Provides clear error messages (e.g., "Column not found", "Column is not a numeric type") instead of raw PostgreSQL errors
+- **percentiles mixed scale warning** — `pg_stats_percentiles` now returns a `warning` field when mixed percentile scales are detected (e.g., `[0.1, 50]` where some values appear to be 0-1 format and others 0-100 format). Helps users understand unexpected key names like p0 instead of p10
 
 ### Fixed
 

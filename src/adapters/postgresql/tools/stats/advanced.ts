@@ -739,6 +739,41 @@ export function createStatsTimeSeriesTool(
         );
       }
 
+      // Validate valueColumn exists and is numeric
+      const numericTypes = [
+        "integer",
+        "bigint",
+        "smallint",
+        "numeric",
+        "decimal",
+        "real",
+        "double precision",
+        "money",
+      ];
+      const valueTypeQuery = `
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_schema = '${schema ?? "public"}' 
+        AND table_name = '${table}'
+        AND column_name = '${valueColumn}'
+      `;
+      const valueTypeResult = await adapter.executeQuery(valueTypeQuery);
+      const valueTypeRow = valueTypeResult.rows?.[0] as
+        | { data_type: string }
+        | undefined;
+
+      if (!valueTypeRow) {
+        throw new Error(
+          `Column "${valueColumn}" not found in table "${schema ?? "public"}.${table}"`,
+        );
+      }
+
+      if (!numericTypes.includes(valueTypeRow.data_type)) {
+        throw new Error(
+          `Column "${valueColumn}" is type "${valueTypeRow.data_type}" but must be a numeric type for time series aggregation`,
+        );
+      }
+
       // Helper to map bucket row
       const mapBucket = (
         row: Record<string, unknown>,

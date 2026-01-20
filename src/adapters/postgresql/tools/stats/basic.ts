@@ -85,12 +85,24 @@ function preprocessBasicStatsParams(input: unknown): unknown {
       // If ANY value > 1 (but <= 100), treat as 0-100 format and divide all by 100
       // If ANY value > 100, it's an error (will be caught by refine validation after normalization)
       const pctiles = result["percentiles"] as number[];
+      const hasValuesInZeroToOne = pctiles.some(
+        (p) => typeof p === "number" && p > 0 && p <= 1,
+      );
       const hasValuesOver1 = pctiles.some(
         (p) => typeof p === "number" && p > 1,
       );
       const hasValuesOver100 = pctiles.some(
         (p) => typeof p === "number" && p > 100,
       );
+
+      // Detect mixed scales: some values in 0-1 range and some in 1-100 range
+      // This produces unexpected keys (e.g., [0.1, 50] → p0, p50 not p10, p50)
+      if (hasValuesInZeroToOne && hasValuesOver1 && !hasValuesOver100) {
+        result["_percentileScaleWarning"] =
+          "Mixed percentile scales detected: some values appear to be in 0-1 format while others are in 0-100 format. " +
+          "When max > 1, all values are treated as 0-100 scale. For example, [0.1, 50] produces p0 and p50, not p10 and p50. " +
+          "Use consistent scale (all 0-1 or all 0-100) for expected results.";
+      }
 
       if (hasValuesOver100) {
         // Leave as-is - will fail validation with clear error
@@ -221,6 +233,10 @@ export const StatsPercentilesSchema = z.preprocess(
       schema: z.string().optional().describe("Schema name"),
       where: z.string().optional().describe("Filter condition"),
       groupBy: z.string().optional().describe("Column to group percentiles by"),
+      _percentileScaleWarning: z
+        .string()
+        .optional()
+        .describe("Internal: warning about mixed scales"),
     })
     .refine(
       (data) =>
@@ -490,8 +506,17 @@ export function createStatsPercentilesTool(
         schema?: string;
         where?: string;
         groupBy?: string;
+        _percentileScaleWarning?: string;
       };
-      const { table, column, percentiles, schema, where, groupBy } = parsed;
+      const {
+        table,
+        column,
+        percentiles,
+        schema,
+        where,
+        groupBy,
+        _percentileScaleWarning,
+      } = parsed;
 
       const schemaName = schema ?? "public";
 
@@ -545,13 +570,20 @@ export function createStatsPercentilesTool(
           percentiles: mapPercentiles(row),
         }));
 
-        return {
+        const response: Record<string, unknown> = {
           table: `${schema ?? "public"}.${table}`,
           column,
           groupBy,
           groups,
           count: groups.length,
         };
+
+        // Include warning if mixed scales were detected
+        if (_percentileScaleWarning) {
+          response["warning"] = _percentileScaleWarning;
+        }
+
+        return response;
       }
 
       // Ungrouped percentiles
@@ -565,11 +597,18 @@ export function createStatsPercentilesTool(
       const result = await adapter.executeQuery(sql);
       const row = result.rows?.[0] ?? {};
 
-      return {
+      const response: Record<string, unknown> = {
         table: `${schema ?? "public"}.${table}`,
         column,
         percentiles: mapPercentiles(row),
       };
+
+      // Include warning if mixed scales were detected
+      if (_percentileScaleWarning) {
+        response["warning"] = _percentileScaleWarning;
+      }
+
+      return response;
     },
   };
 }

@@ -432,9 +432,13 @@ describe("pg_stats_time_series", () => {
   });
 
   it("should analyze time series data", async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
@@ -462,9 +466,13 @@ describe("pg_stats_time_series", () => {
   });
 
   it("should return grouped time series when groupBy is provided", async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
@@ -498,9 +506,13 @@ describe("pg_stats_time_series", () => {
 
   // Parameter smoothing tests
   it('should accept PostgreSQL-style interval "1 day" and normalize to "day"', async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
@@ -524,9 +536,13 @@ describe("pg_stats_time_series", () => {
   });
 
   it('should accept "2 hours" and normalize to "hour"', async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
@@ -550,9 +566,13 @@ describe("pg_stats_time_series", () => {
   });
 
   it('should accept plural form "days" and normalize to "day"', async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
@@ -576,9 +596,13 @@ describe("pg_stats_time_series", () => {
   });
 
   it('should handle uppercase interval "DAY"', async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
@@ -1884,9 +1908,13 @@ describe("pg_stats_time_series optional params", () => {
   });
 
   it("should use custom aggregation function when provided", async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
@@ -1911,9 +1939,13 @@ describe("pg_stats_time_series optional params", () => {
   });
 
   it("should include schema and where clause when provided", async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
@@ -1942,9 +1974,13 @@ describe("pg_stats_time_series optional params", () => {
   });
 
   it("should use custom limit when provided", async () => {
-    // Mock column type check
+    // Mock timeColumn type check
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "timestamp without time zone" }],
+    });
+    // Mock valueColumn type check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "numeric" }],
     });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({

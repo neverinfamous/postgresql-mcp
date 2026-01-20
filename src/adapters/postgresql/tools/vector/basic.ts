@@ -258,7 +258,16 @@ export function createVectorInsertTool(
         }
       }
 
-      const tableName = sanitizeTableName(parsed.table, parsed.schema);
+      // Parse schema.table format (embedded schema takes priority over explicit schema param)
+      let resolvedTable = parsed.table;
+      let resolvedSchema = parsed.schema;
+      if (parsed.table.includes(".")) {
+        const parts = parsed.table.split(".");
+        resolvedSchema = parts[0] ?? parsed.schema ?? "public";
+        resolvedTable = parts[1] ?? parsed.table;
+      }
+
+      const tableName = sanitizeTableName(resolvedTable, resolvedSchema);
       const columnName = sanitizeIdentifier(parsed.column);
       const vectorStr = `[${parsed.vector.join(",")}]`;
 
@@ -923,7 +932,17 @@ export function createVectorBatchInsertTool(
     icons: getToolIcons("vector", write("Batch Insert Vectors")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = BatchInsertSchema.parse(params);
-      const tableName = sanitizeTableName(parsed.table, parsed.schema);
+
+      // Parse schema.table format (embedded schema takes priority over explicit schema param)
+      let resolvedTable = parsed.table;
+      let resolvedSchema = parsed.schema;
+      if (parsed.table.includes(".")) {
+        const parts = parsed.table.split(".");
+        resolvedSchema = parts[0] ?? parsed.schema ?? "public";
+        resolvedTable = parts[1] ?? parsed.table;
+      }
+
+      const tableName = sanitizeTableName(resolvedTable, resolvedSchema);
       const columnName = sanitizeIdentifier(parsed.column);
 
       if (parsed.vectors.length === 0) {

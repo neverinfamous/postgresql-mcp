@@ -41,9 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **hypothesis() and regression() response structure documentation** — Clarified in ServerInstructions.ts that `hypothesis()` returns results in a nested `results` object (access via `hyp.results.pValue`) and `regression()` returns results in a nested `regression` object (access via `reg.regression.slope`). Prevents confusion when accessing response fields
 - **regression column1/column2 aliases** — `pg_stats_regression` now accepts `column1`/`column2` as aliases for `xColumn`/`yColumn`, matching the API of `pg_stats_correlation` for consistency. Users can now use the same parameter names across both tools
 - **Vector tools documentation improvements** — Enhanced ServerInstructions.ts vector tools section:
-  - `pg_vector_search` now documents return structure: `{results: [...], count, metric}` (not `rows`)
-  - `pg_vector_aggregate` documents both ungrouped (`{average_vector, count}`) and grouped (`{groups: [...]}`) response structures
-  - Added `pg_vector_validate` documentation: `{valid: bool, vectorDimensions}` for vector format validation
+  - `pg_vector_search` now documents return structure: `{results: [...], count, metric}` (not `rows`). Added note about parsing vector strings from DB
+  - `pg_vector_insert` now documents `schema.table` format support and `updateExisting` mode usage
+  - `pg_vector_normalize` documents accurate response: `{normalized: [...], magnitude: N}` where `magnitude` is the **original** vector length (not 1)
+  - `pg_vector_aggregate` documents both ungrouped and grouped response structures, clarifying that `average_vector` is wrapped in a preview object for large vectors
+  - `pg_vector_dimension_reduce` now documented with return structure for both direct vector mode and table mode
+  - `pg_vector_create_index` documents `type` parameter with `method` alias, plus IVFFlat/HNSW-specific parameters
+  - `pg_vector_performance` documents `testVectorSource` return field
+  - `pg_vector_validate` documents empty vector behavior: `[]` returns `{valid: true, vectorDimensions: 0}`
+- **pg_vector_insert schema.table format support** — `pg_vector_insert` now supports `schema.table` format (e.g., `'myschema.embeddings'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter
+- **pg_vector_batch_insert schema.table format support** — `pg_vector_batch_insert` now supports `schema.table` format for consistency with `pg_vector_insert`
+- **pg_vector_create_index method alias** — `pg_vector_create_index` now accepts `method` as an alias for `type` parameter (e.g., `method: 'hnsw'` or `type: 'ivfflat'`)
 
 ### Fixed
 

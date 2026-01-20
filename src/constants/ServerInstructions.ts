@@ -65,11 +65,16 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 ## Vector Tools
 
-- \`pg_vector_search\`: Returns \`{results: [...], count, metric}\`. Use \`select: ["id", "name"]\` to include identifying columns. Without select, only returns distance. \`filter\` = \`where\`
+- \`pg_vector_search\`: Returns \`{results: [...], count, metric}\`. Use \`select: ["id", "name"]\` to include identifying columns. Without select, only returns distance. \`filter\` = \`where\`. ⚠️ Vectors read from DB are strings—parse before passing: \`vec.replace(/^\\[|\\]$/g, '').split(',').map(Number)\`
+- \`pg_vector_insert\`: Supports \`schema.table\` format (auto-parsed). Use \`updateExisting\` + \`conflictColumn\` + \`conflictValue\` for UPDATE mode
 - \`pg_vector_batch_insert\`: \`vectors\` expects \`[{vector: [...], data?: {...}}]\` objects, not raw arrays
-- \`pg_vector_cluster\`: \`clusters\` = \`k\`
-- \`pg_vector_performance\`: Auto-generates testVector from first row if omitted
-- \`pg_vector_validate\`: Returns \`{valid: bool, vectorDimensions}\`. Validates vector format and values
+- \`pg_vector_normalize\`: Returns \`{normalized: [...], magnitude: N}\`. Note: \`magnitude\` is the **original** vector length (not 1)
+- \`pg_vector_aggregate\`: Returns \`{average_vector: {preview, dimensions, truncated}, count}\` or \`{groups: [{group_key, average_vector, count}]}\` with groupBy. \`average_vector\` is wrapped in preview object for large vectors
+- \`pg_vector_dimension_reduce\`: Direct mode returns \`{reduced: [...], originalDimensions, targetDimensions}\`. Table mode returns \`{results: [{id, reduced}]}\`
+- \`pg_vector_cluster\`: \`clusters\` = \`k\`. Returns centroids only—use \`pg_vector_distance\` to assign rows
+- \`pg_vector_create_index\`: Use \`type\` (or alias \`method\`) with values 'ivfflat' or 'hnsw'. IVFFlat: \`lists\` param. HNSW: \`m\`, \`efConstruction\` params
+- \`pg_vector_performance\`: Auto-generates testVector from first row if omitted. Returns \`testVectorSource: 'auto-generated'|'user-provided'\`
+- \`pg_vector_validate\`: Returns \`{valid: bool, vectorDimensions}\`. Empty vector \`[]\` returns \`{valid: true, vectorDimensions: 0}\`
 - ⛔ \`pg_vector_embed\`: Demo only (hash-based). Use OpenAI/Cohere for production.
 
 ## JSONB Tools

@@ -73,7 +73,8 @@ const VectorCreateIndexSchemaBase = z.object({
   tableName: z.string().optional().describe("Alias for table"),
   column: z.string().optional().describe("Vector column name"),
   col: z.string().optional().describe("Alias for column"),
-  type: z.enum(["ivfflat", "hnsw"]).describe("Index type"),
+  type: z.enum(["ivfflat", "hnsw"]).optional().describe("Index type"),
+  method: z.enum(["ivfflat", "hnsw"]).optional().describe("Alias for type"),
   metric: z
     .enum(["l2", "cosine", "inner_product"])
     .optional()
@@ -93,15 +94,28 @@ const VectorCreateIndexSchemaBase = z.object({
 
 // Transformed schema with alias resolution
 export const VectorCreateIndexSchema = VectorCreateIndexSchemaBase.transform(
-  (data) => ({
-    table: data.table ?? data.tableName ?? "",
-    column: data.column ?? data.col ?? "",
-    type: data.type,
-    metric: data.metric ?? "l2",
-    ifNotExists: data.ifNotExists,
-    lists: data.lists,
-    m: data.m,
-    efConstruction: data.efConstruction,
-    schema: data.schema,
-  }),
+  (data) => {
+    // Resolve type from type or method alias
+    const resolvedType = data.type ?? data.method;
+    if (!resolvedType) {
+      throw new z.ZodError([
+        {
+          code: "custom",
+          path: [],
+          message: "type (or method alias) is required",
+        },
+      ]);
+    }
+    return {
+      table: data.table ?? data.tableName ?? "",
+      column: data.column ?? data.col ?? "",
+      type: resolvedType,
+      metric: data.metric ?? "l2",
+      ifNotExists: data.ifNotExists,
+      lists: data.lists,
+      m: data.m,
+      efConstruction: data.efConstruction,
+      schema: data.schema,
+    };
+  },
 );

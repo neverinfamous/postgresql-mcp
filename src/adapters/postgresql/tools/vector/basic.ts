@@ -827,7 +827,18 @@ export function createVectorAggregateTool(
 
       // Handle groupBy mode
       if (parsed.groupBy !== undefined) {
-        const groupByCol = sanitizeIdentifier(parsed.groupBy);
+        // Validate groupBy is a simple column name, not an expression
+        let groupByCol: string;
+        try {
+          groupByCol = sanitizeIdentifier(parsed.groupBy);
+        } catch {
+          return {
+            success: false,
+            error: `Invalid groupBy value: '${parsed.groupBy}' is not a valid column name`,
+            suggestion:
+              "groupBy only supports simple column names (not expressions like LOWER(column)). Use a direct column reference.",
+          };
+        }
         const sql = `SELECT ${groupByCol} as group_key, avg(${columnName})::text as average_vector, count(*):: integer as count
                             FROM ${tableName}${whereClause}
                             GROUP BY ${groupByCol}

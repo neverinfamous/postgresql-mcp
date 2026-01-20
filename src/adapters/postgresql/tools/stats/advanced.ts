@@ -206,6 +206,78 @@ function parseSchemaTable(
   return { table, schema: explicitSchema ?? "public" };
 }
 
+/**
+ * Validate that a table exists and a column is numeric.
+ * Throws user-friendly error messages for missing table/column.
+ */
+async function validateNumericColumn(
+  adapter: PostgresAdapter,
+  table: string,
+  column: string,
+  schema: string,
+): Promise<void> {
+  const numericTypes = [
+    "integer",
+    "bigint",
+    "smallint",
+    "numeric",
+    "decimal",
+    "real",
+    "double precision",
+    "money",
+  ];
+
+  const typeCheckQuery = `
+    SELECT data_type 
+    FROM information_schema.columns 
+    WHERE table_schema = '${schema}' 
+    AND table_name = '${table}'
+    AND column_name = '${column}'
+  `;
+  const typeResult = await adapter.executeQuery(typeCheckQuery);
+  const typeRow = typeResult.rows?.[0] as { data_type: string } | undefined;
+
+  if (!typeRow) {
+    // Check if table exists
+    const tableCheckQuery = `
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_schema = '${schema}' AND table_name = '${table}'
+    `;
+    const tableResult = await adapter.executeQuery(tableCheckQuery);
+    if (tableResult.rows?.length === 0) {
+      throw new Error(`Table "${schema}.${table}" not found`);
+    }
+    throw new Error(
+      `Column "${column}" not found in table "${schema}.${table}"`,
+    );
+  }
+
+  if (!numericTypes.includes(typeRow.data_type)) {
+    throw new Error(
+      `Column "${column}" is type "${typeRow.data_type}" but must be a numeric type for statistical analysis`,
+    );
+  }
+}
+
+/**
+ * Validate that a table exists (for tools that don't require a specific column).
+ * Throws user-friendly error message for missing table.
+ */
+async function validateTableExists(
+  adapter: PostgresAdapter,
+  table: string,
+  schema: string,
+): Promise<void> {
+  const tableCheckQuery = `
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = '${schema}' AND table_name = '${table}'
+  `;
+  const tableResult = await adapter.executeQuery(tableCheckQuery);
+  if (tableResult.rows?.length === 0) {
+    throw new Error(`Table "${schema}.${table}" not found`);
+  }
+}
+
 // =============================================================================
 // Parameter Preprocessing
 // =============================================================================
@@ -782,9 +854,13 @@ export function createStatsDistributionTool(
       };
       const { table, column, buckets, schema, where, groupBy } = parsed;
 
+      const schemaName = schema ?? "public";
       const schemaPrefix = schema ? `"${schema}".` : "";
       const whereClause = where ? `WHERE ${where}` : "";
       const numBuckets = buckets ?? 10;
+
+      // Validate column exists and is numeric
+      await validateNumericColumn(adapter, table, column, schemaName);
 
       // Helper to compute skewness and kurtosis for a given group
       const computeMoments = async (
@@ -1009,8 +1085,12 @@ export function createStatsHypothesisTool(
         where?: string;
       };
 
+      const schemaName = schema ?? "public";
       const schemaPrefix = schema ? `"${schema}".` : "";
       const whereClause = where ? `WHERE ${where}` : "";
+
+      // Validate column exists and is numeric
+      await validateNumericColumn(adapter, table, column, schemaName);
 
       // Helper to calculate test results from row stats
       const calculateTestResults = (
@@ -1200,6 +1280,11 @@ export function createStatsSamplingTool(
     handler: async (params: unknown, _context: RequestContext) => {
       const { table, method, sampleSize, percentage, schema, select, where } =
         StatsSamplingSchema.parse(params);
+
+      const schemaName = schema ?? "public";
+
+      // Validate table exists
+      await validateTableExists(adapter, table, schemaName);
 
       const schemaPrefix = schema ? `"${schema}".` : "";
       const columns =

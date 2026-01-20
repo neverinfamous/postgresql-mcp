@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_vector_cluster centroid preview format** — `pg_vector_cluster` now returns centroids in the compact `{preview, dimensions, truncated}` format for large vectors (>10 dimensions), consistent with `pg_vector_aggregate`. Reduces output from ~15KB to a compact preview for 384-dim embeddings
 - **Comprehensive PostGIS tools documentation** — Enhanced ServerInstructions.ts with categorized documentation for all 15 PostGIS tools covering geometry creation, spatial queries, table-based operations, standalone geometry operations, and administration tools. Documents response structures, parameter aliases, and code mode aliases (`pg.postgis.addColumn()` → `geometryColumn`, `pg.postgis.indexOptimize()` → `geoIndexOptimize`)
 - **PostGIS point bounds validation** — `preprocessPoint()` now validates coordinate bounds (lat: ±90°, lng: ±180°) by default for consistency with `pg_geocode`. Tools accepting `point` parameter (`pg_distance`, `pg_point_in_polygon`, `pg_bounding_box`, `pg_buffer`) now throw clear errors for out-of-bounds coordinates instead of passing invalid geometry to PostgreSQL
+- **help() response structure documentation** — Clarified in ServerInstructions.ts that `pg.{group}.help()` returns `{methods, aliases, examples}` structure (not just methods array), making alias discovery more intuitive
 
 ### Fixed
 

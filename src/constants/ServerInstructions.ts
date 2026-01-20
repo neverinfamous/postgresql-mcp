@@ -256,7 +256,7 @@ Response Structures:
 - \`pg_postgis_create_extension\`: Enable PostGIS extension (idempotent)
 - \`pg_geo_index_optimize\`: Analyze spatial indexes. Without \`table\` param, analyzes all spatial indexes
 
-**Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`
+**Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`. Note: \`pg.{group}.help()\` returns \`{methods, aliases, examples}\`
 
 
 ## Code Mode Sandbox

@@ -45,7 +45,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | \`pg_list_tables\` | \`{tables, count}\` | Use \`schema\` to filter, \`limit\` to cap results |
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |
 | \`pg_jsonb_agg groupBy\` | \`{groups: [{group_key, items}], count}\` | Empty array \`[]\` when no match |
-| \`pg_vector_aggregate\` | \`{groups: [{group_key, average_vector, count}]}\` | When using \`groupBy\` |
+| \`pg_vector_aggregate\` | \`{average_vector, count}\` or \`{groups: [{group_key, average_vector, count}]}\` | Without/with \`groupBy\` |
 
 ## API Mapping
 
@@ -65,10 +65,11 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 ## Vector Tools
 
-- \`pg_vector_search\`: Use \`select: ["id", "name"]\` to include identifying columns. Without select, only returns distance. \`filter\` = \`where\`
+- \`pg_vector_search\`: Returns \`{results: [...], count, metric}\`. Use \`select: ["id", "name"]\` to include identifying columns. Without select, only returns distance. \`filter\` = \`where\`
 - \`pg_vector_batch_insert\`: \`vectors\` expects \`[{vector: [...], data?: {...}}]\` objects, not raw arrays
 - \`pg_vector_cluster\`: \`clusters\` = \`k\`
 - \`pg_vector_performance\`: Auto-generates testVector from first row if omitted
+- \`pg_vector_validate\`: Returns \`{valid: bool, vectorDimensions}\`. Validates vector format and values
 - ⛔ \`pg_vector_embed\`: Demo only (hash-based). Use OpenAI/Cohere for production.
 
 ## JSONB Tools

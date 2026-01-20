@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stats tools schema.table support** — All 8 stats tools (`descriptive`, `percentiles`, `correlation`, `regression`, `timeSeries`, `distribution`, `hypothesis`, `sampling`) now support `schema.table` format for the `table` parameter (auto-parsed, embedded schema takes priority over explicit `schema` param). Consistent with other tool groups
 - **Enhanced Stats tools documentation** — Updated ServerInstructions.ts to clarify `sampling` behavior: `percentage` param only works with `bernoulli`/`system` methods and is ignored for default `random` method
 - **Hypothesis test p-value calculation** — `pg_stats_hypothesis` now returns actual two-tailed `pValue` calculated using numerical approximation (t-distribution CDF for t-tests, normal CDF for z-tests). Interpretation now based on p-value thresholds (p<0.001 highly significant, p<0.01 very significant, p<0.05 significant, p<0.1 marginal, p≥0.1 not significant). Previously only returned test statistic without p-value
+- **Percentiles scale consistency documentation** — Updated ServerInstructions.ts to clarify that `percentiles()` parameter values should use a consistent scale (all 0-1 OR all 0-100). Mixing scales (e.g., `[0.1, 50]`) produces unexpected key names due to the auto-normalization logic
 
 ### Fixed
 

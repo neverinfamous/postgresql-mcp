@@ -89,7 +89,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 - \`timeSeries\`: \`timeColumn\` must be timestamp, \`valueColumn\` numeric. \`interval\` accepts: keywords, PostgreSQL format, or plurals
 - \`distribution\`: Returns \`skewness\`, \`kurtosis\` (excess). \`buckets\` must be > 0
 - \`sampling\`: Defaults to \`random\` method with 100 rows. \`sampleSize\` always takes precedence over \`percentage\`. ⚠️ \`percentage\` param only works with \`bernoulli\`/\`system\` methods—ignored for default \`random\` method
-- \`percentiles\`: Accepts 0-1 or 0-100 (auto-normalized). Empty array → defaults [0.25, 0.5, 0.75]
+- \`percentiles\`: Accepts 0-1 or 0-100 (auto-normalized). ⚠️ Use consistent scale—mixing (e.g., \`[0.1, 50]\`) produces unexpected keys. Empty array → defaults [0.25, 0.5, 0.75]
 - \`hypothesis\`: Returns \`pValue\` (two-tailed), \`testStatistic\`, and \`interpretation\`. Use \`populationStdDev\` for z-test, otherwise defaults to t-test
 - ⚠️ WARNING: \`sampling\` with \`system\` method unreliable for small tables—use \`bernoulli\` or \`random\`
 

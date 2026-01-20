@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Comprehensive PostGIS tools documentation** — Enhanced ServerInstructions.ts with categorized documentation for all 15 PostGIS tools covering geometry creation, spatial queries, table-based operations, standalone geometry operations, and administration tools. Documents response structures, parameter aliases, and code mode aliases (`pg.postgis.addColumn()` → `geometryColumn`, `pg.postgis.indexOptimize()` → `geoIndexOptimize`)
 - **PostGIS point bounds validation** — `preprocessPoint()` now validates coordinate bounds (lat: ±90°, lng: ±180°) by default for consistency with `pg_geocode`. Tools accepting `point` parameter (`pg_distance`, `pg_point_in_polygon`, `pg_bounding_box`, `pg_buffer`) now throw clear errors for out-of-bounds coordinates instead of passing invalid geometry to PostgreSQL
 - **help() response structure documentation** — Clarified in ServerInstructions.ts that `pg.{group}.help()` returns `{methods, aliases, examples}` structure (not just methods array), making alias discovery more intuitive
+- **Comprehensive Cron tools documentation** — Added `## Cron Tools (pg_cron)` section to ServerInstructions.ts documenting all 8 pg_cron tools with parameters, aliases (`sql`/`query` for `command`, `name` for `jobName`, `db` for `database`, `days` for `olderThanDays`), error handling behavior, and discovery via `pg.cron.help()`
 
 ### Fixed
 

@@ -258,6 +258,20 @@ Response Structures:
 
 **Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`. Note: \`pg.{group}.help()\` returns \`{methods, aliases, examples}\`
 
+## Cron Tools (pg_cron)
+
+Core: \`createExtension()\`, \`schedule()\`, \`scheduleInDatabase()\`, \`unschedule()\`, \`alterJob()\`, \`listJobs()\`, \`jobRunDetails()\`, \`cleanupHistory()\`
+
+- \`pg_cron_schedule\`: Schedule a cron job. \`schedule\` supports standard cron (\`0 5 * * *\`) or interval (\`30 seconds\`). Use \`name\`/\`jobName\` for identification. \`command\`/\`sql\`/\`query\` aliases supported
+- \`pg_cron_schedule_in_database\`: Schedule job in specific database. \`database\`/\`db\` aliases. Optional \`username\`, \`active\` params
+- \`pg_cron_unschedule\`: Remove job by \`jobId\` or \`jobName\`. If both provided, \`jobName\` takes precedence (with warning)
+- \`pg_cron_alter_job\`: Modify existing job. Can change \`schedule\`, \`command\`, \`database\`, \`username\`, \`active\`. ⛔ Non-existent jobId throws error
+- \`pg_cron_list_jobs\`: List all jobs. Optional \`active\` boolean filter. Returns \`hint\` when jobs have no name
+- \`pg_cron_job_run_details\`: View execution history. Optional \`jobId\`, \`status\` ('running'|'succeeded'|'failed'), \`limit\` filters. Returns \`summary\` with counts
+- \`pg_cron_cleanup_history\`: Delete old run records. \`olderThanDays\`/\`days\` param (default: 7). Optional \`jobId\` to target specific job
+- \`pg_cron_create_extension\`: Enable pg_cron extension (idempotent). Requires superuser
+
+**Discovery**: \`pg.cron.help()\` returns \`{methods, aliases, examples}\` object
 
 ## Code Mode Sandbox
 

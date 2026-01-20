@@ -169,6 +169,8 @@ function preprocessCorrelationParams(input: unknown): unknown {
  * - tableName → table
  * - x → xColumn
  * - y → yColumn
+ * - column1 → xColumn (for consistency with correlation)
+ * - column2 → yColumn (for consistency with correlation)
  */
 function preprocessRegressionParams(input: unknown): unknown {
   if (typeof input !== "object" || input === null) {
@@ -186,6 +188,14 @@ function preprocessRegressionParams(input: unknown): unknown {
   // Alias: y → yColumn
   if (result["y"] !== undefined && result["yColumn"] === undefined) {
     result["yColumn"] = result["y"];
+  }
+  // Alias: column1 → xColumn (for consistency with correlation)
+  if (result["column1"] !== undefined && result["xColumn"] === undefined) {
+    result["xColumn"] = result["column1"];
+  }
+  // Alias: column2 → yColumn (for consistency with correlation)
+  if (result["column2"] !== undefined && result["yColumn"] === undefined) {
+    result["yColumn"] = result["column2"];
   }
   // Alias: filter → where
   if (result["filter"] !== undefined && result["where"] === undefined) {

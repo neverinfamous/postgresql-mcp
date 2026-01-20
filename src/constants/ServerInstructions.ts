@@ -92,7 +92,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 - \`sampling\`: Defaults to \`random\` method with 100 rows. \`sampleSize\` always takes precedence over \`percentage\`. ⚠️ \`percentage\` param only works with \`bernoulli\`/\`system\` methods—ignored for default \`random\` method
 - \`percentiles\`: Accepts 0-1 or 0-100 (auto-normalized). ⚠️ Use consistent scale—mixing (e.g., \`[0.1, 50]\`) produces unexpected keys and returns a \`warning\` field explaining the issue. Empty array → defaults [0.25, 0.5, 0.75]
 - \`hypothesis\`: Returns nested \`results\` object containing \`pValue\` (two-tailed), \`testStatistic\`, \`interpretation\`, \`sampleMean\`, \`sampleStdDev\`. Access via \`hyp.results.pValue\`. Use \`populationStdDev\` for z-test, otherwise defaults to t-test
-- \`regression\`: Returns nested \`regression\` object containing \`slope\`, \`intercept\`, \`rSquared\`, \`equation\`, \`avgX\`, \`avgY\`, \`sampleSize\`. Access via \`reg.regression.slope\`
+- \`regression\`: Use \`xColumn\`/\`yColumn\`, aliases \`x\`/\`y\`, or \`column1\`/\`column2\` (for consistency with correlation). Returns nested \`regression\` object containing \`slope\`, \`intercept\`, \`rSquared\`, \`equation\`, \`avgX\`, \`avgY\`, \`sampleSize\`. Access via \`reg.regression.slope\`
 - ⚠️ WARNING: \`sampling\` with \`system\` method unreliable for small tables—use \`bernoulli\` or \`random\`
 
 ## Performance Tools

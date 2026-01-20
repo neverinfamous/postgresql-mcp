@@ -214,6 +214,7 @@ function parseSchemaTable(
  * Valid interval units for time series analysis
  */
 const VALID_INTERVALS = [
+  "second",
   "minute",
   "hour",
   "day",
@@ -258,6 +259,11 @@ function preprocessTimeSeriesParams(input: unknown): unknown {
   // Alias: column → valueColumn
   if (result["column"] !== undefined && result["valueColumn"] === undefined) {
     result["valueColumn"] = result["column"];
+  }
+
+  // Alias: value → valueColumn
+  if (result["value"] !== undefined && result["valueColumn"] === undefined) {
+    result["valueColumn"] = result["value"];
   }
 
   // Alias: time → timeColumn
@@ -461,7 +467,7 @@ export const StatsTimeSeriesSchema = z.preprocess(
     valueColumn: z.string().describe("Numeric column to aggregate"),
     timeColumn: z.string().describe("Timestamp column"),
     interval: z
-      .enum(["minute", "hour", "day", "week", "month", "year"])
+      .enum(["second", "minute", "hour", "day", "week", "month", "year"])
       .describe("Time bucket size (default: day)"),
     aggregation: z
       .enum(["sum", "avg", "min", "max", "count"])
@@ -642,9 +648,9 @@ export function createStatsTimeSeriesTool(
       const typeRow = typeResult.rows?.[0] as { data_type: string } | undefined;
 
       if (!typeRow) {
-        return {
-          error: `Column "${timeColumn}" not found in table "${schema ?? "public"}.${table}"`,
-        };
+        throw new Error(
+          `Column "${timeColumn}" not found in table "${schema ?? "public"}.${table}"`,
+        );
       }
 
       const validTypes = [
@@ -656,9 +662,9 @@ export function createStatsTimeSeriesTool(
         "time with time zone",
       ];
       if (!validTypes.includes(typeRow.data_type)) {
-        return {
-          error: `Column "${timeColumn}" is type "${typeRow.data_type}" but must be a timestamp or date type for time series analysis`,
-        };
+        throw new Error(
+          `Column "${timeColumn}" is type "${typeRow.data_type}" but must be a timestamp or date type for time series analysis`,
+        );
       }
 
       // Helper to map bucket row

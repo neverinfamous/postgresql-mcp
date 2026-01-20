@@ -120,6 +120,14 @@ function preprocessCorrelationParams(input: unknown): unknown {
   if (result["tableName"] !== undefined && result["table"] === undefined) {
     result["table"] = result["tableName"];
   }
+  // Alias: x → column1
+  if (result["x"] !== undefined && result["column1"] === undefined) {
+    result["column1"] = result["x"];
+  }
+  // Alias: y → column2
+  if (result["y"] !== undefined && result["column2"] === undefined) {
+    result["column2"] = result["y"];
+  }
   // Alias: col1 → column1
   if (result["col1"] !== undefined && result["column1"] === undefined) {
     result["column1"] = result["col1"];
@@ -293,11 +301,11 @@ export function createStatsDescriptiveTool(
                 `;
         const tableResult = await adapter.executeQuery(tableCheckQuery);
         if (tableResult.rows?.length === 0) {
-          return { error: `Table "${schema ?? "public"}.${table}" not found` };
+          throw new Error(`Table "${schema ?? "public"}.${table}" not found`);
         }
-        return {
-          error: `Column "${column}" not found in table "${schema ?? "public"}.${table}"`,
-        };
+        throw new Error(
+          `Column "${column}" not found in table "${schema ?? "public"}.${table}"`,
+        );
       }
 
       const numericTypes = [
@@ -311,9 +319,9 @@ export function createStatsDescriptiveTool(
         "money",
       ];
       if (!numericTypes.includes(typeRow.data_type)) {
-        return {
-          error: `Column "${column}" is type "${typeRow.data_type}" but must be a numeric type for statistical analysis`,
-        };
+        throw new Error(
+          `Column "${column}" is type "${typeRow.data_type}" but must be a numeric type for statistical analysis`,
+        );
       }
 
       // Helper to map stats row to numeric object
@@ -396,7 +404,7 @@ export function createStatsDescriptiveTool(
       const result = await adapter.executeQuery(sql);
       const stats = result.rows?.[0];
 
-      if (!stats) return { error: "No stats found" };
+      if (!stats) throw new Error("No stats found");
 
       return {
         table: `${schema ?? "public"}.${table}`,
@@ -561,15 +569,15 @@ export function createStatsCorrelationTool(
           | undefined;
 
         if (!typeRow) {
-          return {
-            error: `Column "${col}" not found in table "${schema ?? "public"}.${table}"`,
-          };
+          throw new Error(
+            `Column "${col}" not found in table "${schema ?? "public"}.${table}"`,
+          );
         }
 
         if (!numericTypes.includes(typeRow.data_type)) {
-          return {
-            error: `Column "${col}" is type "${typeRow.data_type}" but must be numeric for correlation analysis`,
-          };
+          throw new Error(
+            `Column "${col}" is type "${typeRow.data_type}" but must be numeric for correlation analysis`,
+          );
         }
       }
 
@@ -660,7 +668,7 @@ export function createStatsCorrelationTool(
       const result = await adapter.executeQuery(sql);
       const row = result.rows?.[0];
 
-      if (!row) return { error: "No correlation data found" };
+      if (!row) throw new Error("No correlation data found");
 
       const response: Record<string, unknown> = {
         table: `${schema ?? "public"}.${table}`,

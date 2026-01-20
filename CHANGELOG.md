@@ -33,9 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced Stats tools documentation** — Updated ServerInstructions.ts to clarify `sampling` behavior: `percentage` param only works with `bernoulli`/`system` methods and is ignored for default `random` method
 - **Hypothesis test p-value calculation** — `pg_stats_hypothesis` now returns actual two-tailed `pValue` calculated using numerical approximation (t-distribution CDF for t-tests, normal CDF for z-tests). Interpretation now based on p-value thresholds (p<0.001 highly significant, p<0.01 very significant, p<0.05 significant, p<0.1 marginal, p≥0.1 not significant). Previously only returned test statistic without p-value
 - **Percentiles scale consistency documentation** — Updated ServerInstructions.ts to clarify that `percentiles()` parameter values should use a consistent scale (all 0-1 OR all 0-100). Mixing scales (e.g., `[0.1, 50]`) produces unexpected key names due to the auto-normalization logic
+- **timeSeries second-level granularity** — `pg_stats_time_series` now supports `second` as an interval option for sub-minute time series analysis. Valid intervals: `second`, `minute`, `hour`, `day`, `week`, `month`, `year`
+- **timeSeries time/value aliases** — `pg_stats_time_series` now accepts `time` as alias for `timeColumn` and `value` as alias for `valueColumn` for ergonomic consistency
+- **correlation x/y aliases** — `pg_stats_correlation` now accepts `x`/`y` as aliases for `column1`/`column2`, matching `pg_stats_regression` for API consistency
 
 ### Fixed
 
+- **Stats tools error handling consistency** — `pg_stats_descriptive`, `pg_stats_correlation`, and `pg_stats_time_series` now throw exceptions for invalid columns/tables instead of returning `{error: ...}` objects. Consistent with other stats tools (`percentiles`, `distribution`, `regression`, `hypothesis`, `sampling`)
 - **attachPartition DEFAULT partition handling** — `attachPartition` with `isDefault: true` now correctly generates `ATTACH PARTITION ... DEFAULT` SQL syntax (previously generated invalid `FOR VALUES __DEFAULT__`)
 - **attachPartition/detachPartition schema parameter** — Both tools now correctly use the `schema` parameter when building SQL statements (previously ignored schema, causing "relation does not exist" errors for non-public schemas)
 - **createPartition forValues: "DEFAULT" support** — `createPartition` now accepts `forValues: "DEFAULT"` as an alternative to `isDefault: true` for creating DEFAULT partitions, matching the behavior of `attachPartition` for API consistency

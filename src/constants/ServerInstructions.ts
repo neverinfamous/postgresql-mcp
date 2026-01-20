@@ -86,7 +86,8 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 ## Stats Tools
 
 - All stats tools support \`schema.table\` format (auto-parsed, embedded schema takes priority over explicit \`schema\` param)
-- \`timeSeries\`: \`timeColumn\` must be timestamp, \`valueColumn\` numeric. \`interval\` accepts: keywords, PostgreSQL format, or plurals
+- \`timeSeries\`: \`timeColumn\` must be timestamp, \`valueColumn\` numeric. Aliases: \`time\`→\`timeColumn\`, \`value\`→\`valueColumn\`. \`interval\` accepts: \`second\`, \`minute\`, \`hour\`, \`day\`, \`week\`, \`month\`, \`year\` (keywords, PostgreSQL format, or plurals)
+- \`correlation\`: Use \`column1\`/\`column2\` or aliases \`x\`/\`y\` for column names
 - \`distribution\`: Returns \`skewness\`, \`kurtosis\` (excess). \`buckets\` must be > 0
 - \`sampling\`: Defaults to \`random\` method with 100 rows. \`sampleSize\` always takes precedence over \`percentage\`. ⚠️ \`percentage\` param only works with \`bernoulli\`/\`system\` methods—ignored for default \`random\` method
 - \`percentiles\`: Accepts 0-1 or 0-100 (auto-normalized). ⚠️ Use consistent scale—mixing (e.g., \`[0.1, 50]\`) produces unexpected keys. Empty array → defaults [0.25, 0.5, 0.75]

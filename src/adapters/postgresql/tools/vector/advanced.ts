@@ -502,8 +502,51 @@ export function createHybridSearchTool(
               suggestion: "Use pg_describe_table to find available columns",
             };
           }
+
+          // Parse dimension mismatch errors
+          const dimMatch = /different vector dimensions (\d+) and (\d+)/.exec(
+            error.message,
+          );
+          if (dimMatch) {
+            const expectedDim = dimMatch[1] ?? "0";
+            const providedDim = dimMatch[2] ?? "0";
+            return {
+              success: false,
+              error: `Vector dimension mismatch: column expects ${expectedDim} dimensions, but you provided ${providedDim} dimensions.`,
+              expectedDimensions: parseInt(expectedDim, 10),
+              providedDimensions: parseInt(providedDim, 10),
+              suggestion:
+                "Ensure your query vector has the same dimensions as the column.",
+            };
+          }
+
+          // Parse relation not found errors
+          const relationMatch = /relation "([^"]+)" does not exist/.exec(
+            error.message,
+          );
+          if (relationMatch) {
+            const missingRelation = relationMatch[1] ?? "";
+            return {
+              success: false,
+              error: `Table '${missingRelation}' does not exist`,
+              suggestion:
+                "Use pg_list_tables to find available tables, or check the schema name",
+            };
+          }
+
+          // Return generic database error as {success: false} instead of throwing
+          return {
+            success: false,
+            error: error.message,
+            suggestion: "Check your query parameters and table structure",
+          };
         }
-        throw error;
+        // For non-Error exceptions, return generic error
+        return {
+          success: false,
+          error: "An unexpected error occurred",
+          details: String(error),
+        };
       }
     },
   };

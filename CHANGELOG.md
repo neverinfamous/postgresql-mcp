@@ -53,9 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_vector_batch_insert schema.table format support** — `pg_vector_batch_insert` now supports `schema.table` format for consistency with `pg_vector_insert`
 - **pg_vector_create_index method alias** — `pg_vector_create_index` now accepts `method` as an alias for `type` parameter (e.g., `method: 'hnsw'` or `type: 'ivfflat'`)
 - **pg_hybrid_search schema.table support** — `pg_hybrid_search` now supports `schema.table` format (e.g., `'myschema.embeddings'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter, consistent with other vector tools
+- **pg_vector_aggregate schema.table support and column type validation** — `pg_vector_aggregate` now supports `schema.table` format (auto-parsed) and validates that the specified column is actually a vector type. Returns clear error `{success: false, error: "Column 'x' is not a vector column (type: ...)", suggestion: "..."}` for non-vector columns instead of computing meaningless averages
+- **Vector tools error handling documentation** — Enhanced ServerInstructions.ts to document that vector tools return `{success: false, error: "...", suggestion: "..."}` objects for validation/semantic errors (dimension mismatch, non-vector column, table not found). Users should check the `success` field before processing results
 
 ### Fixed
 
+- **pg_hybrid_search error handling consistency** — `pg_hybrid_search` now returns `{success: false, error: "...", suggestion: "..."}` objects for all error cases (dimension mismatch, table not found, column not found) instead of throwing exceptions. Consistent with other vector tools like `pg_vector_search`, `pg_vector_insert`, and `pg_vector_aggregate`
 - **Stats tools error handling consistency** — `pg_stats_descriptive`, `pg_stats_correlation`, and `pg_stats_time_series` now throw exceptions for invalid columns/tables instead of returning `{error: ...}` objects. Consistent with other stats tools (`percentiles`, `distribution`, `regression`, `hypothesis`, `sampling`)
 - **attachPartition DEFAULT partition handling** — `attachPartition` with `isDefault: true` now correctly generates `ATTACH PARTITION ... DEFAULT` SQL syntax (previously generated invalid `FOR VALUES __DEFAULT__`)
 - **attachPartition/detachPartition schema parameter** — Both tools now correctly use the `schema` parameter when building SQL statements (previously ignored schema, causing "relation does not exist" errors for non-public schemas)

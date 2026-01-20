@@ -311,9 +311,12 @@ describe("Vector Tools", () => {
 
   describe("pg_vector_aggregate", () => {
     it("should calculate average vector", async () => {
-      mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ average_vector: "[0.5,0.5,0.5]", count: 10 }],
-      });
+      // First: column type check, Second: aggregate query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ udt_name: "vector" }] }) // type check
+        .mockResolvedValueOnce({
+          rows: [{ average_vector: "[0.5,0.5,0.5]", count: 10 }],
+        });
 
       const tool = findTool("pg_vector_aggregate");
       const result = (await tool!.handler(
@@ -322,7 +325,7 @@ describe("Vector Tools", () => {
           column: "embedding",
         },
         mockContext,
-      )) as { average_vector: string; count: number };
+      )) as { average_vector: unknown; count: number };
 
       expect(result.count).toBe(10);
       expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
@@ -331,7 +334,12 @@ describe("Vector Tools", () => {
     });
 
     it("should apply where clause", async () => {
-      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{}] });
+      // First: column type check, Second: aggregate query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ udt_name: "vector" }] }) // type check
+        .mockResolvedValueOnce({
+          rows: [{ average_vector: "[0.1]", count: 1 }],
+        });
 
       const tool = findTool("pg_vector_aggregate");
       await tool!.handler(
@@ -343,6 +351,7 @@ describe("Vector Tools", () => {
         mockContext,
       );
 
+      // Second call should contain the where clause
       expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining("category = 'tech'"),
       );

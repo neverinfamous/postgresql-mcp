@@ -784,10 +784,47 @@ export function createVectorAggregateTool(
         };
       }
 
+      // Parse schema.table format (embedded schema takes priority over explicit schema param)
+      let resolvedTable = parsed.table;
+      let resolvedSchema = parsed.schema;
+      if (parsed.table.includes(".")) {
+        const parts = parsed.table.split(".");
+        resolvedSchema = parts[0] ?? parsed.schema ?? "public";
+        resolvedTable = parts[1] ?? parsed.table;
+      }
+      const schemaName = resolvedSchema ?? "public";
+
+      // Validate column is actually a vector type
+      const typeCheckSql = `
+                SELECT udt_name FROM information_schema.columns 
+                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+            `;
+      const typeResult = await adapter.executeQuery(typeCheckSql, [
+        schemaName,
+        resolvedTable,
+        parsed.column,
+      ]);
+      if ((typeResult.rows?.length ?? 0) === 0) {
+        return {
+          success: false,
+          error: `Column '${parsed.column}' does not exist in table '${parsed.table}'`,
+          suggestion: "Use pg_describe_table to find available columns",
+        };
+      }
+      const udtName = typeResult.rows?.[0]?.["udt_name"] as string | undefined;
+      if (udtName !== "vector") {
+        return {
+          success: false,
+          error: `Column '${parsed.column}' is not a vector column (type: ${udtName ?? "unknown"})`,
+          suggestion:
+            "Use a column with vector type, or use pg_vector_add_column to create one",
+        };
+      }
+
       const whereClause =
         parsed.where !== undefined ? ` WHERE ${parsed.where} ` : "";
 
-      const tableName = sanitizeTableName(parsed.table, parsed.schema);
+      const tableName = sanitizeTableName(resolvedTable, resolvedSchema);
       const columnName = sanitizeIdentifier(parsed.column);
 
       // Handle groupBy mode

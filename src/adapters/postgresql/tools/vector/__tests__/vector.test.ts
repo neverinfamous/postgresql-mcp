@@ -332,9 +332,12 @@ describe("Bug Fixes", () => {
 
   describe("pg_vector_aggregate returns only average_vector", () => {
     it("should return average_vector without duplicate average field", async () => {
-      mockAdapter.executeQuery.mockResolvedValue({
-        rows: [{ average_vector: "[0.1, 0.2, 0.3]", count: "5" }],
-      });
+      // First: column type check, Second: aggregate query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ udt_name: "vector" }] }) // type check
+        .mockResolvedValueOnce({
+          rows: [{ average_vector: "[0.1, 0.2, 0.3]", count: "5" }],
+        });
 
       const tool = tools.find((t) => t.name === "pg_vector_aggregate")!;
       const result = (await tool.handler(
@@ -547,12 +550,15 @@ describe("Bug Fixes", () => {
 
   describe("pg_vector_aggregate groupBy", () => {
     it("should generate GROUP BY SQL when groupBy is specified", async () => {
-      mockAdapter.executeQuery.mockResolvedValue({
-        rows: [
-          { group_key: "category_a", average_vector: "[0.1,0.2]", count: 5 },
-          { group_key: "category_b", average_vector: "[0.3,0.4]", count: 3 },
-        ],
-      });
+      // First: column type check, Second: groupBy aggregate query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ udt_name: "vector" }] }) // type check
+        .mockResolvedValueOnce({
+          rows: [
+            { group_key: "category_a", average_vector: "[0.1,0.2]", count: 5 },
+            { group_key: "category_b", average_vector: "[0.3,0.4]", count: 3 },
+          ],
+        });
 
       const tool = tools.find((t) => t.name === "pg_vector_aggregate")!;
       const result = (await tool.handler(
@@ -564,7 +570,8 @@ describe("Bug Fixes", () => {
         mockContext,
       )) as Record<string, unknown>;
 
-      const sql = mockAdapter.executeQuery.mock.calls[0][0] as string;
+      // Second call (index 1) should contain GROUP BY
+      const sql = mockAdapter.executeQuery.mock.calls[1][0] as string;
       expect(sql).toContain("GROUP BY");
       expect(result.groups).toBeDefined();
       expect((result.groups as unknown[]).length).toBe(2);
@@ -572,9 +579,12 @@ describe("Bug Fixes", () => {
     });
 
     it("should return overall average when groupBy is not specified", async () => {
-      mockAdapter.executeQuery.mockResolvedValue({
-        rows: [{ average_vector: "[0.2,0.3]", count: "8" }],
-      });
+      // First: column type check, Second: aggregate query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ udt_name: "vector" }] }) // type check
+        .mockResolvedValueOnce({
+          rows: [{ average_vector: "[0.2,0.3]", count: "8" }],
+        });
 
       const tool = tools.find((t) => t.name === "pg_vector_aggregate")!;
       const result = (await tool.handler(

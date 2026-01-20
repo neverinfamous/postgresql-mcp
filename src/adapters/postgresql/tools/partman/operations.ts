@@ -531,20 +531,58 @@ Checks for issues like data in default partitions, missing premake partitions,
 stale maintenance, and retention configuration.`,
     group: "partman",
     inputSchema: z
-      .object({
-        parentTable: z
-          .string()
-          .optional()
-          .describe("Specific parent table to analyze (all if omitted)"),
-      })
+      .preprocess(
+        (input) => {
+          if (typeof input !== "object" || input === null) return input;
+          const raw = input as { table?: string; parentTable?: string };
+          const result = { ...raw };
+
+          // Alias: table → parentTable
+          if (result.table && !result.parentTable) {
+            result.parentTable = result.table;
+          }
+
+          // Auto-prefix public. for parentTable when no schema specified
+          if (result.parentTable && !result.parentTable.includes(".")) {
+            result.parentTable = `public.${result.parentTable}`;
+          }
+
+          return result;
+        },
+        z.object({
+          parentTable: z
+            .string()
+            .optional()
+            .describe("Specific parent table to analyze (all if omitted)"),
+        }),
+      )
       .default({}),
     annotations: readOnly("Analyze Partition Health"),
     icons: getToolIcons("partman", readOnly("Analyze Partition Health")),
     handler: async (params: unknown, _context: RequestContext) => {
       const AnalyzeHealthSchema = z
-        .object({
-          parentTable: z.string().optional(),
-        })
+        .preprocess(
+          (input) => {
+            if (typeof input !== "object" || input === null) return input;
+            const raw = input as { table?: string; parentTable?: string };
+            const result = { ...raw };
+
+            // Alias: table → parentTable
+            if (result.table && !result.parentTable) {
+              result.parentTable = result.table;
+            }
+
+            // Auto-prefix public. for parentTable when no schema specified
+            if (result.parentTable && !result.parentTable.includes(".")) {
+              result.parentTable = `public.${result.parentTable}`;
+            }
+
+            return result;
+          },
+          z.object({
+            parentTable: z.string().optional(),
+          }),
+        )
         .default({});
       const parsed = AnalyzeHealthSchema.parse(params ?? {});
       const queryParams: unknown[] = [];

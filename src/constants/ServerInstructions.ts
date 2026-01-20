@@ -227,7 +227,16 @@ Response Structures:
 
 ## citext Tools
 
-- \`pg_citext_convert_column\`: When views depend on column, drop/recreate manually—tool will list dependent views
+Core: \`createExtension()\`, \`convertColumn()\`, \`listColumns()\`, \`analyzeCandidates()\`, \`compare()\`, \`schemaAdvisor()\`
+
+- \`pg_citext_create_extension\`: Enable citext extension (idempotent). Returns \`{success, message, usage}\`
+- \`pg_citext_convert_column\`: Supports \`schema.table\` format (auto-parsed). When views depend on column, returns \`{success: false, dependentViews, hint}\`—drop/recreate views manually. \`col\` alias for \`column\`
+- \`pg_citext_list_columns\`: Returns \`{columns: [{table_schema, table_name, column_name, is_nullable, column_default}], count}\`. Optional \`schema\` filter
+- \`pg_citext_analyze_candidates\`: Scans all tables for TEXT/VARCHAR columns matching common patterns (email, username, name, etc.). Returns \`{candidates, highConfidenceCandidates, mediumConfidenceCandidates, recommendation}\`
+- \`pg_citext_compare\`: Test case-insensitive comparison. Returns \`{value1, value2, citextEqual, textEqual, lowerEqual, extensionInstalled}\`
+- \`pg_citext_schema_advisor\`: Supports \`schema.table\` format (auto-parsed). Analyzes specific table. Returns \`{table, recommendations: [{column, currentType, recommendation, confidence, reason}], summary, nextSteps}\`. \`tableName\` alias for \`table\`
+
+**Discovery**: \`pg.citext.help()\` returns \`{methods, aliases, examples}\` object
 
 ## ltree Tools
 

@@ -98,7 +98,7 @@ Note: If views depend on this column, you must drop and recreate them manually b
 
       const colCheck = await adapter.executeQuery(
         `
-                SELECT data_type 
+                SELECT data_type, udt_name
                 FROM information_schema.columns 
                 WHERE table_schema = $1 
                   AND table_name = $2 
@@ -113,8 +113,11 @@ Note: If views depend on this column, you must drop and recreate them manually b
         );
       }
 
-      const currentType = colCheck.rows[0]?.["data_type"] as string;
-      if (currentType === "citext") {
+      const dataType = colCheck.rows[0]?.["data_type"] as string;
+      const udtName = colCheck.rows[0]?.["udt_name"] as string;
+      // Normalize type: use udt_name for user-defined types (like citext)
+      const currentType = dataType === "USER-DEFINED" ? udtName : dataType;
+      if (udtName === "citext") {
         return {
           success: true,
           message: `Column ${column} is already citext`,

@@ -82,7 +82,9 @@ describe("Citext Tools", () => {
     it("should report already citext column", async () => {
       mockAdapter.executeQuery
         .mockResolvedValueOnce({ rows: [{ installed: true }] })
-        .mockResolvedValueOnce({ rows: [{ data_type: "citext" }] });
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "USER-DEFINED", udt_name: "citext" }],
+        });
 
       const tool = findTool("pg_citext_convert_column");
       const result = (await tool!.handler(
@@ -100,7 +102,9 @@ describe("Citext Tools", () => {
     it("should convert text column to citext", async () => {
       mockAdapter.executeQuery
         .mockResolvedValueOnce({ rows: [{ installed: true }] })
-        .mockResolvedValueOnce({ rows: [{ data_type: "text" }] })
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "text", udt_name: "text" }],
+        })
         .mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_citext_convert_column");

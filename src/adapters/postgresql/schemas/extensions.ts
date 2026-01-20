@@ -95,6 +95,43 @@ function normalizeOptionalParams(input: unknown): Record<string, unknown> {
 }
 
 /**
+ * Preprocess citext table parameters:
+ * - Alias: tableName -> table
+ * - Alias: col -> column
+ * - Parse schema.table format
+ */
+function preprocessCitextTableParams(input: unknown): unknown {
+  if (typeof input !== "object" || input === null) return input;
+  const obj = input as Record<string, unknown>;
+  const result = { ...obj };
+
+  // Alias: tableName -> table
+  if (result["table"] === undefined && result["tableName"] !== undefined) {
+    result["table"] = result["tableName"];
+  }
+
+  // Alias: col -> column
+  if (result["col"] !== undefined && result["column"] === undefined) {
+    result["column"] = result["col"];
+  }
+
+  // Parse schema.table format
+  if (
+    typeof result["table"] === "string" &&
+    result["table"].includes(".") &&
+    result["schema"] === undefined
+  ) {
+    const parts = result["table"].split(".");
+    if (parts.length === 2) {
+      result["schema"] = parts[0];
+      result["table"] = parts[1];
+    }
+  }
+
+  return result;
+}
+
+/**
  * Base schema for MCP visibility (shows all parameters including aliases).
  */
 export const CitextConvertColumnSchemaBase = z.object({
@@ -106,14 +143,16 @@ export const CitextConvertColumnSchemaBase = z.object({
 
 /**
  * Transformed schema for converting a text column to citext.
- * Resolves aliases and validates required fields.
+ * Resolves aliases, parses schema.table format, and validates required fields.
  */
-export const CitextConvertColumnSchema =
-  CitextConvertColumnSchemaBase.transform((data) => ({
+export const CitextConvertColumnSchema = z
+  .preprocess(preprocessCitextTableParams, CitextConvertColumnSchemaBase)
+  .transform((data) => ({
     table: data.table,
     column: data.column ?? data.col ?? "",
     schema: data.schema,
-  })).refine((data) => data.column !== "", {
+  }))
+  .refine((data) => data.column !== "", {
     message: "column (or col alias) is required",
   });
 
@@ -157,13 +196,10 @@ export const CitextSchemaAdvisorSchemaBase = z.object({
 
 /**
  * Transformed schema for citext schema advisor tool.
- * Resolves aliases and validates required fields.
+ * Resolves aliases, parses schema.table format, and validates required fields.
  */
 export const CitextSchemaAdvisorSchema = z
-  .preprocess(
-    (input) => (typeof input !== "object" || input === null ? {} : input),
-    CitextSchemaAdvisorSchemaBase,
-  )
+  .preprocess(preprocessCitextTableParams, CitextSchemaAdvisorSchemaBase)
   .transform((data) => ({
     table: data.table ?? data.tableName ?? "",
     schema: data.schema,

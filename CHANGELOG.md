@@ -71,6 +71,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_partman_set_retention`: `retentionKeepTable` behavior (detach vs DROP), `retention: null` to disable
   - `pg_partman_analyze_partition_health`: Response structure with `overallHealth` status values
   - Schema resolution note: All partman tools auto-prefix `public.` when no schema specified
+- **Comprehensive citext tools documentation** — Expanded `## citext Tools` section in ServerInstructions.ts with documentation for all 6 tools including:
+  - Core methods: `createExtension()`, `convertColumn()`, `listColumns()`, `analyzeCandidates()`, `compare()`, `schemaAdvisor()`
+  - Response structures for all tools
+  - `schema.table` format support documentation for `convertColumn` and `schemaAdvisor`
+  - Discovery via `pg.citext.help()` returning `{methods, aliases, examples}`
+- **citext schema.table format support** — `pg_citext_convert_column` and `pg_citext_schema_advisor` now support `schema.table` format (e.g., `'myschema.users'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter, consistent with other tool groups
 
 ### Fixed
 
@@ -92,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_vector_insert updateExisting mode additionalColumns** — Fixed `pg_vector_insert` `updateExisting` mode to also update `additionalColumns` alongside the vector column. Previously, only the vector was updated and additional columns were ignored. Now returns `columnsUpdated: N` indicating total columns modified
 - **pg_vector_validate direct MCP tool exposure** — Fixed `pg_vector_validate` not appearing as a direct MCP tool. Applied Split Schema pattern (base schema for MCP visibility, transformed schema for handler). Also enhanced tool description to document return structure `{valid: bool, vectorDimensions}` and empty vector behavior
 - **pg_partman_undo_partition targetTable schema auto-resolution** — `pg_partman_undo_partition` now auto-prefixes `public.` to `targetTable` when no schema is specified, consistent with `parentTable` behavior. Previously, plain table names caused \"Unable to find given target table in system catalogs\" errors because pg_partman requires schema-qualified table references
+- **pg_citext_convert_column previousType display** — `pg_citext_convert_column` now correctly reports `previousType: \"citext\"` instead of `\"USER-DEFINED\"` when converting an already-citext column. The fix queries both `data_type` and `udt_name` columns and normalizes the display for user-defined types
 
 - **dumpTable table parameter validation** — `dumpTable()` now validates that the `table` parameter is provided and throws a descriptive error if missing (previously created invalid DDL for "undefined")
 - **dumpTable schema.table format parsing** — `dumpTable()` now correctly parses `schema.table` format (e.g., `'public.users'` → schema='public', table='users'). Embedded schema takes priority over explicit `schema` parameter to prevent duplication errors

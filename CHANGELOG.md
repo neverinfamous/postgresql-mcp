@@ -89,6 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Parameter aliases documentation (`offset`/`start`/`from`, `length`/`len`, `pattern`/`lquery`/`query`, `mode`/`type`)
   - Enhanced error handling documentation (column type validation, offset bounds checking, dependent views)
   - Discovery via `pg.ltree.help()` returning `{methods, aliases, examples}`
+- **pg.pgcryptoXxx() top-level aliases** — Code mode now supports top-level pgcrypto method aliases for convenience: `pg.pgcryptoCreateExtension()`, `pg.pgcryptoHash()`, `pg.pgcryptoHmac()`, `pg.pgcryptoEncrypt()`, `pg.pgcryptoDecrypt()`, `pg.pgcryptoGenRandomUuid()`, `pg.pgcryptoGenRandomBytes()`, `pg.pgcryptoGenSalt()`, `pg.pgcryptoCrypt()`. These map directly to `pg.pgcrypto.xxx()` methods, matching the aliases documented in `pg.pgcrypto.help()`
+- **pg_pgcrypto_gen_random_uuid convenience `uuid` property** — `pg_pgcrypto_gen_random_uuid` response now includes a `uuid` convenience property (containing the first UUID) when generating a single UUID. Previously only returned `uuids` array. Now returns `{success, uuid, uuids, count}` for single UUID requests
+- **Comprehensive pgcrypto tools documentation** — Added `## pgcrypto Tools` section to ServerInstructions.ts documenting all 9 tools with parameters, aliases (`key`/`password`, `encryptedData`/`data`), response structures, password workflow pattern (genSalt → crypt → store → verify), and discovery via `pg.pgcrypto.help()`
 
 ### Fixed
 

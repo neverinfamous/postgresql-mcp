@@ -337,8 +337,10 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
   ],
   pgcrypto: [
     "pg.pgcrypto.hash({ data: 'password123', algorithm: 'sha256' })",
-    "pg.pgcrypto.encrypt({ data: 'secret', key: 'mykey', algorithm: 'aes' })",
+    "pg.pgcrypto.encrypt({ data: 'secret', password: 'mykey' })",
     "pg.pgcrypto.genRandomUuid()",
+    "pg.pgcrypto.genSalt({ type: 'bf', iterations: 10 })",
+    "pg.pgcrypto.crypt({ password: 'userpass', salt: storedHash })",
   ],
 };
 /**
@@ -1131,6 +1133,40 @@ export class PgApi {
       }
       if (ltreeApi["createIndex"] !== undefined) {
         bindings["ltreeCreateIndex"] = ltreeApi["createIndex"];
+      }
+    }
+
+    // Add top-level pgcrypto aliases for convenience: pg.pgcryptoXxx() → pg.pgcrypto.xxx()
+    const pgcryptoApi = bindings["pgcrypto"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (pgcryptoApi !== undefined) {
+      if (pgcryptoApi["createExtension"] !== undefined) {
+        bindings["pgcryptoCreateExtension"] = pgcryptoApi["createExtension"];
+      }
+      if (pgcryptoApi["hash"] !== undefined) {
+        bindings["pgcryptoHash"] = pgcryptoApi["hash"];
+      }
+      if (pgcryptoApi["hmac"] !== undefined) {
+        bindings["pgcryptoHmac"] = pgcryptoApi["hmac"];
+      }
+      if (pgcryptoApi["encrypt"] !== undefined) {
+        bindings["pgcryptoEncrypt"] = pgcryptoApi["encrypt"];
+      }
+      if (pgcryptoApi["decrypt"] !== undefined) {
+        bindings["pgcryptoDecrypt"] = pgcryptoApi["decrypt"];
+      }
+      if (pgcryptoApi["genRandomUuid"] !== undefined) {
+        bindings["pgcryptoGenRandomUuid"] = pgcryptoApi["genRandomUuid"];
+      }
+      if (pgcryptoApi["genRandomBytes"] !== undefined) {
+        bindings["pgcryptoGenRandomBytes"] = pgcryptoApi["genRandomBytes"];
+      }
+      if (pgcryptoApi["genSalt"] !== undefined) {
+        bindings["pgcryptoGenSalt"] = pgcryptoApi["genSalt"];
+      }
+      if (pgcryptoApi["crypt"] !== undefined) {
+        bindings["pgcryptoCrypt"] = pgcryptoApi["crypt"];
       }
     }
 

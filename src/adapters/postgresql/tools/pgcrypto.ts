@@ -197,7 +197,16 @@ function createPgcryptoGenRandomUuidTool(
         [generateCount],
       );
       const uuids = (result.rows ?? []).map((r) => r["uuid"] as string);
-      return { success: true, uuids, count: uuids.length };
+      // Add convenience 'uuid' property for single UUID requests
+      const response: Record<string, unknown> = {
+        success: true,
+        uuids,
+        count: uuids.length,
+      };
+      if (uuids.length === 1) {
+        response["uuid"] = uuids[0];
+      }
+      return response;
     },
   };
 }

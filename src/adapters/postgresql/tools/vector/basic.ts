@@ -724,44 +724,42 @@ export function createVectorNormalizeTool(): ToolDefinition {
 export function createVectorAggregateTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
-  // Schema with parameter smoothing
-  const AggregateSchema = z
-    .object({
-      table: z.string().optional().describe("Table name"),
-      tableName: z.string().optional().describe("Alias for table"),
-      column: z.string().optional().describe("Vector column"),
-      col: z.string().optional().describe("Alias for column"),
-      where: z.string().optional(),
-      groupBy: z.string().optional().describe("Column to group results by"),
-      schema: z
-        .string()
-        .optional()
-        .describe("Database schema (default: public)"),
-      excludeNullGroups: z
-        .boolean()
-        .optional()
-        .describe("Filter out groups with NULL average vectors"),
-      summarizeVector: z
-        .boolean()
-        .optional()
-        .describe("Truncate large vectors to preview (default: true)"),
-    })
-    .transform((data) => ({
-      table: data.table ?? data.tableName ?? "",
-      column: data.column ?? data.col ?? "",
-      where: data.where,
-      groupBy: data.groupBy,
-      schema: data.schema,
-      excludeNullGroups: data.excludeNullGroups,
-      summarizeVector: data.summarizeVector ?? true,
-    }));
+  // Base schema exposes all properties to MCP without transform
+  const AggregateSchemaBase = z.object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Alias for table"),
+    column: z.string().optional().describe("Vector column"),
+    col: z.string().optional().describe("Alias for column"),
+    where: z.string().optional(),
+    groupBy: z.string().optional().describe("Column to group results by"),
+    schema: z.string().optional().describe("Database schema (default: public)"),
+    excludeNullGroups: z
+      .boolean()
+      .optional()
+      .describe("Filter out groups with NULL average vectors"),
+    summarizeVector: z
+      .boolean()
+      .optional()
+      .describe("Truncate large vectors to preview (default: true)"),
+  });
+
+  // Transformed schema applies alias resolution
+  const AggregateSchema = AggregateSchemaBase.transform((data) => ({
+    table: data.table ?? data.tableName ?? "",
+    column: data.column ?? data.col ?? "",
+    where: data.where,
+    groupBy: data.groupBy,
+    schema: data.schema,
+    excludeNullGroups: data.excludeNullGroups,
+    summarizeVector: data.summarizeVector ?? true,
+  }));
 
   return {
     name: "pg_vector_aggregate",
     description:
       "Calculate average vector. Requires: table, column. Optional: groupBy, where.",
     group: "vector",
-    inputSchema: AggregateSchema,
+    inputSchema: AggregateSchemaBase,
     annotations: readOnly("Vector Aggregate"),
     icons: getToolIcons("vector", readOnly("Vector Aggregate")),
     handler: async (params: unknown, _context: RequestContext) => {

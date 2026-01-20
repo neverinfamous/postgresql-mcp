@@ -80,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `schema.table` format support documentation for `convertColumn` and `schemaAdvisor`
   - Discovery via `pg.citext.help()` returning `{methods, aliases, examples}`
 - **citext schema.table format support** — `pg_citext_convert_column` and `pg_citext_schema_advisor` now support `schema.table` format (e.g., `'myschema.users'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter, consistent with other tool groups
+- **pg.citextXxx() top-level aliases** — Code mode now supports top-level citext method aliases for convenience: `pg.citextCreateExtension()`, `pg.citextConvertColumn()`, `pg.citextListColumns()`, `pg.citextAnalyzeCandidates()`, `pg.citextCompare()`, `pg.citextSchemaAdvisor()`. These map directly to `pg.citext.xxx()` methods, matching the aliases documented in `pg.citext.help()`
 
 ### Fixed
 

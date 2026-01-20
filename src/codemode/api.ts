@@ -1078,6 +1078,31 @@ export class PgApi {
       bindings["hybridSearch"] = vectorApi["hybridSearch"];
     }
 
+    // Add top-level citext aliases for convenience: pg.citextXxx() → pg.citext.xxx()
+    const citextApi = bindings["citext"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (citextApi !== undefined) {
+      if (citextApi["createExtension"] !== undefined) {
+        bindings["citextCreateExtension"] = citextApi["createExtension"];
+      }
+      if (citextApi["convertColumn"] !== undefined) {
+        bindings["citextConvertColumn"] = citextApi["convertColumn"];
+      }
+      if (citextApi["listColumns"] !== undefined) {
+        bindings["citextListColumns"] = citextApi["listColumns"];
+      }
+      if (citextApi["analyzeCandidates"] !== undefined) {
+        bindings["citextAnalyzeCandidates"] = citextApi["analyzeCandidates"];
+      }
+      if (citextApi["compare"] !== undefined) {
+        bindings["citextCompare"] = citextApi["compare"];
+      }
+      if (citextApi["schemaAdvisor"] !== undefined) {
+        bindings["citextSchemaAdvisor"] = citextApi["schemaAdvisor"];
+      }
+    }
+
     return bindings;
   }
 }

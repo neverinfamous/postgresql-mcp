@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_vector_insert schema.table format support** — `pg_vector_insert` now supports `schema.table` format (e.g., `'myschema.embeddings'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter
 - **pg_vector_batch_insert schema.table format support** — `pg_vector_batch_insert` now supports `schema.table` format for consistency with `pg_vector_insert`
 - **pg_vector_create_index method alias** — `pg_vector_create_index` now accepts `method` as an alias for `type` parameter (e.g., `method: 'hnsw'` or `type: 'ivfflat'`)
+- **pg_hybrid_search schema.table support** — `pg_hybrid_search` now supports `schema.table` format (e.g., `'myschema.embeddings'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter, consistent with other vector tools
 
 ### Fixed
 

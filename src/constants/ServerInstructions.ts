@@ -76,6 +76,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 - \`pg_vector_performance\`: Auto-generates testVector from first row if omitted. Returns \`testVectorSource: 'auto-generated'|'user-provided'\`
 - \`pg_vector_validate\`: Returns \`{valid: bool, vectorDimensions}\`. Empty vector \`[]\` returns \`{valid: true, vectorDimensions: 0}\`
 - ⛔ \`pg_vector_embed\`: Demo only (hash-based). Use OpenAI/Cohere for production.
+- \`pg_hybrid_search\`: Supports \`schema.table\` format (auto-parsed). Combines vector similarity and full-text search with weighted scoring
 
 ## JSONB Tools
 

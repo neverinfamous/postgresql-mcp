@@ -364,14 +364,26 @@ export function createHybridSearchTool(
         };
       }
 
+      // Parse schema.table format (embedded schema takes priority)
+      let resolvedTable = parsed.table;
+      let resolvedSchema: string | undefined;
+      if (parsed.table.includes(".")) {
+        const parts = parsed.table.split(".");
+        resolvedSchema = parts[0];
+        resolvedTable = parts[1] ?? parsed.table;
+      }
+      const schemaName = resolvedSchema ?? "public";
+      const tableName = sanitizeTableName(resolvedTable, schemaName);
+
       // Check column type - reject if it's a tsvector
       const colTypeSql = `
                 SELECT data_type, udt_name 
                 FROM information_schema.columns 
-                WHERE table_name = $1 AND column_name = $2
+                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
             `;
       const colTypeResult = await adapter.executeQuery(colTypeSql, [
-        parsed.table,
+        schemaName,
+        resolvedTable,
         parsed.vectorColumn,
       ]);
       const colType = colTypeResult.rows?.[0] as
@@ -414,11 +426,14 @@ export function createHybridSearchTool(
         const colsSql = `
                     SELECT column_name 
                     FROM information_schema.columns 
-                    WHERE table_name = $1 
+                    WHERE table_schema = $1 AND table_name = $2 
                     AND udt_name != 'vector' 
                     ORDER BY ordinal_position
                 `;
-        const colsResult = await adapter.executeQuery(colsSql, [parsed.table]);
+        const colsResult = await adapter.executeQuery(colsSql, [
+          schemaName,
+          resolvedTable,
+        ]);
         const cols = (colsResult.rows ?? []).map(
           (r: Record<string, unknown>) => r["column_name"] as string,
         );
@@ -431,7 +446,7 @@ export function createHybridSearchTool(
                     SELECT 
                         ctid,
                         1 - ("${parsed.vectorColumn}" <=> '${vectorStr}'::vector) as vector_score
-                    FROM "${parsed.table}"
+                    FROM ${tableName}
                     WHERE "${parsed.vectorColumn}" IS NOT NULL
                     ORDER BY "${parsed.vectorColumn}" <=> '${vectorStr}'::vector
                     LIMIT ${String(limitVal * 3)}
@@ -440,7 +455,7 @@ export function createHybridSearchTool(
                     SELECT 
                         ctid,
                         ts_rank(to_tsvector('english', "${parsed.textColumn}"), plainto_tsquery($1)) as text_score
-                    FROM "${parsed.table}"
+                    FROM ${tableName}
                     WHERE to_tsvector('english', "${parsed.textColumn}") @@ plainto_tsquery($1)
                 )
                 SELECT 
@@ -449,7 +464,7 @@ export function createHybridSearchTool(
                     COALESCE(ts.text_score, 0) * ${String(textWeight)} as combined_score,
                     COALESCE(v.vector_score, 0) as vector_score,
                     COALESCE(ts.text_score, 0) as text_score
-                FROM "${parsed.table}" t
+                FROM ${tableName} t
                 LEFT JOIN vector_scores v ON t.ctid = v.ctid
                 LEFT JOIN text_scores ts ON t.ctid = ts.ctid
                 WHERE v.ctid IS NOT NULL OR ts.ctid IS NOT NULL
@@ -482,7 +497,7 @@ export function createHybridSearchTool(
             }
             return {
               success: false,
-              error: `Column '${missingCol}' does not exist in table '${parsed.table}'`,
+              error: `Column '${missingCol}' does not exist in table '${resolvedTable}'`,
               parameterWithIssue: paramName,
               suggestion: "Use pg_describe_table to find available columns",
             };

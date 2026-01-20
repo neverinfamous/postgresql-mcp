@@ -34,6 +34,25 @@ function parseGeometry(geometry: string): { sql: string; isGeoJson: boolean } {
 }
 
 /**
+ * Parse geometry with explicit SRID normalization for intersection operations.
+ * This ensures both GeoJSON (which has implicit SRID 4326) and WKT (no SRID)
+ * use consistent coordinate systems.
+ */
+function parseGeometryWithSrid(
+  geometry: string,
+  srid = 4326,
+): { sql: string; isGeoJson: boolean } {
+  const trimmed = geometry.trim();
+  const isGeoJson = trimmed.startsWith("{");
+  // GeoJSON uses 4326 implicitly; WKT has no SRID. Normalize both.
+  const baseExpr = isGeoJson ? "ST_GeomFromGeoJSON($1)" : "ST_GeomFromText($1)";
+  return {
+    sql: `ST_SetSRID(${baseExpr}, ${String(srid)})`,
+    isGeoJson,
+  };
+}
+
+/**
  * Create buffer around a standalone geometry
  */
 export function createGeometryBufferTool(
@@ -90,8 +109,10 @@ export function createGeometryIntersectionTool(
       const { geometry1, geometry2 } = GeometryIntersectionSchema.parse(
         params ?? {},
       );
-      const geom1 = parseGeometry(geometry1);
-      const geom2 = parseGeometry(geometry2);
+      // Use SRID-normalized parsing to prevent mixed SRID errors when combining
+      // GeoJSON (implicit SRID 4326) with WKT (no SRID)
+      const geom1 = parseGeometryWithSrid(geometry1);
+      const geom2 = parseGeometryWithSrid(geometry2);
 
       // geom1 uses $1 (first parameter), geom2 uses $2 (second parameter)
       const geom1Expr = geom1.sql;
@@ -110,6 +131,7 @@ export function createGeometryIntersectionTool(
         ...result.rows?.[0],
         geometry1Format: geom1.isGeoJson ? "GeoJSON" : "WKT",
         geometry2Format: geom2.isGeoJson ? "GeoJSON" : "WKT",
+        sridUsed: 4326,
       };
     },
   };

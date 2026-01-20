@@ -47,9 +47,13 @@ export function preprocessPostgisParams(input: unknown): unknown {
  * - lon/longitude -> lng
  * - latitude -> lat
  * - x/y -> lng/lat
+ *
+ * Also validates coordinate bounds when validateBounds is true (default).
+ * Throws ZodError-compatible error for consistency with schema validation.
  */
 export function preprocessPoint(
   point: unknown,
+  validateBounds = true,
 ): { lat: number; lng: number } | undefined {
   if (typeof point !== "object" || point === null) {
     return undefined;
@@ -64,6 +68,19 @@ export function preprocessPoint(
     | undefined;
 
   if (lat !== undefined && lng !== undefined) {
+    // Validate coordinate bounds for consistency with pg_geocode
+    if (validateBounds) {
+      if (lat < -90 || lat > 90) {
+        throw new Error(
+          `Invalid latitude ${String(lat)}: must be between -90 and 90 degrees`,
+        );
+      }
+      if (lng < -180 || lng > 180) {
+        throw new Error(
+          `Invalid longitude ${String(lng)}: must be between -180 and 180 degrees`,
+        );
+      }
+    }
     return { lat, lng };
   }
   return undefined;

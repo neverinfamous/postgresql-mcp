@@ -469,16 +469,26 @@ export function createPartmanShowPartitionsTool(
 export function createPartmanShowConfigTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
-  // Preprocess to support table alias
+  // Preprocess to support table alias and auto-prefix public schema
   const inputSchema = z
     .preprocess(
       (input) => {
         if (typeof input !== "object" || input === null) return input;
         const raw = input as { table?: string; parentTable?: string };
-        if (raw.table && !raw.parentTable) {
-          return { ...raw, parentTable: raw.table };
+        const result = { ...raw };
+
+        // Alias: table → parentTable
+        if (result.table && !result.parentTable) {
+          result.parentTable = result.table;
         }
-        return input;
+
+        // Auto-prefix public. for parentTable when no schema specified
+        // (Consistent with other partman tools)
+        if (result.parentTable && !result.parentTable.includes(".")) {
+          result.parentTable = `public.${result.parentTable}`;
+        }
+
+        return result;
       },
       z.object({
         parentTable: z

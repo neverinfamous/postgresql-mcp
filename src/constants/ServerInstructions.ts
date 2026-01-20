@@ -211,9 +211,14 @@ Response Structures:
 
 ## pg_partman Tools
 
-- \`pg_partman_create_parent\`: Interval uses PostgreSQL syntax ('1 day', '1 month') NOT keywords ('daily')
-- \`pg_partman_show_partitions\`/\`check_default\`/\`partition_data\`: \`parentTable\` required
-- \`pg_partman_undo_partition\`: Target table MUST exist before calling
+- \`pg_partman_create_parent\`: Interval uses PostgreSQL syntax ('1 day', '1 month') NOT keywords ('daily'). \`startPartition\` accepts 'now' shorthand for current date. Required params: \`parentTable\`, \`controlColumn\`/\`control\`, \`interval\`
+- \`pg_partman_run_maintenance\`: Without \`parentTable\`, maintains ALL partition sets. Returns \`partial: true\` when some tables are skipped with \`skipped\` array containing reasons
+- \`pg_partman_show_config\`: Supports \`schema.table\` or plain table name (auto-prefixes \`public.\`). Returns \`configs\` array with \`orphaned\` flag for each
+- \`pg_partman_show_partitions\`/\`check_default\`/\`partition_data\`: \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
+- \`pg_partman_set_retention\`: \`retentionKeepTable: true\` = detach only, \`false\` = DROP. Pass \`retention: null\` to disable retention
+- \`pg_partman_undo_partition\`: \`targetTable\` MUST exist before calling. Requires both \`parentTable\` and \`targetTable\`/\`target\`
+- \`pg_partman_analyze_partition_health\`: Returns \`{partitionSets: [{issues, warnings, recommendations, partitionCount}], summary: {overallHealth}}\`. \`overallHealth\`: 'healthy'|'warnings'|'issues_found'
+- 📝 **Schema Resolution**: All partman tools auto-prefix \`public.\` when no schema specified in \`parentTable\`
 
 ## pg_stat_kcache Tools
 

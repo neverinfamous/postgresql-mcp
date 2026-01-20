@@ -64,9 +64,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PostGIS point bounds validation** — `preprocessPoint()` now validates coordinate bounds (lat: ±90°, lng: ±180°) by default for consistency with `pg_geocode`. Tools accepting `point` parameter (`pg_distance`, `pg_point_in_polygon`, `pg_bounding_box`, `pg_buffer`) now throw clear errors for out-of-bounds coordinates instead of passing invalid geometry to PostgreSQL
 - **help() response structure documentation** — Clarified in ServerInstructions.ts that `pg.{group}.help()` returns `{methods, aliases, examples}` structure (not just methods array), making alias discovery more intuitive
 - **Comprehensive Cron tools documentation** — Added `## Cron Tools (pg_cron)` section to ServerInstructions.ts documenting all 8 pg_cron tools with parameters, aliases (`sql`/`query` for `command`, `name` for `jobName`, `db` for `database`, `days` for `olderThanDays`), error handling behavior, and discovery via `pg.cron.help()`
+- **Enhanced pg_partman tools documentation** — Expanded `## pg_partman Tools` section in ServerInstructions.ts with comprehensive documentation for all 10 tools including:
+  - `pg_partman_create_parent`: Required params (`parentTable`, `controlColumn`/`control`, `interval`) and `startPartition` 'now' shorthand
+  - `pg_partman_run_maintenance`: Behavior without `parentTable` (maintains ALL), `partial: true` response with `skipped` array
+  - `pg_partman_show_config`: `schema.table` format support with auto-prefix `public.`, `orphaned` flag in response
+  - `pg_partman_set_retention`: `retentionKeepTable` behavior (detach vs DROP), `retention: null` to disable
+  - `pg_partman_analyze_partition_health`: Response structure with `overallHealth` status values
+  - Schema resolution note: All partman tools auto-prefix `public.` when no schema specified
 
 ### Fixed
 
+- **pg_partman_show_config schema auto-resolution** — `pg_partman_show_config` now auto-prefixes `public.` when `parentTable` is specified without a schema (e.g., `showConfig({ parentTable: 'events' })` now correctly resolves to `public.events`). Previously, plain table names returned empty results with a hint instead of matching the partman config. Now consistent with other partman tools that use `preprocessPartmanParams`
 - **pg_geometry_intersection SRID mismatch** — `pg_geometry_intersection` now normalizes both geometries to SRID 4326 before computing intersection. Previously, mixing GeoJSON input (implicit SRID 4326) with WKT input (no SRID) caused PostgreSQL error: "ST_Intersects: Operation on mixed SRID geometries". Now safe to mix formats; returns `sridUsed: 4326` in response
 - **pg_hybrid_search error handling consistency** — `pg_hybrid_search` now returns `{success: false, error: "...", suggestion: "..."}` objects for all error cases (dimension mismatch, table not found, column not found) instead of throwing exceptions. Consistent with other vector tools like `pg_vector_search`, `pg_vector_insert`, and `pg_vector_aggregate`
 - **pg_vector_aggregate direct tool call parameters** — Fixed `pg_vector_aggregate` direct MCP tool call failing with "table parameter is required" error even when `table` was provided. The issue was caused by using a transformed Zod schema for `inputSchema`, which prevented proper JSON Schema generation for MCP clients. Now uses a base schema for MCP visibility and applies transforms only in the handler

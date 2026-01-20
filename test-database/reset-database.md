@@ -30,6 +30,13 @@ Stats/Measurements:
 
 test_measurements (500 rows): id, sensor_id, temperature, humidity, pressure, measured_at
 
+Vector Embeddings:
+
+test_embeddings (50 rows): id, content, category, embedding (vector(384))
+
+- Categories: tech, science, business, sports, entertainment (for groupBy testing)
+- Each row has a **unique** random 384-dim vector (not identical) for meaningful search/clustering tests
+
 ---
 
 ## Testing Tools

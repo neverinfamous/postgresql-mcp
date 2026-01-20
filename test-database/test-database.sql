@@ -96,21 +96,40 @@ SELECT
   NOW() - (random() * 30 || ' days')::interval
 FROM generate_series(1, 500);
 
--- Vector embeddings
+-- Vector embeddings (with diverse random vectors for meaningful search/clustering tests)
 CREATE TABLE test_embeddings (
   id SERIAL PRIMARY KEY,
   content TEXT,
+  category VARCHAR(20),
   embedding vector(384)
 );
 
-INSERT INTO test_embeddings (content, embedding)
-SELECT 
-  'Sample document ' || i,
-  ('[' || array_to_string(
-    ARRAY(SELECT (random() * 2 - 1)::float4 FROM generate_series(1, 384)), 
-    ','
-  ) || ']')::vector
-FROM generate_series(1, 50) i;
+-- Generate 50 embeddings with truly unique random vectors per row
+-- Uses DO block to ensure random() is called fresh for each dimension of each row
+DO $$
+DECLARE
+  i INT;
+  j INT;
+  vec_str TEXT;
+  cat TEXT;
+  categories TEXT[] := ARRAY['tech', 'science', 'business', 'sports', 'entertainment'];
+BEGIN
+  FOR i IN 1..50 LOOP
+    -- Build a unique random vector for this row
+    vec_str := '[';
+    FOR j IN 1..384 LOOP
+      IF j > 1 THEN vec_str := vec_str || ','; END IF;
+      vec_str := vec_str || (random() * 2 - 1)::float4::text;
+    END LOOP;
+    vec_str := vec_str || ']';
+    
+    -- Assign category for groupBy testing
+    cat := categories[1 + (i % 5)];
+    
+    INSERT INTO test_embeddings (content, category, embedding)
+    VALUES ('Sample document ' || i, cat, vec_str::vector);
+  END LOOP;
+END $$;
 
 CREATE INDEX ON test_embeddings USING hnsw (embedding vector_cosine_ops);
 

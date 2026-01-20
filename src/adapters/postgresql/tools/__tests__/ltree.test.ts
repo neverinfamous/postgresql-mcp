@@ -46,6 +46,11 @@ describe("Ltree Tools", () => {
 
   describe("pg_ltree_query", () => {
     it("should query descendants by default", async () => {
+      // Mock column type check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ udt_name: "ltree" }],
+      });
+      // Mock actual query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [
           { id: 1, path: "root.child1", depth: 2 },
@@ -66,13 +71,17 @@ describe("Ltree Tools", () => {
       expect(result.mode).toBe("descendants");
       expect(result.count).toBe(2);
       // descendants uses <@ operator (column is contained by path)
-      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringContaining("<@"),
         ["root.child1"],
       );
     });
 
     it("should query ancestors when mode specified", async () => {
+      // Mock column type check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ udt_name: "ltree" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ id: 1, path: "root", depth: 1 }],
       });
@@ -89,13 +98,17 @@ describe("Ltree Tools", () => {
       );
 
       // ancestors uses @> operator (column contains path, i.e., column is ancestor of path)
-      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringContaining("@>"),
         expect.anything(),
       );
     });
 
     it("should query exact matches", async () => {
+      // Mock column type check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ udt_name: "ltree" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ id: 1, path: "root.child1", depth: 2 }],
       });
@@ -111,13 +124,17 @@ describe("Ltree Tools", () => {
         mockContext,
       );
 
-      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringMatching(/= \$1::ltree/),
         expect.anything(),
       );
     });
 
     it("should apply limit when specified", async () => {
+      // Mock column type check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ udt_name: "ltree" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_ltree_query");
@@ -131,7 +148,7 @@ describe("Ltree Tools", () => {
         mockContext,
       );
 
-      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringContaining("LIMIT 10"),
         expect.anything(),
       );
@@ -140,6 +157,11 @@ describe("Ltree Tools", () => {
 
   describe("pg_ltree_subpath", () => {
     it("should extract subpath with offset only", async () => {
+      // Mock depth check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ depth: 3 }],
+      });
+      // Mock subpath query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ subpath: "child1.grandchild", original_depth: 3 }],
       });
@@ -158,6 +180,10 @@ describe("Ltree Tools", () => {
     });
 
     it("should extract subpath with offset and length", async () => {
+      // Mock depth check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ depth: 3 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ subpath: "child1", original_depth: 3 }],
       });
@@ -172,13 +198,17 @@ describe("Ltree Tools", () => {
         mockContext,
       );
 
-      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringContaining("subpath($1::ltree, $2, $3)"),
         ["root.child1.grandchild", 1, 1],
       );
     });
 
     it("should accept len as alias for length", async () => {
+      // Mock depth check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ depth: 3 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ subpath: "child1", original_depth: 3 }],
       });
@@ -193,13 +223,17 @@ describe("Ltree Tools", () => {
         mockContext,
       );
 
-      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringContaining("subpath($1::ltree, $2, $3)"),
         ["root.child1.grandchild", 1, 1],
       );
     });
 
     it("should default offset to 0 when not provided", async () => {
+      // Mock depth check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ depth: 3 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ subpath: "root.child1.grandchild", original_depth: 3 }],
       });
@@ -214,7 +248,7 @@ describe("Ltree Tools", () => {
       )) as { subpath: string; offset: number };
 
       expect(result.offset).toBe(0);
-      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringContaining("subpath($1::ltree, $2)"),
         ["root.child1.grandchild", 0],
       );
@@ -223,6 +257,10 @@ describe("Ltree Tools", () => {
 
   describe("pg_ltree_query type alias", () => {
     it("should accept type as alias for mode", async () => {
+      // Mock column type check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ udt_name: "ltree" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ id: 1, path: "root", depth: 1 }],
       });
@@ -239,7 +277,7 @@ describe("Ltree Tools", () => {
       );
 
       // Should use @> operator for ancestors
-      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringContaining("@>"),
         expect.anything(),
       );
@@ -387,11 +425,18 @@ describe("Ltree Tools", () => {
 
   describe("pg_ltree_convert_column", () => {
     it("should convert text column to ltree", async () => {
-      mockAdapter.executeQuery
-        .mockResolvedValueOnce({
-          rows: [{ data_type: "text", udt_name: "text" }],
-        })
-        .mockResolvedValueOnce({ rows: [] });
+      // Mock extension check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ installed: true }],
+      });
+      // Mock column check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ data_type: "text", udt_name: "text" }],
+      });
+      // Mock dependent views check
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+      // Mock ALTER TABLE
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_ltree_convert_column");
       const result = (await tool!.handler(
@@ -410,6 +455,11 @@ describe("Ltree Tools", () => {
     });
 
     it("should report column not found", async () => {
+      // Mock extension check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ installed: true }],
+      });
+      // Mock column check - no rows = not found
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_ltree_convert_column");
@@ -426,6 +476,11 @@ describe("Ltree Tools", () => {
     });
 
     it("should report already ltree column", async () => {
+      // Mock extension check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ installed: true }],
+      });
+      // Mock column check - already ltree
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ data_type: "USER-DEFINED", udt_name: "ltree" }],
       });

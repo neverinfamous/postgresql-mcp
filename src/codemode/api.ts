@@ -1103,6 +1103,37 @@ export class PgApi {
       }
     }
 
+    // Add top-level ltree aliases for convenience: pg.ltreeXxx() → pg.ltree.xxx()
+    const ltreeApi = bindings["ltree"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (ltreeApi !== undefined) {
+      if (ltreeApi["createExtension"] !== undefined) {
+        bindings["ltreeCreateExtension"] = ltreeApi["createExtension"];
+      }
+      if (ltreeApi["query"] !== undefined) {
+        bindings["ltreeQuery"] = ltreeApi["query"];
+      }
+      if (ltreeApi["subpath"] !== undefined) {
+        bindings["ltreeSubpath"] = ltreeApi["subpath"];
+      }
+      if (ltreeApi["lca"] !== undefined) {
+        bindings["ltreeLca"] = ltreeApi["lca"];
+      }
+      if (ltreeApi["match"] !== undefined) {
+        bindings["ltreeMatch"] = ltreeApi["match"];
+      }
+      if (ltreeApi["listColumns"] !== undefined) {
+        bindings["ltreeListColumns"] = ltreeApi["listColumns"];
+      }
+      if (ltreeApi["convertColumn"] !== undefined) {
+        bindings["ltreeConvertColumn"] = ltreeApi["convertColumn"];
+      }
+      if (ltreeApi["createIndex"] !== undefined) {
+        bindings["ltreeCreateIndex"] = ltreeApi["createIndex"];
+      }
+    }
+
     return bindings;
   }
 }

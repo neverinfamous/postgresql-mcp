@@ -69,6 +69,25 @@ function createLtreeQueryTool(adapter: PostgresAdapter): ToolDefinition {
       const qualifiedTable = `"${schemaName}"."${table}"`;
       const limitClause = limit !== undefined ? `LIMIT ${String(limit)}` : "";
 
+      // Validate column is ltree type
+      const colCheck = await adapter.executeQuery(
+        `SELECT udt_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3`,
+        [schemaName, table, column],
+      );
+      if (!colCheck.rows || colCheck.rows.length === 0) {
+        return {
+          success: false,
+          error: `Column "${column}" not found in table ${qualifiedTable}.`,
+        };
+      }
+      const udtName = colCheck.rows[0]?.["udt_name"] as string;
+      if (udtName !== "ltree") {
+        return {
+          success: false,
+          error: `Column "${column}" is not an ltree type (found: ${udtName}). Use an ltree column or convert with pg_ltree_convert_column.`,
+        };
+      }
+
       // Detect if path contains lquery pattern characters
       const isLqueryPattern = /[*?{!@|]/.test(path);
 
@@ -118,6 +137,25 @@ function createLtreeSubpathTool(adapter: PostgresAdapter): ToolDefinition {
     icons: getToolIcons("ltree", readOnly("Ltree Subpath")),
     handler: async (params: unknown, _context: RequestContext) => {
       const { path, offset, length } = LtreeSubpathSchema.parse(params);
+
+      // First get the path depth for validation
+      const depthResult = await adapter.executeQuery(
+        `SELECT nlevel($1::ltree) as depth`,
+        [path],
+      );
+      const pathDepth = depthResult.rows?.[0]?.["depth"] as number;
+
+      // Validate offset is within bounds
+      const effectiveOffset = offset < 0 ? pathDepth + offset : offset;
+      if (effectiveOffset < 0 || effectiveOffset >= pathDepth) {
+        return {
+          success: false,
+          error: `Invalid offset: ${String(offset)}. Path "${path}" has ${String(pathDepth)} labels (valid offset range: 0 to ${String(pathDepth - 1)}, or -${String(pathDepth)} to -1 for negative indexing).`,
+          originalPath: path,
+          pathDepth,
+        };
+      }
+
       const sql =
         length !== undefined
           ? `SELECT subpath($1::ltree, $2, $3) as subpath, nlevel($1::ltree) as original_depth`
@@ -218,7 +256,8 @@ function createLtreeConvertColumnTool(
 ): ToolDefinition {
   return {
     name: "pg_ltree_convert_column",
-    description: "Convert an existing TEXT column to LTREE type.",
+    description:
+      "Convert an existing TEXT column to LTREE type. Note: If views depend on this column, you must drop and recreate them manually before conversion.",
     group: "ltree",
     inputSchema: LtreeConvertColumnSchemaBase, // Base schema for MCP visibility
     annotations: write("Convert to Ltree"),
@@ -227,28 +266,100 @@ function createLtreeConvertColumnTool(
       const { table, column, schema } = LtreeConvertColumnSchema.parse(params);
       const schemaName = schema ?? "public";
       const qualifiedTable = `"${schemaName}"."${table}"`;
+
+      // Check if ltree extension is installed
+      const extCheck = await adapter.executeQuery(`
+        SELECT EXISTS(
+          SELECT 1 FROM pg_extension WHERE extname = 'ltree'
+        ) as installed
+      `);
+      const hasExt = (extCheck.rows?.[0]?.["installed"] as boolean) ?? false;
+      if (!hasExt) {
+        return {
+          success: false,
+          error:
+            "ltree extension is not installed. Run pg_ltree_create_extension first.",
+        };
+      }
+
       const colCheck = await adapter.executeQuery(
         `SELECT data_type, udt_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3`,
         [schemaName, table, column],
       );
-      if (!colCheck.rows || colCheck.rows.length === 0)
-        return { success: false, error: `Column ${column} not found` };
+      if (!colCheck.rows || colCheck.rows.length === 0) {
+        return {
+          success: false,
+          error: `Column "${column}" not found in table ${qualifiedTable}. Verify the table and column names.`,
+        };
+      }
+
+      const dataType = colCheck.rows[0]?.["data_type"] as string;
       const udtName = colCheck.rows[0]?.["udt_name"] as string;
-      if (udtName === "ltree")
+      const currentType = dataType === "USER-DEFINED" ? udtName : dataType;
+
+      if (udtName === "ltree") {
         return {
           success: true,
           message: `Column ${column} is already ltree`,
           wasAlreadyLtree: true,
         };
-      await adapter.executeQuery(
-        `ALTER TABLE ${qualifiedTable} ALTER COLUMN "${column}" TYPE ltree USING "${column}"::ltree`,
+      }
+
+      // Check for dependent views before attempting the conversion
+      const depCheck = await adapter.executeQuery(
+        `
+        SELECT DISTINCT 
+          c.relname as dependent_view,
+          n.nspname as view_schema
+        FROM pg_depend d
+        JOIN pg_rewrite r ON d.objid = r.oid
+        JOIN pg_class c ON r.ev_class = c.oid
+        JOIN pg_namespace n ON c.relnamespace = n.oid
+        JOIN pg_class t ON d.refobjid = t.oid
+        JOIN pg_namespace tn ON t.relnamespace = tn.oid
+        JOIN pg_attribute a ON d.refobjid = a.attrelid AND d.refobjsubid = a.attnum
+        WHERE c.relkind = 'v'
+          AND tn.nspname = $1
+          AND t.relname = $2
+          AND a.attname = $3
+        `,
+        [schemaName, table, column],
       );
-      return {
-        success: true,
-        message: `Column ${column} converted to ltree`,
-        table: qualifiedTable,
-        previousType: colCheck.rows[0]?.["data_type"] as string,
-      };
+
+      const dependentViews = depCheck.rows ?? [];
+
+      if (dependentViews.length > 0) {
+        return {
+          success: false,
+          error:
+            "Column has dependent views that must be dropped before conversion",
+          dependentViews: dependentViews.map(
+            (v) =>
+              `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
+          ),
+          hint: "Drop the listed views, run this conversion, then recreate the views. PostgreSQL cannot ALTER COLUMN TYPE when views depend on it.",
+        };
+      }
+
+      try {
+        await adapter.executeQuery(
+          `ALTER TABLE ${qualifiedTable} ALTER COLUMN "${column}" TYPE ltree USING "${column}"::ltree`,
+        );
+        return {
+          success: true,
+          message: `Column ${column} converted to ltree`,
+          table: qualifiedTable,
+          previousType: currentType,
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        return {
+          success: false,
+          error: `Failed to convert column: ${errorMessage}`,
+          hint: "If views depend on this column, they may need to be dropped and recreated",
+        };
+      }
     },
   };
 }

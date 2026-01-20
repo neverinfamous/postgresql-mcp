@@ -81,6 +81,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Discovery via `pg.citext.help()` returning `{methods, aliases, examples}`
 - **citext schema.table format support** — `pg_citext_convert_column` and `pg_citext_schema_advisor` now support `schema.table` format (e.g., `'myschema.users'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter, consistent with other tool groups
 - **pg.citextXxx() top-level aliases** — Code mode now supports top-level citext method aliases for convenience: `pg.citextCreateExtension()`, `pg.citextConvertColumn()`, `pg.citextListColumns()`, `pg.citextAnalyzeCandidates()`, `pg.citextCompare()`, `pg.citextSchemaAdvisor()`. These map directly to `pg.citext.xxx()` methods, matching the aliases documented in `pg.citext.help()`
+- **pg.ltreeXxx() top-level aliases** — Code mode now supports top-level ltree method aliases for convenience: `pg.ltreeCreateExtension()`, `pg.ltreeQuery()`, `pg.ltreeSubpath()`, `pg.ltreeLca()`, `pg.ltreeMatch()`, `pg.ltreeListColumns()`, `pg.ltreeConvertColumn()`, `pg.ltreeCreateIndex()`. These map directly to `pg.ltree.xxx()` methods, matching the aliases documented in `pg.ltree.help()`
+- **Comprehensive ltree tools documentation** — Expanded `## ltree Tools` section in ServerInstructions.ts with documentation for all 8 tools including:
+  - Core methods: `createExtension()`, `query()`, `match()`, `subpath()`, `lca()`, `listColumns()`, `convertColumn()`, `createIndex()`
+  - Response structures for all tools
+  - `schema.table` format support documentation for `query`, `match`, `convertColumn`, `createIndex`
+  - Parameter aliases documentation (`offset`/`start`/`from`, `length`/`len`, `pattern`/`lquery`/`query`, `mode`/`type`)
+  - Enhanced error handling documentation (column type validation, offset bounds checking, dependent views)
+  - Discovery via `pg.ltree.help()` returning `{methods, aliases, examples}`
 
 ### Fixed
 
@@ -103,6 +111,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_vector_validate direct MCP tool exposure** — Fixed `pg_vector_validate` not appearing as a direct MCP tool. Applied Split Schema pattern (base schema for MCP visibility, transformed schema for handler). Also enhanced tool description to document return structure `{valid: bool, vectorDimensions}` and empty vector behavior
 - **pg_partman_undo_partition targetTable schema auto-resolution** — `pg_partman_undo_partition` now auto-prefixes `public.` to `targetTable` when no schema is specified, consistent with `parentTable` behavior. Previously, plain table names caused \"Unable to find given target table in system catalogs\" errors because pg_partman requires schema-qualified table references
 - **pg_citext_convert_column previousType display** — `pg_citext_convert_column` now correctly reports `previousType: \"citext\"` instead of `\"USER-DEFINED\"` when converting an already-citext column. The fix queries both `data_type` and `udt_name` columns and normalizes the display for user-defined types
+- **pg_ltree_query column type validation** — `pg_ltree_query` now validates that the specified column is an ltree type before querying. Returns clear error message (e.g., `Column "name" is not an ltree type (found: varchar)`) instead of cryptic PostgreSQL function error `function nlevel(character varying) does not exist`
+- **pg_ltree_subpath offset bounds validation** — `pg_ltree_subpath` now validates offset before calling PostgreSQL `subpath()` function. Returns structured error `{success: false, error: \"Invalid offset: 5. Path 'a.b' has 2 labels...\", pathDepth: 2}` instead of raw PostgreSQL error `invalid positions`
+- **pg_ltree_convert_column dependent views handling** — `pg_ltree_convert_column` now checks for dependent views before attempting type conversion, matching `pg_citext_convert_column` behavior. Returns `{success: false, dependentViews: [...], hint: \"...\"}` instead of raw PostgreSQL error. Also validates ltree extension is installed, enhanced error messages for column not found, and catches conversion errors with helpful hints
 
 - **dumpTable table parameter validation** — `dumpTable()` now validates that the `table` parameter is provided and throws a descriptive error if missing (previously created invalid DDL for "undefined")
 - **dumpTable schema.table format parsing** — `dumpTable()` now correctly parses `schema.table` format (e.g., `'public.users'` → schema='public', table='users'). Embedded schema takes priority over explicit `schema` parameter to prevent duplication errors

@@ -1070,6 +1070,14 @@ export class PgApi {
     // Add top-level help as directly callable pg.help()
     bindings["help"] = () => this.help();
 
+    // Add top-level hybridSearch alias for convenience: pg.hybridSearch() → pg.vector.hybridSearch()
+    const vectorApi = bindings["vector"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (vectorApi?.["hybridSearch"] !== undefined) {
+      bindings["hybridSearch"] = vectorApi["hybridSearch"];
+    }
+
     return bindings;
   }
 }

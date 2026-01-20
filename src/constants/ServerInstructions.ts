@@ -65,19 +65,19 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 ## Vector Tools
 
-- \`pg_vector_search\`: Returns \`{results: [...], count, metric}\`. Use \`select: ["id", "name"]\` to include identifying columns. Without select, only returns distance. \`filter\` = \`where\`. ⚠️ Vectors read from DB are strings—parse before passing: \`vec.replace(/^\\[|\\]$/g, '').split(',').map(Number)\`
+- \`pg_vector_search\`: Supports \`schema.table\` format (auto-parsed). Returns \`{results: [...], count, metric}\`. Use \`select: ["id", "name"]\` to include identifying columns. Without select, only returns distance. \`filter\` = \`where\`. ⚠️ Vectors read from DB are strings—parse before passing: \`vec.replace(/^\\[|\\]$/g, '').split(',').map(Number)\`
 - \`pg_vector_insert\`: Supports \`schema.table\` format (auto-parsed). Use \`updateExisting\` + \`conflictColumn\` + \`conflictValue\` for UPDATE mode. \`additionalColumns\` is applied in both INSERT and UPDATE modes
 - \`pg_vector_batch_insert\`: \`vectors\` expects \`[{vector: [...], data?: {...}}]\` objects, not raw arrays
 - \`pg_vector_normalize\`: Returns \`{normalized: [...], magnitude: N}\`. Note: \`magnitude\` is the **original** vector length (not 1)
 - \`pg_vector_aggregate\`: Supports \`schema.table\` format (auto-parsed). ⛔ Validates column is vector type. Returns \`{average_vector: {preview, dimensions, truncated}, count}\` or \`{groups: [{group_key, average_vector, count}]}\` with groupBy. ⚠️ \`groupBy\` only supports simple column names (not expressions)
 - \`pg_vector_dimension_reduce\`: Direct mode returns \`{reduced: [...], originalDimensions, targetDimensions}\`. Table mode returns \`{rows: [{id, original_dimensions, reduced}], processedCount}\`
 - \`pg_vector_distance\`: Calculate distance between two vectors. \`metric\`: 'l2' (default), 'cosine', 'inner_product'. Returns \`{distance, metric}\`
-- \`pg_vector_cluster\`: \`clusters\` = \`k\`. Returns centroids only—use \`pg_vector_distance\` to assign rows
+- \`pg_vector_cluster\`: \`clusters\` = \`k\`. Returns centroids with \`{preview, dimensions, truncated}\` format for large vectors (>10 dims)—use \`pg_vector_distance\` to assign rows
 - \`pg_vector_create_index\`: Use \`type\` (or alias \`method\`) with values 'ivfflat' or 'hnsw'. IVFFlat: \`lists\` param. HNSW: \`m\`, \`efConstruction\` params
 - \`pg_vector_performance\`: Auto-generates testVector from first row if omitted. Returns \`testVectorSource: 'auto-generated'|'user-provided'\`
 - \`pg_vector_validate\`: Returns \`{valid: bool, vectorDimensions}\`. Empty vector \`[]\` returns \`{valid: true, vectorDimensions: 0}\`
 - ⛔ \`pg_vector_embed\`: Demo only (hash-based). Use OpenAI/Cohere for production.
-- \`pg_hybrid_search\`: Supports \`schema.table\` format (auto-parsed). Combines vector similarity and full-text search with weighted scoring
+- \`pg_hybrid_search\`: Supports \`schema.table\` format (auto-parsed). Combines vector similarity and full-text search with weighted scoring. Code mode alias: \`pg.hybridSearch()\` → \`pg.vector.hybridSearch()\`
 - 📝 **Error Handling**: Vector tools return \`{success: false, error: "...", suggestion: "..."}\` for validation/semantic errors (dimension mismatch, non-vector column, table not found). Check \`success\` field before processing results.
 
 ## JSONB Tools

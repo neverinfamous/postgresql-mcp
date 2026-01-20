@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vector tools error handling documentation** — Enhanced ServerInstructions.ts to document that vector tools return `{success: false, error: "...", suggestion: "..."}` objects for validation/semantic errors (dimension mismatch, non-vector column, table not found). Users should check the `success` field before processing results
 - **pg_vector_distance documentation** — Added documentation for `pg_vector_distance` tool in ServerInstructions.ts. Documents `metric` parameter ('l2', 'cosine', 'inner_product') and return structure `{distance, metric}`
 - **pg_vector_aggregate groupBy limitation documentation** — Added note that `groupBy` parameter only supports simple column names (not expressions) due to SQL injection safety measures
+- **pg_vector_search schema.table support** — `pg_vector_search` now supports `schema.table` format (e.g., `'myschema.embeddings'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter, consistent with other vector tools (`pg_vector_insert`, `pg_vector_aggregate`, `pg_hybrid_search`)
+- **pg.hybridSearch top-level alias** — Code mode now supports `pg.hybridSearch()` as a top-level alias for `pg.vector.hybridSearch()`, providing more intuitive access to hybrid search functionality
+- **pg_vector_cluster centroid preview format** — `pg_vector_cluster` now returns centroids in the compact `{preview, dimensions, truncated}` format for large vectors (>10 dimensions), consistent with `pg_vector_aggregate`. Reduces output from ~15KB to a compact preview for 384-dim embeddings
 
 ### Fixed
 

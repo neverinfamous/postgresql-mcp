@@ -37,7 +37,7 @@ function parseVector(vecStr: unknown): number[] | null {
  * Truncate a vector for display, showing first/last N values.
  * For vectors <= maxDisplay, returns the full vector.
  */
-function truncateVector(
+export function truncateVector(
   vec: number[] | null | undefined,
   maxDisplay = 10,
 ): {

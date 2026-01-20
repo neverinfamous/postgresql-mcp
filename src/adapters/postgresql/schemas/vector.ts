@@ -54,18 +54,29 @@ const VectorSearchSchemaBase = z.object({
     .describe("Exclude rows with NULL vectors (default: false)"),
 });
 
-// Transformed schema with alias resolution
-export const VectorSearchSchema = VectorSearchSchemaBase.transform((data) => ({
-  table: data.table ?? data.tableName ?? "",
-  column: data.column ?? data.col ?? "",
-  vector: data.vector,
-  metric: data.metric,
-  limit: data.limit,
-  select: data.select,
-  where: data.where ?? data.filter,
-  schema: data.schema,
-  excludeNull: data.excludeNull,
-}));
+// Transformed schema with alias resolution and schema.table parsing
+export const VectorSearchSchema = VectorSearchSchemaBase.transform((data) => {
+  // Parse schema.table format (embedded schema takes priority over explicit schema param)
+  let resolvedTable = data.table ?? data.tableName ?? "";
+  let resolvedSchema = data.schema;
+  if (resolvedTable.includes(".")) {
+    const parts = resolvedTable.split(".");
+    resolvedSchema = parts[0] ?? data.schema ?? "public";
+    resolvedTable = parts[1] ?? resolvedTable;
+  }
+
+  return {
+    table: resolvedTable,
+    column: data.column ?? data.col ?? "",
+    vector: data.vector,
+    metric: data.metric,
+    limit: data.limit,
+    select: data.select,
+    where: data.where ?? data.filter,
+    schema: resolvedSchema,
+    excludeNull: data.excludeNull,
+  };
+});
 
 // Base schema for MCP exposure
 const VectorCreateIndexSchemaBase = z.object({

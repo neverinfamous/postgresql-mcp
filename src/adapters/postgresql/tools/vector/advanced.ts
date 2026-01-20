@@ -14,6 +14,7 @@ import {
   sanitizeIdentifier,
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
+import { truncateVector } from "./basic.js";
 
 /**
  * Parse a PostgreSQL vector string to a number array.
@@ -142,11 +143,29 @@ export function createVectorClusterTool(
         }
       }
 
+      // Truncate large centroids for display (like pg_vector_aggregate does)
+      const parsedCentroids = centroids.map((c) => {
+        const parsed = parseVector(c);
+        if (parsed === null) {
+          return { vector: c };
+        }
+        // For large vectors, use preview format (first 10 dimensions)
+        if (parsed.length > 10) {
+          const truncated = truncateVector(parsed, 10);
+          return {
+            preview: truncated.preview,
+            dimensions: truncated.dimensions,
+            truncated: truncated.truncated,
+          };
+        }
+        return { vector: parsed };
+      });
+
       return {
         k: k,
         iterations: maxIter,
         sampleSize: vectors.length,
-        centroids: centroids.map((c) => ({ vector: parseVector(c) ?? c })),
+        centroids: parsedCentroids,
         note: "For production clustering, consider using specialized libraries",
       };
     },

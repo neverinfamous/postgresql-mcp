@@ -179,6 +179,7 @@ export {
   CitextConvertColumnSchemaBase,
   CitextListColumnsSchema,
   CitextAnalyzeCandidatesSchema,
+  CitextAnalyzeCandidatesSchemaBase,
   CitextSchemaAdvisorSchema,
   CitextSchemaAdvisorSchemaBase,
   // ltree

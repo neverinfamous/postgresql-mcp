@@ -170,19 +170,33 @@ export const CitextListColumnsSchema = z.preprocess(
 );
 
 /**
+ * Base schema for MCP visibility - shows all parameters for analyzeCandidates.
+ */
+export const CitextAnalyzeCandidatesSchemaBase = z.object({
+  patterns: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Column name patterns to match (default: email, username, name, etc.)",
+    ),
+  schema: z.string().optional().describe("Schema name to filter"),
+  table: z
+    .string()
+    .optional()
+    .describe("Table name to filter (analyzes single table)"),
+  limit: z
+    .number()
+    .optional()
+    .describe("Maximum number of candidates to return"),
+});
+
+/**
  * Schema for analyzing candidate columns for citext conversion.
+ * Preprocesses to handle empty/null params.
  */
 export const CitextAnalyzeCandidatesSchema = z.preprocess(
   normalizeOptionalParams,
-  z.object({
-    patterns: z
-      .array(z.string())
-      .optional()
-      .describe(
-        "Column name patterns to match (default: email, username, name, etc.)",
-      ),
-    schema: z.string().optional().describe("Schema name to filter"),
-  }),
+  CitextAnalyzeCandidatesSchemaBase,
 );
 
 /**

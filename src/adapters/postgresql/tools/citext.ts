@@ -20,6 +20,7 @@ import {
   CitextConvertColumnSchemaBase,
   CitextListColumnsSchema,
   CitextAnalyzeCandidatesSchema,
+  CitextAnalyzeCandidatesSchemaBase,
   CitextSchemaAdvisorSchema,
   CitextSchemaAdvisorSchemaBase,
 } from "../schemas/index.js";
@@ -259,11 +260,12 @@ function createCitextAnalyzeCandidatesTool(
     description: `Find TEXT columns that may benefit from case-insensitive comparisons.
 Looks for common patterns like email, username, name, slug, etc.`,
     group: "citext",
-    inputSchema: CitextAnalyzeCandidatesSchema,
+    inputSchema: CitextAnalyzeCandidatesSchemaBase,
     annotations: readOnly("Analyze Citext Candidates"),
     icons: getToolIcons("citext", readOnly("Analyze Citext Candidates")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { patterns, schema } = CitextAnalyzeCandidatesSchema.parse(params);
+      const { patterns, schema, table, limit } =
+        CitextAnalyzeCandidatesSchema.parse(params);
 
       const searchPatterns = patterns ?? [
         "email",
@@ -296,12 +298,20 @@ Looks for common patterns like email, username, name, slug, etc.`,
         queryParams.push(schema);
       }
 
+      if (table !== undefined) {
+        conditions.push(`table_name = $${String(paramIndex++)}`);
+        queryParams.push(table);
+      }
+
       const patternConditions = searchPatterns.map((p) => {
         const idx = paramIndex++;
         queryParams.push(`%${p}%`);
         return `LOWER(column_name) LIKE $${String(idx)}`;
       });
       conditions.push(`(${patternConditions.join(" OR ")})`);
+
+      // Add LIMIT clause if specified
+      const limitClause = limit !== undefined ? `LIMIT ${String(limit)}` : "";
 
       const sql = `
                 SELECT 
@@ -314,6 +324,7 @@ Looks for common patterns like email, username, name, slug, etc.`,
                 FROM information_schema.columns
                 WHERE ${conditions.join(" AND ")}
                 ORDER BY table_schema, table_name, ordinal_position
+                ${limitClause}
             `;
 
       const result = await adapter.executeQuery(sql, queryParams);
@@ -338,6 +349,9 @@ Looks for common patterns like email, username, name, slug, etc.`,
       return {
         candidates,
         count: candidates.length,
+        ...(limit !== undefined && { limit }),
+        ...(table !== undefined && { table }),
+        ...(schema !== undefined && { schema }),
         summary: {
           highConfidence: highConfidence.length,
           mediumConfidence: mediumConfidence.length,
@@ -484,6 +498,7 @@ Requires the 'table' parameter to specify which table to analyze.`,
       const recommendations: {
         column: string;
         currentType: string;
+        previousType?: string;
         recommendation: "convert" | "keep" | "already_citext";
         confidence: "high" | "medium" | "low";
         reason: string;
@@ -514,6 +529,7 @@ Requires the 'table' parameter to specify which table to analyze.`,
           recommendations.push({
             column: col["column_name"] as string,
             currentType: "citext",
+            previousType: "text or varchar (converted)",
             recommendation: "already_citext",
             confidence: "high",
             reason: "Column is already using citext",

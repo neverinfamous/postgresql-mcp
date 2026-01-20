@@ -278,11 +278,24 @@ export function createVectorInsertTool(
         parsed.conflictValue !== undefined
       ) {
         const conflictCol = sanitizeIdentifier(parsed.conflictColumn);
-        const sql = `UPDATE ${tableName} SET ${columnName} = $1::vector WHERE ${conflictCol} = $2`;
-        const result = await adapter.executeQuery(sql, [
-          vectorStr,
-          parsed.conflictValue,
-        ]);
+
+        // Build SET clause including vector and additionalColumns
+        const setClauses: string[] = [`${columnName} = $1::vector`];
+        const queryParams: unknown[] = [vectorStr, parsed.conflictValue];
+        let paramIndex = 3; // $1 = vector, $2 = conflictValue
+
+        if (parsed.additionalColumns !== undefined) {
+          for (const [col, val] of Object.entries(parsed.additionalColumns)) {
+            setClauses.push(
+              `${sanitizeIdentifier(col)} = $${String(paramIndex)}`,
+            );
+            queryParams.push(val);
+            paramIndex++;
+          }
+        }
+
+        const sql = `UPDATE ${tableName} SET ${setClauses.join(", ")} WHERE ${conflictCol} = $2`;
+        const result = await adapter.executeQuery(sql, queryParams);
 
         if (result.rowsAffected === 0) {
           return {
@@ -297,6 +310,7 @@ export function createVectorInsertTool(
           success: true,
           rowsAffected: result.rowsAffected,
           mode: "update",
+          columnsUpdated: setClauses.length,
         };
       }
 
@@ -1045,40 +1059,35 @@ export function createVectorBatchInsertTool(
 export function createVectorValidateTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
-  // Schema with parameter smoothing
-  const ValidateSchema = z
-    .object({
-      table: z.string().optional().describe("Table name"),
-      tableName: z.string().optional().describe("Alias for table"),
-      column: z.string().optional().describe("Vector column"),
-      col: z.string().optional().describe("Alias for column"),
-      vector: z
-        .array(z.number())
-        .optional()
-        .describe("Vector to validate dimensions"),
-      dimensions: z
-        .number()
-        .optional()
-        .describe("Expected dimensions to check"),
-      schema: z
-        .string()
-        .optional()
-        .describe("Database schema (default: public)"),
-    })
-    .transform((data) => ({
-      table: data.table ?? data.tableName ?? "",
-      column: data.column ?? data.col ?? "",
-      vector: data.vector,
-      dimensions: data.dimensions,
-      schema: data.schema,
-    }));
+  // Base schema exposes all properties to MCP without transform
+  const ValidateSchemaBase = z.object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Alias for table"),
+    column: z.string().optional().describe("Vector column"),
+    col: z.string().optional().describe("Alias for column"),
+    vector: z
+      .array(z.number())
+      .optional()
+      .describe("Vector to validate dimensions"),
+    dimensions: z.number().optional().describe("Expected dimensions to check"),
+    schema: z.string().optional().describe("Database schema (default: public)"),
+  });
+
+  // Transformed schema applies alias resolution
+  const ValidateSchema = ValidateSchemaBase.transform((data) => ({
+    table: data.table ?? data.tableName ?? "",
+    column: data.column ?? data.col ?? "",
+    vector: data.vector,
+    dimensions: data.dimensions,
+    schema: data.schema,
+  }));
 
   return {
     name: "pg_vector_validate",
     description:
-      "Validate vector dimensions against a column or check a vector before operations.",
+      "Returns `{valid: bool, vectorDimensions}`. Validate vector dimensions against a column or check a vector before operations. Empty vector `[]` returns `{valid: true, vectorDimensions: 0}`.",
     group: "vector",
-    inputSchema: ValidateSchema,
+    inputSchema: ValidateSchemaBase,
     annotations: readOnly("Validate Vector"),
     icons: getToolIcons("vector", readOnly("Validate Vector")),
     handler: async (params: unknown, _context: RequestContext) => {

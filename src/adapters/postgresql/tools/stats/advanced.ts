@@ -621,6 +621,14 @@ export const StatsHypothesisSchema = z.preprocess(
         // This allows 0 as a valid hypothesized mean - refinement always passes
         message: "hypothesizedMean (or mean/expected alias) is required",
       },
+    )
+    .refine(
+      (data) =>
+        data.populationStdDev === undefined || data.populationStdDev > 0,
+      {
+        message: "populationStdDev must be greater than 0",
+        path: ["populationStdDev"],
+      },
     ),
 );
 
@@ -708,11 +716,22 @@ export function createStatsTimeSeriesTool(
       const agg = aggregation ?? "avg";
       const lim = limit ?? 100;
 
+      // First check if table exists
+      const schemaName = schema ?? "public";
+      const tableCheckQuery = `
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = '${schemaName}' AND table_name = '${table}'
+      `;
+      const tableCheckResult = await adapter.executeQuery(tableCheckQuery);
+      if (tableCheckResult.rows?.length === 0) {
+        throw new Error(`Table "${schemaName}.${table}" not found`);
+      }
+
       // Validate timeColumn is a timestamp/date type
       const typeCheckQuery = `
                 SELECT data_type 
                 FROM information_schema.columns 
-                WHERE table_schema = '${schema ?? "public"}' 
+                WHERE table_schema = '${schemaName}' 
                 AND table_name = '${table}'
                 AND column_name = '${timeColumn}'
             `;
@@ -721,7 +740,7 @@ export function createStatsTimeSeriesTool(
 
       if (!typeRow) {
         throw new Error(
-          `Column "${timeColumn}" not found in table "${schema ?? "public"}.${table}"`,
+          `Column "${timeColumn}" not found in table "${schemaName}.${table}"`,
         );
       }
 
@@ -739,6 +758,8 @@ export function createStatsTimeSeriesTool(
         );
       }
 
+      // Note: schemaName already defined above for table check
+
       // Validate valueColumn exists and is numeric
       const numericTypes = [
         "integer",
@@ -753,7 +774,7 @@ export function createStatsTimeSeriesTool(
       const valueTypeQuery = `
         SELECT data_type 
         FROM information_schema.columns 
-        WHERE table_schema = '${schema ?? "public"}' 
+        WHERE table_schema = '${schemaName}' 
         AND table_name = '${table}'
         AND column_name = '${valueColumn}'
       `;
@@ -764,7 +785,7 @@ export function createStatsTimeSeriesTool(
 
       if (!valueTypeRow) {
         throw new Error(
-          `Column "${valueColumn}" not found in table "${schema ?? "public"}.${table}"`,
+          `Column "${valueColumn}" not found in table "${schemaName}.${table}"`,
         );
       }
 

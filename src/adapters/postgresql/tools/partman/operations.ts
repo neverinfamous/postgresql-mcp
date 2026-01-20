@@ -462,19 +462,22 @@ Example: undoPartition({ parentTable: "public.events", targetTable: "public.even
       }
 
       // At this point, parentTable and targetTable are guaranteed to be defined
-      const validatedParentTable = parentTable;
-      const validatedTargetTable = targetTable;
+      // Auto-prefix 'public.' schema when not specified (consistent with parentTable behavior)
+      const validatedParentTable = parentTable.includes(".")
+        ? parentTable
+        : `public.${parentTable}`;
+      const validatedTargetTable = targetTable.includes(".")
+        ? targetTable
+        : `public.${targetTable}`;
 
       // Pre-validate: Check that target table exists before calling pg_partman
       const partmanSchema = await getPartmanSchema(adapter);
 
       // Parse target table name to check existence
-      const [targetSchema, targetTableName] = validatedTargetTable.includes(".")
-        ? [
-            validatedTargetTable.split(".")[0],
-            validatedTargetTable.split(".")[1],
-          ]
-        : ["public", validatedTargetTable];
+      const [targetSchema, targetTableName] = [
+        validatedTargetTable.split(".")[0],
+        validatedTargetTable.split(".")[1],
+      ];
 
       const tableExistsResult = await adapter.executeQuery(
         `

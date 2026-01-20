@@ -182,6 +182,14 @@ export const CitextAnalyzeCandidatesSchema = z.preprocess(
         "Column name patterns to match (default: email, username, name, etc.)",
       ),
     schema: z.string().optional().describe("Schema name to filter"),
+    table: z
+      .string()
+      .optional()
+      .describe("Table name to filter (analyzes single table)"),
+    limit: z
+      .number()
+      .optional()
+      .describe("Maximum number of candidates to return"),
   }),
 );
 

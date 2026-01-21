@@ -303,11 +303,10 @@ describe("JSONB Tools", () => {
       });
 
       const tool = findTool("pg_jsonb_object");
-      // Pass key-value pairs directly (no 'pairs' wrapper)
+      // Use 'data' parameter to pass key-value pairs (MCP tool format)
       const result = (await tool!.handler(
         {
-          name: "John",
-          age: 30,
+          data: { name: "John", age: 30 },
         },
         mockContext,
       )) as { object: Record<string, unknown> };

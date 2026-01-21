@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **pg.jsonbXxx() top-level aliases** — Code mode now supports top-level JSONB method aliases for convenience: `pg.jsonbExtract()`, `pg.jsonbSet()`, `pg.jsonbInsert()`, `pg.jsonbDelete()`, `pg.jsonbContains()`, `pg.jsonbPathQuery()`, `pg.jsonbAgg()`, `pg.jsonbObject()`, `pg.jsonbArray()`, `pg.jsonbKeys()`, `pg.jsonbStripNulls()`, `pg.jsonbTypeof()`, `pg.jsonbValidatePath()`, `pg.jsonbMerge()`, `pg.jsonbNormalize()`, `pg.jsonbDiff()`, `pg.jsonbIndexSuggest()`, `pg.jsonbSecurityScan()`, `pg.jsonbStats()`. These map directly to `pg.jsonb.xxx()` methods, matching the aliases documented in `pg.jsonb.help()`
 - **pg.createIndex() and 7 more top-level core aliases** — Code mode now supports additional top-level aliases beyond the original 11 starter tools: `pg.createIndex()`, `pg.dropIndex()`, `pg.getIndexes()`, `pg.listObjects()`, `pg.objectDetails()`, `pg.analyzeDbHealth()`, `pg.analyzeQueryIndexes()`, `pg.analyzeWorkloadIndexes()`. All 19 starter tools now have top-level aliases for maximum ergonomics
+
+### Fixed
+
+- **pg_jsonb_object MCP tool call fix** — `pg_jsonb_object` direct MCP tool calls now properly accept key-value pairs via `data`, `object`, or `pairs` parameter (e.g., `{data: {name: "John", age: 30}}`). Previously, passing individual key-value pairs as separate tool parameters returned an empty object `{}` because the MCP protocol doesn't support arbitrary record keys as tool parameters. Code mode continues to work with direct object syntax via the OBJECT_WRAP_MAP normalization
 
 ### Performance
 

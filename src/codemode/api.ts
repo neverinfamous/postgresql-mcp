@@ -1080,6 +1080,70 @@ export class PgApi {
       bindings["hybridSearch"] = vectorApi["hybridSearch"];
     }
 
+    // Add top-level JSONB aliases for convenience: pg.jsonbXxx() → pg.jsonb.xxx()
+    const jsonbApi = bindings["jsonb"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (jsonbApi !== undefined) {
+      if (jsonbApi["extract"] !== undefined) {
+        bindings["jsonbExtract"] = jsonbApi["extract"];
+      }
+      if (jsonbApi["set"] !== undefined) {
+        bindings["jsonbSet"] = jsonbApi["set"];
+      }
+      if (jsonbApi["insert"] !== undefined) {
+        bindings["jsonbInsert"] = jsonbApi["insert"];
+      }
+      if (jsonbApi["delete"] !== undefined) {
+        bindings["jsonbDelete"] = jsonbApi["delete"];
+      }
+      if (jsonbApi["contains"] !== undefined) {
+        bindings["jsonbContains"] = jsonbApi["contains"];
+      }
+      if (jsonbApi["pathQuery"] !== undefined) {
+        bindings["jsonbPathQuery"] = jsonbApi["pathQuery"];
+      }
+      if (jsonbApi["agg"] !== undefined) {
+        bindings["jsonbAgg"] = jsonbApi["agg"];
+      }
+      if (jsonbApi["object"] !== undefined) {
+        bindings["jsonbObject"] = jsonbApi["object"];
+      }
+      if (jsonbApi["array"] !== undefined) {
+        bindings["jsonbArray"] = jsonbApi["array"];
+      }
+      if (jsonbApi["keys"] !== undefined) {
+        bindings["jsonbKeys"] = jsonbApi["keys"];
+      }
+      if (jsonbApi["stripNulls"] !== undefined) {
+        bindings["jsonbStripNulls"] = jsonbApi["stripNulls"];
+      }
+      if (jsonbApi["typeof"] !== undefined) {
+        bindings["jsonbTypeof"] = jsonbApi["typeof"];
+      }
+      if (jsonbApi["validatePath"] !== undefined) {
+        bindings["jsonbValidatePath"] = jsonbApi["validatePath"];
+      }
+      if (jsonbApi["merge"] !== undefined) {
+        bindings["jsonbMerge"] = jsonbApi["merge"];
+      }
+      if (jsonbApi["normalize"] !== undefined) {
+        bindings["jsonbNormalize"] = jsonbApi["normalize"];
+      }
+      if (jsonbApi["diff"] !== undefined) {
+        bindings["jsonbDiff"] = jsonbApi["diff"];
+      }
+      if (jsonbApi["indexSuggest"] !== undefined) {
+        bindings["jsonbIndexSuggest"] = jsonbApi["indexSuggest"];
+      }
+      if (jsonbApi["securityScan"] !== undefined) {
+        bindings["jsonbSecurityScan"] = jsonbApi["securityScan"];
+      }
+      if (jsonbApi["stats"] !== undefined) {
+        bindings["jsonbStats"] = jsonbApi["stats"];
+      }
+    }
+
     // Add top-level citext aliases for convenience: pg.citextXxx() → pg.citext.xxx()
     const citextApi = bindings["citext"] as
       | Record<string, (...args: unknown[]) => Promise<unknown>>

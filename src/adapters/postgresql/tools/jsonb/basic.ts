@@ -566,12 +566,26 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
   };
 }
 
-// Schema for pg_jsonb_object - accepts direct key-value pairs, defaults to empty
+// Schema for pg_jsonb_object - accepts 'data', 'object', or 'pairs' parameter containing key-value pairs
+// For code mode: pg.jsonb.object({name: "John", age: 30}) - passes through OBJECT_WRAP_MAP
+// For MCP tools: {data: {name: "John", age: 30}} or {pairs: {...}} or {object: {...}}
 const JsonbObjectSchema = z
-  .record(z.string(), z.unknown())
-  .default({})
+  .object({
+    data: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe('Key-value pairs to build: {name: "John", age: 30}'),
+    object: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Alias for data"),
+    pairs: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Alias for data (legacy)"),
+  })
   .describe(
-    'Key-value pairs to build into a JSONB object. Pass keys directly: {name: "John", age: 30}',
+    "Build a JSONB object from key-value pairs. Use data: {key: value} or object: {key: value}.",
   );
 
 export function createJsonbObjectTool(
@@ -580,7 +594,7 @@ export function createJsonbObjectTool(
   return {
     name: "pg_jsonb_object",
     description:
-      'Build a JSONB object. Pass key-value pairs directly: {name: "John", age: 30}. Returns {object: {...}}.',
+      'Build a JSONB object. Use data: {name: "John", age: 30} or object: {name: "John"}. Returns {object: {...}}.',
     group: "jsonb",
     inputSchema: JsonbObjectSchema,
     annotations: readOnly("JSONB Object"),
@@ -589,18 +603,9 @@ export function createJsonbObjectTool(
       // Parse the input
       const parsed = JsonbObjectSchema.parse(params);
 
-      // Backward compatibility: if input is {pairs: {...}} unwrap it
-      // (old format had pairs wrapper, new format is direct key-value)
-      let pairs: Record<string, unknown> = parsed;
-      if (
-        Object.keys(parsed).length === 1 &&
-        "pairs" in parsed &&
-        typeof parsed["pairs"] === "object" &&
-        parsed["pairs"] !== null &&
-        !Array.isArray(parsed["pairs"])
-      ) {
-        pairs = parsed["pairs"] as Record<string, unknown>;
-      }
+      // Support multiple parameter names: data, object, pairs (in priority order)
+      const pairs: Record<string, unknown> =
+        parsed.data ?? parsed.object ?? parsed.pairs ?? {};
 
       const entries = Object.entries(pairs);
 

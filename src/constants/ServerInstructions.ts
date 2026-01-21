@@ -180,7 +180,7 @@ Core: \`dumpTable()\`, \`dumpSchema()\`, \`copyExport()\`, \`copyImport()\`, \`c
 
 Response Structures:
 - \`dumpTable\`: \`{ddl, type, note, insertStatements?}\` — \`insertStatements\` only with \`includeData: true\` (separate field from \`ddl\`)
-- \`copyExport\`: \`{data, rowCount, truncated?, limit?}\` — \`data\` contains CSV/text content. \`truncated: true\` when default limit applied
+- \`copyExport\`: \`{data, rowCount, truncated?, limit?}\` — \`data\` contains CSV/text content. \`truncated: true\` + \`limit\` when rows returned equals applied limit (indicating more rows likely exist)
 - \`copyImport\`: \`{command, stdinCommand, notes}\` — Both file and stdin COPY commands
 - \`createBackupPlan\`: \`{strategy: {fullBackup, walArchiving}, estimates}\`
 - \`restoreCommand\`: \`{command, warnings?, notes}\` — Warnings when \`database\` omitted

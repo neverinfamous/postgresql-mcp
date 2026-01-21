@@ -155,9 +155,12 @@ export function createListObjectsTool(
         objects.push(...(result.rows as typeof objects));
       }
 
-      // Apply limit if specified
-      const limitedObjects =
-        limit !== undefined && limit > 0 ? objects.slice(0, limit) : objects;
+      // Apply default limit of 100 if not specified
+      const effectiveLimit = limit ?? 100;
+      const truncated = objects.length > effectiveLimit;
+      const limitedObjects = truncated
+        ? objects.slice(0, effectiveLimit)
+        : objects;
 
       return {
         objects: limitedObjects,
@@ -167,12 +170,10 @@ export function createListObjectsTool(
           acc[obj.type] = (acc[obj.type] ?? 0) + 1;
           return acc;
         }, {}),
-        ...(limit !== undefined &&
-          limit > 0 &&
-          objects.length > limit && {
-            truncated: true,
-            hint: `Showing ${String(limit)} of ${String(objects.length)} objects. Remove limit to see all.`,
-          }),
+        ...(truncated && {
+          truncated: true,
+          hint: `Showing ${String(effectiveLimit)} of ${String(objects.length)} objects. Use 'limit' to see more, or 'schema'/'types' to filter.`,
+        }),
       };
     },
   };

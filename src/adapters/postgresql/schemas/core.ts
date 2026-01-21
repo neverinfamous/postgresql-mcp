@@ -106,7 +106,10 @@ export const ListTablesSchema = z.preprocess(
       .string()
       .optional()
       .describe("Schema name (default: all user schemas)"),
-    limit: z.number().optional().describe("Maximum number of tables to return"),
+    limit: z
+      .number()
+      .optional()
+      .describe("Maximum number of tables to return (default: 100)"),
   }),
 );
 

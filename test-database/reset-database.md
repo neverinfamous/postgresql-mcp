@@ -1,6 +1,67 @@
-Run this command to reset and seed the database for testing all postgres-mcp tools:
+# Test Database Reset
 
+This document describes how to reset the postgres-mcp test database between test runs.
+
+> [!IMPORTANT]
+> The database accumulates temporary tables, partitions, and test artifacts over multiple test runs.
+> Always run the **Full Cleanup** before testing to prevent performance issues caused by accumulated objects.
+
+## Quick Reset (Known Test Tables Only)
+
+Use this if you're confident no extra tables have accumulated:
+
+```powershell
 docker exec postgres-server psql -U postgres -d postgres -c "DROP TABLE IF EXISTS test_orders CASCADE; DROP TABLE IF EXISTS test_products CASCADE; DROP TABLE IF EXISTS test_jsonb_docs CASCADE; DROP TABLE IF EXISTS test_articles CASCADE; DROP SCHEMA IF EXISTS test_schema CASCADE; DROP TABLE IF EXISTS test_events CASCADE; DROP TABLE IF EXISTS test_measurements CASCADE; DROP TABLE IF EXISTS test_embeddings CASCADE; DROP TABLE IF EXISTS test_locations CASCADE; DROP TABLE IF EXISTS test_logs CASCADE; DROP TABLE IF EXISTS test_users CASCADE; DROP TABLE IF EXISTS test_categories CASCADE; DROP TABLE IF EXISTS test_secure_data CASCADE;" && docker cp c:\Users\chris\Desktop\postgres-mcp\test-database\test-database.sql postgres-server:/tmp/test-database.sql && docker exec postgres-server psql -U postgres -d postgres -f /tmp/test-database.sql 2>&1 | Select-Object -Last 10
+```
+
+## Full Cleanup (Recommended)
+
+Use this to clean up ALL accumulated test artifacts including `temp_*` tables, partition tables, and test schemas:
+
+```powershell
+# Step 1: Drop ALL temp_* and accumulated test tables (run in psql or via docker exec)
+docker exec postgres-server psql -U postgres -d postgres -c "
+DO \$\$
+DECLARE
+    r RECORD;
+BEGIN
+    -- Drop all temp_* tables
+    FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'temp_%' AND schemaname = 'public'
+    LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+
+    -- Drop all test_* tables (except partman-managed)
+    FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'test_%' AND schemaname = 'public'
+    LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+
+    -- Drop accumulated ai_test_* tables
+    FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'ai_test_%' AND schemaname = 'public'
+    LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+
+    -- Drop test schemas
+    DROP SCHEMA IF EXISTS test_schema CASCADE;
+    DROP SCHEMA IF EXISTS test_vector_schema CASCADE;
+END \$\$;
+"
+
+# Step 2: Re-seed the database
+docker cp c:\Users\chris\Desktop\postgres-mcp\test-database\test-database.sql postgres-server:/tmp/test-database.sql && docker exec postgres-server psql -U postgres -d postgres -f /tmp/test-database.sql 2>&1 | Select-Object -Last 10
+```
+
+## Verify Cleanup
+
+After cleanup, verify the database has a reasonable number of objects:
+
+```powershell
+docker exec postgres-server psql -U postgres -d postgres -c "SELECT COUNT(*) as table_count FROM pg_tables WHERE schemaname = 'public';"
+```
+
+Expected: ~15-25 tables (test\_\* plus a few system tables)
 
 ## What This Creates
 

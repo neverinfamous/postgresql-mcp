@@ -33,20 +33,28 @@ export function createListTablesTool(adapter: PostgresAdapter): ToolDefinition {
     handler: async (params: unknown, _context: RequestContext) => {
       const { schema, limit } = ListTablesSchema.parse(params);
       let tables = await adapter.listTables();
+      const totalCount = tables.length;
 
       if (schema) {
         tables = tables.filter((t) => t.schema === schema);
       }
 
-      // Apply limit if specified
-      if (limit !== undefined && limit > 0) {
-        tables = tables.slice(0, limit);
+      // Apply default limit of 100 if not specified
+      const effectiveLimit = limit ?? 100;
+      const truncated = tables.length > effectiveLimit;
+      if (truncated) {
+        tables = tables.slice(0, effectiveLimit);
       }
 
       return {
         tables,
         data: tables, // Alias for consistency with array-expecting code
         count: tables.length,
+        totalCount,
+        ...(truncated && {
+          truncated: true,
+          hint: `Showing ${String(effectiveLimit)} of ${String(totalCount)} tables. Use 'limit' to see more, or 'schema' to filter.`,
+        }),
       };
     },
   };

@@ -66,7 +66,7 @@ export const ListObjectsSchema = z.preprocess(
     limit: z
       .number()
       .optional()
-      .describe("Maximum number of objects to return"),
+      .describe("Maximum number of objects to return (default: 100)"),
   }),
 );
 

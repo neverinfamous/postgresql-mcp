@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+
+- **pg_list_tables default limit** — `pg_list_tables` now applies a default limit of 100 rows when no `limit` parameter is specified. Returns `{truncated: true, totalCount, hint}` metadata when results are truncated. Prevents UI slowdowns in AntiGravity and other MCP clients when databases have many tables. Use `limit: 500` to see more, or `schema` filter to narrow scope
+- **pg_list_objects default limit** — `pg_list_objects` now applies a default limit of 100 objects when no `limit` parameter is specified. Same truncation metadata as `pg_list_tables`. Prevents massive JSON response payloads (300KB+ in databases with accumulated test tables)
+
 ### Added
 
 - **pg_citext_analyze_candidates filter parameters** — `pg_citext_analyze_candidates` now accepts optional `table` and `limit` parameters to narrow results. Useful for large databases where scanning all tables produces too many candidates. Response now includes applied filters in output

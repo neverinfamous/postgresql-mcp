@@ -307,6 +307,32 @@ export const CreateTableSchema = z
         const lowerDefault = defaultValue.toLowerCase().trim();
         if (functionConversions[lowerDefault]) {
           defaultValue = functionConversions[lowerDefault];
+        } else if (typeof rawDefault === "string") {
+          // Auto-quote string literals that are not SQL expressions
+          // Detect SQL expressions by checking for:
+          // - Already quoted (starts with ')
+          // - Function calls (contains parentheses)
+          // - SQL keywords (CURRENT_*, NULL, TRUE, FALSE, etc.)
+          // - Type casts (contains ::)
+          // - Numeric values
+          // - Operators or complex expressions
+          const trimmed = defaultValue.trim();
+          const isAlreadyQuoted =
+            trimmed.startsWith("'") && trimmed.endsWith("'");
+          const isSqlExpression =
+            /^[0-9.\-+eE]+$/.test(trimmed) || // Numeric
+            /\(.*\)/.test(trimmed) || // Function call
+            trimmed.includes("::") || // Type cast
+            /^(NULL|TRUE|FALSE|CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME|CURRENT_USER|SESSION_USER|LOCALTIME|LOCALTIMESTAMP)$/i.test(
+              trimmed,
+            ) || // SQL keywords
+            /^nextval\s*\(/i.test(trimmed) || // nextval function
+            /^(gen_random_uuid|uuid_generate_v[1-4])\s*\(/i.test(trimmed); // UUID functions
+
+          if (!isAlreadyQuoted && !isSqlExpression) {
+            // Quote the string literal, escaping any internal single quotes
+            defaultValue = `'${trimmed.replace(/'/g, "''")}'`;
+          }
         }
       }
 

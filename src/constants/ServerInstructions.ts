@@ -16,7 +16,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 1. **Transactions**: Use \`pg.transactions.execute({statements: [{sql: "..."}, ...]})\` for atomic ops. Returns \`{success, statementsExecuted, results}\` (rolled back on error)
 2. **pg_write_query**: ⛔ Throws for SELECT—use \`pg_read_query\` for SELECT statements
 3. **pg_upsert/pg_create_table**: \`schema.table\` format auto-parses (e.g., \`'myschema.users'\` → schema: 'myschema', table: 'users')
-4. **pg_create_table columns**: \`notNull\`, \`defaultValue\` (numbers/booleans auto-coerced; \`now()\` → \`CURRENT_TIMESTAMP\`), \`check\`, \`references\` (object or string \`"table(column)"\` syntax)
+4. **pg_create_table columns**: \`notNull\`, \`defaultValue\` (string literals auto-quoted; numbers/booleans auto-coerced; \`now()\` → \`CURRENT_TIMESTAMP\`), \`check\`, \`references\` (object or string \`"table(column)"\` syntax)
 5. **pg_create_table constraints**: \`constraints\` array only accepts \`{type: 'unique'|'check'}\`. Primary keys: use \`column.primaryKey\` or top-level \`primaryKey: ['col1', 'col2']\`
 6. **pg_create_index expression**: Columns can be expressions like \`LOWER(name)\` or \`name::text\`—auto-detected
 7. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`

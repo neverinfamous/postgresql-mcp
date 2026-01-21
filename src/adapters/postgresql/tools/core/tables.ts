@@ -48,7 +48,6 @@ export function createListTablesTool(adapter: PostgresAdapter): ToolDefinition {
 
       return {
         tables,
-        data: tables, // Alias for consistency with array-expecting code
         count: tables.length,
         totalCount,
         ...(truncated && {

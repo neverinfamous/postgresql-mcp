@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **pg.readQuery() and 10 other top-level core aliases** — Code mode now supports top-level aliases for the most common starter tools: `pg.readQuery()`, `pg.writeQuery()`, `pg.listTables()`, `pg.describeTable()`, `pg.createTable()`, `pg.dropTable()`, `pg.count()`, `pg.exists()`, `pg.upsert()`, `pg.batchInsert()`, `pg.truncate()`. These map directly to `pg.core.*` methods for improved ergonomics
+- **pg_upsert/pg_batch_insert RETURNING documentation** — Added critical gotcha #13 documenting that `returning` parameter must be an array of column names (e.g., `["id", "name"]`) and does not support `"*"` wildcard
+- **pg_create_table constraints documentation** — Added critical gotcha #5 documenting that `constraints` array only accepts `{type: 'unique'|'check'}`. Primary keys must use `column.primaryKey` property or top-level `primaryKey: ['col1', 'col2']` array
+- **pg.transactions.execute response structure documentation** — Updated critical gotcha #1 to document actual response structure: `{success, statementsExecuted, results}` with automatic rollback on error
+
 - **pg_citext_analyze_candidates filter parameters** — `pg_citext_analyze_candidates` now accepts optional `table` and `limit` parameters to narrow results. Useful for large databases where scanning all tables produces too many candidates. Response now includes applied filters in output
 - **pg_citext_schema_advisor previousType field** — `pg_citext_schema_advisor` recommendations for already-citext columns now include `previousType: "text or varchar (converted)"` field, providing clearer indication that the column was converted from a text-based type
 

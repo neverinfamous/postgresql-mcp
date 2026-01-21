@@ -1170,6 +1170,50 @@ export class PgApi {
       }
     }
 
+    // Add top-level core aliases for the most common starter tools: pg.readQuery() → pg.core.readQuery()
+    const coreApi = bindings["core"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (coreApi !== undefined) {
+      // Query tools
+      if (coreApi["readQuery"] !== undefined) {
+        bindings["readQuery"] = coreApi["readQuery"];
+      }
+      if (coreApi["writeQuery"] !== undefined) {
+        bindings["writeQuery"] = coreApi["writeQuery"];
+      }
+      // Table metadata tools
+      if (coreApi["listTables"] !== undefined) {
+        bindings["listTables"] = coreApi["listTables"];
+      }
+      if (coreApi["describeTable"] !== undefined) {
+        bindings["describeTable"] = coreApi["describeTable"];
+      }
+      // Table CRUD tools
+      if (coreApi["createTable"] !== undefined) {
+        bindings["createTable"] = coreApi["createTable"];
+      }
+      if (coreApi["dropTable"] !== undefined) {
+        bindings["dropTable"] = coreApi["dropTable"];
+      }
+      // Row operation tools
+      if (coreApi["count"] !== undefined) {
+        bindings["count"] = coreApi["count"];
+      }
+      if (coreApi["exists"] !== undefined) {
+        bindings["exists"] = coreApi["exists"];
+      }
+      if (coreApi["upsert"] !== undefined) {
+        bindings["upsert"] = coreApi["upsert"];
+      }
+      if (coreApi["batchInsert"] !== undefined) {
+        bindings["batchInsert"] = coreApi["batchInsert"];
+      }
+      if (coreApi["truncate"] !== undefined) {
+        bindings["truncate"] = coreApi["truncate"];
+      }
+    }
+
     return bindings;
   }
 }

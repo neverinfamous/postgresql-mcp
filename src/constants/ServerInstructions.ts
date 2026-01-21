@@ -13,18 +13,20 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 ## ⚠️ Critical Gotchas
 
-1. **Transactions**: Use \`pg.transactions.execute({statements: [{sql: "..."}, ...]})\` for atomic ops, OR pass \`transactionId\` to individual queries
+1. **Transactions**: Use \`pg.transactions.execute({statements: [{sql: "..."}, ...]})\` for atomic ops. Returns \`{success, statementsExecuted, results}\` (rolled back on error)
 2. **pg_write_query**: ⛔ Throws for SELECT—use \`pg_read_query\` for SELECT statements
 3. **pg_upsert/pg_create_table**: \`schema.table\` format auto-parses (e.g., \`'myschema.users'\` → schema: 'myschema', table: 'users')
 4. **pg_create_table columns**: \`notNull\`, \`defaultValue\` (numbers/booleans auto-coerced to string), \`check\`, \`references\` (object or string \`"table(column)"\` syntax)
-5. **pg_create_index expression**: Columns can be expressions like \`LOWER(name)\` or \`name::text\`—auto-detected
-6. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`
-7. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint
-8. **pg_exists optional WHERE**: \`where\`/\`condition\`/\`filter\` is optional. Without it, checks if table has any rows
-9. **pg_describe_table**: Returns columns, foreignKeys, primaryKey—use \`pg_get_indexes\` separately for index details
-10. **pg_vector_insert updateExisting**: Uses direct UPDATE (avoids NOT NULL constraint issues vs INSERT mode)
-11. **pg_get_indexes without table**: Returns ALL database indexes (potentially large). Use \`table\` param for specific table
-12. **Small tables**: Optimizer correctly uses Seq Scan for <1000 rows—this is expected behavior
+5. **pg_create_table constraints**: \`constraints\` array only accepts \`{type: 'unique'|'check'}\`. Primary keys: use \`column.primaryKey\` or top-level \`primaryKey: ['col1', 'col2']\`
+6. **pg_create_index expression**: Columns can be expressions like \`LOWER(name)\` or \`name::text\`—auto-detected
+7. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`
+8. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint
+9. **pg_exists optional WHERE**: \`where\`/\`condition\`/\`filter\` is optional. Without it, checks if table has any rows
+10. **pg_describe_table**: Returns columns, foreignKeys, primaryKey—use \`pg_get_indexes\` separately for index details
+11. **pg_vector_insert updateExisting**: Uses direct UPDATE (avoids NOT NULL constraint issues vs INSERT mode)
+12. **pg_get_indexes without table**: Returns ALL database indexes (potentially large). Use \`table\` param for specific table
+13. **pg_upsert/pg_batch_insert RETURNING**: \`returning\` param must be array of column names: \`["id", "name"]\`. ⛔ \`"*"\` wildcard not supported
+14. **Small tables**: Optimizer correctly uses Seq Scan for <1000 rows—this is expected behavior
 
 ## 🔄 Response Structures
 
@@ -50,6 +52,8 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 ## API Mapping
 
 \`pg_group_action\` → \`pg.group.action()\` (group prefixes dropped: \`pg_jsonb_extract\` → \`pg.jsonb.extract()\`)
+
+**Top-Level Core Aliases**: Common starter tools available directly: \`pg.readQuery()\`, \`pg.writeQuery()\`, \`pg.listTables()\`, \`pg.describeTable()\`, \`pg.createTable()\`, \`pg.dropTable()\`, \`pg.count()\`, \`pg.exists()\`, \`pg.upsert()\`, \`pg.batchInsert()\`, \`pg.truncate()\`
 
 **Positional args work**: \`readQuery("SELECT...")\`, \`exists("users", "id=1")\`, \`createIndex("users", ["email"])\`
 

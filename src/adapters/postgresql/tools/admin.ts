@@ -485,7 +485,12 @@ function createClusterTool(adapter: PostgresAdapter): ToolDefinition {
           : `"${parsed.table}"`;
       const sql = `CLUSTER ${tableName} USING "${parsed.index}"`;
       await adapter.executeQuery(sql);
-      return { success: true, table: parsed.table, index: parsed.index };
+      return {
+        success: true,
+        message: `Clustered ${parsed.table} using index ${parsed.index}`,
+        table: parsed.table,
+        index: parsed.index,
+      };
     },
   };
 }

@@ -746,6 +746,7 @@ describe("pg_cluster", () => {
       mockContext,
     )) as {
       success: boolean;
+      message: string;
       table: string;
       index: string;
     };
@@ -754,6 +755,9 @@ describe("pg_cluster", () => {
       'CLUSTER "users" USING "idx_users_created"',
     );
     expect(result.success).toBe(true);
+    expect(result.message).toBe(
+      "Clustered users using index idx_users_created",
+    );
     expect(result.table).toBe("users");
     expect(result.index).toBe("idx_users_created");
   });

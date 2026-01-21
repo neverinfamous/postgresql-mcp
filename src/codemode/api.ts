@@ -487,8 +487,8 @@ const ARRAY_WRAP_MAP: Record<string, string> = {
  * (instead of passed through directly)
  */
 const OBJECT_WRAP_MAP: Record<string, string> = {
-  object: "pairs", // pg.jsonb.object({key: val}) → {pairs: {key: val}}
-  jsonbObject: "pairs", // alias
+  object: "data", // pg.jsonb.object({key: val}) → {data: {key: val}}
+  jsonbObject: "data", // alias
 };
 
 /**

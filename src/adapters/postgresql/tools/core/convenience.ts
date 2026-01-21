@@ -445,7 +445,13 @@ export function createBatchInsertTool(
       for (const row of parsed.rows) {
         const rowValues: string[] = [];
         for (const col of columns) {
-          values.push(row[col] ?? null);
+          let value = row[col] ?? null;
+          // Serialize objects/arrays to JSON strings for JSONB column support
+          // PostgreSQL expects JSON data as string literals, not raw objects
+          if (value !== null && typeof value === "object") {
+            value = JSON.stringify(value);
+          }
+          values.push(value);
           rowValues.push(`$${String(paramIndex)}`);
           paramIndex++;
         }

@@ -567,7 +567,7 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 // Schema for pg_jsonb_object - accepts 'data', 'object', or 'pairs' parameter containing key-value pairs
-// For code mode: pg.jsonb.object({name: "John", age: 30}) - passes through OBJECT_WRAP_MAP
+// For code mode: pg.jsonb.object({name: "John", age: 30}) - passes through OBJECT_WRAP_MAP → {data: {...}}
 // For MCP tools: {data: {name: "John", age: 30}} or {pairs: {...}} or {object: {...}}
 const JsonbObjectSchema = z
   .object({

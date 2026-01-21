@@ -75,10 +75,9 @@ function createTableSizesTool(adapter: PostgresAdapter): ToolDefinition {
     handler: async (params: unknown, _context: RequestContext) => {
       const { schema, limit } = TableSizesSchema.parse(params);
       const schemaClause = schema ? `AND n.nspname = '${schema}'` : "";
-      const limitClause =
-        limit !== undefined && limit > 0
-          ? ` LIMIT ${String(limit)}`
-          : " LIMIT 50";
+      // Apply limit (default 50)
+      const effectiveLimit = limit !== undefined && limit > 0 ? limit : 50;
+      const limitClause = ` LIMIT ${String(effectiveLimit)}`;
 
       const sql = `SELECT n.nspname as schema, c.relname as table_name,
                         pg_size_pretty(pg_table_size(c.oid)) as table_size,
@@ -106,7 +105,27 @@ function createTableSizesTool(adapter: PostgresAdapter): ToolDefinition {
                 : 0,
         };
       });
-      return { tables };
+
+      // If limit was applied and we hit the limit, get total count to indicate truncation
+      if (tables.length === effectiveLimit) {
+        const countSql = `SELECT count(*) as total
+                          FROM pg_class c
+                          LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+                          WHERE c.relkind IN ('r', 'p')
+                          AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                          ${schemaClause}`;
+        const countResult = await adapter.executeQuery(countSql);
+        const totalCount = Number(countResult.rows?.[0]?.["total"] ?? 0);
+
+        return {
+          tables,
+          count: tables.length,
+          totalCount,
+          truncated: totalCount > tables.length,
+        };
+      }
+
+      return { tables, count: tables.length };
     },
   };
 }
@@ -240,7 +259,7 @@ function createShowSettingsTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: readOnly("Show Settings"),
     icons: getToolIcons("monitoring", readOnly("Show Settings")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { pattern } = ShowSettingsSchema.parse(params);
+      const { pattern, limit } = ShowSettingsSchema.parse(params);
 
       // Auto-detect if user passed exact name vs LIKE pattern
       // If no wildcards, try exact match first, fall back to LIKE with wildcards
@@ -259,15 +278,35 @@ function createShowSettingsTool(adapter: PostgresAdapter): ToolDefinition {
         }
       }
 
+      // Build LIMIT clause if limit is specified
+      const limitClause =
+        limit !== undefined && limit > 0 ? ` LIMIT ${String(limit)}` : "";
+
       const sql = `SELECT name, setting, unit, category, short_desc
                         FROM pg_settings
                         ${whereClause}
-                        ORDER BY category, name`;
+                        ORDER BY category, name${limitClause}`;
 
       const result = await adapter.executeQuery(sql, queryParams);
+      const rows = result.rows ?? [];
+
+      // If limit was applied, get total count to indicate truncation
+      if (limit !== undefined && limit > 0 && rows.length === limit) {
+        const countSql = `SELECT count(*) as total FROM pg_settings ${whereClause}`;
+        const countResult = await adapter.executeQuery(countSql, queryParams);
+        const totalCount = Number(countResult.rows?.[0]?.["total"] ?? 0);
+
+        return {
+          settings: rows,
+          count: rows.length,
+          totalCount,
+          truncated: totalCount > rows.length,
+        };
+      }
+
       return {
-        settings: result.rows,
-        count: result.rows?.length ?? 0,
+        settings: rows,
+        count: rows.length,
       };
     },
   };

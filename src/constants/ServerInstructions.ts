@@ -139,9 +139,9 @@ Wrappers: \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQu
 Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSettings()\`, \`capacityPlanning()\`, \`uptime()\`, \`serverVersion()\`, \`recoveryStatus()\`, \`replicationStatus()\`, \`resourceUsageAnalyze()\`, \`alertThresholdSet()\`
 
 - \`databaseSize()\`: Returns \`{bytes: number, size: string}\`. Optional \`database\` param for specific db
-- \`tableSizes({ limit?, schema? })\`: Returns \`{tables: [{schema, table_name, table_size, indexes_size, total_size, total_bytes}]}\`. All \`total_bytes\` are numbers
+- \`tableSizes({ limit?, schema? })\`: Default limit 50. Returns \`{tables: [...], count, truncated?, totalCount?}\`. \`truncated: true\` + \`totalCount\` when limited. Use \`limit: 0\` for all
 - \`connectionStats()\`: Returns \`{byDatabaseAndState, totalConnections: number, maxConnections: number}\`
-- \`showSettings({setting: 'work_mem'})\`: Accepts \`pattern\`, \`setting\`, or \`name\`. Exact names auto-match; \`%\` for LIKE patterns
+- \`showSettings({ setting?, limit? })\`: Default limit 50 when no pattern. Returns \`{settings: [...], count, truncated?, totalCount?}\`. Accepts \`pattern\`, \`setting\`, or \`name\`. Exact names auto-match; \`%\` for LIKE patterns
 - \`capacityPlanning({days: 90})\`: \`days\` = \`projectionDays\`. Returns \`{current, growth, projection, recommendations}\` with numeric fields. ⛔ Negative days rejected
 - \`uptime()\`: Returns \`{start_time: string, uptime: {days, hours, minutes, seconds, milliseconds}}\`
 - \`serverVersion()\`: Returns \`{full_version: string, version: string, version_num: number}\`
@@ -149,6 +149,10 @@ Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSetting
 - \`replicationStatus()\`: Returns \`{role: 'primary'|'replica', replicas: [...]}\` for primary, or \`{role: 'replica', replay_lag, ...}\` for replica
 - \`resourceUsageAnalyze()\`: Returns \`{backgroundWriter, checkpoints, connectionDistribution, bufferUsage, activity, analysis}\` with all counts as numbers
 - \`alertThresholdSet({metric?: 'connection_usage'})\`: Returns recommended thresholds. ⛔ Invalid metric throws validation error. Valid metrics: connection_usage, cache_hit_ratio, replication_lag, dead_tuples, long_running_queries, lock_wait_time
+
+📦 **AI-Optimized Payloads**: Tools return limited results by default to reduce context size:
+- \`tableSizes({ limit? })\`: Default 50 rows. Returns \`truncated: true\` + \`totalCount\` when limited. Use \`limit: 0\` for all
+- \`showSettings({ limit? })\`: Default 50 rows when no pattern specified. Use \`limit: 0\` for all or specify a pattern
 
 Aliases: \`connections\`→\`connectionStats\`, \`settings\`/\`config\`→\`showSettings\`, \`alerts\`/\`thresholds\`→\`alertThresholdSet\`
 

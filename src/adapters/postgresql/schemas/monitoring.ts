@@ -43,10 +43,18 @@ export const ShowSettingsSchema = z.preprocess(
         .string()
         .optional()
         .describe("Alias for pattern - setting name or pattern"),
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          "Max settings to return (default: 50 when no pattern specified)",
+        ),
     })
     .transform((data) => {
       // Resolve alias: setting or name → pattern
       const pattern = data.pattern ?? data.setting ?? data.name;
-      return { pattern };
+      // Default limit to 50 only when NO filter is specified (to avoid 415+ results)
+      const limit = data.limit ?? (pattern === undefined ? 50 : undefined);
+      return { pattern, limit };
     }),
 );

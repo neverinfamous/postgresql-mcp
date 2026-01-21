@@ -1,5 +1,9 @@
 /**
  * PostgreSQL Performance Tools - EXPLAIN Operations
+ *
+ * NOTE: Uses the "Split Schema" pattern where ExplainSchemaBase (without
+ * z.preprocess) is used for MCP inputSchema visibility, while ExplainSchema
+ * (with preprocess) is used in the handler for alias support.
  */
 
 import type { PostgresAdapter } from "../../PostgresAdapter.js";
@@ -9,14 +13,14 @@ import type {
 } from "../../../../types/index.js";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
-import { ExplainSchema } from "../../schemas/index.js";
+import { ExplainSchema, ExplainSchemaBase } from "../../schemas/index.js";
 
 export function createExplainTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_explain",
     description: "Show query execution plan without running the query.",
     group: "performance",
-    inputSchema: ExplainSchema,
+    inputSchema: ExplainSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Explain Query"),
     icons: getToolIcons("performance", readOnly("Explain Query")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -40,7 +44,7 @@ export function createExplainAnalyzeTool(
     name: "pg_explain_analyze",
     description: "Run query and show actual execution plan with timing.",
     group: "performance",
-    inputSchema: ExplainSchema,
+    inputSchema: ExplainSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Explain Analyze"),
     icons: getToolIcons("performance", readOnly("Explain Analyze")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -64,7 +68,7 @@ export function createExplainBuffersTool(
     name: "pg_explain_buffers",
     description: "Show query plan with buffer usage statistics.",
     group: "performance",
-    inputSchema: ExplainSchema,
+    inputSchema: ExplainSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Explain Buffers"),
     icons: getToolIcons("performance", readOnly("Explain Buffers")),
     handler: async (params: unknown, _context: RequestContext) => {

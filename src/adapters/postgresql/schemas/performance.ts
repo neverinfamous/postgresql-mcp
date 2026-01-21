@@ -9,10 +9,34 @@ import { z } from "zod";
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
 
-// Base schema for MCP visibility
-const ExplainSchemaBase = z.object({
-  sql: z.string().optional().describe("Query to explain"),
-  query: z.string().optional().describe("Alias for sql"),
+/**
+ * Preprocess explain params to normalize aliases.
+ * Exported so tools can apply it in their handlers.
+ */
+export function preprocessExplainParams(input: unknown): unknown {
+  if (typeof input !== "object" || input === null) {
+    return input;
+  }
+  const result = { ...(input as Record<string, unknown>) };
+
+  // Alias: query → sql
+  if (result["query"] !== undefined && result["sql"] === undefined) {
+    result["sql"] = result["query"];
+  }
+
+  return result;
+}
+
+// =============================================================================
+// Base Schema (for MCP inputSchema visibility - no preprocess)
+// =============================================================================
+
+/**
+ * Base schema for EXPLAIN tools - used for MCP inputSchema visibility.
+ * Shows sql as required so MCP clients prompt for it.
+ */
+export const ExplainSchemaBase = z.object({
+  sql: z.string().describe("Query to explain"),
   params: z.array(z.unknown()).optional().describe("Query parameters"),
   analyze: z.boolean().optional().describe("Run EXPLAIN ANALYZE"),
   buffers: z.boolean().optional().describe("Include buffer usage"),
@@ -22,16 +46,18 @@ const ExplainSchemaBase = z.object({
     .describe("Output format"),
 });
 
-// Transformed schema with alias resolution
-export const ExplainSchema = ExplainSchemaBase.transform((data) => ({
-  sql: data.sql ?? data.query ?? "",
-  params: data.params,
-  analyze: data.analyze,
-  buffers: data.buffers,
-  format: data.format,
-})).refine((data) => data.sql !== "", {
-  message: "sql (or query alias) is required",
-});
+// =============================================================================
+// Full Schema (with preprocess - for handler parsing)
+// =============================================================================
+
+/**
+ * Full schema with preprocessing for alias support.
+ * Used in handler to parse params after MCP has collected them.
+ */
+export const ExplainSchema = z.preprocess(
+  preprocessExplainParams,
+  ExplainSchemaBase,
+);
 
 export const IndexStatsSchema = z.preprocess(
   defaultToEmpty,

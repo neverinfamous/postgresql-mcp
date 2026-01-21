@@ -55,6 +55,8 @@ export {
 // Performance and explain schemas
 export {
   ExplainSchema,
+  ExplainSchemaBase,
+  preprocessExplainParams,
   IndexStatsSchema,
   TableStatsSchema,
 } from "./performance.js";

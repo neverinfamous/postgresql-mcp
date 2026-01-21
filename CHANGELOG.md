@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg.dumpTable() and 10 more top-level backup aliases** — Code mode now supports top-level backup method aliases for convenience: `pg.dumpTable()`, `pg.dumpSchema()`, `pg.copyExport()`, `pg.copyImport()`, `pg.createBackupPlan()`, `pg.restoreCommand()`, `pg.restoreValidate()`, `pg.physical()`, `pg.backupPhysical()`, `pg.scheduleOptimize()`, `pg.backupScheduleOptimize()`. These map directly to `pg.backup.xxx()` methods for backup and recovery tasks
 - **Admin tools schema.table format support** — `pg_vacuum`, `pg_vacuum_analyze`, and `pg_analyze` now support `schema.table` format (e.g., `'public.users'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter, consistent with other tool groups
 - **Admin tools tableName alias** — `pg_vacuum`, `pg_vacuum_analyze`, and `pg_analyze` now accept `tableName` as an alias for `table` parameter, with consistent response field inclusion
+- **pg_dump_table partitioned table support** — `pg_dump_table` now detects partitioned tables and includes the `PARTITION BY` clause in the DDL output. Returns `type: 'partitioned_table'` instead of `type: 'table'` for partitioned tables. Supports RANGE, LIST, and HASH partitioning strategies with correct partition key columns. Note provides guidance to use `pg_list_partitions` for partition children
 
 ### Fixed
 

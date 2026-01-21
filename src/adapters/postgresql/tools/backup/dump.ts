@@ -175,6 +175,64 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
         };
       }
 
+      // Check if it's a partitioned table (relkind 'p') and get partition info
+      let partitionClause = "";
+      const isPartitionedTable = relkind === "p";
+
+      if (isPartitionedTable) {
+        try {
+          // Query pg_partitioned_table to get partition strategy and key columns
+          const partInfo = await adapter.executeQuery(`
+            SELECT pt.partstrat,
+                   array_agg(a.attname ORDER BY partattrs.ord) as partition_columns
+            FROM pg_partitioned_table pt
+            JOIN pg_class c ON pt.partrelid = c.oid
+            JOIN pg_namespace n ON c.relnamespace = n.oid
+            CROSS JOIN LATERAL unnest(pt.partattrs) WITH ORDINALITY AS partattrs(attnum, ord)
+            JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = partattrs.attnum
+            WHERE n.nspname = '${schemaName}' AND c.relname = '${tableName}'
+            GROUP BY pt.partstrat
+          `);
+
+          const partRow = partInfo.rows?.[0];
+          if (partRow) {
+            const strategy = partRow["partstrat"];
+            const columns = partRow["partition_columns"];
+
+            // Map strategy code to keyword
+            const strategyMap: Record<string, string> = {
+              r: "RANGE",
+              l: "LIST",
+              h: "HASH",
+            };
+            const strategyKeyword =
+              typeof strategy === "string"
+                ? (strategyMap[strategy] ?? "RANGE")
+                : "RANGE";
+
+            // Build column list - PostgreSQL returns array_agg as string like "{col1,col2}"
+            let columnList = "";
+            if (Array.isArray(columns)) {
+              columnList = columns.map((c) => `"${String(c)}"`).join(", ");
+            } else if (typeof columns === "string") {
+              // Parse PostgreSQL array literal format: "{col1,col2}" -> ["col1", "col2"]
+              const parsed = columns
+                .replace(/^\{/, "")
+                .replace(/\}$/, "")
+                .split(",")
+                .filter((c) => c.length > 0);
+              columnList = parsed.map((c) => `"${c.trim()}"`).join(", ");
+            }
+
+            if (columnList) {
+              partitionClause = ` PARTITION BY ${strategyKeyword} (${columnList})`;
+            }
+          }
+        } catch {
+          // Partition info query failed, continue without partition clause
+        }
+      }
+
       const tableInfo = await adapter.describeTable(tableName, schemaName);
 
       const columns =
@@ -201,7 +259,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
           })
           .join(",\n") ?? "";
 
-      const createTable = `CREATE TABLE "${schemaName}"."${tableName}" (\n${columns}\n);`;
+      const createTable = `CREATE TABLE "${schemaName}"."${tableName}" (\n${columns}\n)${partitionClause};`;
 
       const result: {
         ddl: string;
@@ -210,8 +268,10 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
         note: string;
       } = {
         ddl: createTable,
-        type: "table",
-        note: "Basic CREATE TABLE only. For indexes use pg_get_indexes, for constraints use pg_get_constraints.",
+        type: isPartitionedTable ? "partitioned_table" : "table",
+        note: isPartitionedTable
+          ? "For partition children use pg_list_partitions, for indexes use pg_get_indexes, for constraints use pg_get_constraints."
+          : "Basic CREATE TABLE only. For indexes use pg_get_indexes, for constraints use pg_get_constraints.",
       };
 
       if (parsed.includeData) {

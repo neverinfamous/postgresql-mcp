@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Performance
 
+- **pg_table_stats default limit** — `pg_table_stats` now applies a default limit of 50 rows when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all tables. Prevents large payloads in databases with many tables
+- **pg_vacuum_stats default limit** — `pg_vacuum_stats` now applies a default limit of 50 rows when no `limit` parameter is specified. Same truncation indicators as `pg_table_stats`. Use `limit: 0` for all tables
+- **pg_unused_indexes default limit** — `pg_unused_indexes` now applies a default limit of 20 rows when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` when limited. Use `limit: 0` for all indexes
+- **pg_unused_indexes summary mode** — `pg_unused_indexes({ summary: true })` returns aggregated statistics by schema (`{bySchema: [{schema, unusedCount, totalSize, totalSizeBytes}], totalCount, totalSizeBytes}`) instead of individual indexes, providing a compact overview for large databases
+- **pg_query_plan_stats query truncation** — `pg_query_plan_stats` now truncates query text to 100 characters by default, significantly reducing payload size. Each row includes `queryTruncated: boolean` indicator. Use `truncateQuery: 0` for full query text
 - **pg_trigram_similarity default limit** — `pg_trigram_similarity` now applies a default limit of 100 rows when no `limit` parameter is specified. Prevents large response payloads when searching across many rows. Use `limit: 500` or higher to see more results
 - **pg_fuzzy_match default limit** — `pg_fuzzy_match` now applies a default limit of 100 rows when no `limit` parameter is specified. Consistent with `pg_trigram_similarity` and other list-returning tools
 - **pg_get_indexes payload reduction** — Removed redundant `indexName` (duplicate of `name`) and `indexType` (duplicate of `type`) fields from `pg_get_indexes` response. Index objects now return only `{name, tableName, schemaName, columns, unique, type, sizeBytes?, numberOfScans?, ...}`, reducing payload size by ~15%

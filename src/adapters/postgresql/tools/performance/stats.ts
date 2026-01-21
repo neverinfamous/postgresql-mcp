@@ -10,7 +10,7 @@ import type {
 import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
-import { IndexStatsSchema, TableStatsSchema } from "../../schemas/index.js";
+import { IndexStatsSchema } from "../../schemas/index.js";
 
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
@@ -57,15 +57,32 @@ export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 export function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
+  const TableStatsSchemaLocal = z.preprocess(
+    defaultToEmpty,
+    z.object({
+      table: z
+        .string()
+        .optional()
+        .describe("Table name (all tables if omitted)"),
+      schema: z.string().optional().describe("Schema name"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max rows to return (default: 50, use 0 for all)"),
+    }),
+  );
+
   return {
     name: "pg_table_stats",
     description: "Get table access statistics.",
     group: "performance",
-    inputSchema: TableStatsSchema,
+    inputSchema: TableStatsSchemaLocal,
     annotations: readOnly("Table Stats"),
     icons: getToolIcons("performance", readOnly("Table Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { table, schema } = TableStatsSchema.parse(params);
+      const parsed = TableStatsSchemaLocal.parse(params);
+      const { table, schema } = parsed;
+      const limit = parsed.limit === 0 ? null : (parsed.limit ?? 50);
       let whereClause =
         "schemaname NOT IN ('pg_catalog', 'information_schema')";
       if (schema) whereClause += ` AND schemaname = '${schema}'`;
@@ -78,7 +95,8 @@ export function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
                         last_vacuum, last_autovacuum, last_analyze, last_autoanalyze
                         FROM pg_stat_user_tables
                         WHERE ${whereClause}
-                        ORDER BY seq_scan DESC`;
+                        ORDER BY seq_scan DESC
+                        ${limit !== null ? `LIMIT ${String(limit)}` : ""}`;
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
@@ -96,7 +114,19 @@ export function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
           dead_tuples: toNum(row["dead_tuples"]),
         }),
       );
-      return { tables };
+
+      // Get total count if limited
+      const response: Record<string, unknown> = {
+        tables,
+        count: tables.length,
+      };
+      if (limit !== null && tables.length === limit) {
+        const countSql = `SELECT COUNT(*) as total FROM pg_stat_user_tables WHERE ${whereClause}`;
+        const countResult = await adapter.executeQuery(countSql);
+        response["totalCount"] = toNum(countResult.rows?.[0]?.["total"]);
+        response["truncated"] = true;
+      }
+      return response;
     },
   };
 }
@@ -198,6 +228,14 @@ export function createUnusedIndexesTool(
         .string()
         .optional()
         .describe('Minimum index size to include (e.g., "1 MB")'),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max indexes to return (default: 20, use 0 for all)"),
+      summary: z
+        .boolean()
+        .optional()
+        .describe("Return aggregated summary instead of full list"),
     }),
   );
 
@@ -211,10 +249,48 @@ export function createUnusedIndexesTool(
     icons: getToolIcons("performance", readOnly("Unused Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = UnusedIndexesSchema.parse(params);
+      const limit = parsed.limit === 0 ? null : (parsed.limit ?? 20);
       let whereClause =
         "schemaname NOT IN ('pg_catalog', 'information_schema') AND idx_scan = 0";
       if (parsed.schema !== undefined)
         whereClause += ` AND schemaname = '${parsed.schema}'`;
+
+      // Summary mode - return aggregated stats
+      if (parsed.summary === true) {
+        const summarySql = `SELECT schemaname, 
+                              COUNT(*) as unused_count,
+                              pg_size_pretty(SUM(pg_relation_size(indexrelid))) as total_size,
+                              SUM(pg_relation_size(indexrelid)) as total_size_bytes
+                              FROM pg_stat_user_indexes
+                              WHERE ${whereClause}
+                              ${parsed.minSize !== undefined ? `AND pg_relation_size(indexrelid) >= pg_size_bytes('${parsed.minSize}')` : ""}
+                              GROUP BY schemaname
+                              ORDER BY SUM(pg_relation_size(indexrelid)) DESC`;
+        const summaryResult = await adapter.executeQuery(summarySql);
+        const bySchema = (summaryResult.rows ?? []).map(
+          (row: Record<string, unknown>) => ({
+            schema: row["schemaname"],
+            unusedCount: toNum(row["unused_count"]),
+            totalSize: row["total_size"],
+            totalSizeBytes: toNum(row["total_size_bytes"]),
+          }),
+        );
+        const totalCount = bySchema.reduce(
+          (sum, s) => sum + (s.unusedCount ?? 0),
+          0,
+        );
+        const totalBytes = bySchema.reduce(
+          (sum, s) => sum + (s.totalSizeBytes ?? 0),
+          0,
+        );
+        return {
+          summary: true,
+          bySchema,
+          totalCount,
+          totalSizeBytes: totalBytes,
+          hint: "Use summary=false or omit to see individual indexes.",
+        };
+      }
 
       const sql = `SELECT schemaname, relname as table_name, indexrelname as index_name,
                         idx_scan as scans, idx_tup_read as tuples_read,
@@ -223,7 +299,8 @@ export function createUnusedIndexesTool(
                         FROM pg_stat_user_indexes
                         WHERE ${whereClause}
                         ${parsed.minSize !== undefined ? `AND pg_relation_size(indexrelid) >= pg_size_bytes('${parsed.minSize}')` : ""}
-                        ORDER BY pg_relation_size(indexrelid) DESC`;
+                        ORDER BY pg_relation_size(indexrelid) DESC
+                        ${limit !== null ? `LIMIT ${String(limit)}` : ""}`;
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
@@ -235,11 +312,22 @@ export function createUnusedIndexesTool(
           size_bytes: toNum(row["size_bytes"]),
         }),
       );
-      return {
+
+      const response: Record<string, unknown> = {
         unusedIndexes,
         count: unusedIndexes.length,
         hint: "These indexes have never been used. Consider removing them to save disk space and improve write performance.",
       };
+
+      // Add totalCount if results were limited
+      if (limit !== null && unusedIndexes.length === limit) {
+        const countSql = `SELECT COUNT(*) as total FROM pg_stat_user_indexes WHERE ${whereClause}
+                          ${parsed.minSize !== undefined ? `AND pg_relation_size(indexrelid) >= pg_size_bytes('${parsed.minSize}')` : ""}`;
+        const countResult = await adapter.executeQuery(countSql);
+        response["totalCount"] = toNum(countResult.rows?.[0]?.["total"]);
+        response["truncated"] = true;
+      }
+      return response;
     },
   };
 }
@@ -326,6 +414,10 @@ export function createVacuumStatsTool(
     z.object({
       schema: z.string().optional().describe("Schema to filter"),
       table: z.string().optional().describe("Table name to filter"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max rows to return (default: 50, use 0 for all)"),
     }),
   );
 
@@ -339,6 +431,7 @@ export function createVacuumStatsTool(
     icons: getToolIcons("performance", readOnly("Vacuum Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = VacuumStatsSchema.parse(params);
+      const limit = parsed.limit === 0 ? null : (parsed.limit ?? 50);
       let whereClause =
         "schemaname NOT IN ('pg_catalog', 'information_schema')";
       if (parsed.schema !== undefined)
@@ -364,7 +457,8 @@ export function createVacuumStatsTool(
                 JOIN pg_class c ON c.relname = s.relname
                     AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = s.schemaname)
                 WHERE ${whereClause.replace(/schemaname/g, "s.schemaname").replace(/relname/g, "s.relname")}
-                ORDER BY s.n_dead_tup DESC`;
+                ORDER BY s.n_dead_tup DESC
+                ${limit !== null ? `LIMIT ${String(limit)}` : ""}`;
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
@@ -380,10 +474,20 @@ export function createVacuumStatsTool(
           autoanalyze_count: toNum(row["autoanalyze_count"]),
         }),
       );
-      return {
+
+      const response: Record<string, unknown> = {
         tables,
         count: tables.length,
       };
+
+      // Add totalCount if results were limited
+      if (limit !== null && tables.length === limit) {
+        const countSql = `SELECT COUNT(*) as total FROM pg_stat_user_tables WHERE ${whereClause}`;
+        const countResult = await adapter.executeQuery(countSql);
+        response["totalCount"] = toNum(countResult.rows?.[0]?.["total"]);
+        response["truncated"] = true;
+      }
+      return response;
     },
   };
 }
@@ -398,6 +502,12 @@ export function createQueryPlanStatsTool(
         .number()
         .optional()
         .describe("Number of queries to return (default: 20)"),
+      truncateQuery: z
+        .number()
+        .optional()
+        .describe(
+          "Max query length in chars (default: 100, use 0 for full text)",
+        ),
     }),
   );
 
@@ -412,6 +522,8 @@ export function createQueryPlanStatsTool(
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = QueryPlanStatsSchema.parse(params);
       const limit = parsed.limit ?? 20;
+      const truncateLen =
+        parsed.truncateQuery === 0 ? null : (parsed.truncateQuery ?? 100);
 
       // Check if pg_stat_statements is available with planning time columns
       const sql = `SELECT
@@ -439,17 +551,30 @@ export function createQueryPlanStatsTool(
                 LIMIT ${String(limit)}`;
 
       const result = await adapter.executeQuery(sql);
-      // Coerce numeric fields to JavaScript numbers
+      // Coerce numeric fields to JavaScript numbers and optionally truncate query
       const queryPlanStats = (result.rows ?? []).map(
-        (row: Record<string, unknown>) => ({
-          ...row,
-          calls: toNum(row["calls"]),
-          rows: toNum(row["rows"]),
-          plan_pct: toNum(row["plan_pct"]),
-          cache_hit_pct: toNum(row["cache_hit_pct"]),
-          shared_blks_hit: toNum(row["shared_blks_hit"]),
-          shared_blks_read: toNum(row["shared_blks_read"]),
-        }),
+        (row: Record<string, unknown>) => {
+          const queryVal = row["query"];
+          const query = typeof queryVal === "string" ? queryVal : "";
+          const truncatedQuery =
+            truncateLen !== null && query.length > truncateLen
+              ? query.substring(0, truncateLen) + "..."
+              : query;
+          return {
+            query: truncatedQuery,
+            queryTruncated: truncateLen !== null && query.length > truncateLen,
+            calls: toNum(row["calls"]),
+            total_plan_time: row["total_plan_time"],
+            mean_plan_time: row["mean_plan_time"],
+            total_exec_time: row["total_exec_time"],
+            mean_exec_time: row["mean_exec_time"],
+            rows: toNum(row["rows"]),
+            plan_pct: toNum(row["plan_pct"]),
+            cache_hit_pct: toNum(row["cache_hit_pct"]),
+            shared_blks_hit: toNum(row["shared_blks_hit"]),
+            shared_blks_read: toNum(row["shared_blks_read"]),
+          };
+        },
       );
       return {
         queryPlanStats,

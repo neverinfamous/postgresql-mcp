@@ -354,8 +354,11 @@ export function createAnalyzeQueryIndexesTool(
     annotations: readOnly("Analyze Query Indexes"),
     icons: getToolIcons("core", readOnly("Analyze Query Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { sql, params: queryParams } =
-        AnalyzeQueryIndexesSchema.parse(params);
+      const {
+        sql,
+        params: queryParams,
+        verbosity,
+      } = AnalyzeQueryIndexesSchema.parse(params);
 
       // CRITICAL: Block write queries - EXPLAIN ANALYZE executes them!
       const sqlUpper = sql.trim().toUpperCase();
@@ -444,12 +447,59 @@ export function createAnalyzeQueryIndexesTool(
 
       analyzePlanNode(rootPlan);
 
-      return {
+      // Create summary plan for compact response
+      function createSummaryPlan(
+        node: Record<string, unknown>,
+      ): Record<string, unknown> {
+        const summary: Record<string, unknown> = {
+          "Node Type": node["Node Type"],
+          "Actual Rows": node["Actual Rows"],
+          "Actual Total Time": node["Actual Total Time"],
+        };
+
+        // Include relevant details based on node type
+        if (node["Relation Name"] !== undefined)
+          summary["Relation Name"] = node["Relation Name"];
+        if (node["Index Name"] !== undefined)
+          summary["Index Name"] = node["Index Name"];
+        if (node["Filter"] !== undefined) summary["Filter"] = node["Filter"];
+        if (node["Index Cond"] !== undefined)
+          summary["Index Cond"] = node["Index Cond"];
+        if (node["Join Type"] !== undefined)
+          summary["Join Type"] = node["Join Type"];
+
+        // Recursively summarize child plans
+        const childPlans = node["Plans"] as
+          | Record<string, unknown>[]
+          | undefined;
+        if (childPlans !== undefined && childPlans.length > 0) {
+          summary["Plans"] = childPlans.map(createSummaryPlan);
+        }
+
+        return summary;
+      }
+
+      // Return based on verbosity
+      const baseResult = {
         executionTime: plan["Execution Time"] as number,
         planningTime: plan["Planning Time"] as number,
         issues,
         recommendations,
-        plan: rootPlan,
+      };
+
+      if (verbosity === "full") {
+        return {
+          ...baseResult,
+          plan: rootPlan,
+        };
+      }
+
+      // Default: summary mode with condensed plan
+      return {
+        ...baseResult,
+        plan: createSummaryPlan(rootPlan),
+        verbosity: "summary",
+        hint: "Use verbosity: 'full' to include complete plan with all metrics",
       };
     },
   };

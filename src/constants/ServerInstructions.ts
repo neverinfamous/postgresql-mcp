@@ -20,7 +20,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 5. **pg_create_table constraints**: \`constraints\` array only accepts \`{type: 'unique'|'check'}\`. Primary keys: use \`column.primaryKey\` or top-level \`primaryKey: ['col1', 'col2']\`
 6. **pg_create_index expression**: Columns can be expressions like \`LOWER(name)\` or \`name::text\`—auto-detected
 7. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`
-8. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint
+8. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint (supports: table, view, materialized_view, partitioned_table, function, sequence, index)
 9. **pg_exists optional WHERE**: \`where\`/\`condition\`/\`filter\` is optional. Without it, checks if table has any rows
 10. **pg_describe_table**: Returns columns, foreignKeys, primaryKey—use \`pg_get_indexes\` separately for index details
 11. **pg_vector_insert updateExisting**: Uses direct UPDATE (avoids NOT NULL constraint issues vs INSERT mode)
@@ -40,10 +40,10 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | \`pg_exists\` | \`{exists: bool, mode, hint?}\` | \`params\` for placeholders. \`mode: 'filtered'|'any_rows'\` |
 | \`pg_get_indexes\` | \`{indexes, count, totalCount?}\` | Default \`limit: 100\` without \`table\`. Use \`schema\`/\`limit\` to filter |
 | \`pg_list_objects\` | \`{objects, count, totalCount, byType}\` | Use \`limit\` to cap results, \`type\`/\`types\` to filter |
-| \`pg_object_details\` | \`{name, schema, type, returnType?, ...}\` | Functions: \`returnType\` alias. Views: \`definition\` |
+| \`pg_object_details\` | \`{name, schema, type, returnType?, ...}\` | Functions: \`returnType\` alias. Views/Mat. views: \`definition\` |
 | \`pg_analyze_db_health\` | \`{cacheHitRatio: {ratio, heap, index, status}}\` | \`ratio\` = primary numeric %. \`bloat\` available |
 | \`pg_describe_table\` | \`{columns, indexes, constraints, foreignKeys}\` | Columns include \`notNull\` (alias for \`!nullable\`), \`foreignKey\`. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL |
-| \`pg_analyze_query_indexes\` | \`{plan, issues, recommendations}\` | \`plan\` contains EXPLAIN ANALYZE output |
+| \`pg_analyze_query_indexes\` | \`{plan, issues, recommendations}\` | \`verbosity\`: 'summary' (default) or 'full'. Summary mode returns condensed plan |
 | \`pg_list_tables\` | \`{tables, count}\` | Use \`schema\` to filter, \`limit\` to cap results |
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |
 | \`pg_jsonb_agg groupBy\` | \`{groups: [{group_key, items}], count}\` | Empty array \`[]\` when no match |

@@ -204,7 +204,11 @@ export function createObjectDetailsTool(
                         WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
                                     WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'r') THEN 'table'
                         WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
+                                    WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'p') THEN 'partitioned_table'
+                        WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
                                     WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v') THEN 'view'
+                        WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
+                                    WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'm') THEN 'materialized_view'
                         WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
                                     WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'i') THEN 'index'
                         WHEN EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace 
@@ -243,17 +247,23 @@ export function createObjectDetailsTool(
         type: objectType,
       };
 
-      if (objectType === "table" || objectType === "view") {
+      if (
+        objectType === "table" ||
+        objectType === "partitioned_table" ||
+        objectType === "view" ||
+        objectType === "materialized_view"
+      ) {
         const tableDetails = await adapter.describeTable(name, schemaName);
         details = { ...details, ...tableDetails };
 
-        // For views, also get the view definition SQL
-        if (objectType === "view") {
+        // For views and materialized views, also get the view definition SQL
+        if (objectType === "view" || objectType === "materialized_view") {
+          const relkind = objectType === "view" ? "v" : "m";
           const viewDefSql = `
                         SELECT pg_get_viewdef(c.oid, true) as definition
                         FROM pg_class c
                         JOIN pg_namespace n ON n.oid = c.relnamespace
-                        WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v'
+                        WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = '${relkind}'
                     `;
           const viewDefResult = await adapter.executeQuery(viewDefSql, [
             name,

@@ -364,8 +364,37 @@ describe("Handler Execution", () => {
         mockContext,
       );
 
-      const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+      // First call is existence check, second call is the DROP statement
+      const sql = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
       expect(sql).toContain("IF EXISTS");
+    });
+
+    it("should return existed: true when table existed", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // Table exists
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 }); // DROP succeeds
+
+      const tool = tools.find((t) => t.name === "pg_drop_table")!;
+      const result = (await tool.handler(
+        { table: "existing_table" },
+        mockContext,
+      )) as { existed: boolean };
+
+      expect(result.existed).toBe(true);
+    });
+
+    it("should return existed: false when table did not exist", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [] }) // Table does not exist
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 }); // DROP succeeds
+
+      const tool = tools.find((t) => t.name === "pg_drop_table")!;
+      const result = (await tool.handler(
+        { table: "non_existing_table", ifExists: true },
+        mockContext,
+      )) as { existed: boolean };
+
+      expect(result.existed).toBe(false);
     });
   });
 
@@ -1456,7 +1485,8 @@ describe("Drop Table with Options", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    // First call is existence check, second call is the DROP statement
+    const sql = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
     expect(sql).toContain("CASCADE");
   });
 
@@ -1472,7 +1502,8 @@ describe("Drop Table with Options", () => {
       mockContext,
     )) as { success: boolean; dropped: string };
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    // First call is existence check, second call is the DROP statement
+    const sql = mockAdapter.executeQuery.mock.calls[1]?.[0] as string;
     expect(sql).toContain('"archive".');
     expect(result.dropped).toContain("archive.");
   });

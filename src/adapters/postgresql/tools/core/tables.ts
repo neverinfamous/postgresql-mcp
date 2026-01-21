@@ -256,9 +256,17 @@ export function createDropTableTool(adapter: PostgresAdapter): ToolDefinition {
       const { table, schema, ifExists, cascade } =
         DropTableSchema.parse(params);
 
+      const schemaName = schema ?? "public";
       const schemaPrefix = schema ? `"${schema}".` : "";
       const ifExistsClause = ifExists ? "IF EXISTS " : "";
       const cascadeClause = cascade ? " CASCADE" : "";
+
+      // Check if table exists before dropping (for existed property)
+      const existsCheck = await adapter.executeQuery(
+        `SELECT 1 FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2`,
+        [schemaName, table],
+      );
+      const existed = (existsCheck.rows?.length ?? 0) > 0;
 
       const sql = `DROP TABLE ${ifExistsClause}${schemaPrefix}"${table}"${cascadeClause}`;
 
@@ -266,7 +274,8 @@ export function createDropTableTool(adapter: PostgresAdapter): ToolDefinition {
 
       return {
         success: true,
-        dropped: `${schema ?? "public"}.${table}`,
+        dropped: `${schemaName}.${table}`,
+        existed,
       };
     },
   };

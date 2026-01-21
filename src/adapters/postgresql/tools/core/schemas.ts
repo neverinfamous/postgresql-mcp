@@ -115,11 +115,27 @@ export const ObjectDetailsSchema = z
       table: z.string().optional().describe("Alias for name"),
       schema: z.string().optional().describe("Schema name (default: public)"),
       type: z
-        .enum(["table", "view", "function", "sequence", "index"])
+        .enum([
+          "table",
+          "view",
+          "materialized_view",
+          "partitioned_table",
+          "function",
+          "sequence",
+          "index",
+        ])
         .optional()
         .describe("Object type hint (case-insensitive)"),
       objectType: z
-        .enum(["table", "view", "function", "sequence", "index"])
+        .enum([
+          "table",
+          "view",
+          "materialized_view",
+          "partitioned_table",
+          "function",
+          "sequence",
+          "index",
+        ])
         .optional()
         .describe("Alias for type"),
     }),
@@ -170,6 +186,12 @@ const AnalyzeQueryIndexesSchemaBase = z.object({
     .describe("Query to analyze for index recommendations"),
   query: z.string().optional().describe("Alias for sql"),
   params: z.array(z.unknown()).optional().describe("Query parameters"),
+  verbosity: z
+    .enum(["summary", "full"])
+    .optional()
+    .describe(
+      "Response detail level: 'summary' (compact), 'full' (include full plan). Default: summary",
+    ),
 });
 
 // Transformed schema with alias resolution
@@ -177,6 +199,7 @@ export const AnalyzeQueryIndexesSchema =
   AnalyzeQueryIndexesSchemaBase.transform((data) => ({
     sql: data.sql ?? data.query ?? "",
     params: data.params,
+    verbosity: data.verbosity ?? "summary",
   })).refine((data) => data.sql !== "", {
     message: "sql (or query alias) is required",
   });

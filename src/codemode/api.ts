@@ -1478,6 +1478,54 @@ export class PgApi {
       }
     }
 
+    // Add top-level monitoring aliases for convenience: pg.databaseSize() → pg.monitoring.databaseSize()
+    const monitoringApi = bindings["monitoring"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (monitoringApi !== undefined) {
+      // Database and table sizing
+      if (monitoringApi["databaseSize"] !== undefined) {
+        bindings["databaseSize"] = monitoringApi["databaseSize"];
+      }
+      if (monitoringApi["tableSizes"] !== undefined) {
+        bindings["tableSizes"] = monitoringApi["tableSizes"];
+      }
+      // Connection monitoring
+      if (monitoringApi["connectionStats"] !== undefined) {
+        bindings["connectionStats"] = monitoringApi["connectionStats"];
+      }
+      // Server information
+      if (monitoringApi["serverVersion"] !== undefined) {
+        bindings["serverVersion"] = monitoringApi["serverVersion"];
+      }
+      if (monitoringApi["uptime"] !== undefined) {
+        bindings["uptime"] = monitoringApi["uptime"];
+      }
+      // Configuration
+      if (monitoringApi["showSettings"] !== undefined) {
+        bindings["showSettings"] = monitoringApi["showSettings"];
+      }
+      // Recovery and replication
+      if (monitoringApi["recoveryStatus"] !== undefined) {
+        bindings["recoveryStatus"] = monitoringApi["recoveryStatus"];
+      }
+      if (monitoringApi["replicationStatus"] !== undefined) {
+        bindings["replicationStatus"] = monitoringApi["replicationStatus"];
+      }
+      // Capacity and resource analysis
+      if (monitoringApi["capacityPlanning"] !== undefined) {
+        bindings["capacityPlanning"] = monitoringApi["capacityPlanning"];
+      }
+      if (monitoringApi["resourceUsageAnalyze"] !== undefined) {
+        bindings["resourceUsageAnalyze"] =
+          monitoringApi["resourceUsageAnalyze"];
+      }
+      // Alert thresholds
+      if (monitoringApi["alertThresholdSet"] !== undefined) {
+        bindings["alertThresholdSet"] = monitoringApi["alertThresholdSet"];
+      }
+    }
+
     return bindings;
   }
 }

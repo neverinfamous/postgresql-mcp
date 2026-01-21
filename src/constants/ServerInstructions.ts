@@ -156,6 +156,8 @@ Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSetting
 
 Aliases: \`connections\`→\`connectionStats\`, \`settings\`/\`config\`→\`showSettings\`, \`alerts\`/\`thresholds\`→\`alertThresholdSet\`
 
+**Top-Level Aliases**: \`pg.databaseSize()\`, \`pg.tableSizes()\`, \`pg.connectionStats()\`, \`pg.serverVersion()\`, \`pg.uptime()\`, \`pg.showSettings()\`, \`pg.recoveryStatus()\`, \`pg.replicationStatus()\`, \`pg.capacityPlanning()\`, \`pg.resourceUsageAnalyze()\`, \`pg.alertThresholdSet()\`
+
 ## Admin Tools
 
 Core: \`vacuum()\`, \`vacuumAnalyze()\`, \`analyze()\`, \`reindex()\`, \`cluster()\`, \`setConfig()\`, \`reloadConf()\`, \`resetStats()\`, \`cancelBackend()\`, \`terminateBackend()\`

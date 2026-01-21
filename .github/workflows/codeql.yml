@@ -8,6 +8,7 @@ on:
       - "**.ts"
       - "**.tsx"
       - "package.json"
+      - ".github/workflows/codeql.yml"
   pull_request:
     branches: ["master"]
   schedule:
@@ -21,6 +22,7 @@ jobs:
       actions: read
       contents: read
       packages: read
+      metadata: read
       security-events: write
     strategy:
       fail-fast: false

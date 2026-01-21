@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_list_tables payload reduction** — Removed redundant `data` field from `pg_list_tables` response (was duplicate of `tables`). Response now returns only `{tables, count, totalCount, truncated?, hint?}`, reducing payload size
 - **pg_copy_export default limit** — `pg_copy_export` now applies a default limit of 500 rows when no `limit` parameter is specified. Returns `{truncated: true, limit: 500}` metadata when default limit is applied. Use `limit: 0` for all rows. Prevents accidentally large data exports consuming excessive context
 - **pg_list_views definition truncation** — `pg_list_views` now truncates view definitions to 1000 characters by default, significantly reducing payload size for databases with complex system views (e.g., PostGIS). Returns `{definitionTruncated: true}` per view and `{truncatedDefinitions: N}` in response. Use `truncateDefinition: 0` for full definitions
+- **pg_list_views default limit** — `pg_list_views` now applies a default limit of 50 views when no `limit` parameter is specified. Returns `{truncated: true, note}` metadata when results are limited. Use `limit: 0` for all views. Prevents large payloads in databases with many system and extension views
 
 ### Added
 

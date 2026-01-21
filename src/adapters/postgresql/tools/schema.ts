@@ -285,6 +285,12 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
         .describe(
           "Max length for view definitions (default: 1000). Use 0 for no truncation.",
         ),
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          "Maximum number of views to return (default: 50). Use 0 for all views.",
+        ),
     }),
     annotations: readOnly("List Views"),
     icons: getToolIcons("schema", readOnly("List Views")),
@@ -293,6 +299,7 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
         schema?: string;
         includeMaterialized?: boolean;
         truncateDefinition?: number;
+        limit?: number;
       };
       const schemaClause = parsed.schema
         ? `AND n.nspname = '${parsed.schema}'`
@@ -303,6 +310,10 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
       // Default truncation: 1000 chars, 0 = no truncation
       const truncateLimit = parsed.truncateDefinition ?? 1000;
 
+      // Default limit: 50, 0 = no limit
+      const limitVal = parsed.limit ?? 50;
+      const limitClause = limitVal > 0 ? `LIMIT ${String(limitVal + 1)}` : "";
+
       const sql = `SELECT n.nspname as schema, c.relname as name,
                         CASE c.relkind WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized_view' END as type,
                         TRIM(pg_get_viewdef(c.oid, true)) as definition
@@ -311,10 +322,17 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
                         WHERE c.relkind ${kindClause}
                         AND n.nspname NOT IN ('pg_catalog', 'information_schema')
                         ${schemaClause}
-                        ORDER BY n.nspname, c.relname`;
+                        ORDER BY n.nspname, c.relname
+                        ${limitClause}`;
 
       const result = await adapter.executeQuery(sql);
       let views = result.rows ?? [];
+
+      // Check if there are more results than the limit
+      const hasMore = limitVal > 0 && views.length > limitVal;
+      if (hasMore) {
+        views = views.slice(0, limitVal);
+      }
 
       // Truncate definitions if limit is set
       let truncatedCount = 0;
@@ -344,6 +362,11 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
       };
       if (truncatedCount > 0) {
         response["truncatedDefinitions"] = truncatedCount;
+      }
+      if (hasMore) {
+        response["truncated"] = true;
+        response["note"] =
+          `Results limited to ${String(limitVal)}. Use 'limit: 0' for all views.`;
       }
       return response;
     },

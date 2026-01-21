@@ -427,6 +427,16 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
         .describe(
           'Headline options (e.g., "MaxWords=20, MinWords=5"). Note: MinWords must be < MaxWords.',
         ),
+      startSel: z
+        .string()
+        .optional()
+        .describe("Start selection marker (default: <b>)"),
+      stopSel: z
+        .string()
+        .optional()
+        .describe("Stop selection marker (default: </b>)"),
+      maxWords: z.number().optional().describe("Maximum words in headline"),
+      minWords: z.number().optional().describe("Minimum words in headline"),
       select: z
         .array(z.string())
         .optional()
@@ -447,10 +457,19 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = HeadlineSchema.parse(params);
       const cfg = parsed.config ?? "english";
-      // Default options include both MinWords and MaxWords to avoid PostgreSQL error
-      const opts =
-        parsed.options ??
-        "StartSel=<b>, StopSel=</b>, MaxWords=35, MinWords=15";
+
+      // Build options string from individual params or use provided options
+      let opts: string;
+      if (parsed.options) {
+        opts = parsed.options;
+      } else {
+        const optParts: string[] = [];
+        optParts.push(`StartSel=${parsed.startSel ?? "<b>"}`);
+        optParts.push(`StopSel=${parsed.stopSel ?? "</b>"}`);
+        optParts.push(`MaxWords=${String(parsed.maxWords ?? 35)}`);
+        optParts.push(`MinWords=${String(parsed.minWords ?? 15)}`);
+        opts = optParts.join(", ");
+      }
 
       // Build qualified table name with schema support
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";

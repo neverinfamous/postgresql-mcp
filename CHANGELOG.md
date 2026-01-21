@@ -92,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg.pgcryptoXxx() top-level aliases** — Code mode now supports top-level pgcrypto method aliases for convenience: `pg.pgcryptoCreateExtension()`, `pg.pgcryptoHash()`, `pg.pgcryptoHmac()`, `pg.pgcryptoEncrypt()`, `pg.pgcryptoDecrypt()`, `pg.pgcryptoGenRandomUuid()`, `pg.pgcryptoGenRandomBytes()`, `pg.pgcryptoGenSalt()`, `pg.pgcryptoCrypt()`. These map directly to `pg.pgcrypto.xxx()` methods, matching the aliases documented in `pg.pgcrypto.help()`
 - **pg_pgcrypto_gen_random_uuid convenience `uuid` property** — `pg_pgcrypto_gen_random_uuid` response now includes a `uuid` convenience property (containing the first UUID) when generating a single UUID. Previously only returned `uuids` array. Now returns `{success, uuid, uuids, count}` for single UUID requests
 - **Comprehensive pgcrypto tools documentation** — Added `## pgcrypto Tools` section to ServerInstructions.ts documenting all 9 tools with parameters, aliases (`key`/`password`, `encryptedData`/`data`), response structures, password workflow pattern (genSalt → crypt → store → verify), and discovery via `pg.pgcrypto.help()`
+- **pg.transactions.execute statement format clarification** — Updated Critical Gotcha #1 to clarify that `pg.transactions.execute` requires statements as array of objects with `sql` property (`statements: [{sql: "..."}, ...]`), not raw strings. Prevents validation errors from passing raw SQL strings
 
 ### Fixed
 

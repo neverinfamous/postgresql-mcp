@@ -13,7 +13,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 ## ⚠️ Critical Gotchas
 
-1. **Transactions**: Use \`pg.transactions.execute({statements})\` for atomic ops, OR pass \`transactionId\` to individual queries
+1. **Transactions**: Use \`pg.transactions.execute({statements: [{sql: "..."}, ...]})\` for atomic ops, OR pass \`transactionId\` to individual queries
 2. **pg_write_query**: ⛔ Throws for SELECT—use \`pg_read_query\` for SELECT statements
 3. **pg_upsert/pg_create_table**: \`schema.table\` format auto-parses (e.g., \`'myschema.users'\` → schema: 'myschema', table: 'users')
 4. **pg_create_table columns**: \`notNull\`, \`defaultValue\` (numbers/booleans auto-coerced to string), \`check\`, \`references\` (object or string \`"table(column)"\` syntax)

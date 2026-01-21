@@ -484,12 +484,16 @@ const ARRAY_WRAP_MAP: Record<string, string> = {
 
 /**
  * Methods where a single object arg should be wrapped in a specific key
- * (instead of passed through directly)
+ * (instead of passed through directly).
+ *
+ * For pg_jsonb_object, the skipKeys array lists keys that indicate the user
+ * has already provided the correct structure (e.g., { data: {...} }).
  */
-const OBJECT_WRAP_MAP: Record<string, string> = {
-  object: "data", // pg.jsonb.object({key: val}) → {data: {key: val}}
-  jsonbObject: "data", // alias
-};
+const OBJECT_WRAP_MAP: Record<string, { wrapKey: string; skipKeys: string[] }> =
+  {
+    object: { wrapKey: "data", skipKeys: ["data", "object", "pairs"] }, // pg.jsonb.object({key: val}) → {data: {key: val}}
+    jsonbObject: { wrapKey: "data", skipKeys: ["data", "object", "pairs"] }, // alias
+  };
 
 /**
  * Normalize parameters to support positional arguments.
@@ -505,11 +509,16 @@ function normalizeParams(methodName: string, args: unknown[]): unknown {
 
     // Object arg - check if we need to wrap it
     if (typeof arg === "object" && arg !== null && !Array.isArray(arg)) {
-      const wrapKey = OBJECT_WRAP_MAP[methodName];
-      if (wrapKey !== undefined) {
-        return { [wrapKey]: arg };
+      const wrapConfig = OBJECT_WRAP_MAP[methodName];
+      if (wrapConfig !== undefined) {
+        const objArg = arg as Record<string, unknown>;
+        // Only wrap if none of the skipKeys are present (avoid double-wrapping)
+        const hasExpectedKey = wrapConfig.skipKeys.some((key) => key in objArg);
+        if (!hasExpectedKey) {
+          return { [wrapConfig.wrapKey]: arg };
+        }
       }
-      // Pass through normally
+      // Pass through normally (either no wrap config or already has expected structure)
       return arg;
     }
 

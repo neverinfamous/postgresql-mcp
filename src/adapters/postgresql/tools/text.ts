@@ -506,7 +506,7 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
       ifNotExists: z
         .boolean()
         .optional()
-        .describe("Skip if index already exists (default: false)"),
+        .describe("Skip if index already exists (default: true)"),
       schema: z.string().optional().describe("Schema name (default: public)"),
     }),
   );
@@ -524,7 +524,9 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
       const defaultIndexName = `idx_${parsed.table}_${parsed.column}_fts`;
       const resolvedIndexName = parsed.name ?? defaultIndexName;
       const indexName = sanitizeIdentifier(resolvedIndexName);
-      const ifNotExists = parsed.ifNotExists === true ? "IF NOT EXISTS " : "";
+      // Default to IF NOT EXISTS for safer operation (skip existing indexes)
+      const useIfNotExists = parsed.ifNotExists !== false;
+      const ifNotExists = useIfNotExists ? "IF NOT EXISTS " : "";
 
       // Build qualified table name with schema support
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
@@ -533,7 +535,7 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
 
       // Check if index exists before creation (to accurately report 'skipped')
       let existedBefore = false;
-      if (parsed.ifNotExists === true) {
+      if (useIfNotExists) {
         const checkResult = await adapter.executeQuery(
           `SELECT 1 FROM pg_indexes WHERE indexname = $1 LIMIT 1`,
           [resolvedIndexName],

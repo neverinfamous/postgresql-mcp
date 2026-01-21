@@ -48,7 +48,9 @@ docker cp c:\Users\chris\Desktop\postgres-mcp\test-database\test-database.sql po
 
 After cleanup, verify the database has a reasonable number of objects:
 
-docker exec postgres-server psql -U postgres -d postgres -c "SELECT COUNT(\*) as table_count FROM pg_tables WHERE schemaname = 'public';"
+```powershell
+docker exec postgres-server psql -U postgres -d postgres -c "SELECT COUNT(*) as table_count FROM pg_tables WHERE schemaname = 'public';"
+```
 
 Expected: ~15-25 tables (test\_\* plus a few system tables)
 

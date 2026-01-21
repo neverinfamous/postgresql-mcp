@@ -1391,6 +1391,51 @@ export class PgApi {
       }
     }
 
+    // Add top-level performance aliases for convenience: pg.explain() → pg.performance.explain()
+    const performanceApi = bindings["performance"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (performanceApi !== undefined) {
+      // Query plan analysis
+      if (performanceApi["explain"] !== undefined) {
+        bindings["explain"] = performanceApi["explain"];
+      }
+      if (performanceApi["explainAnalyze"] !== undefined) {
+        bindings["explainAnalyze"] = performanceApi["explainAnalyze"];
+      }
+      // Cache and stats
+      if (performanceApi["cacheHitRatio"] !== undefined) {
+        bindings["cacheHitRatio"] = performanceApi["cacheHitRatio"];
+      }
+      if (performanceApi["indexStats"] !== undefined) {
+        bindings["indexStats"] = performanceApi["indexStats"];
+      }
+      if (performanceApi["tableStats"] !== undefined) {
+        bindings["tableStats"] = performanceApi["tableStats"];
+      }
+      // Recommendations and analysis
+      if (performanceApi["indexRecommendations"] !== undefined) {
+        bindings["indexRecommendations"] =
+          performanceApi["indexRecommendations"];
+      }
+      if (performanceApi["bloatCheck"] !== undefined) {
+        bindings["bloatCheck"] = performanceApi["bloatCheck"];
+      }
+      if (performanceApi["vacuumStats"] !== undefined) {
+        bindings["vacuumStats"] = performanceApi["vacuumStats"];
+      }
+      // Index analysis
+      if (performanceApi["unusedIndexes"] !== undefined) {
+        bindings["unusedIndexes"] = performanceApi["unusedIndexes"];
+      }
+      if (performanceApi["duplicateIndexes"] !== undefined) {
+        bindings["duplicateIndexes"] = performanceApi["duplicateIndexes"];
+      }
+      if (performanceApi["seqScanTables"] !== undefined) {
+        bindings["seqScanTables"] = performanceApi["seqScanTables"];
+      }
+    }
+
     return bindings;
   }
 }

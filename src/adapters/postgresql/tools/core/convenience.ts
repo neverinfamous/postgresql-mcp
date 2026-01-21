@@ -108,7 +108,8 @@ export const UpsertSchema = z
     data: d.data ?? d.values ?? {},
   }))
   .refine((d) => d.table !== "", {
-    message: "table (or tableName alias) is required",
+    message:
+      'table (or tableName alias) is required. Usage: pg_upsert({ table: "users", data: { name: "John" }, conflictColumns: ["id"] })',
   })
   .refine((d) => Object.keys(d.data).length > 0, {
     message: "data (or values alias) is required",
@@ -139,7 +140,8 @@ export const BatchInsertSchema = z
     table: data.table ?? data.tableName ?? "",
   }))
   .refine((data) => data.table !== "", {
-    message: "table (or tableName alias) is required",
+    message:
+      'table (or tableName alias) is required. Usage: pg_batch_insert({ table: "users", rows: [{ name: "John" }, { name: "Jane" }] })',
   })
   .refine((data) => data.rows.length > 0, {
     message: "rows must not be empty",
@@ -177,7 +179,8 @@ export const CountSchema = z
     table: data.table ?? data.tableName ?? "",
   }))
   .refine((data) => data.table !== "", {
-    message: "table (or tableName alias) is required",
+    message:
+      'table (or tableName alias) is required. Usage: pg_count({ table: "users" }) or pg_count({ table: "users", where: "active = true" })',
   });
 
 // Base schema for exists
@@ -227,7 +230,8 @@ export const ExistsSchema = z
     where: data.where ?? data.condition ?? data.filter,
   }))
   .refine((data) => data.table !== "", {
-    message: "table (or tableName alias) is required",
+    message:
+      'table (or tableName alias) is required. Usage: pg_exists({ table: "users" }) or pg_exists({ table: "users", where: "id = 1" })',
   });
 
 // Base schema for truncate
@@ -255,7 +259,8 @@ export const TruncateSchema = z
     table: data.table ?? data.tableName ?? "",
   }))
   .refine((data) => data.table !== "", {
-    message: "table (or tableName alias) is required",
+    message:
+      'table (or tableName alias) is required. Usage: pg_truncate({ table: "logs" }) or pg_truncate({ table: "logs", cascade: true })',
   });
 
 // =============================================================================

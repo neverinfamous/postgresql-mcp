@@ -131,7 +131,8 @@ export const DescribeTableSchema = z
     schema: data.schema,
   }))
   .refine((data) => data.table !== "", {
-    message: "table (or tableName alias) is required",
+    message:
+      'table (or tableName alias) is required. Usage: pg_describe_table({ table: "users" }) or pg_describe_table({ table: "public.users" })',
   });
 
 // Base schema for MCP visibility

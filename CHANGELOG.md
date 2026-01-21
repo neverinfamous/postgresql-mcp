@@ -118,6 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_pgcrypto_gen_random_uuid convenience `uuid` property** — `pg_pgcrypto_gen_random_uuid` response now includes a `uuid` convenience property (containing the first UUID) when generating a single UUID. Previously only returned `uuids` array. Now returns `{success, uuid, uuids, count}` for single UUID requests
 - **Comprehensive pgcrypto tools documentation** — Added `## pgcrypto Tools` section to ServerInstructions.ts documenting all 9 tools with parameters, aliases (`key`/`password`, `encryptedData`/`data`), response structures, password workflow pattern (genSalt → crypt → store → verify), and discovery via `pg.pgcrypto.help()`
 - **pg.transactions.execute statement format clarification** — Updated Critical Gotcha #1 to clarify that `pg.transactions.execute` requires statements as array of objects with `sql` property (`statements: [{sql: "..."}, ...]`), not raw strings. Prevents validation errors from passing raw SQL strings
+- **pg.exists() positional args with params support** — Code mode `pg.exists()` now supports positional arguments with params array: `pg.exists("users", "id=$1", [1])`. The third positional argument maps to `params`, enabling parameterized WHERE clauses without object syntax
+- **Enhanced error messages with usage examples** — Starter tools (`pg_count`, `pg_exists`, `pg_truncate`, `pg_upsert`, `pg_batch_insert`, `pg_describe_table`) now include usage examples in error messages when required parameters are missing. Example: `table (or tableName alias) is required. Usage: pg_count({ table: "users" })`
 
 ### Fixed
 

@@ -223,7 +223,7 @@ const METHOD_ALIASES: Record<string, Record<string, string>> = {
 const GROUP_EXAMPLES: Record<string, string[]> = {
   core: [
     'pg.core.readQuery("SELECT * FROM users LIMIT 10")',
-    'pg.core.exists("users", "email=$1", { params: ["test@example.com"] })',
+    'pg.core.exists("users", "email=$1", ["test@example.com"])',
     'pg.core.createTable("orders", [{ name: "id", type: "SERIAL PRIMARY KEY" }])',
     'pg.core.batchInsert("products", [{ name: "A" }, { name: "B" }])',
   ],
@@ -366,7 +366,7 @@ const POSITIONAL_PARAM_MAP: Record<string, string | string[]> = {
   dropIndex: "name",
   listObjects: "schema",
   // Multi param
-  exists: ["table", "where"],
+  exists: ["table", "where", "params"],
   objectDetails: ["name", "type"],
   createTable: ["name", "columns"],
   createIndex: ["table", "columns"], // Only required params; options object gets merged

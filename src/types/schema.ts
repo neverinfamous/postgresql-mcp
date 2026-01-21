@@ -26,15 +26,11 @@ export interface SchemaInfo {
  */
 export interface IndexInfo {
   name: string;
-  /** Alias for name (consistency with other responses) */
-  indexName?: string | undefined;
   tableName: string;
   schemaName?: string | undefined;
   columns: string[];
   unique: boolean;
   type: "btree" | "hash" | "gist" | "gin" | "spgist" | "brin";
-  /** Alias for type (consistency with different API contexts) */
-  indexType?: "btree" | "hash" | "gist" | "gin" | "spgist" | "brin" | undefined;
   isPartial?: boolean | undefined;
   predicate?: string | undefined;
   sizeBytes?: number | undefined;

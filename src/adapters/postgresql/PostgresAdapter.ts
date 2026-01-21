@@ -449,13 +449,11 @@ export class PostgresAdapter extends DatabaseAdapter {
       const indexType = row["type"] as IndexInfo["type"];
       return {
         name: row["name"] as string,
-        indexName: row["name"] as string, // Alias for consistency
         tableName: row["table_name"] as string,
         schemaName: row["schema_name"] as string,
         columns: this.extractIndexColumns(rawColumns, definition),
         unique: row["is_unique"] as boolean,
         type: indexType,
-        indexType, // Alias for consistency with different API contexts
         sizeBytes: Number(row["size_bytes"]) || undefined,
         numberOfScans: Number(row["num_scans"]) || undefined,
         tuplesRead: Number(row["tuples_read"]) || undefined,
@@ -770,7 +768,6 @@ export class PostgresAdapter extends DatabaseAdapter {
       const definition = row["definition"] as string;
       return {
         name: row["name"] as string,
-        indexName: row["name"] as string, // Alias
         type: row["type"] as string,
         isUnique: row["is_unique"] as boolean,
         isPrimary: row["is_primary"] as boolean,
@@ -950,13 +947,11 @@ export class PostgresAdapter extends DatabaseAdapter {
       const indexType = row["type"] as IndexInfo["type"];
       return {
         name: row["name"] as string,
-        indexName: row["name"] as string, // Alias for consistency
         tableName,
         schemaName,
         columns: this.extractIndexColumns(rawColumns, definition),
         unique: row["is_unique"] as boolean,
         type: indexType,
-        indexType, // Alias for consistency with different API contexts
         sizeBytes: Number(row["size_bytes"]) || undefined,
         numberOfScans: Number(row["num_scans"]) || undefined,
         tuplesRead: Number(row["tuples_read"]) || undefined,

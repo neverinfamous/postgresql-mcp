@@ -18,7 +18,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 3. **pg_upsert/pg_create_table**: \`schema.table\` format auto-parses (e.g., \`'myschema.users'\` → schema: 'myschema', table: 'users')
 4. **pg_create_table columns**: \`notNull\`, \`defaultValue\` (string literals auto-quoted; numbers/booleans auto-coerced; \`now()\` → \`CURRENT_TIMESTAMP\`), \`check\`, \`references\` (object or string \`"table(column)"\` syntax)
 5. **pg_create_table constraints**: \`constraints\` array only accepts \`{type: 'unique'|'check'}\`. Primary keys: use \`column.primaryKey\` or top-level \`primaryKey: ['col1', 'col2']\`
-6. **pg_create_index expression**: Columns can be expressions like \`LOWER(name)\` or \`name::text\`—auto-detected
+6. **pg_create_index expression**: Columns can be expressions like \`LOWER(name)\` or \`UPPER(email)\`—auto-detected. ⚠️ Cast syntax (\`::\`) requires raw SQL via \`pg_write_query\`
 7. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`
 8. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint (supports: table, view, materialized_view, partitioned_table, function, sequence, index)
 9. **pg_exists optional WHERE**: \`where\`/\`condition\`/\`filter\` is optional. Without it, checks if table has any rows
@@ -38,7 +38,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | \`pg_batch_insert\` | \`{rowsAffected, affectedRows, insertedCount, rows?}\` | Empty objects use DEFAULT VALUES. ⚠️ BIGINT > 2^53 loses precision |
 | \`pg_count\` | \`{count: N}\` | Use \`params\` for placeholders: \`where: 'id=$1', params: [5]\`. DISTINCT: use \`pg_read_query\` |
 | \`pg_exists\` | \`{exists: bool, mode, hint?}\` | \`params\` for placeholders. \`mode: 'filtered'|'any_rows'\` |
-| \`pg_get_indexes\` | \`{indexes, count, totalCount?}\` | Default \`limit: 100\` without \`table\`. Use \`schema\`/\`limit\` to filter |
+| \`pg_get_indexes\` | \`{indexes, count, totalCount?}\` | Default \`limit: 100\` without \`table\`. Use \`schema\`/\`limit\` to filter. Index objects have \`name\`, \`type\`, \`columns\` |
 | \`pg_list_objects\` | \`{objects, count, totalCount, byType}\` | Use \`limit\` to cap results, \`type\`/\`types\` to filter |
 | \`pg_object_details\` | \`{name, schema, type, returnType?, ...}\` | Functions: \`returnType\` alias. Views/Mat. views: \`definition\` |
 | \`pg_analyze_db_health\` | \`{cacheHitRatio: {ratio, heap, index, status}}\` | \`ratio\` = primary numeric %. \`bloat\` available |
@@ -53,7 +53,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 \`pg_group_action\` → \`pg.group.action()\` (group prefixes dropped: \`pg_jsonb_extract\` → \`pg.jsonb.extract()\`)
 
-**Top-Level Core Aliases**: Common starter tools available directly: \`pg.readQuery()\`, \`pg.writeQuery()\`, \`pg.listTables()\`, \`pg.describeTable()\`, \`pg.createTable()\`, \`pg.dropTable()\`, \`pg.count()\`, \`pg.exists()\`, \`pg.upsert()\`, \`pg.batchInsert()\`, \`pg.truncate()\`
+**Top-Level Core Aliases**: All starter tools available directly: \`pg.readQuery()\`, \`pg.writeQuery()\`, \`pg.listTables()\`, \`pg.describeTable()\`, \`pg.createTable()\`, \`pg.dropTable()\`, \`pg.count()\`, \`pg.exists()\`, \`pg.upsert()\`, \`pg.batchInsert()\`, \`pg.truncate()\`, \`pg.createIndex()\`, \`pg.dropIndex()\`, \`pg.getIndexes()\`, \`pg.listObjects()\`, \`pg.objectDetails()\`, \`pg.analyzeDbHealth()\`, \`pg.analyzeQueryIndexes()\`, \`pg.analyzeWorkloadIndexes()\`
 
 **Positional args work**: \`readQuery("SELECT...")\`, \`exists("users", "id=1")\`, \`createIndex("users", ["email"])\`
 

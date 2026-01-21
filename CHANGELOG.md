@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **pg.createIndex() and 7 more top-level core aliases** — Code mode now supports additional top-level aliases beyond the original 11 starter tools: `pg.createIndex()`, `pg.dropIndex()`, `pg.getIndexes()`, `pg.listObjects()`, `pg.objectDetails()`, `pg.analyzeDbHealth()`, `pg.analyzeQueryIndexes()`, `pg.analyzeWorkloadIndexes()`. All 19 starter tools now have top-level aliases for maximum ergonomics
+
 ### Performance
 
+- **pg_get_indexes payload reduction** — Removed redundant `indexName` (duplicate of `name`) and `indexType` (duplicate of `type`) fields from `pg_get_indexes` response. Index objects now return only `{name, tableName, schemaName, columns, unique, type, sizeBytes?, numberOfScans?, ...}`, reducing payload size by ~15%
+- **pg_describe_table indexes payload reduction** — Same redundant field removal applied to the `indexes` array in `pg_describe_table` response
 - **pg_list_tables default limit** — `pg_list_tables` now applies a default limit of 100 rows when no `limit` parameter is specified. Returns `{truncated: true, totalCount, hint}` metadata when results are truncated. Prevents UI slowdowns in AntiGravity and other MCP clients when databases have many tables. Use `limit: 500` to see more, or `schema` filter to narrow scope
 - **pg_list_objects default limit** — `pg_list_objects` now applies a default limit of 100 objects when no `limit` parameter is specified. Same truncation metadata as `pg_list_tables`. Prevents massive JSON response payloads (300KB+ in databases with accumulated test tables)
 - **pg_analyze_query_indexes reduced payload** — Removed redundant `explainPlan` and `executionPlan` aliases from response (these were duplicates of `plan`). Response now returns only `{plan, issues, recommendations, executionTime, planningTime}`, reducing payload size by ~66% for complex query plans

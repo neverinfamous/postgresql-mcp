@@ -1212,6 +1212,33 @@ export class PgApi {
       if (coreApi["truncate"] !== undefined) {
         bindings["truncate"] = coreApi["truncate"];
       }
+      // Index tools
+      if (coreApi["createIndex"] !== undefined) {
+        bindings["createIndex"] = coreApi["createIndex"];
+      }
+      if (coreApi["dropIndex"] !== undefined) {
+        bindings["dropIndex"] = coreApi["dropIndex"];
+      }
+      if (coreApi["getIndexes"] !== undefined) {
+        bindings["getIndexes"] = coreApi["getIndexes"];
+      }
+      // Object listing tools
+      if (coreApi["listObjects"] !== undefined) {
+        bindings["listObjects"] = coreApi["listObjects"];
+      }
+      if (coreApi["objectDetails"] !== undefined) {
+        bindings["objectDetails"] = coreApi["objectDetails"];
+      }
+      // Health/analysis tools
+      if (coreApi["analyzeDbHealth"] !== undefined) {
+        bindings["analyzeDbHealth"] = coreApi["analyzeDbHealth"];
+      }
+      if (coreApi["analyzeQueryIndexes"] !== undefined) {
+        bindings["analyzeQueryIndexes"] = coreApi["analyzeQueryIndexes"];
+      }
+      if (coreApi["analyzeWorkloadIndexes"] !== undefined) {
+        bindings["analyzeWorkloadIndexes"] = coreApi["analyzeWorkloadIndexes"];
+      }
     }
 
     return bindings;

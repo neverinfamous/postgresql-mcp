@@ -224,7 +224,6 @@ export interface TableInfo {
   indexes?:
     | {
         name: string;
-        indexName: string;
         type: string;
         isUnique: boolean;
         isPrimary: boolean;

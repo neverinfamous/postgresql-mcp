@@ -363,8 +363,9 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
       if (truncatedCount > 0) {
         response["truncatedDefinitions"] = truncatedCount;
       }
+      // Always include truncated field for consistent response structure
+      response["truncated"] = hasMore;
       if (hasMore) {
-        response["truncated"] = true;
         response["note"] =
           `Results limited to ${String(limitVal)}. Use 'limit: 0' for all views.`;
       }

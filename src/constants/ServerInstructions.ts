@@ -222,7 +222,7 @@ Core: \`listSchemas()\`, \`createSchema()\`, \`dropSchema()\`, \`listViews()\`, 
 
 Response Structures:
 - \`listSchemas()\`: \`{schemas: string[], count}\`
-- \`listViews({ includeMaterialized?, truncateDefinition?, limit? })\`: \`{views: [{schema, name, type, definition, definitionTruncated?}], count, hasMatViews, truncatedDefinitions?, truncated?, note?}\`. Default \`limit: 50\` (use \`0\` for all). Default \`truncateDefinition: 1000\` chars (use \`0\` for full definitions)
+- \`listViews({ includeMaterialized?, truncateDefinition?, limit? })\`: \`{views: [{schema, name, type, definition, definitionTruncated?}], count, hasMatViews, truncatedDefinitions?, truncated, note?}\`. Default \`limit: 50\` (use \`0\` for all). Default \`truncateDefinition: 1000\` chars (use \`0\` for full definitions). \`truncated\` always included (\`true\`/\`false\`)
 - \`listSequences({ schema? })\`: \`{sequences: [{schema, name, owned_by}], count}\`. Note: \`owned_by\` omits \`public.\` prefix for sequences in public schema (e.g., \`users.id\` not \`public.users.id\`)
 - \`listFunctions({ schema?, limit?, exclude? })\`: \`{functions: [{schema, name, arguments, returns, language, volatility}], count, limit, note?}\`
 - \`listTriggers({ schema?, table? })\`: \`{triggers: [{schema, table_name, name, timing, events, function_name, enabled}], count}\`
@@ -232,7 +232,7 @@ Response Structures:
 
 - \`pg_create_view\`: Supports \`schema.name\` format (auto-parsed). Use \`orReplace: true\` for CREATE OR REPLACE. \`checkOption\`: 'cascaded', 'local', 'none'. ⛔ OR REPLACE can add new columns but cannot rename/remove existing ones—PostgreSQL limitation
 - \`pg_create_sequence\`: Supports \`schema.name\` format. Parameters: \`start\`, \`increment\`, \`minValue\`, \`maxValue\`, \`cache\`, \`cycle\`, \`ownedBy\`, \`ifNotExists\`
-- \`pg_list_functions\`: Default limit=500. Use \`schema: 'public'\`, \`limit: 2000\`, or \`exclude: ['postgis']\` to filter. ⚠️ \`exclude\` filters by **schema name**, not function name prefix
+- \`pg_list_functions\`: Default limit=500. Use \`schema: 'public'\`, \`limit: 2000\`, or \`exclude: ['postgis']\` to filter. ⚠️ \`exclude\` filters by **schema name** AND extension-owned functions. Note: Aggressive \`exclude\` may return 0 results if all functions belong to excluded extensions
 
 **Discovery**: \`pg.schema.help()\` returns \`{methods: string[], examples: string[]}\` object with available methods and usage examples
 

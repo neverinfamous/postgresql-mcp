@@ -324,8 +324,15 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: readOnly("Copy Export"),
     icons: getToolIcons("backup", readOnly("Copy Export")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { query, format, header, delimiter, conflictWarning } =
-        CopyExportSchema.parse(params); // Use transform for validation
+      const {
+        query,
+        format,
+        header,
+        delimiter,
+        conflictWarning,
+        truncated,
+        effectiveLimit,
+      } = CopyExportSchema.parse(params); // Use transform for validation
 
       const options: string[] = [];
       options.push(`FORMAT ${format ?? "csv"}`);
@@ -395,6 +402,9 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
         return {
           data: lines.join("\n"),
           rowCount: result.rows.length,
+          ...(truncated === true
+            ? { truncated: true, limit: effectiveLimit }
+            : {}),
           ...(conflictWarning !== undefined
             ? { warning: conflictWarning }
             : {}),
@@ -457,6 +467,9 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
         return {
           data: lines.join("\n"),
           rowCount: result.rows.length,
+          ...(truncated === true
+            ? { truncated: true, limit: effectiveLimit }
+            : {}),
           ...(conflictWarning !== undefined
             ? { warning: conflictWarning }
             : {}),

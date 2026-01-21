@@ -1526,6 +1526,48 @@ export class PgApi {
       }
     }
 
+    // Add top-level backup aliases for convenience: pg.dumpTable() → pg.backup.dumpTable()
+    const backupApi = bindings["backup"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (backupApi !== undefined) {
+      // Dump operations
+      if (backupApi["dumpTable"] !== undefined) {
+        bindings["dumpTable"] = backupApi["dumpTable"];
+      }
+      if (backupApi["dumpSchema"] !== undefined) {
+        bindings["dumpSchema"] = backupApi["dumpSchema"];
+      }
+      // Copy operations
+      if (backupApi["copyExport"] !== undefined) {
+        bindings["copyExport"] = backupApi["copyExport"];
+      }
+      if (backupApi["copyImport"] !== undefined) {
+        bindings["copyImport"] = backupApi["copyImport"];
+      }
+      // Backup planning
+      if (backupApi["createBackupPlan"] !== undefined) {
+        bindings["createBackupPlan"] = backupApi["createBackupPlan"];
+      }
+      // Restore operations
+      if (backupApi["restoreCommand"] !== undefined) {
+        bindings["restoreCommand"] = backupApi["restoreCommand"];
+      }
+      if (backupApi["restoreValidate"] !== undefined) {
+        bindings["restoreValidate"] = backupApi["restoreValidate"];
+      }
+      // Physical backup
+      if (backupApi["physical"] !== undefined) {
+        bindings["physical"] = backupApi["physical"];
+        bindings["backupPhysical"] = backupApi["physical"]; // Also add prefixed alias
+      }
+      // Schedule optimization
+      if (backupApi["scheduleOptimize"] !== undefined) {
+        bindings["scheduleOptimize"] = backupApi["scheduleOptimize"];
+        bindings["backupScheduleOptimize"] = backupApi["scheduleOptimize"]; // Also add prefixed alias
+      }
+    }
+
     return bindings;
   }
 }

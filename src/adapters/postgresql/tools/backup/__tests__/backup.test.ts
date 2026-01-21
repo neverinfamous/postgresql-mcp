@@ -650,8 +650,9 @@ describe("pg_copy_export", () => {
     )) as { data: string; rowCount: number };
 
     expect(result.rowCount).toBe(1);
+    // Default limit of 500 is applied
     expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-      'SELECT * FROM "public"."users"',
+      'SELECT * FROM "public"."users" LIMIT 500',
     );
   });
 
@@ -670,8 +671,9 @@ describe("pg_copy_export", () => {
     )) as { data: string; rowCount: number };
 
     expect(result.rowCount).toBe(1);
+    // Default limit of 500 is applied
     expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-      'SELECT * FROM "inventory"."products"',
+      'SELECT * FROM "inventory"."products" LIMIT 500',
     );
   });
 
@@ -689,7 +691,10 @@ describe("pg_copy_export", () => {
     )) as { data: string; rowCount: number };
 
     expect(result.rowCount).toBe(1);
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith("SELECT 1 as id");
+    // Default limit of 500 is applied to custom queries too
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      "SELECT 1 as id LIMIT 500",
+    );
   });
 
   it("should use \\N for NULL in text format", async () => {

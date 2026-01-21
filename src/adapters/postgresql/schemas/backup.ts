@@ -32,10 +32,15 @@ export const CopyExportSchemaBase = z.object({
   limit: z
     .number()
     .int()
-    .positive()
+    .nonnegative()
     .optional()
-    .describe("Maximum number of rows to export"),
+    .describe(
+      "Maximum number of rows to export (default: 500 to prevent large payloads). Use 0 for all rows",
+    ),
 });
+
+/** Default limit for copyExport when not specified */
+const DEFAULT_EXPORT_LIMIT = 500;
 
 /**
  * Transformed schema with alias resolution, table shortcut, and schema.table parsing.
@@ -54,6 +59,19 @@ export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
       "Both query and table parameters provided. Using query parameter (table ignored).";
   }
 
+  // Resolve effective limit:
+  // - undefined = use DEFAULT_EXPORT_LIMIT (500)
+  // - 0 = no limit (export all rows)
+  // - positive number = user-specified limit
+  const effectiveLimit =
+    input.limit === undefined
+      ? DEFAULT_EXPORT_LIMIT
+      : input.limit === 0
+        ? undefined // 0 means no limit
+        : input.limit;
+
+  let truncated: boolean | undefined;
+
   // Auto-generate query from table if provided
   if ((query === undefined || query === "") && input.table !== undefined) {
     // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
@@ -69,23 +87,37 @@ export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
       }
     }
 
-    // Build query with optional LIMIT
+    // Build query with LIMIT
     query = `SELECT * FROM "${schemaName}"."${tableName}"`;
-    if (input.limit !== undefined) {
-      query += ` LIMIT ${String(input.limit)}`;
+    if (effectiveLimit !== undefined) {
+      query += ` LIMIT ${String(effectiveLimit)}`;
+      // Only mark as potentially truncated if using default limit
+      if (input.limit === undefined) {
+        truncated = true;
+      }
     }
-  } else if (query !== undefined && input.limit !== undefined) {
+  } else if (query !== undefined && effectiveLimit !== undefined) {
     // If a custom query is provided and limit is specified, wrap or append LIMIT
     // Only append if query doesn't already have LIMIT
     if (!/\bLIMIT\s+\d+\s*$/i.test(query)) {
-      query += ` LIMIT ${String(input.limit)}`;
+      query += ` LIMIT ${String(effectiveLimit)}`;
+      // Only mark as potentially truncated if using default limit
+      if (input.limit === undefined) {
+        truncated = true;
+      }
     }
   }
 
   if (query === undefined || query === "") {
     throw new Error("Either query/sql or table parameter is required");
   }
-  return { ...input, query, conflictWarning };
+  return {
+    ...input,
+    query,
+    conflictWarning,
+    truncated,
+    effectiveLimit,
+  };
 });
 
 export const DumpSchemaSchema = z.object({

@@ -180,14 +180,17 @@ Core: \`dumpTable()\`, \`dumpSchema()\`, \`copyExport()\`, \`copyImport()\`, \`c
 
 Response Structures:
 - \`dumpTable\`: \`{ddl, type, note, insertStatements?}\` — \`insertStatements\` only with \`includeData: true\` (separate field from \`ddl\`)
-- \`copyExport\`: \`{data, rowCount}\` — \`data\` contains CSV/text content
+- \`copyExport\`: \`{data, rowCount, truncated?, limit?}\` — \`data\` contains CSV/text content. \`truncated: true\` when default limit applied
 - \`copyImport\`: \`{command, stdinCommand, notes}\` — Both file and stdin COPY commands
 - \`createBackupPlan\`: \`{strategy: {fullBackup, walArchiving}, estimates}\`
 - \`restoreCommand\`: \`{command, warnings?, notes}\` — Warnings when \`database\` omitted
+- \`restoreValidate\`: \`{validationSteps: [{step, name, command?, commands?, note?}], recommendations}\` — Note: \`note\` field only for pg_dump default type
 - \`physical\`: \`{command, notes, requirements}\`
 - \`scheduleOptimize\`: \`{analysis, recommendation, commands}\`
 
-- \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). Format: \`csv\` (default), \`text\`. ⛔ \`binary\` not supported via MCP—use \`pg_dump_schema\` for binary exports. Use \`limit: N\` to cap rows. Optional \`header\` (default: true), \`delimiter\`
+📦 **AI-Optimized Payloads**: \`copyExport\` limits results to 500 rows by default to prevent large payloads. Use \`limit: 0\` for all rows, or specify a custom limit.
+
+- \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). Format: \`csv\` (default), \`text\`. ⛔ \`binary\` not supported via MCP—use \`pg_dump_schema\` for binary exports. Default \`limit: 500\` (use \`0\` for all rows). Optional \`header\` (default: true), \`delimiter\`
 - \`pg_dump_table\`: Returns \`ddl\` (basic CREATE TABLE only) + \`insertStatements\` when \`includeData: true\`. **PRIMARY KEYS, INDEXES, CONSTRAINTS NOT included**—use \`pg_get_indexes\`/\`pg_get_constraints\`. Supports sequences, views, and \`schema.table\` format
 - \`pg_dump_schema\`: Generates pg_dump command. Optional \`schema\`, \`table\`, \`filename\`
 - \`pg_copy_import\`: Generates COPY FROM command. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). \`columns\` array, \`filePath\`, \`format\`, \`header\`, \`delimiter\`
@@ -196,6 +199,8 @@ Response Structures:
 - \`pg_backup_physical\`: Generates pg_basebackup command. \`format\`: 'plain'|'tar', \`checkpoint\`: 'fast'|'spread', \`compress\`: 0-9
 - \`pg_restore_validate\`: Generates validation commands. \`backupType\`: 'pg_dump' (default)|'pg_basebackup'
 - \`pg_backup_schedule_optimize\`: Analyzes database activity patterns and recommends optimal backup schedule
+
+**Top-Level Aliases**: \`pg.dumpTable()\`, \`pg.dumpSchema()\`, \`pg.copyExport()\`, \`pg.copyImport()\`, \`pg.createBackupPlan()\`, \`pg.restoreCommand()\`, \`pg.restoreValidate()\`, \`pg.physical()\`, \`pg.backupPhysical()\`, \`pg.scheduleOptimize()\`, \`pg.backupScheduleOptimize()\`
 
 ## Text Tools
 

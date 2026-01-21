@@ -19,7 +19,8 @@ export const DropSchemaSchema = z.object({
 });
 
 // Base schema for MCP visibility (shows both name and sequenceName)
-const CreateSequenceSchemaBase = z.object({
+// Exported so MCP Direct Tool Calls can show parameter schema
+export const CreateSequenceSchemaBase = z.object({
   name: z.string().optional().describe("Sequence name"),
   sequenceName: z.string().optional().describe("Alias for name"),
   schema: z.string().optional().describe("Schema name"),
@@ -94,7 +95,8 @@ export const CreateSequenceSchema = z.preprocess(
 const CHECK_OPTION_VALUES = ["cascaded", "local", "none"] as const;
 
 // Base schema for MCP visibility (shows both name and viewName, query/sql/definition)
-const CreateViewSchemaBase = z.object({
+// Exported so MCP Direct Tool Calls can show parameter schema
+export const CreateViewSchemaBase = z.object({
   name: z
     .string()
     .optional()
@@ -153,3 +155,93 @@ export const CreateViewSchema = z
   .refine((data) => data.query !== "", {
     message: "query (or sql/definition alias) is required",
   });
+
+// =============================================================================
+// Drop Schemas - Split Schema pattern for MCP visibility
+// =============================================================================
+
+/**
+ * Base schema for dropping sequences - used for MCP inputSchema visibility.
+ */
+export const DropSequenceSchemaBase = z.object({
+  name: z.string().describe("Sequence name (supports schema.name format)"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  ifExists: z.boolean().optional().describe("Use IF EXISTS to avoid errors"),
+  cascade: z.boolean().optional().describe("Drop dependent objects"),
+});
+
+/**
+ * Preprocess sequence drop params to handle schema.name format
+ */
+function preprocessDropSequenceParams(input: unknown): unknown {
+  if (typeof input !== "object" || input === null) return input;
+  const result = { ...(input as Record<string, unknown>) };
+
+  // Parse schema.name format
+  if (
+    typeof result["name"] === "string" &&
+    result["name"].includes(".") &&
+    result["schema"] === undefined
+  ) {
+    const parts = result["name"].split(".");
+    if (parts.length === 2) {
+      result["schema"] = parts[0];
+      result["name"] = parts[1];
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Full schema with preprocessing for alias support.
+ */
+export const DropSequenceSchema = z.preprocess(
+  preprocessDropSequenceParams,
+  DropSequenceSchemaBase,
+);
+
+/**
+ * Base schema for dropping views - used for MCP inputSchema visibility.
+ */
+export const DropViewSchemaBase = z.object({
+  name: z.string().describe("View name (supports schema.name format)"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  materialized: z
+    .boolean()
+    .optional()
+    .describe("Whether the view is materialized"),
+  ifExists: z.boolean().optional().describe("Use IF EXISTS to avoid errors"),
+  cascade: z.boolean().optional().describe("Drop dependent objects"),
+});
+
+/**
+ * Preprocess view drop params to handle schema.name format
+ */
+function preprocessDropViewParams(input: unknown): unknown {
+  if (typeof input !== "object" || input === null) return input;
+  const result = { ...(input as Record<string, unknown>) };
+
+  // Parse schema.name format
+  if (
+    typeof result["name"] === "string" &&
+    result["name"].includes(".") &&
+    result["schema"] === undefined
+  ) {
+    const parts = result["name"].split(".");
+    if (parts.length === 2) {
+      result["schema"] = parts[0];
+      result["name"] = parts[1];
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Full schema with preprocessing for alias support.
+ */
+export const DropViewSchema = z.preprocess(
+  preprocessDropViewParams,
+  DropViewSchemaBase,
+);

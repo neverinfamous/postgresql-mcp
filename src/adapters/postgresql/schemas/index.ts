@@ -93,8 +93,16 @@ export {
 export {
   CreateSchemaSchema,
   DropSchemaSchema,
+  // Sequence schemas - Split Schema pattern for MCP visibility
+  CreateSequenceSchemaBase,
   CreateSequenceSchema,
+  DropSequenceSchemaBase,
+  DropSequenceSchema,
+  // View schemas - Split Schema pattern for MCP visibility
+  CreateViewSchemaBase,
   CreateViewSchema,
+  DropViewSchemaBase,
+  DropViewSchema,
 } from "./schema-mgmt.js";
 
 // pgvector schemas

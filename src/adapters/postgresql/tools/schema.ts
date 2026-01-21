@@ -14,8 +14,14 @@ import { sanitizeIdentifier } from "../../../utils/identifiers.js";
 import {
   CreateSchemaSchema,
   DropSchemaSchema,
+  CreateSequenceSchemaBase,
   CreateSequenceSchema,
+  DropSequenceSchemaBase,
+  DropSequenceSchema,
+  CreateViewSchemaBase,
   CreateViewSchema,
+  DropViewSchemaBase,
+  DropViewSchema,
 } from "../schemas/index.js";
 
 /**
@@ -157,7 +163,7 @@ function createCreateSequenceTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Create a new sequence with optional START, INCREMENT, MIN/MAX, CACHE, CYCLE, and OWNED BY.",
     group: "schema",
-    inputSchema: CreateSequenceSchema,
+    inputSchema: CreateSequenceSchemaBase,
     annotations: write("Create Sequence"),
     icons: getToolIcons("schema", write("Create Sequence")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -200,45 +206,14 @@ function createCreateSequenceTool(adapter: PostgresAdapter): ToolDefinition {
   };
 }
 
-/**
- * Preprocess sequence drop params to handle schema.name format
- */
-function preprocessDropSequenceParams(input: unknown): unknown {
-  if (typeof input !== "object" || input === null) return input;
-  const result = { ...(input as Record<string, unknown>) };
-
-  // Parse schema.name format
-  if (
-    typeof result["name"] === "string" &&
-    result["name"].includes(".") &&
-    result["schema"] === undefined
-  ) {
-    const parts = result["name"].split(".");
-    if (parts.length === 2) {
-      result["schema"] = parts[0];
-      result["name"] = parts[1];
-    }
-  }
-
-  return result;
-}
-
-const DropSequenceSchema = z.preprocess(
-  preprocessDropSequenceParams,
-  z.object({
-    name: z.string().describe("Sequence name (supports schema.name format)"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-    ifExists: z.boolean().optional().describe("Use IF EXISTS to avoid errors"),
-    cascade: z.boolean().optional().describe("Drop dependent objects"),
-  }),
-);
+// DropSequenceSchema is now imported from schemas/schema-mgmt.js
 
 function createDropSequenceTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_drop_sequence",
     description: "Drop a sequence. Supports IF EXISTS and CASCADE options.",
     group: "schema",
-    inputSchema: DropSequenceSchema,
+    inputSchema: DropSequenceSchemaBase,
     annotations: destructive("Drop Sequence"),
     icons: getToolIcons("schema", destructive("Drop Sequence")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -310,7 +285,7 @@ function createCreateViewTool(adapter: PostgresAdapter): ToolDefinition {
     name: "pg_create_view",
     description: "Create a view or materialized view.",
     group: "schema",
-    inputSchema: CreateViewSchema,
+    inputSchema: CreateViewSchemaBase,
     annotations: write("Create View"),
     icons: getToolIcons("schema", write("Create View")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -339,42 +314,7 @@ function createCreateViewTool(adapter: PostgresAdapter): ToolDefinition {
   };
 }
 
-/**
- * Preprocess view drop params to handle schema.name format
- */
-function preprocessDropViewParams(input: unknown): unknown {
-  if (typeof input !== "object" || input === null) return input;
-  const result = { ...(input as Record<string, unknown>) };
-
-  // Parse schema.name format
-  if (
-    typeof result["name"] === "string" &&
-    result["name"].includes(".") &&
-    result["schema"] === undefined
-  ) {
-    const parts = result["name"].split(".");
-    if (parts.length === 2) {
-      result["schema"] = parts[0];
-      result["name"] = parts[1];
-    }
-  }
-
-  return result;
-}
-
-const DropViewSchema = z.preprocess(
-  preprocessDropViewParams,
-  z.object({
-    name: z.string().describe("View name (supports schema.name format)"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-    materialized: z
-      .boolean()
-      .optional()
-      .describe("Whether the view is materialized"),
-    ifExists: z.boolean().optional().describe("Use IF EXISTS to avoid errors"),
-    cascade: z.boolean().optional().describe("Drop dependent objects"),
-  }),
-);
+// DropViewSchema is now imported from schemas/schema-mgmt.js
 
 function createDropViewTool(adapter: PostgresAdapter): ToolDefinition {
   return {
@@ -382,7 +322,7 @@ function createDropViewTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Drop a view or materialized view. Supports IF EXISTS and CASCADE options.",
     group: "schema",
-    inputSchema: DropViewSchema,
+    inputSchema: DropViewSchemaBase,
     annotations: destructive("Drop View"),
     icons: getToolIcons("schema", destructive("Drop View")),
     handler: async (params: unknown, _context: RequestContext) => {

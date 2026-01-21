@@ -185,6 +185,7 @@ Response Structures:
 Defaults: \`threshold\`=0.3 (use 0.1-0.2 for partial), \`maxDistance\`=3 (use 5+ for longer strings)
 
 - All text tools support \`schema.table\` format (auto-parsed, embedded schema takes priority over explicit \`schema\` param)
+- \`pg_text_search\`: Supports both \`column\` (singular string) and \`columns\` (array). Either is valid—\`column\` auto-converts to array
 - \`pg_trigram_similarity\` vs \`pg_similarity_search\`: Both use pg_trgm. First filters by threshold; second uses set_limit() with %
 - \`pg_fuzzy_match\`: Levenshtein returns distance (lower=better). Soundex/metaphone return phonetic codes (exact match only). ⛔ Invalid \`method\` values throw error with valid options
 - \`pg_text_normalize\`: Removes accents only (unaccent). Does NOT lowercase/trim

@@ -63,10 +63,23 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
       const parsed = TextSearchSchema.parse(params);
       const cfg = parsed.config ?? "english";
 
+      // Handle both column (string) and columns (array) parameters
+      // The preprocessor converts column → columns, but we handle both for safety
+      let cols: string[];
+      if (parsed.columns !== undefined && parsed.columns.length > 0) {
+        cols = parsed.columns;
+      } else if (parsed.column !== undefined) {
+        cols = [parsed.column];
+      } else {
+        throw new Error(
+          "Either 'columns' (array) or 'column' (string) is required",
+        );
+      }
+
       // Build qualified table name with schema support
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const tableName = `${schemaPrefix}"${parsed.table}"`;
-      const sanitizedCols = sanitizeIdentifiers(parsed.columns);
+      const sanitizedCols = sanitizeIdentifiers(cols);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")

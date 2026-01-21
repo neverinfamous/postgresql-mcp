@@ -69,18 +69,29 @@ export function preprocessTextParams(input: unknown): unknown {
 // Base Schemas (for MCP inputSchema visibility - no preprocess)
 // =============================================================================
 
-export const TextSearchSchemaBase = z.object({
-  table: z.string().describe("Table name"),
-  columns: z.array(z.string()).describe("Text columns to search"),
-  query: z.string().describe("Search query"),
-  config: z
-    .string()
-    .optional()
-    .describe("Text search config (default: english)"),
-  select: z.array(z.string()).optional().describe("Columns to return"),
-  limit: z.number().optional().describe("Max results"),
-  schema: z.string().optional().describe("Schema name (default: public)"),
-});
+export const TextSearchSchemaBase = z
+  .object({
+    table: z.string().describe("Table name"),
+    columns: z
+      .array(z.string())
+      .optional()
+      .describe("Text columns to search (array)"),
+    column: z
+      .string()
+      .optional()
+      .describe("Text column to search (singular, alias for columns)"),
+    query: z.string().describe("Search query"),
+    config: z
+      .string()
+      .optional()
+      .describe("Text search config (default: english)"),
+    select: z.array(z.string()).optional().describe("Columns to return"),
+    limit: z.number().optional().describe("Max results"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  })
+  .refine((data) => data.columns !== undefined || data.column !== undefined, {
+    message: "Either 'columns' (array) or 'column' (string) is required",
+  });
 
 export const TrigramSimilaritySchemaBase = z.object({
   table: z.string().describe("Table name"),

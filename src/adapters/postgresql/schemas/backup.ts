@@ -70,7 +70,8 @@ export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
         ? undefined // 0 means no limit
         : input.limit;
 
-  let truncated: boolean | undefined;
+  // Track whether we used the default limit (handler will check actual row count)
+  let usedDefaultLimit = false;
 
   // Auto-generate query from table if provided
   if ((query === undefined || query === "") && input.table !== undefined) {
@@ -91,9 +92,9 @@ export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
     query = `SELECT * FROM "${schemaName}"."${tableName}"`;
     if (effectiveLimit !== undefined) {
       query += ` LIMIT ${String(effectiveLimit)}`;
-      // Only mark as potentially truncated if using default limit
+      // Track if we're using the default limit (actual truncation determined in handler)
       if (input.limit === undefined) {
-        truncated = true;
+        usedDefaultLimit = true;
       }
     }
   } else if (query !== undefined && effectiveLimit !== undefined) {
@@ -101,9 +102,9 @@ export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
     // Only append if query doesn't already have LIMIT
     if (!/\bLIMIT\s+\d+\s*$/i.test(query)) {
       query += ` LIMIT ${String(effectiveLimit)}`;
-      // Only mark as potentially truncated if using default limit
+      // Track if we're using the default limit (actual truncation determined in handler)
       if (input.limit === undefined) {
-        truncated = true;
+        usedDefaultLimit = true;
       }
     }
   }
@@ -115,7 +116,7 @@ export const CopyExportSchema = CopyExportSchemaBase.transform((input) => {
     ...input,
     query,
     conflictWarning,
-    truncated,
+    usedDefaultLimit,
     effectiveLimit,
   };
 });

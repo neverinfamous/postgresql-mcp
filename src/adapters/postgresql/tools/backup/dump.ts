@@ -330,7 +330,7 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
         header,
         delimiter,
         conflictWarning,
-        truncated,
+        usedDefaultLimit,
         effectiveLimit,
       } = CopyExportSchema.parse(params); // Use transform for validation
 
@@ -399,12 +399,17 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
           );
         }
 
+        // Only mark as truncated if we used default limit AND rows returned equals limit
+        // This indicates there are likely more rows available
+        const isTruncated =
+          usedDefaultLimit &&
+          effectiveLimit !== undefined &&
+          result.rows.length === effectiveLimit;
+
         return {
           data: lines.join("\n"),
           rowCount: result.rows.length,
-          ...(truncated === true
-            ? { truncated: true, limit: effectiveLimit }
-            : {}),
+          ...(isTruncated ? { truncated: true, limit: effectiveLimit } : {}),
           ...(conflictWarning !== undefined
             ? { warning: conflictWarning }
             : {}),
@@ -464,12 +469,17 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
           );
         }
 
+        // Only mark as truncated if we used default limit AND rows returned equals limit
+        // This indicates there are likely more rows available
+        const isTruncated =
+          usedDefaultLimit &&
+          effectiveLimit !== undefined &&
+          result.rows.length === effectiveLimit;
+
         return {
           data: lines.join("\n"),
           rowCount: result.rows.length,
-          ...(truncated === true
-            ? { truncated: true, limit: effectiveLimit }
-            : {}),
+          ...(isTruncated ? { truncated: true, limit: effectiveLimit } : {}),
           ...(conflictWarning !== undefined
             ? { warning: conflictWarning }
             : {}),

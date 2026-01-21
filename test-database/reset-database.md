@@ -19,38 +19,24 @@ docker exec postgres-server psql -U postgres -d postgres -c "DROP TABLE IF EXIST
 Use this to clean up ALL accumulated test artifacts including `temp_*` tables, partition tables, and test schemas:
 
 ```powershell
-# Step 1: Drop ALL temp_* and accumulated test tables (run in psql or via docker exec)
-docker exec postgres-server psql -U postgres -d postgres -c "
-DO \$\$
-DECLARE
-    r RECORD;
-BEGIN
-    -- Drop all temp_* tables
-    FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'temp_%' AND schemaname = 'public'
-    LOOP
-        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE';
-    END LOOP;
+# Step 1: Drop test schemas
+docker exec postgres-server psql -U postgres -d postgres -c "DROP SCHEMA IF EXISTS test_schema CASCADE; DROP SCHEMA IF EXISTS test_vector_schema CASCADE;"
 
-    -- Drop all test_* tables (except partman-managed)
-    FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'test_%' AND schemaname = 'public'
-    LOOP
-        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE';
-    END LOOP;
+# Step 2: Drop temp_* tables
+docker exec postgres-server psql -U postgres -d postgres -c "DO `$`$DECLARE r RECORD; BEGIN FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'temp_%' AND schemaname = 'public' LOOP EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END`$`$;"
 
-    -- Drop accumulated ai_test_* tables
-    FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'ai_test_%' AND schemaname = 'public'
-    LOOP
-        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE';
-    END LOOP;
+# Step 3: Drop test_* tables
+docker exec postgres-server psql -U postgres -d postgres -c "DO `$`$DECLARE r RECORD; BEGIN FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'test_%' AND schemaname = 'public' LOOP EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END`$`$;"
 
-    -- Drop test schemas
-    DROP SCHEMA IF EXISTS test_schema CASCADE;
-    DROP SCHEMA IF EXISTS test_vector_schema CASCADE;
-END \$\$;
-"
+# Step 4: Drop ai_test_* tables
+docker exec postgres-server psql -U postgres -d postgres -c "DO `$`$DECLARE r RECORD; BEGIN FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE tablename LIKE 'ai_test_%' AND schemaname = 'public' LOOP EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END`$`$;"
 
-# Step 2: Re-seed the database
-docker cp c:\Users\chris\Desktop\postgres-mcp\test-database\test-database.sql postgres-server:/tmp/test-database.sql && docker exec postgres-server psql -U postgres -d postgres -f /tmp/test-database.sql 2>&1 | Select-Object -Last 10
+# Step 5: Drop other accumulated artifacts (partman_*, prompt_*, mcp_*, ltree_*, fts_*, etc.)
+# Excludes spatial_ref_sys which is a PostGIS extension table
+docker exec postgres-server psql -U postgres -d postgres -c "DO `$`$DECLARE r RECORD; BEGIN FOR r IN SELECT schemaname, tablename FROM pg_tables WHERE (tablename LIKE 'partman_%' OR tablename LIKE 'prompt_%' OR tablename LIKE 'mcp_%' OR tablename LIKE 'orders_%' OR tablename LIKE 'ltree_%' OR tablename LIKE 'fts_%' OR tablename LIKE 'spatial_places%' OR tablename LIKE 'jsonb_%' OR tablename LIKE 'notebook_%' OR tablename IN ('categories','documents','locations','vector_docs','txn_demo') OR tablename LIKE 'empty_%' OR tablename LIKE 'batch_%') AND schemaname = 'public' AND tablename != 'spatial_ref_sys' LOOP EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END`$`$;"
+
+# Step 6: Re-seed the database
+docker cp c:\Users\chris\Desktop\postgres-mcp\test-database\test-database.sql postgres-server:/tmp/test-database.sql; docker exec postgres-server psql -U postgres -d postgres -f /tmp/test-database.sql 2>&1 | Select-Object -Last 10
 ```
 
 ## Verify Cleanup

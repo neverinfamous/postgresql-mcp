@@ -14,6 +14,12 @@ Use this if you're confident no extra tables have accumulated:
 docker exec postgres-server psql -U postgres -d postgres -c "DROP TABLE IF EXISTS test_orders CASCADE; DROP TABLE IF EXISTS test_products CASCADE; DROP TABLE IF EXISTS test_jsonb_docs CASCADE; DROP TABLE IF EXISTS test_articles CASCADE; DROP SCHEMA IF EXISTS test_schema CASCADE; DROP TABLE IF EXISTS test_events CASCADE; DROP TABLE IF EXISTS test_measurements CASCADE; DROP TABLE IF EXISTS test_embeddings CASCADE; DROP TABLE IF EXISTS test_locations CASCADE; DROP TABLE IF EXISTS test_logs CASCADE; DROP TABLE IF EXISTS test_users CASCADE; DROP TABLE IF EXISTS test_categories CASCADE; DROP TABLE IF EXISTS test_secure_data CASCADE;" && docker cp c:\Users\chris\Desktop\postgres-mcp\test-database\test-database.sql postgres-server:/tmp/test-database.sql && docker exec postgres-server psql -U postgres -d postgres -f /tmp/test-database.sql 2>&1 | Select-Object -Last 10
 ```
 
+## Reset
+
+# Standard reset
+
+.\test-database\reset-database.ps1
+
 ## Full Cleanup (Recommended)
 
 Use this to clean up ALL accumulated test artifacts including `temp_*` tables, partition tables, and test schemas:

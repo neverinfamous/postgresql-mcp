@@ -31,6 +31,14 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
         .boolean()
         .optional()
         .describe("Include INSERT statements for table data"),
+      limit: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          "Maximum rows to include when includeData is true (default: 500, use 0 for all rows)",
+        ),
     }),
     annotations: readOnly("Dump Table"),
     icons: getToolIcons("backup", readOnly("Dump Table")),
@@ -39,6 +47,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
         table: string;
         schema?: string;
         includeData?: boolean;
+        limit?: number;
       };
 
       // Validate required table parameter
@@ -206,8 +215,13 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
       };
 
       if (parsed.includeData) {
+        // Default limit is 500 to prevent large payloads, 0 means no limit
+        const effectiveLimit =
+          parsed.limit === 0 ? null : (parsed.limit ?? 500);
+        const limitClause =
+          effectiveLimit !== null ? ` LIMIT ${String(effectiveLimit)}` : "";
         const dataResult = await adapter.executeQuery(
-          `SELECT * FROM "${schemaName}"."${tableName}" LIMIT 1000`,
+          `SELECT * FROM "${schemaName}"."${tableName}"${limitClause}`,
         );
         if (dataResult.rows !== undefined && dataResult.rows.length > 0) {
           const firstRow = dataResult.rows[0];

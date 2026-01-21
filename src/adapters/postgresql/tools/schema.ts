@@ -283,7 +283,7 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
         .number()
         .optional()
         .describe(
-          "Max length for view definitions (default: 1000). Use 0 for no truncation.",
+          "Max length for view definitions (default: 500). Use 0 for no truncation.",
         ),
       limit: z
         .number()
@@ -307,8 +307,8 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
       const kindClause =
         parsed.includeMaterialized !== false ? "IN ('v', 'm')" : "= 'v'";
 
-      // Default truncation: 1000 chars, 0 = no truncation
-      const truncateLimit = parsed.truncateDefinition ?? 1000;
+      // Default truncation: 500 chars, 0 = no truncation
+      const truncateLimit = parsed.truncateDefinition ?? 500;
 
       // Default limit: 50, 0 = no limit
       const limitVal = parsed.limit ?? 50;

@@ -159,6 +159,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_jsonb_object code mode double-wrapping fix** — `pg.jsonb.object({ data: { name: "John" } })` now correctly passes through to the tool without double-wrapping. Previously, Code Mode wrapped all objects unconditionally, causing `{ data: { key: 'val' } }` to become `{ data: { data: { key: 'val' } } }`. The fix uses skipKeys detection: when the object already contains expected keys (`data`, `object`, or `pairs`), it passes through unchanged. Both usage patterns now work correctly: `pg.jsonb.object({ name: "John" })` wraps to `{ data: { name: "John" } }`, while `pg.jsonb.object({ data: { name: "John" } })` passes through as-is
 - **pg_batch_insert JSONB column support** — `pg_batch_insert` now correctly handles objects and arrays in row data, serializing them to JSON strings for JSONB column compatibility. Previously, passing objects/arrays to JSONB columns caused "invalid input syntax for type json" errors. Now `pg.batchInsert("table", [{ data: { nested: "object" }, tags: ["a", "b"] }])` works correctly
 
+- **Text tools filter/where parameter support** — `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_like_search`, and `pg_regexp_match` now properly support `filter` and `where` parameters. Previously, these parameters were silently ignored and all matching rows were returned
+- **Text tools `text` parameter alias** — `pg_trigram_similarity` and `pg_fuzzy_match` now accept `text` as an alias for `value` parameter, matching the examples in `pg.text.help()` output
+- **pg_text_search `column` singular alias** — `pg_text_search` now accepts `column` (singular string) as an alias for `columns` (array), auto-wrapping to array
+- **pg_create_fts_index `indexName` parameter alias** — `pg_create_fts_index` now accepts `indexName` as an alias for `name` parameter
 - **dumpTable table parameter validation** — `dumpTable()` now validates that the `table` parameter is provided and throws a descriptive error if missing (previously created invalid DDL for "undefined")
 - **dumpTable schema.table format parsing** — `dumpTable()` now correctly parses `schema.table` format (e.g., `'public.users'` → schema='public', table='users'). Embedded schema takes priority over explicit `schema` parameter to prevent duplication errors
 - **copyExport schema.table format parsing** — `copyExport()` now correctly parses `schema.table` format with embedded schema taking priority over explicit `schema` parameter to prevent `public.public.table` duplication errors
@@ -435,3 +439,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Connection pooling with health checks
 - Tool filtering system
 - 6 resources and 7 AI-powered prompts
+

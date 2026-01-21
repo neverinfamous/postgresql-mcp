@@ -69,6 +69,22 @@ function preprocessTextParams(input: unknown): unknown {
   if (result["filter"] !== undefined && result["where"] === undefined) {
     result["where"] = result["filter"];
   }
+  // Alias: text → value (for trigram/fuzzy tools)
+  if (result["text"] !== undefined && result["value"] === undefined) {
+    result["value"] = result["text"];
+  }
+  // Alias: indexName → name (for FTS index tool)
+  if (result["indexName"] !== undefined && result["name"] === undefined) {
+    result["name"] = result["indexName"];
+  }
+  // Alias: column (singular) → columns (array) for text search
+  if (
+    result["column"] !== undefined &&
+    result["columns"] === undefined &&
+    typeof result["column"] === "string"
+  ) {
+    result["columns"] = [result["column"]];
+  }
 
   // Parse schema.table format (embedded schema takes priority)
   if (typeof result["table"] === "string" && result["table"].includes(".")) {
@@ -238,10 +254,11 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
+      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
 
       const sql = `SELECT ${selectCols}, similarity(${columnName}, $1) as similarity
                         FROM ${tableName}
-                        WHERE similarity(${columnName}, $1) > ${String(thresh)}
+                        WHERE similarity(${columnName}, $1) > ${String(thresh)}${additionalWhere}
                         ORDER BY similarity DESC LIMIT ${String(limitVal)}`;
 
       const result = await adapter.executeQuery(sql, [parsed.value]);
@@ -266,6 +283,7 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
         ),
       select: z.array(z.string()).optional().describe("Columns to return"),
       limit: z.number().optional(),
+      where: z.string().optional().describe("Additional WHERE clause filter"),
       schema: z.string().optional().describe("Schema name (default: public)"),
     }),
   );
@@ -296,14 +314,15 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
+      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
 
       let sql: string;
       if (method === "soundex") {
-        sql = `SELECT ${selectCols}, soundex(${columnName}) as code FROM ${tableName} WHERE soundex(${columnName}) = soundex($1) LIMIT ${String(limitVal)}`;
+        sql = `SELECT ${selectCols}, soundex(${columnName}) as code FROM ${tableName} WHERE soundex(${columnName}) = soundex($1)${additionalWhere} LIMIT ${String(limitVal)}`;
       } else if (method === "metaphone") {
-        sql = `SELECT ${selectCols}, metaphone(${columnName}, 10) as code FROM ${tableName} WHERE metaphone(${columnName}, 10) = metaphone($1, 10) LIMIT ${String(limitVal)}`;
+        sql = `SELECT ${selectCols}, metaphone(${columnName}, 10) as code FROM ${tableName} WHERE metaphone(${columnName}, 10) = metaphone($1, 10)${additionalWhere} LIMIT ${String(limitVal)}`;
       } else {
-        sql = `SELECT ${selectCols}, levenshtein(${columnName}, $1) as distance FROM ${tableName} WHERE levenshtein(${columnName}, $1) <= ${String(maxDist)} ORDER BY distance LIMIT ${String(limitVal)}`;
+        sql = `SELECT ${selectCols}, levenshtein(${columnName}, $1) as distance FROM ${tableName} WHERE levenshtein(${columnName}, $1) <= ${String(maxDist)}${additionalWhere} ORDER BY distance LIMIT ${String(limitVal)}`;
       }
 
       const result = await adapter.executeQuery(sql, [parsed.value]);
@@ -332,10 +351,11 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
       const op = parsed.flags?.includes("i") ? "~*" : "~";
+      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
       const limitClause =
         parsed.limit !== undefined ? ` LIMIT ${String(parsed.limit)}` : "";
 
-      const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${limitClause}`;
+      const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${additionalWhere}${limitClause}`;
       const result = await adapter.executeQuery(sql, [parsed.pattern]);
       return { rows: result.rows, count: result.rows?.length ?? 0 };
     },
@@ -355,6 +375,7 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
         .describe("Use case-sensitive LIKE (default: false, uses ILIKE)"),
       select: z.array(z.string()).optional(),
       limit: z.number().optional(),
+      where: z.string().optional().describe("Additional WHERE clause filter"),
       schema: z.string().optional().describe("Schema name (default: public)"),
     }),
   );
@@ -379,12 +400,13 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
       const op = parsed.caseSensitive === true ? "LIKE" : "ILIKE";
+      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
       const limitClause =
         parsed.limit !== undefined && parsed.limit > 0
           ? ` LIMIT ${String(parsed.limit)}`
           : "";
 
-      const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${limitClause}`;
+      const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${additionalWhere}${limitClause}`;
       const result = await adapter.executeQuery(sql, [parsed.pattern]);
       return { rows: result.rows, count: result.rows?.length ?? 0 };
     },

@@ -30,6 +30,22 @@ function preprocessTextParams(input: unknown): unknown {
   if (result["filter"] !== undefined && result["where"] === undefined) {
     result["where"] = result["filter"];
   }
+  // Alias: text → value (for trigram/fuzzy tools)
+  if (result["text"] !== undefined && result["value"] === undefined) {
+    result["value"] = result["text"];
+  }
+  // Alias: indexName → name (for FTS index tool)
+  if (result["indexName"] !== undefined && result["name"] === undefined) {
+    result["name"] = result["indexName"];
+  }
+  // Alias: column (singular) → columns (array) for text search
+  if (
+    result["column"] !== undefined &&
+    result["columns"] === undefined &&
+    typeof result["column"] === "string"
+  ) {
+    result["columns"] = [result["column"]];
+  }
 
   // Parse schema.table format (embedded schema takes priority)
   if (typeof result["table"] === "string" && result["table"].includes(".")) {
@@ -76,6 +92,7 @@ export const TrigramSimilaritySchema = z.preprocess(
       ),
     select: z.array(z.string()).optional().describe("Columns to return"),
     limit: z.number().optional().describe("Max results"),
+    where: z.string().optional().describe("Additional WHERE clause filter"),
     schema: z.string().optional().describe("Schema name (default: public)"),
   }),
 );
@@ -89,6 +106,7 @@ export const RegexpMatchSchema = z.preprocess(
     flags: z.string().optional().describe("Regex flags (i, g, etc.)"),
     select: z.array(z.string()).optional().describe("Columns to return"),
     limit: z.number().optional().describe("Max results"),
+    where: z.string().optional().describe("Additional WHERE clause filter"),
     schema: z.string().optional().describe("Schema name (default: public)"),
   }),
 );

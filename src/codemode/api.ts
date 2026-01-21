@@ -1153,6 +1153,52 @@ export class PgApi {
       }
     }
 
+    // Add top-level text aliases for convenience: pg.textXxx() → pg.text.xxx()
+    const textApi = bindings["text"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (textApi !== undefined) {
+      if (textApi["search"] !== undefined) {
+        bindings["textSearch"] = textApi["search"];
+      }
+      if (textApi["rank"] !== undefined) {
+        bindings["textRank"] = textApi["rank"];
+      }
+      if (textApi["headline"] !== undefined) {
+        bindings["textHeadline"] = textApi["headline"];
+      }
+      if (textApi["normalize"] !== undefined) {
+        bindings["textNormalize"] = textApi["normalize"];
+      }
+      if (textApi["sentiment"] !== undefined) {
+        bindings["textSentiment"] = textApi["sentiment"];
+      }
+      if (textApi["toVector"] !== undefined) {
+        bindings["textToVector"] = textApi["toVector"];
+      }
+      if (textApi["toQuery"] !== undefined) {
+        bindings["textToQuery"] = textApi["toQuery"];
+      }
+      if (textApi["searchConfig"] !== undefined) {
+        bindings["textSearchConfig"] = textApi["searchConfig"];
+      }
+      if (textApi["trigramSimilarity"] !== undefined) {
+        bindings["textTrigramSimilarity"] = textApi["trigramSimilarity"];
+      }
+      if (textApi["fuzzyMatch"] !== undefined) {
+        bindings["textFuzzyMatch"] = textApi["fuzzyMatch"];
+      }
+      if (textApi["likeSearch"] !== undefined) {
+        bindings["textLikeSearch"] = textApi["likeSearch"];
+      }
+      if (textApi["regexpMatch"] !== undefined) {
+        bindings["textRegexpMatch"] = textApi["regexpMatch"];
+      }
+      if (textApi["createFtsIndex"] !== undefined) {
+        bindings["textCreateFtsIndex"] = textApi["createFtsIndex"];
+      }
+    }
+
     // Add top-level citext aliases for convenience: pg.citextXxx() → pg.citext.xxx()
     const citextApi = bindings["citext"] as
       | Record<string, (...args: unknown[]) => Promise<unknown>>

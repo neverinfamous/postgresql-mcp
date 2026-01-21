@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **pg.textXxx() top-level aliases** — Code mode now supports top-level text method aliases for convenience: `pg.textSearch()`, `pg.textRank()`, `pg.textHeadline()`, `pg.textNormalize()`, `pg.textSentiment()`, `pg.textToVector()`, `pg.textToQuery()`, `pg.textSearchConfig()`, `pg.textTrigramSimilarity()`, `pg.textFuzzyMatch()`, `pg.textLikeSearch()`, `pg.textRegexpMatch()`, `pg.textCreateFtsIndex()`. These map directly to `pg.text.xxx()` methods, matching the aliases documented in `pg.text.help()`
+- **Text tools schema.table format support** — All 13 text tools now support `schema.table` format (auto-parsed, embedded schema takes priority over explicit `schema` parameter). Consistent with other tool groups like stats, vector, partitioning
 - **pg.jsonbXxx() top-level aliases** — Code mode now supports top-level JSONB method aliases for convenience: `pg.jsonbExtract()`, `pg.jsonbSet()`, `pg.jsonbInsert()`, `pg.jsonbDelete()`, `pg.jsonbContains()`, `pg.jsonbPathQuery()`, `pg.jsonbAgg()`, `pg.jsonbObject()`, `pg.jsonbArray()`, `pg.jsonbKeys()`, `pg.jsonbStripNulls()`, `pg.jsonbTypeof()`, `pg.jsonbValidatePath()`, `pg.jsonbMerge()`, `pg.jsonbNormalize()`, `pg.jsonbDiff()`, `pg.jsonbIndexSuggest()`, `pg.jsonbSecurityScan()`, `pg.jsonbStats()`. These map directly to `pg.jsonb.xxx()` methods, matching the aliases documented in `pg.jsonb.help()`
 - **pg.createIndex() and 7 more top-level core aliases** — Code mode now supports additional top-level aliases beyond the original 11 starter tools: `pg.createIndex()`, `pg.dropIndex()`, `pg.getIndexes()`, `pg.listObjects()`, `pg.objectDetails()`, `pg.analyzeDbHealth()`, `pg.analyzeQueryIndexes()`, `pg.analyzeWorkloadIndexes()`. All 19 starter tools now have top-level aliases for maximum ergonomics
 
 ### Fixed
 
+- **pg_fuzzy_match invalid method validation** — `pg_fuzzy_match` now throws a descriptive error when an invalid `method` is provided (e.g., `method: "invalid"`). Previously, invalid methods silently defaulted to `levenshtein`, which could be misleading. Error message includes valid options: `levenshtein`, `soundex`, `metaphone`
 - **pg_jsonb_object MCP tool call fix** — `pg_jsonb_object` direct MCP tool calls now properly accept key-value pairs via `data`, `object`, or `pairs` parameter (e.g., `{data: {name: "John", age: 30}}`). Previously, passing individual key-value pairs as separate tool parameters returned an empty object `{}` because the MCP protocol doesn't support arbitrary record keys as tool parameters. Code mode continues to work with direct object syntax via the OBJECT_WRAP_MAP normalization
 
 ### Performance

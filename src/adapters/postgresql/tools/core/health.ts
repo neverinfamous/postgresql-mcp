@@ -49,7 +49,6 @@ export function createAnalyzeDbHealthTool(
         unusedIndexes?: number | undefined;
         tablesNeedingVacuum?: number | undefined;
         connections?: Record<string, unknown> | undefined;
-        connectionStats?: Record<string, unknown> | undefined; // Alias for connections
         isReplica?: boolean | undefined;
         overallScore?: number | undefined;
         overallStatus?: string | undefined;
@@ -160,7 +159,6 @@ export function createAnalyzeDbHealthTool(
         const connResult = await adapter.executeQuery(connQuery);
         if (connResult.rows && connResult.rows.length > 0) {
           health.connections = connResult.rows[0];
-          health.connectionStats = connResult.rows[0]; // Alias for API consistency
         }
       }
 
@@ -452,8 +450,6 @@ export function createAnalyzeQueryIndexesTool(
         issues,
         recommendations,
         plan: rootPlan,
-        explainPlan: rootPlan, // Alias for discoverability
-        executionPlan: rootPlan, // Additional alias
       };
     },
   };

@@ -11,8 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **pg_list_tables default limit** — `pg_list_tables` now applies a default limit of 100 rows when no `limit` parameter is specified. Returns `{truncated: true, totalCount, hint}` metadata when results are truncated. Prevents UI slowdowns in AntiGravity and other MCP clients when databases have many tables. Use `limit: 500` to see more, or `schema` filter to narrow scope
 - **pg_list_objects default limit** — `pg_list_objects` now applies a default limit of 100 objects when no `limit` parameter is specified. Same truncation metadata as `pg_list_tables`. Prevents massive JSON response payloads (300KB+ in databases with accumulated test tables)
+- **pg_analyze_query_indexes reduced payload** — Removed redundant `explainPlan` and `executionPlan` aliases from response (these were duplicates of `plan`). Response now returns only `{plan, issues, recommendations, executionTime, planningTime}`, reducing payload size by ~66% for complex query plans
+- **pg_analyze_db_health reduced payload** — Removed redundant `connectionStats` alias from response (was duplicate of `connections`). Response now uses only `connections` field for connection statistics
 
 ### Added
+
+- **pg_create_table now() auto-conversion** — `defaultValue: 'now()'` is now automatically converted to `CURRENT_TIMESTAMP` to prevent PostgreSQL "cannot use column reference in DEFAULT expression" error. Also converts `current_date()`, `current_time()`, and `current_timestamp()` to their SQL keyword equivalents
 
 - **pg.readQuery() and 10 other top-level core aliases** — Code mode now supports top-level aliases for the most common starter tools: `pg.readQuery()`, `pg.writeQuery()`, `pg.listTables()`, `pg.describeTable()`, `pg.createTable()`, `pg.dropTable()`, `pg.count()`, `pg.exists()`, `pg.upsert()`, `pg.batchInsert()`, `pg.truncate()`. These map directly to `pg.core.*` methods for improved ergonomics
 - **pg_upsert/pg_batch_insert RETURNING documentation** — Added critical gotcha #13 documenting that `returning` parameter must be an array of column names (e.g., `["id", "name"]`) and does not support `"*"` wildcard

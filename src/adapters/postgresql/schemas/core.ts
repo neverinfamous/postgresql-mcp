@@ -295,6 +295,19 @@ export const CreateTableSchema = z
       if (rawDefault !== undefined && rawDefault !== null) {
         defaultValue =
           typeof rawDefault === "string" ? rawDefault : String(rawDefault);
+
+        // Auto-convert common function shortcuts to valid SQL expressions
+        // e.g., now() → CURRENT_TIMESTAMP (PostgreSQL rejects now() as column reference)
+        const functionConversions: Record<string, string> = {
+          "now()": "CURRENT_TIMESTAMP",
+          "current_date()": "CURRENT_DATE",
+          "current_time()": "CURRENT_TIME",
+          "current_timestamp()": "CURRENT_TIMESTAMP",
+        };
+        const lowerDefault = defaultValue.toLowerCase().trim();
+        if (functionConversions[lowerDefault]) {
+          defaultValue = functionConversions[lowerDefault];
+        }
       }
 
       return {

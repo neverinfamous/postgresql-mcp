@@ -360,45 +360,45 @@ export function createIndexRecommendationsTool(
 export function createQueryPlanCompareTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
+  // Base schema for MCP visibility (no preprocess)
+  const QueryPlanCompareSchemaBase = z.object({
+    query1: z.string().describe("First SQL query"),
+    query2: z.string().describe("Second SQL query"),
+    params1: z
+      .array(z.unknown())
+      .optional()
+      .describe("Parameters for first query ($1, $2, etc.)"),
+    params2: z
+      .array(z.unknown())
+      .optional()
+      .describe("Parameters for second query ($1, $2, etc.)"),
+    analyze: z
+      .boolean()
+      .optional()
+      .describe("Run EXPLAIN ANALYZE (executes queries)"),
+  });
+
   // Preprocess for sql1/sql2 → query1/query2 aliases
-  const QueryPlanCompareSchema = z.preprocess(
-    (input) => {
-      if (typeof input !== "object" || input === null) return input;
-      const obj = input as Record<string, unknown>;
-      const result = { ...obj };
-      // Alias: sql1 → query1, sql2 → query2
-      if (result["query1"] === undefined && result["sql1"] !== undefined) {
-        result["query1"] = result["sql1"];
-      }
-      if (result["query2"] === undefined && result["sql2"] !== undefined) {
-        result["query2"] = result["sql2"];
-      }
-      return result;
-    },
-    z.object({
-      query1: z.string().describe("First SQL query"),
-      query2: z.string().describe("Second SQL query"),
-      params1: z
-        .array(z.unknown())
-        .optional()
-        .describe("Parameters for first query ($1, $2, etc.)"),
-      params2: z
-        .array(z.unknown())
-        .optional()
-        .describe("Parameters for second query ($1, $2, etc.)"),
-      analyze: z
-        .boolean()
-        .optional()
-        .describe("Run EXPLAIN ANALYZE (executes queries)"),
-    }),
-  );
+  const QueryPlanCompareSchema = z.preprocess((input) => {
+    if (typeof input !== "object" || input === null) return input;
+    const obj = input as Record<string, unknown>;
+    const result = { ...obj };
+    // Alias: sql1 → query1, sql2 → query2
+    if (result["query1"] === undefined && result["sql1"] !== undefined) {
+      result["query1"] = result["sql1"];
+    }
+    if (result["query2"] === undefined && result["sql2"] !== undefined) {
+      result["query2"] = result["sql2"];
+    }
+    return result;
+  }, QueryPlanCompareSchemaBase);
 
   return {
     name: "pg_query_plan_compare",
     description:
       "Compare execution plans of two SQL queries to identify performance differences.",
     group: "performance",
-    inputSchema: QueryPlanCompareSchema,
+    inputSchema: QueryPlanCompareSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Query Plan Compare"),
     icons: getToolIcons("performance", readOnly("Query Plan Compare")),
     handler: async (params: unknown, _context: RequestContext) => {

@@ -240,19 +240,23 @@ export function createConnectionPoolOptimizeTool(
 export function createPartitionStrategySuggestTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
+  // Base schema for MCP visibility (no preprocess)
+  const PartitionStrategySchemaBase = z.object({
+    table: z.string().describe("Table to analyze"),
+    schema: z.string().optional().describe("Schema name"),
+  });
+
+  // Full schema with preprocessing for aliases
   const PartitionStrategySchema = z.preprocess(
     preprocessPartitionStrategyParams,
-    z.object({
-      table: z.string().describe("Table to analyze"),
-      schema: z.string().optional().describe("Schema name"),
-    }),
+    PartitionStrategySchemaBase,
   );
 
   return {
     name: "pg_partition_strategy_suggest",
     description: "Analyze a table and suggest optimal partitioning strategy.",
     group: "performance",
-    inputSchema: PartitionStrategySchema,
+    inputSchema: PartitionStrategySchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Partition Strategy Suggest"),
     icons: getToolIcons("performance", readOnly("Partition Strategy Suggest")),
     handler: async (params: unknown, _context: RequestContext) => {

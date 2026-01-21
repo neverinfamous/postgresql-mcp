@@ -13,7 +13,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 ## ⚠️ Critical Gotchas
 
-1. **Transactions**: Use \`pg.transactions.execute({statements: [{sql: "..."}, ...]})\` for atomic ops. Returns \`{success, statementsExecuted, results}\` (rolled back on error)
+1. **Transactions**: \`pg.transactions.execute({statements: [{sql: "..."}]})\` auto-commits on success, auto-rollbacks on error. To join existing transaction: \`{transactionId: txId, statements: [...]}\` (no auto-commit, caller controls)
 2. **pg_write_query**: ⛔ Throws for SELECT—use \`pg_read_query\` for SELECT statements
 3. **pg_upsert/pg_create_table**: \`schema.table\` format auto-parses (e.g., \`'myschema.users'\` → schema: 'myschema', table: 'users')
 4. **pg_create_table columns**: \`notNull\`, \`defaultValue\` (string literals auto-quoted; numbers/booleans auto-coerced; \`now()\` → \`CURRENT_TIMESTAMP\`), \`check\`, \`references\` (object or string \`"table(column)"\` syntax)

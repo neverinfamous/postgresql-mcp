@@ -1241,6 +1241,37 @@ export class PgApi {
       }
     }
 
+    // Add top-level transaction aliases for consistency: pg.transactionXxx() → pg.transactions.xxx()
+    const transactionsApi = bindings["transactions"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (transactionsApi !== undefined) {
+      if (transactionsApi["transactionBegin"] !== undefined) {
+        bindings["transactionBegin"] = transactionsApi["transactionBegin"];
+      }
+      if (transactionsApi["transactionCommit"] !== undefined) {
+        bindings["transactionCommit"] = transactionsApi["transactionCommit"];
+      }
+      if (transactionsApi["transactionRollback"] !== undefined) {
+        bindings["transactionRollback"] =
+          transactionsApi["transactionRollback"];
+      }
+      if (transactionsApi["transactionSavepoint"] !== undefined) {
+        bindings["transactionSavepoint"] =
+          transactionsApi["transactionSavepoint"];
+      }
+      if (transactionsApi["transactionRelease"] !== undefined) {
+        bindings["transactionRelease"] = transactionsApi["transactionRelease"];
+      }
+      if (transactionsApi["transactionRollbackTo"] !== undefined) {
+        bindings["transactionRollbackTo"] =
+          transactionsApi["transactionRollbackTo"];
+      }
+      if (transactionsApi["transactionExecute"] !== undefined) {
+        bindings["transactionExecute"] = transactionsApi["transactionExecute"];
+      }
+    }
+
     return bindings;
   }
 }

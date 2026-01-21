@@ -178,16 +178,25 @@ function createTransactionExecuteTool(
     annotations: write("Transaction Execute"),
     icons: getToolIcons("transactions", write("Transaction Execute")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { statements, isolationLevel } =
+      const { statements, transactionId, isolationLevel } =
         TransactionExecuteSchema.parse(params);
 
-      const transactionId = await adapter.beginTransaction(isolationLevel);
+      // Check if joining an existing transaction or creating a new one
+      const isJoiningExisting = transactionId !== undefined;
+      const txId = isJoiningExisting
+        ? transactionId
+        : await adapter.beginTransaction(isolationLevel);
+
       const results: unknown[] = [];
 
       try {
-        const client = adapter.getTransactionConnection(transactionId);
+        const client = adapter.getTransactionConnection(txId);
         if (!client) {
-          throw new Error("Transaction connection lost");
+          throw new Error(
+            isJoiningExisting
+              ? `Transaction not found: ${txId}`
+              : "Transaction connection lost",
+          );
         }
 
         for (const stmt of statements) {
@@ -208,15 +217,26 @@ function createTransactionExecuteTool(
           });
         }
 
-        await adapter.commitTransaction(transactionId);
+        // Only auto-commit if we created a new transaction
+        // If joining an existing transaction, let the caller control commit/rollback
+        if (!isJoiningExisting) {
+          await adapter.commitTransaction(txId);
+        }
 
         return {
           success: true,
           statementsExecuted: statements.length,
           results,
+          // Include transactionId in response when joining existing transaction
+          // so caller knows transaction is still open
+          ...(isJoiningExisting && { transactionId: txId }),
         };
       } catch (error) {
-        await adapter.rollbackTransaction(transactionId);
+        // Only auto-rollback if we created a new transaction
+        // If joining an existing transaction, let the caller control cleanup
+        if (!isJoiningExisting) {
+          await adapter.rollbackTransaction(txId);
+        }
         throw error;
       }
     },

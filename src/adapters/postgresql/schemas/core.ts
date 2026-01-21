@@ -648,7 +648,20 @@ export const TransactionExecuteSchemaBase = z.object({
     .describe(
       'Statements to execute atomically. Each must be an object with {sql: "..."} format.',
     ),
-  isolationLevel: z.string().optional().describe("Transaction isolation level"),
+  transactionId: z
+    .string()
+    .optional()
+    .describe(
+      "Optional: Join existing transaction from pg_transaction_begin. If omitted, creates new auto-commit transaction.",
+    ),
+  txId: z.string().optional().describe("Alias for transactionId"),
+  tx: z.string().optional().describe("Alias for transactionId"),
+  isolationLevel: z
+    .string()
+    .optional()
+    .describe(
+      "Transaction isolation level (only used when creating new transaction)",
+    ),
 });
 
 // Schema with undefined handling for pg_transaction_execute
@@ -656,6 +669,7 @@ export const TransactionExecuteSchema = z
   .preprocess(defaultToEmpty, TransactionExecuteSchemaBase)
   .transform((data) => ({
     statements: data.statements ?? [],
+    transactionId: data.transactionId ?? data.txId ?? data.tx,
     isolationLevel: data.isolationLevel,
   }))
   .refine((data) => data.statements.length > 0, {

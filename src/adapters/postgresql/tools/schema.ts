@@ -22,6 +22,8 @@ import {
   CreateViewSchema,
   DropViewSchemaBase,
   DropViewSchema,
+  ListFunctionsSchemaBase,
+  ListFunctionsSchema,
 } from "../schemas/index.js";
 
 /**
@@ -440,39 +442,17 @@ function createDropViewTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 function createListFunctionsTool(adapter: PostgresAdapter): ToolDefinition {
-  // Schema with filtering options
-  const ListFunctionsSchema = z.preprocess(
-    (val: unknown) => val ?? {},
-    z.object({
-      schema: z.string().optional().describe("Filter to specific schema"),
-      exclude: z
-        .array(z.string())
-        .optional()
-        .describe(
-          'Array of extension names/schemas to exclude, e.g., ["postgis", "ltree", "pgcrypto"]',
-        ),
-      language: z
-        .string()
-        .optional()
-        .describe('Filter by language (e.g., "plpgsql", "sql", "c")'),
-      limit: z
-        .number()
-        .optional()
-        .describe(
-          "Max results (default: 500). Increase for databases with many extensions.",
-        ),
-    }),
-  );
-
   return {
     name: "pg_list_functions",
     description:
       "List user-defined functions with optional filtering. Use exclude (array) to filter out extension functions. Default limit=500 may need increasing for busy databases.",
     group: "schema",
-    inputSchema: ListFunctionsSchema,
+    // Use base schema for MCP visibility - ensures parameters are visible in Direct Tool Calls
+    inputSchema: ListFunctionsSchemaBase,
     annotations: readOnly("List Functions"),
     icons: getToolIcons("schema", readOnly("List Functions")),
     handler: async (params: unknown, _context: RequestContext) => {
+      // Use full schema with preprocessing for validation
       const parsed = ListFunctionsSchema.parse(params);
       const conditions: string[] = [
         "n.nspname NOT IN ('pg_catalog', 'information_schema')",

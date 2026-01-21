@@ -245,3 +245,40 @@ export const DropViewSchema = z.preprocess(
   preprocessDropViewParams,
   DropViewSchemaBase,
 );
+
+// =============================================================================
+// List Functions Schema - Split Schema pattern for MCP visibility
+// =============================================================================
+
+/**
+ * Base schema for listing functions - used for MCP inputSchema visibility.
+ * All parameters are visible to MCP clients.
+ */
+export const ListFunctionsSchemaBase = z.object({
+  schema: z.string().optional().describe("Filter to specific schema"),
+  exclude: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Array of extension names/schemas to exclude, e.g., ["postgis", "ltree", "pgcrypto"]',
+    ),
+  language: z
+    .string()
+    .optional()
+    .describe('Filter by language (e.g., "plpgsql", "sql", "c")'),
+  limit: z
+    .number()
+    .optional()
+    .describe(
+      "Max results (default: 500). Increase for databases with many extensions.",
+    ),
+});
+
+/**
+ * Full schema with preprocessing that handles null/undefined params.
+ * Used in the handler for validation.
+ */
+export const ListFunctionsSchema = z.preprocess(
+  (val: unknown) => val ?? {},
+  ListFunctionsSchemaBase,
+);

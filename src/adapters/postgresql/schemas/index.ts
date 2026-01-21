@@ -103,6 +103,9 @@ export {
   CreateViewSchema,
   DropViewSchemaBase,
   DropViewSchema,
+  // List functions schemas - Split Schema pattern for MCP visibility
+  ListFunctionsSchemaBase,
+  ListFunctionsSchema,
 } from "./schema-mgmt.js";
 
 // pgvector schemas

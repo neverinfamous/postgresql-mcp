@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Admin tools schema.table format support** — `pg_vacuum`, `pg_vacuum_analyze`, and `pg_analyze` now support `schema.table` format (e.g., `'public.users'` → auto-parsed). Embedded schema takes priority over explicit `schema` parameter, consistent with other tool groups
 - **Admin tools tableName alias** — `pg_vacuum`, `pg_vacuum_analyze`, and `pg_analyze` now accept `tableName` as an alias for `table` parameter, with consistent response field inclusion
 - **pg_dump_table partitioned table support** — `pg_dump_table` now detects partitioned tables and includes the `PARTITION BY` clause in the DDL output. Returns `type: 'partitioned_table'` instead of `type: 'table'` for partitioned tables. Supports RANGE, LIST, and HASH partitioning strategies with correct partition key columns. Note provides guidance to use `pg_list_partitions` for partition children
+- **createSchema/createSequence `alreadyExisted` response field** — `pg_create_schema` and `pg_create_sequence` now return `alreadyExisted: boolean` when `ifNotExists: true` is used, indicating whether the object already existed before the operation. Consistent with `drop` operations which return `existed` field
+- **createView `alreadyExisted` response field** — `pg_create_view` now returns `alreadyExisted: boolean` when `orReplace: true` is used, indicating whether the view was replaced or created new. Provides parity with `drop` operations for response consistency
 
 ### Fixed
 
@@ -54,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_analyze_query_indexes verbosity parameter** — Added `verbosity` parameter to `pg_analyze_query_indexes` with options `'summary'` (default) or `'full'`. Summary mode returns a condensed plan with only essential metrics (`Node Type`, `Actual Rows`, `Actual Total Time`, relation/index names, filters), reducing payload size significantly for routine query analysis. Full mode returns the complete EXPLAIN ANALYZE output
 - **pg_list_tables payload reduction** — Removed redundant `data` field from `pg_list_tables` response (was duplicate of `tables`). Response now returns only `{tables, count, totalCount, truncated?, hint?}`, reducing payload size
 - **pg_copy_export default limit** — `pg_copy_export` now applies a default limit of 500 rows when no `limit` parameter is specified. Returns `{truncated: true, limit: 500}` metadata when default limit is applied. Use `limit: 0` for all rows. Prevents accidentally large data exports consuming excessive context
+- **pg_list_views definition truncation** — `pg_list_views` now truncates view definitions to 1000 characters by default, significantly reducing payload size for databases with complex system views (e.g., PostGIS). Returns `{definitionTruncated: true}` per view and `{truncatedDefinitions: N}` in response. Use `truncateDefinition: 0` for full definitions
 
 ### Added
 

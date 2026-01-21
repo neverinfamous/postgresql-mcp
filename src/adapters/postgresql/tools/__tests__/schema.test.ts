@@ -104,14 +104,57 @@ describe("pg_create_schema", () => {
   });
 
   it("should create schema with IF NOT EXISTS", async () => {
+    // First call: existence check, second call: create
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_schema")!;
     await tool.handler({ name: "app", ifNotExists: true }, mockContext);
 
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+    expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+      2,
       'CREATE SCHEMA IF NOT EXISTS "app"',
     );
+  });
+
+  it("should return alreadyExisted: false when schema does not exist", async () => {
+    // First call: existence check returns empty, second call: create
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_create_schema")!;
+    const result = (await tool.handler(
+      { name: "new_schema", ifNotExists: true },
+      mockContext,
+    )) as {
+      success: boolean;
+      schema: string;
+      alreadyExisted: boolean;
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.alreadyExisted).toBe(false);
+  });
+
+  it("should return alreadyExisted: true when schema already exists", async () => {
+    // First call: existence check returns row, second call: create (no-op)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ "?column?": 1 }],
+    });
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_create_schema")!;
+    const result = (await tool.handler(
+      { name: "existing_schema", ifNotExists: true },
+      mockContext,
+    )) as {
+      success: boolean;
+      schema: string;
+      alreadyExisted: boolean;
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.alreadyExisted).toBe(true);
   });
 
   it("should create schema with authorization", async () => {
@@ -336,6 +379,46 @@ describe("pg_create_sequence", () => {
     expect(result.success).toBe(true);
     expect(result.sequence).toBe("public.aliased_seq");
   });
+
+  it("should return alreadyExisted: false when sequence does not exist", async () => {
+    // First call: existence check returns empty, second call: create
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_create_sequence")!;
+    const result = (await tool.handler(
+      { name: "new_seq", ifNotExists: true },
+      mockContext,
+    )) as {
+      success: boolean;
+      sequence: string;
+      alreadyExisted: boolean;
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.alreadyExisted).toBe(false);
+  });
+
+  it("should return alreadyExisted: true when sequence already exists", async () => {
+    // First call: existence check returns row, second call: create (no-op)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ "?column?": 1 }],
+    });
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_create_sequence")!;
+    const result = (await tool.handler(
+      { name: "existing_seq", ifNotExists: true },
+      mockContext,
+    )) as {
+      success: boolean;
+      sequence: string;
+      alreadyExisted: boolean;
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.alreadyExisted).toBe(true);
+  });
 });
 
 describe("pg_list_views", () => {
@@ -430,6 +513,70 @@ describe("pg_list_views", () => {
 
     expect(result.hasMatViews).toBe(false);
   });
+
+  it("should truncate long view definitions by default (1000 chars)", async () => {
+    const longDef = "SELECT " + "a".repeat(1500);
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        { schema: "public", name: "v1", type: "view", definition: longDef },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_list_views")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      views: Array<{ definition: string; definitionTruncated?: boolean }>;
+      truncatedDefinitions: number;
+    };
+
+    expect(result.views[0].definition.length).toBeLessThanOrEqual(1003); // 1000 + "..."
+    expect(result.views[0].definition.endsWith("...")).toBe(true);
+    expect(result.views[0].definitionTruncated).toBe(true);
+    expect(result.truncatedDefinitions).toBe(1);
+  });
+
+  it("should not truncate definitions when truncateDefinition is 0", async () => {
+    const longDef = "SELECT " + "a".repeat(1500);
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        { schema: "public", name: "v1", type: "view", definition: longDef },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_list_views")!;
+    const result = (await tool.handler(
+      { truncateDefinition: 0 },
+      mockContext,
+    )) as {
+      views: Array<{ definition: string; definitionTruncated?: boolean }>;
+      truncatedDefinitions?: number;
+    };
+
+    expect(result.views[0].definition).toBe(longDef);
+    expect(result.views[0].definitionTruncated).toBeUndefined();
+    expect(result.truncatedDefinitions).toBeUndefined();
+  });
+
+  it("should use custom truncateDefinition limit", async () => {
+    const longDef = "SELECT " + "a".repeat(500);
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        { schema: "public", name: "v1", type: "view", definition: longDef },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_list_views")!;
+    const result = (await tool.handler(
+      { truncateDefinition: 100 },
+      mockContext,
+    )) as {
+      views: Array<{ definition: string; definitionTruncated?: boolean }>;
+      truncatedDefinitions: number;
+    };
+
+    expect(result.views[0].definition.length).toBeLessThanOrEqual(103); // 100 + "..."
+    expect(result.views[0].definitionTruncated).toBe(true);
+    expect(result.truncatedDefinitions).toBe(1);
+  });
 });
 
 describe("pg_create_view", () => {
@@ -489,6 +636,8 @@ describe("pg_create_view", () => {
   });
 
   it("should create or replace a view", async () => {
+    // First call: existence check, second call: create
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_view")!;
@@ -501,9 +650,50 @@ describe("pg_create_view", () => {
       mockContext,
     );
 
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+    expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+      2,
       'CREATE OR REPLACE VIEW "my_view" AS SELECT 1',
     );
+  });
+
+  it("should return alreadyExisted: false when view does not exist with orReplace", async () => {
+    // First call: existence check returns empty, second call: create
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_create_view")!;
+    const result = (await tool.handler(
+      { name: "new_view", query: "SELECT 1", orReplace: true },
+      mockContext,
+    )) as {
+      success: boolean;
+      view: string;
+      alreadyExisted: boolean;
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.alreadyExisted).toBe(false);
+  });
+
+  it("should return alreadyExisted: true when view already exists with orReplace", async () => {
+    // First call: existence check returns row, second call: create/replace
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ "?column?": 1 }],
+    });
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_create_view")!;
+    const result = (await tool.handler(
+      { name: "existing_view", query: "SELECT 1", orReplace: true },
+      mockContext,
+    )) as {
+      success: boolean;
+      view: string;
+      alreadyExisted: boolean;
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.alreadyExisted).toBe(true);
   });
 
   it("should accept viewName as alias for name parameter", async () => {

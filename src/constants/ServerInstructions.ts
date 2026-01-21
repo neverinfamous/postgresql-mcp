@@ -222,12 +222,13 @@ Core: \`listSchemas()\`, \`createSchema()\`, \`dropSchema()\`, \`listViews()\`, 
 
 Response Structures:
 - \`listSchemas()\`: \`{schemas: string[], count}\`
-- \`listViews({ includeMaterialized? })\`: \`{views: [{schema, name, type, definition}], count, hasMatViews}\`
+- \`listViews({ includeMaterialized?, truncateDefinition? })\`: \`{views: [{schema, name, type, definition, definitionTruncated?}], count, hasMatViews, truncatedDefinitions?}\`. Default \`truncateDefinition: 1000\` chars. Use \`0\` for full definitions
 - \`listSequences({ schema? })\`: \`{sequences: [{schema, name, owned_by}], count}\`. Note: \`owned_by\` omits \`public.\` prefix for sequences in public schema (e.g., \`users.id\` not \`public.users.id\`)
 - \`listFunctions({ schema?, limit?, exclude? })\`: \`{functions: [{schema, name, arguments, returns, language, volatility}], count, limit, note?}\`
 - \`listTriggers({ schema?, table? })\`: \`{triggers: [{schema, table_name, name, timing, events, function_name, enabled}], count}\`
 - \`listConstraints({ schema?, table?, type? })\`: \`{constraints: [{schema, table_name, name, type, definition}], count}\`. Type codes: \`p\`=primary_key, \`f\`=foreign_key, \`u\`=unique, \`c\`=check
 - \`dropSchema/dropView/dropSequence\`: All return \`{existed: true/false}\` to indicate if object existed before drop
+- \`createSchema/createSequence\` (with \`ifNotExists\`) and \`createView\` (with \`orReplace\`): Return \`{alreadyExisted: true/false}\` to indicate if object existed before creation
 
 - \`pg_create_view\`: Supports \`schema.name\` format (auto-parsed). Use \`orReplace: true\` for CREATE OR REPLACE. \`checkOption\`: 'cascaded', 'local', 'none'. ⛔ OR REPLACE can add new columns but cannot rename/remove existing ones—PostgreSQL limitation
 - \`pg_create_sequence\`: Supports \`schema.name\` format. Parameters: \`start\`, \`increment\`, \`minValue\`, \`maxValue\`, \`cache\`, \`cycle\`, \`ownedBy\`, \`ifNotExists\`

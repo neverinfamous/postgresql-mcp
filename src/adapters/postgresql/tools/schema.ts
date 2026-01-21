@@ -70,6 +70,16 @@ function createCreateSchemaTool(adapter: PostgresAdapter): ToolDefinition {
     handler: async (params: unknown, _context: RequestContext) => {
       const { name, authorization, ifNotExists } =
         CreateSchemaSchema.parse(params);
+
+      // Check if schema already exists when ifNotExists is true
+      let alreadyExisted: boolean | undefined;
+      if (ifNotExists === true) {
+        const existsResult = await adapter.executeQuery(
+          `SELECT 1 FROM pg_namespace WHERE nspname = '${name}'`,
+        );
+        alreadyExisted = (existsResult.rows?.length ?? 0) > 0;
+      }
+
       const ifNotExistsClause = ifNotExists ? "IF NOT EXISTS " : "";
       const schemaName = sanitizeIdentifier(name);
       const authClause = authorization
@@ -78,7 +88,12 @@ function createCreateSchemaTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `CREATE SCHEMA ${ifNotExistsClause}${schemaName}${authClause}`;
       await adapter.executeQuery(sql);
-      return { success: true, schema: name };
+
+      const result: Record<string, unknown> = { success: true, schema: name };
+      if (alreadyExisted !== undefined) {
+        result["alreadyExisted"] = alreadyExisted;
+      }
+      return result;
     },
   };
 }
@@ -180,6 +195,17 @@ function createCreateSequenceTool(adapter: PostgresAdapter): ToolDefinition {
         ifNotExists,
       } = CreateSequenceSchema.parse(params);
 
+      const schemaName = schema ?? "public";
+
+      // Check if sequence already exists when ifNotExists is true
+      let alreadyExisted: boolean | undefined;
+      if (ifNotExists === true) {
+        const existsResult = await adapter.executeQuery(
+          `SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'S' AND n.nspname = '${schemaName}' AND c.relname = '${name}'`,
+        );
+        alreadyExisted = (existsResult.rows?.length ?? 0) > 0;
+      }
+
       const schemaPrefix = schema ? `${sanitizeIdentifier(schema)}.` : "";
       const ifNotExistsClause = ifNotExists === true ? "IF NOT EXISTS " : "";
       const parts = [
@@ -197,11 +223,16 @@ function createCreateSequenceTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = parts.join(" ");
       await adapter.executeQuery(sql);
-      return {
+
+      const result: Record<string, unknown> = {
         success: true,
-        sequence: `${schema ?? "public"}.${name}`,
+        sequence: `${schemaName}.${name}`,
         ifNotExists: ifNotExists ?? false,
       };
+      if (alreadyExisted !== undefined) {
+        result["alreadyExisted"] = alreadyExisted;
+      }
+      return result;
     },
   };
 }
@@ -246,6 +277,12 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: z.object({
       schema: z.string().optional(),
       includeMaterialized: z.boolean().optional(),
+      truncateDefinition: z
+        .number()
+        .optional()
+        .describe(
+          "Max length for view definitions (default: 1000). Use 0 for no truncation.",
+        ),
     }),
     annotations: readOnly("List Views"),
     icons: getToolIcons("schema", readOnly("List Views")),
@@ -253,12 +290,16 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
       const parsed = (params ?? {}) as {
         schema?: string;
         includeMaterialized?: boolean;
+        truncateDefinition?: number;
       };
       const schemaClause = parsed.schema
         ? `AND n.nspname = '${parsed.schema}'`
         : "";
       const kindClause =
         parsed.includeMaterialized !== false ? "IN ('v', 'm')" : "= 'v'";
+
+      // Default truncation: 1000 chars, 0 = no truncation
+      const truncateLimit = parsed.truncateDefinition ?? 1000;
 
       const sql = `SELECT n.nspname as schema, c.relname as name,
                         CASE c.relkind WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized_view' END as type,
@@ -271,11 +312,38 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
                         ORDER BY n.nspname, c.relname`;
 
       const result = await adapter.executeQuery(sql);
-      const views = result.rows ?? [];
+      let views = result.rows ?? [];
+
+      // Truncate definitions if limit is set
+      let truncatedCount = 0;
+      if (truncateLimit > 0) {
+        views = views.map((v: Record<string, unknown>) => {
+          const def = v["definition"];
+          if (typeof def === "string" && def.length > truncateLimit) {
+            truncatedCount++;
+            return {
+              ...v,
+              definition: def.slice(0, truncateLimit) + "...",
+              definitionTruncated: true,
+            };
+          }
+          return v;
+        });
+      }
+
       const hasMatViews = views.some(
         (v: Record<string, unknown>) => v["type"] === "materialized_view",
       );
-      return { views, count: views.length, hasMatViews };
+
+      const response: Record<string, unknown> = {
+        views,
+        count: views.length,
+        hasMatViews,
+      };
+      if (truncatedCount > 0) {
+        response["truncatedDefinitions"] = truncatedCount;
+      }
+      return response;
     },
   };
 }
@@ -292,6 +360,18 @@ function createCreateViewTool(adapter: PostgresAdapter): ToolDefinition {
       const { name, schema, query, materialized, orReplace, checkOption } =
         CreateViewSchema.parse(params);
 
+      const schemaName = schema ?? "public";
+
+      // Check if view already exists when orReplace is true (for informational response)
+      let alreadyExisted: boolean | undefined;
+      if (orReplace === true) {
+        const relkind = materialized === true ? "'m'" : "'v'";
+        const existsResult = await adapter.executeQuery(
+          `SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = ${relkind} AND n.nspname = '${schemaName}' AND c.relname = '${name}'`,
+        );
+        alreadyExisted = (existsResult.rows?.length ?? 0) > 0;
+      }
+
       const schemaPrefix = schema ? `${sanitizeIdentifier(schema)}.` : "";
       const replaceClause = orReplace && !materialized ? "OR REPLACE " : "";
       const matClause = materialized ? "MATERIALIZED " : "";
@@ -305,11 +385,16 @@ function createCreateViewTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `CREATE ${replaceClause}${matClause}VIEW ${schemaPrefix}${viewName} AS ${query}${checkClause}`;
       await adapter.executeQuery(sql);
-      return {
+
+      const result: Record<string, unknown> = {
         success: true,
-        view: `${schema ?? "public"}.${name}`,
+        view: `${schemaName}.${name}`,
         materialized: !!materialized,
       };
+      if (alreadyExisted !== undefined) {
+        result["alreadyExisted"] = alreadyExisted;
+      }
+      return result;
     },
   };
 }

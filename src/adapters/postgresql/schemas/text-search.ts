@@ -2,17 +2,20 @@
  * postgres-mcp - Text Search Tool Schemas
  *
  * Input validation schemas for full-text search and pattern matching.
+ *
+ * NOTE: Some tools use the "Split Schema" pattern where a Base schema (without
+ * z.preprocess) is used for MCP inputSchema visibility, while the full schema
+ * (with preprocess) is used in the handler. This is because z.preprocess() can
+ * interfere with JSON Schema generation for direct MCP tool calls.
  */
 
 import { z } from "zod";
 
 /**
- * Preprocess text tool parameters to normalize common input patterns:
- * - tableName → table
- * - col → column
- * - Parse schema.table format (embedded schema takes priority)
+ * Preprocess text tool parameters to normalize common input patterns.
+ * Exported so tools can apply it in their handlers.
  */
-function preprocessTextParams(input: unknown): unknown {
+export function preprocessTextParams(input: unknown): unknown {
   if (typeof input !== "object" || input === null) {
     return input;
   }
@@ -62,51 +65,68 @@ function preprocessTextParams(input: unknown): unknown {
   return result;
 }
 
+// =============================================================================
+// Base Schemas (for MCP inputSchema visibility - no preprocess)
+// =============================================================================
+
+export const TextSearchSchemaBase = z.object({
+  table: z.string().describe("Table name"),
+  columns: z.array(z.string()).describe("Text columns to search"),
+  query: z.string().describe("Search query"),
+  config: z
+    .string()
+    .optional()
+    .describe("Text search config (default: english)"),
+  select: z.array(z.string()).optional().describe("Columns to return"),
+  limit: z.number().optional().describe("Max results"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+});
+
+export const TrigramSimilaritySchemaBase = z.object({
+  table: z.string().describe("Table name"),
+  column: z.string().describe("Column to compare"),
+  value: z.string().describe("Value to compare against"),
+  threshold: z
+    .number()
+    .optional()
+    .describe(
+      "Similarity threshold (0-1, default 0.3; use 0.1-0.2 for partial matches)",
+    ),
+  select: z.array(z.string()).optional().describe("Columns to return"),
+  limit: z
+    .number()
+    .optional()
+    .describe("Max results (default: 100 to prevent large payloads)"),
+  where: z.string().optional().describe("Additional WHERE clause filter"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+});
+
+export const RegexpMatchSchemaBase = z.object({
+  table: z.string().describe("Table name"),
+  column: z.string().describe("Column to match"),
+  pattern: z.string().describe("POSIX regex pattern"),
+  flags: z.string().optional().describe("Regex flags (i, g, etc.)"),
+  select: z.array(z.string()).optional().describe("Columns to return"),
+  limit: z.number().optional().describe("Max results"),
+  where: z.string().optional().describe("Additional WHERE clause filter"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+});
+
+// =============================================================================
+// Full Schemas (with preprocess - for handler parsing)
+// =============================================================================
+
 export const TextSearchSchema = z.preprocess(
   preprocessTextParams,
-  z.object({
-    table: z.string().describe("Table name"),
-    columns: z.array(z.string()).describe("Text columns to search"),
-    query: z.string().describe("Search query"),
-    config: z
-      .string()
-      .optional()
-      .describe("Text search config (default: english)"),
-    select: z.array(z.string()).optional().describe("Columns to return"),
-    limit: z.number().optional().describe("Max results"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-  }),
+  TextSearchSchemaBase,
 );
 
 export const TrigramSimilaritySchema = z.preprocess(
   preprocessTextParams,
-  z.object({
-    table: z.string().describe("Table name"),
-    column: z.string().describe("Column to compare"),
-    value: z.string().describe("Value to compare against"),
-    threshold: z
-      .number()
-      .optional()
-      .describe(
-        "Similarity threshold (0-1, default 0.3; use 0.1-0.2 for partial matches)",
-      ),
-    select: z.array(z.string()).optional().describe("Columns to return"),
-    limit: z.number().optional().describe("Max results"),
-    where: z.string().optional().describe("Additional WHERE clause filter"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-  }),
+  TrigramSimilaritySchemaBase,
 );
 
 export const RegexpMatchSchema = z.preprocess(
   preprocessTextParams,
-  z.object({
-    table: z.string().describe("Table name"),
-    column: z.string().describe("Column to match"),
-    pattern: z.string().describe("POSIX regex pattern"),
-    flags: z.string().optional().describe("Regex flags (i, g, etc.)"),
-    select: z.array(z.string()).optional().describe("Columns to return"),
-    limit: z.number().optional().describe("Max results"),
-    where: z.string().optional().describe("Additional WHERE clause filter"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-  }),
+  RegexpMatchSchemaBase,
 );

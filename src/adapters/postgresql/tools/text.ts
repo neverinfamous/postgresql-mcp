@@ -16,88 +16,16 @@ import {
 } from "../../../utils/identifiers.js";
 import {
   TextSearchSchema,
+  TextSearchSchemaBase,
   TrigramSimilaritySchema,
+  TrigramSimilaritySchemaBase,
   RegexpMatchSchema,
+  RegexpMatchSchemaBase,
+  preprocessTextParams,
 } from "../schemas/index.js";
 
-// =============================================================================
-// Schema.Table Parsing
-// =============================================================================
-
-/**
- * Parse schema.table format from table name.
- * Returns { table, schema } with schema extracted from prefix if present.
- * Embedded schema takes priority over explicit schema parameter.
- */
-function parseSchemaTable(
-  table: string,
-  explicitSchema?: string,
-): { table: string; schema: string } {
-  if (table.includes(".")) {
-    const parts = table.split(".");
-    if (parts.length === 2 && parts[0] && parts[1]) {
-      return {
-        schema: parts[0],
-        table: parts[1],
-      };
-    }
-  }
-  return { table, schema: explicitSchema ?? "public" };
-}
-
-/**
- * Preprocess text tool parameters to normalize common input patterns:
- * - tableName → table
- * - col → column
- * - Parse schema.table format (embedded schema takes priority)
- */
-function preprocessTextParams(input: unknown): unknown {
-  if (typeof input !== "object" || input === null) {
-    return input;
-  }
-  const result = { ...(input as Record<string, unknown>) };
-
-  // Alias: tableName → table
-  if (result["tableName"] !== undefined && result["table"] === undefined) {
-    result["table"] = result["tableName"];
-  }
-  // Alias: col → column
-  if (result["col"] !== undefined && result["column"] === undefined) {
-    result["column"] = result["col"];
-  }
-  // Alias: filter → where
-  if (result["filter"] !== undefined && result["where"] === undefined) {
-    result["where"] = result["filter"];
-  }
-  // Alias: text → value (for trigram/fuzzy tools)
-  if (result["text"] !== undefined && result["value"] === undefined) {
-    result["value"] = result["text"];
-  }
-  // Alias: indexName → name (for FTS index tool)
-  if (result["indexName"] !== undefined && result["name"] === undefined) {
-    result["name"] = result["indexName"];
-  }
-  // Alias: column (singular) → columns (array) for text search
-  if (
-    result["column"] !== undefined &&
-    result["columns"] === undefined &&
-    typeof result["column"] === "string"
-  ) {
-    result["columns"] = [result["column"]];
-  }
-
-  // Parse schema.table format (embedded schema takes priority)
-  if (typeof result["table"] === "string" && result["table"].includes(".")) {
-    const parsed = parseSchemaTable(
-      result["table"],
-      result["schema"] as string | undefined,
-    );
-    result["table"] = parsed.table;
-    result["schema"] = parsed.schema;
-  }
-
-  return result;
-}
+// Note: preprocessTextParams is imported from schemas/index.js
+// Schema.table parsing is handled within that preprocessor
 
 // Fuzzy match method type (validated by zod enum in schema)
 type FuzzyMethod = "levenshtein" | "soundex" | "metaphone";
@@ -128,7 +56,7 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
     name: "pg_text_search",
     description: "Full-text search using tsvector and tsquery.",
     group: "text",
-    inputSchema: TextSearchSchema,
+    inputSchema: TextSearchSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Full-Text Search"),
     icons: getToolIcons("text", readOnly("Full-Text Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -163,30 +91,31 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
-  const TextRankSchema = z.preprocess(
-    preprocessTextParams,
-    z.object({
-      table: z.string(),
-      column: z.string().optional().describe("Single column to search"),
-      columns: z
-        .array(z.string())
-        .optional()
-        .describe("Multiple columns to search (alternative to column)"),
-      query: z.string(),
-      config: z.string().optional(),
-      normalization: z.number().optional(),
-      select: z.array(z.string()).optional().describe("Columns to return"),
-      limit: z.number().optional().describe("Max results"),
-      schema: z.string().optional().describe("Schema name (default: public)"),
-    }),
-  );
+  // Base schema for MCP visibility (no preprocess)
+  const TextRankSchemaBase = z.object({
+    table: z.string(),
+    column: z.string().optional().describe("Single column to search"),
+    columns: z
+      .array(z.string())
+      .optional()
+      .describe("Multiple columns to search (alternative to column)"),
+    query: z.string(),
+    config: z.string().optional(),
+    normalization: z.number().optional(),
+    select: z.array(z.string()).optional().describe("Columns to return"),
+    limit: z.number().optional().describe("Max results"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  });
+
+  // Full schema with preprocess for handler parsing
+  const TextRankSchema = z.preprocess(preprocessTextParams, TextRankSchemaBase);
 
   return {
     name: "pg_text_rank",
     description:
       "Get relevance ranking for full-text search results. Returns matching rows only with rank score.",
     group: "text",
-    inputSchema: TextRankSchema,
+    inputSchema: TextRankSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Text Rank"),
     icons: getToolIcons("text", readOnly("Text Rank")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -237,14 +166,15 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Find similar strings using pg_trgm trigram matching. Returns similarity score (0-1). Default threshold 0.3; use lower (e.g., 0.1) for partial matches.",
     group: "text",
-    inputSchema: TrigramSimilaritySchema,
+    inputSchema: TrigramSimilaritySchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Trigram Similarity"),
     icons: getToolIcons("text", readOnly("Trigram Similarity")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = TrigramSimilaritySchema.parse(params);
       const thresh = parsed.threshold ?? 0.3;
+      // Default limit to 100 to prevent large payloads
       const limitVal =
-        parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 20;
+        parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
 
       // Build qualified table name with schema support
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
@@ -268,24 +198,31 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
+  // Base schema for MCP visibility (no preprocess)
+  const FuzzyMatchSchemaBase = z.object({
+    table: z.string(),
+    column: z.string(),
+    value: z.string(),
+    method: z.enum(["soundex", "levenshtein", "metaphone"]).optional(),
+    maxDistance: z
+      .number()
+      .optional()
+      .describe(
+        "Max Levenshtein distance (default: 3, use 5+ for longer strings)",
+      ),
+    select: z.array(z.string()).optional().describe("Columns to return"),
+    limit: z
+      .number()
+      .optional()
+      .describe("Max results (default: 100 to prevent large payloads)"),
+    where: z.string().optional().describe("Additional WHERE clause filter"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  });
+
+  // Full schema with preprocess for handler parsing
   const FuzzyMatchSchema = z.preprocess(
     preprocessTextParams,
-    z.object({
-      table: z.string(),
-      column: z.string(),
-      value: z.string(),
-      method: z.enum(["soundex", "levenshtein", "metaphone"]).optional(),
-      maxDistance: z
-        .number()
-        .optional()
-        .describe(
-          "Max Levenshtein distance (default: 3, use 5+ for longer strings)",
-        ),
-      select: z.array(z.string()).optional().describe("Columns to return"),
-      limit: z.number().optional(),
-      where: z.string().optional().describe("Additional WHERE clause filter"),
-      schema: z.string().optional().describe("Schema name (default: public)"),
-    }),
+    FuzzyMatchSchemaBase,
   );
 
   return {
@@ -293,7 +230,7 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Fuzzy string matching using fuzzystrmatch extension. Levenshtein (default): returns distance; use maxDistance=5+ for longer strings. Soundex/metaphone: returns phonetic code for exact matches only.",
     group: "text",
-    inputSchema: FuzzyMatchSchema,
+    inputSchema: FuzzyMatchSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Fuzzy Match"),
     icons: getToolIcons("text", readOnly("Fuzzy Match")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -303,8 +240,9 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
       const method: FuzzyMethod = parsed.method ?? "levenshtein";
 
       const maxDist = parsed.maxDistance ?? 3;
+      // Default limit to 100 to prevent large payloads
       const limitVal =
-        parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 20;
+        parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
 
       // Build qualified table name with schema support
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
@@ -336,7 +274,7 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
     name: "pg_regexp_match",
     description: "Match text using POSIX regular expressions.",
     group: "text",
-    inputSchema: RegexpMatchSchema,
+    inputSchema: RegexpMatchSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Regexp Match"),
     icons: getToolIcons("text", readOnly("Regexp Match")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -363,21 +301,25 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
+  // Base schema for MCP visibility (no preprocess)
+  const LikeSearchSchemaBase = z.object({
+    table: z.string(),
+    column: z.string(),
+    pattern: z.string(),
+    caseSensitive: z
+      .boolean()
+      .optional()
+      .describe("Use case-sensitive LIKE (default: false, uses ILIKE)"),
+    select: z.array(z.string()).optional(),
+    limit: z.number().optional(),
+    where: z.string().optional().describe("Additional WHERE clause filter"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  });
+
+  // Full schema with preprocess for handler parsing
   const LikeSearchSchema = z.preprocess(
     preprocessTextParams,
-    z.object({
-      table: z.string(),
-      column: z.string(),
-      pattern: z.string(),
-      caseSensitive: z
-        .boolean()
-        .optional()
-        .describe("Use case-sensitive LIKE (default: false, uses ILIKE)"),
-      select: z.array(z.string()).optional(),
-      limit: z.number().optional(),
-      where: z.string().optional().describe("Additional WHERE clause filter"),
-      schema: z.string().optional().describe("Schema name (default: public)"),
-    }),
+    LikeSearchSchemaBase,
   );
 
   return {
@@ -385,7 +327,7 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Search text using LIKE patterns. Case-insensitive (ILIKE) by default.",
     group: "text",
-    inputSchema: LikeSearchSchema,
+    inputSchema: LikeSearchSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("LIKE Search"),
     icons: getToolIcons("text", readOnly("LIKE Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -414,44 +356,45 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
-  const HeadlineSchema = z.preprocess(
-    preprocessTextParams,
-    z.object({
-      table: z.string(),
-      column: z.string(),
-      query: z.string(),
-      config: z.string().optional(),
-      options: z
-        .string()
-        .optional()
-        .describe(
-          'Headline options (e.g., "MaxWords=20, MinWords=5"). Note: MinWords must be < MaxWords.',
-        ),
-      startSel: z
-        .string()
-        .optional()
-        .describe("Start selection marker (default: <b>)"),
-      stopSel: z
-        .string()
-        .optional()
-        .describe("Stop selection marker (default: </b>)"),
-      maxWords: z.number().optional().describe("Maximum words in headline"),
-      minWords: z.number().optional().describe("Minimum words in headline"),
-      select: z
-        .array(z.string())
-        .optional()
-        .describe('Columns to return for row identification (e.g., ["id"])'),
-      limit: z.number().optional().describe("Max results"),
-      schema: z.string().optional().describe("Schema name (default: public)"),
-    }),
-  );
+  // Base schema for MCP visibility (no preprocess)
+  const HeadlineSchemaBase = z.object({
+    table: z.string(),
+    column: z.string(),
+    query: z.string(),
+    config: z.string().optional(),
+    options: z
+      .string()
+      .optional()
+      .describe(
+        'Headline options (e.g., "MaxWords=20, MinWords=5"). Note: MinWords must be < MaxWords.',
+      ),
+    startSel: z
+      .string()
+      .optional()
+      .describe("Start selection marker (default: <b>)"),
+    stopSel: z
+      .string()
+      .optional()
+      .describe("Stop selection marker (default: </b>)"),
+    maxWords: z.number().optional().describe("Maximum words in headline"),
+    minWords: z.number().optional().describe("Minimum words in headline"),
+    select: z
+      .array(z.string())
+      .optional()
+      .describe('Columns to return for row identification (e.g., ["id"])'),
+    limit: z.number().optional().describe("Max results"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  });
+
+  // Full schema with preprocess for handler parsing
+  const HeadlineSchema = z.preprocess(preprocessTextParams, HeadlineSchemaBase);
 
   return {
     name: "pg_text_headline",
     description:
       "Generate highlighted snippets from full-text search matches. Use select param for stable row identification (e.g., primary key).",
     group: "text",
-    inputSchema: HeadlineSchema,
+    inputSchema: HeadlineSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Text Headline"),
     icons: getToolIcons("text", readOnly("Text Headline")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -496,26 +439,27 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
 }
 
 function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
-  const FtsIndexSchema = z.preprocess(
-    preprocessTextParams,
-    z.object({
-      table: z.string(),
-      column: z.string(),
-      name: z.string().optional(),
-      config: z.string().optional(),
-      ifNotExists: z
-        .boolean()
-        .optional()
-        .describe("Skip if index already exists (default: true)"),
-      schema: z.string().optional().describe("Schema name (default: public)"),
-    }),
-  );
+  // Base schema for MCP visibility (no preprocess)
+  const FtsIndexSchemaBase = z.object({
+    table: z.string(),
+    column: z.string(),
+    name: z.string().optional(),
+    config: z.string().optional(),
+    ifNotExists: z
+      .boolean()
+      .optional()
+      .describe("Skip if index already exists (default: true)"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  });
+
+  // Full schema with preprocess for handler parsing
+  const FtsIndexSchema = z.preprocess(preprocessTextParams, FtsIndexSchemaBase);
 
   return {
     name: "pg_create_fts_index",
     description: "Create a GIN index for full-text search on a column.",
     group: "text",
-    inputSchema: FtsIndexSchema,
+    inputSchema: FtsIndexSchemaBase, // Base schema for MCP visibility
     annotations: write("Create FTS Index"),
     icons: getToolIcons("text", write("Create FTS Index")),
     handler: async (params: unknown, _context: RequestContext) => {

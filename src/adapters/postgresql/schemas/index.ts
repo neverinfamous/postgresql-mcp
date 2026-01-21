@@ -44,8 +44,12 @@ export {
 // Text search schemas
 export {
   TextSearchSchema,
+  TextSearchSchemaBase,
   TrigramSimilaritySchema,
+  TrigramSimilaritySchemaBase,
   RegexpMatchSchema,
+  RegexpMatchSchemaBase,
+  preprocessTextParams,
 } from "./text-search.js";
 
 // Performance and explain schemas

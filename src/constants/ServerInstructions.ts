@@ -156,6 +156,7 @@ Aliases: \`connections\`→\`connectionStats\`, \`settings\`/\`config\`→\`show
 
 Core: \`vacuum()\`, \`vacuumAnalyze()\`, \`analyze()\`, \`reindex()\`, \`cluster()\`, \`setConfig()\`, \`reloadConf()\`, \`resetStats()\`, \`cancelBackend()\`, \`terminateBackend()\`
 
+- All admin tools support \`schema.table\` format (auto-parsed, embedded schema takes priority over explicit \`schema\` param)
 - \`vacuum({ table?, full?, analyze?, verbose? })\`: Without \`table\`, vacuums ALL tables. \`verbose\` output goes to PostgreSQL server logs
 - \`reindex({ target, name?, concurrently? })\`: Targets: 'table', 'index', 'schema', 'database'. \`database\` target defaults to current db when \`name\` omitted
 - \`cluster()\`: Without args, re-clusters all previously-clustered tables. With args, requires BOTH \`table\` AND \`index\`
@@ -164,6 +165,8 @@ Core: \`vacuum()\`, \`vacuumAnalyze()\`, \`analyze()\`, \`reindex()\`, \`cluster
 - \`terminateBackend({ pid })\`: Forceful connection termination—use with caution
 
 Aliases: \`tableName\`→\`table\`, \`indexName\`→\`index\`, \`param\`/\`setting\`→\`name\`, \`processId\`→\`pid\`
+
+**Top-Level Aliases**: \`pg.vacuum()\`, \`pg.vacuumAnalyze()\`, \`pg.analyze()\`, \`pg.reindex()\`, \`pg.cluster()\`, \`pg.setConfig()\`, \`pg.reloadConf()\`, \`pg.resetStats()\`, \`pg.cancelBackend()\`, \`pg.terminateBackend()\`
 
 ## Backup Tools
 

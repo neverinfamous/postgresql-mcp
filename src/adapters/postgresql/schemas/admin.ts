@@ -10,26 +10,69 @@
 
 import { z } from "zod";
 
-// Helper to handle undefined params (allows tools to be called without {})
-const defaultToEmpty = (val: unknown): unknown => val ?? {};
+/**
+ * Preprocess vacuum/analyze parameters:
+ * - Alias: tableName → table
+ * - Parse schema.table format (e.g., 'public.users' → { schema: 'public', table: 'users' })
+ */
+function preprocessTableParams(input: unknown): unknown {
+  if (input === null || input === undefined) {
+    return {};
+  }
+  if (typeof input !== "object") {
+    return input;
+  }
+  const result = { ...(input as Record<string, unknown>) };
+
+  // Alias: tableName → table
+  if (result["tableName"] !== undefined && result["table"] === undefined) {
+    result["table"] = result["tableName"];
+  }
+
+  // Parse schema.table format
+  const tableVal = result["table"];
+  if (typeof tableVal === "string" && tableVal.includes(".")) {
+    const parts = tableVal.split(".");
+    if (parts.length === 2 && parts[0] !== "" && parts[1] !== "") {
+      // Only override schema if not explicitly provided
+      if (result["schema"] === undefined) {
+        result["schema"] = parts[0];
+      }
+      result["table"] = parts[1];
+    }
+  }
+
+  return result;
+}
 
 // ============== VACUUM SCHEMA ==============
 // Base schema for MCP visibility
 export const VacuumSchemaBase = z.object({
   table: z.string().optional().describe("Table name (all tables if omitted)"),
+  tableName: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name"),
   full: z.boolean().optional().describe("Full vacuum (rewrites table)"),
   analyze: z.boolean().optional().describe("Update statistics"),
   verbose: z.boolean().optional().describe("Print progress"),
 });
 
-// Preprocess schema for handlers (accepts no-args)
-export const VacuumSchema = z.preprocess(defaultToEmpty, VacuumSchemaBase);
+// Preprocess schema for handlers (resolves aliases and parses schema.table)
+export const VacuumSchema = z.preprocess(
+  preprocessTableParams,
+  z.object({
+    table: z.string().optional().describe("Table name (all tables if omitted)"),
+    schema: z.string().optional().describe("Schema name"),
+    full: z.boolean().optional().describe("Full vacuum (rewrites table)"),
+    analyze: z.boolean().optional().describe("Update statistics"),
+    verbose: z.boolean().optional().describe("Print progress"),
+  }),
+);
 
 // ============== ANALYZE SCHEMA ==============
 // Base schema for MCP visibility
 export const AnalyzeSchemaBase = z.object({
   table: z.string().optional().describe("Table name (all tables if omitted)"),
+  tableName: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name"),
   columns: z
     .array(z.string())
@@ -37,8 +80,18 @@ export const AnalyzeSchemaBase = z.object({
     .describe("Specific columns to analyze"),
 });
 
-// Preprocess schema for handlers (accepts no-args)
-export const AnalyzeSchema = z.preprocess(defaultToEmpty, AnalyzeSchemaBase);
+// Preprocess schema for handlers (resolves aliases and parses schema.table)
+export const AnalyzeSchema = z.preprocess(
+  preprocessTableParams,
+  z.object({
+    table: z.string().optional().describe("Table name (all tables if omitted)"),
+    schema: z.string().optional().describe("Schema name"),
+    columns: z
+      .array(z.string())
+      .optional()
+      .describe("Specific columns to analyze"),
+  }),
+);
 
 // ============== REINDEX SCHEMA ==============
 /**

@@ -1436,6 +1436,48 @@ export class PgApi {
       }
     }
 
+    // Add top-level admin aliases for convenience: pg.vacuum() → pg.admin.vacuum()
+    // Note: Admin tools are system-level operations, so we include essential maintenance aliases
+    const adminApi = bindings["admin"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (adminApi !== undefined) {
+      // Maintenance operations
+      if (adminApi["vacuum"] !== undefined) {
+        bindings["vacuum"] = adminApi["vacuum"];
+      }
+      if (adminApi["vacuumAnalyze"] !== undefined) {
+        bindings["vacuumAnalyze"] = adminApi["vacuumAnalyze"];
+      }
+      if (adminApi["analyze"] !== undefined) {
+        bindings["analyze"] = adminApi["analyze"];
+      }
+      if (adminApi["reindex"] !== undefined) {
+        bindings["reindex"] = adminApi["reindex"];
+      }
+      if (adminApi["cluster"] !== undefined) {
+        bindings["cluster"] = adminApi["cluster"];
+      }
+      // Configuration
+      if (adminApi["setConfig"] !== undefined) {
+        bindings["setConfig"] = adminApi["setConfig"];
+      }
+      if (adminApi["reloadConf"] !== undefined) {
+        bindings["reloadConf"] = adminApi["reloadConf"];
+      }
+      // Statistics
+      if (adminApi["resetStats"] !== undefined) {
+        bindings["resetStats"] = adminApi["resetStats"];
+      }
+      // Backend management
+      if (adminApi["cancelBackend"] !== undefined) {
+        bindings["cancelBackend"] = adminApi["cancelBackend"];
+      }
+      if (adminApi["terminateBackend"] !== undefined) {
+        bindings["terminateBackend"] = adminApi["terminateBackend"];
+      }
+    }
+
     return bindings;
   }
 }

@@ -444,11 +444,15 @@ describe("pg_stats_time_series", () => {
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "numeric" }],
     });
+    // Mock totalCount query (when using default limit)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total_buckets: 2 }],
+    });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
-        { time_bucket: "2024-01-01", value: 100, count: 10 },
-        { time_bucket: "2024-02-01", value: 110, count: 12 },
+        { time_bucket: new Date("2024-01-01"), value: 100, count: 10 },
+        { time_bucket: new Date("2024-02-01"), value: 110, count: 12 },
       ],
     });
 
@@ -463,10 +467,14 @@ describe("pg_stats_time_series", () => {
       mockContext,
     )) as {
       buckets: unknown[];
+      truncated?: boolean;
+      totalCount?: number;
     };
 
     expect(mockAdapter.executeQuery).toHaveBeenCalled();
     expect(result.buckets).toHaveLength(2);
+    expect(result.truncated).toBe(false);
+    expect(result.totalCount).toBe(2);
   });
 
   it("should return grouped time series when groupBy is provided", async () => {

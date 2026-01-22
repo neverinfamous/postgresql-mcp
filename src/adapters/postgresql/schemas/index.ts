@@ -229,3 +229,25 @@ export {
   PgcryptoGenSaltSchema,
   PgcryptoCryptSchema,
 } from "./extensions.js";
+
+// Stats schemas
+export {
+  // Base schemas for MCP visibility
+  StatsDescriptiveSchemaBase,
+  StatsPercentilesSchemaBase,
+  StatsCorrelationSchemaBase,
+  StatsRegressionSchemaBase,
+  StatsTimeSeriesSchemaBase,
+  StatsDistributionSchemaBase,
+  StatsHypothesisSchemaBase,
+  StatsSamplingSchemaBase,
+  // Preprocessed schemas for handler validation
+  StatsDescriptiveSchema,
+  StatsPercentilesSchema,
+  StatsCorrelationSchema,
+  StatsRegressionSchema,
+  StatsTimeSeriesSchema,
+  StatsDistributionSchema,
+  StatsHypothesisSchema,
+  StatsSamplingSchema,
+} from "./stats.js";

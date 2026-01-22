@@ -102,7 +102,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 ## Stats Tools
 
 - All stats tools support \`schema.table\` format (auto-parsed, embedded schema takes priority over explicit \`schema\` param)
-- \`timeSeries\`: Both \`timeColumn\` (must be timestamp/date) and \`valueColumn\` (must be numeric) are validated upfront with clear error messages. Aliases: \`time\`→\`timeColumn\`, \`value\`→\`valueColumn\`. \`interval\` accepts: \`second\`, \`minute\`, \`hour\`, \`day\`, \`week\`, \`month\`, \`year\` (keywords, PostgreSQL format, or plurals)
+- \`timeSeries\`: Both \`timeColumn\` (must be timestamp/date) and \`valueColumn\` (must be numeric) are validated upfront with clear error messages. Aliases: \`time\`→\`timeColumn\`, \`value\`→\`valueColumn\`. \`interval\` accepts: \`second\`, \`minute\`, \`hour\`, \`day\`, \`week\`, \`month\`, \`year\` (keywords, PostgreSQL format, or plurals). Default \`limit: 100\` time buckets. Use \`limit: 0\` for no limit. Returns \`truncated\` and \`totalCount\` indicators when default limit is applied
 - \`correlation\`: Use \`column1\`/\`column2\` or aliases \`x\`/\`y\` for column names
 - \`distribution\`: Returns \`skewness\`, \`kurtosis\` (excess). \`buckets\` must be > 0
 - \`sampling\`: Defaults to \`random\` method with 100 rows. \`sampleSize\` always takes precedence over \`percentage\`. ⚠️ \`percentage\` param only works with \`bernoulli\`/\`system\` methods—ignored for default \`random\` method

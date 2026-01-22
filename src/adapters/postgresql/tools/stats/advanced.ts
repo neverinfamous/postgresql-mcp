@@ -9,9 +9,20 @@ import type {
   ToolDefinition,
   RequestContext,
 } from "../../../../types/index.js";
-import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
+import {
+  // Base schemas for MCP visibility
+  StatsTimeSeriesSchemaBase,
+  StatsDistributionSchemaBase,
+  StatsHypothesisSchemaBase,
+  StatsSamplingSchemaBase,
+  // Preprocessed schemas for handler parsing
+  StatsTimeSeriesSchema,
+  StatsDistributionSchema,
+  StatsHypothesisSchema,
+  StatsSamplingSchema,
+} from "../../schemas/index.js";
 
 // =============================================================================
 // P-Value Calculation Utilities
@@ -182,29 +193,8 @@ function calculateZTestPValue(z: number): number {
 }
 
 // =============================================================================
-// Schema.Table Parsing
+// Validation Helpers
 // =============================================================================
-
-/**
- * Parse schema.table format from table name.
- * Returns { table, schema } with schema extracted from prefix if present.
- * Embedded schema takes priority over explicit schema parameter.
- */
-function parseSchemaTable(
-  table: string,
-  explicitSchema?: string,
-): { table: string; schema: string } {
-  if (table.includes(".")) {
-    const parts = table.split(".");
-    if (parts.length === 2 && parts[0] && parts[1]) {
-      return {
-        schema: parts[0],
-        table: parts[1],
-      };
-    }
-  }
-  return { table, schema: explicitSchema ?? "public" };
-}
 
 /**
  * Validate that a table exists and a column is numeric.
@@ -279,398 +269,6 @@ async function validateTableExists(
 }
 
 // =============================================================================
-// Parameter Preprocessing
-// =============================================================================
-
-/**
- * Valid interval units for time series analysis
- */
-const VALID_INTERVALS = [
-  "second",
-  "minute",
-  "hour",
-  "day",
-  "week",
-  "month",
-  "year",
-] as const;
-
-/**
- * Interval shorthand mappings
- */
-const INTERVAL_SHORTHANDS: Record<string, string> = {
-  daily: "day",
-  hourly: "hour",
-  weekly: "week",
-  monthly: "month",
-  yearly: "year",
-  minutely: "minute",
-};
-
-/**
- * Preprocess time series parameters:
- * - Extract interval unit from PostgreSQL-style intervals ('1 day' → 'day', '2 hours' → 'hour')
- * - Normalize to lowercase
- * - Handle shorthands: daily→day, hourly→hour, weekly→week, monthly→month
- * - Alias: column → valueColumn, time → timeColumn
- * - Alias: tableName → table
- * - Default interval to 'day' if not provided
- */
-function preprocessTimeSeriesParams(input: unknown): unknown {
-  if (typeof input !== "object" || input === null) {
-    return input;
-  }
-
-  const result = { ...(input as Record<string, unknown>) };
-
-  // Alias: tableName → table
-  if (result["tableName"] !== undefined && result["table"] === undefined) {
-    result["table"] = result["tableName"];
-  }
-
-  // Alias: column → valueColumn
-  if (result["column"] !== undefined && result["valueColumn"] === undefined) {
-    result["valueColumn"] = result["column"];
-  }
-
-  // Alias: value → valueColumn
-  if (result["value"] !== undefined && result["valueColumn"] === undefined) {
-    result["valueColumn"] = result["value"];
-  }
-
-  // Alias: time → timeColumn
-  if (result["time"] !== undefined && result["timeColumn"] === undefined) {
-    result["timeColumn"] = result["time"];
-  }
-
-  // Alias: bucket → interval
-  if (result["bucket"] !== undefined && result["interval"] === undefined) {
-    result["interval"] = result["bucket"];
-  }
-
-  if (typeof result["interval"] === "string") {
-    let interval = result["interval"].toLowerCase().trim();
-
-    // Handle shorthands: daily → day, hourly → hour, etc.
-    const shorthand = INTERVAL_SHORTHANDS[interval];
-    if (shorthand !== undefined) {
-      interval = shorthand;
-    }
-
-    // Extract unit from PostgreSQL-style interval: '1 day', '2 hours', etc.
-    const match = /^\d+\s*(\w+?)s?$/.exec(interval);
-    if (match?.[1] !== undefined) {
-      interval = match[1];
-    }
-
-    // Handle plural forms: 'days' → 'day', 'hours' → 'hour'
-    if (
-      interval.endsWith("s") &&
-      VALID_INTERVALS.includes(
-        interval.slice(0, -1) as (typeof VALID_INTERVALS)[number],
-      )
-    ) {
-      interval = interval.slice(0, -1);
-    }
-
-    result["interval"] = interval;
-  } else if (result["interval"] === undefined) {
-    // Default interval to 'day' if not provided
-    result["interval"] = "day";
-  }
-
-  // Alias: filter → where
-  if (result["filter"] !== undefined && result["where"] === undefined) {
-    result["where"] = result["filter"];
-  }
-
-  // Parse schema.table format (embedded schema takes priority)
-  if (typeof result["table"] === "string" && result["table"].includes(".")) {
-    const parsed = parseSchemaTable(
-      result["table"],
-      result["schema"] as string | undefined,
-    );
-    result["table"] = parsed.table;
-    result["schema"] = parsed.schema;
-  }
-
-  return result;
-}
-
-/**
- * Preprocess hypothesis test parameters:
- * - Normalize testType variants: 'ttest', 't-test', 'T_TEST' → 't_test'
- * - Default testType to 't_test' if not provided
- * - Alias: tableName → table, col → column
- */
-function preprocessHypothesisParams(input: unknown): unknown {
-  if (typeof input !== "object" || input === null) {
-    return input;
-  }
-
-  const result = { ...(input as Record<string, unknown>) };
-
-  // Alias: tableName → table
-  if (result["tableName"] !== undefined && result["table"] === undefined) {
-    result["table"] = result["tableName"];
-  }
-
-  // Alias: col → column
-  if (result["col"] !== undefined && result["column"] === undefined) {
-    result["column"] = result["col"];
-  }
-
-  if (typeof result["testType"] === "string") {
-    const normalized = result["testType"].toLowerCase().trim();
-
-    // t_test variants: t, ttest, t-test, t_test, T_TEST
-    if (normalized === "t" || /^t[-_]?test$/.test(normalized)) {
-      result["testType"] = "t_test";
-    }
-    // z_test variants: z, ztest, z-test, z_test, Z_TEST
-    else if (normalized === "z" || /^z[-_]?test$/.test(normalized)) {
-      result["testType"] = "z_test";
-    }
-  } else if (result["testType"] === undefined) {
-    // Auto-detect: if populationStdDev or sigma provided, default to z_test
-    if (
-      result["populationStdDev"] !== undefined ||
-      result["sigma"] !== undefined
-    ) {
-      result["testType"] = "z_test";
-    } else {
-      // Default testType to 't_test' if not provided
-      result["testType"] = "t_test";
-    }
-  }
-
-  // Alias: filter → where
-  if (result["filter"] !== undefined && result["where"] === undefined) {
-    result["where"] = result["filter"];
-  }
-
-  // Parse schema.table format (embedded schema takes priority)
-  if (typeof result["table"] === "string" && result["table"].includes(".")) {
-    const parsed = parseSchemaTable(
-      result["table"],
-      result["schema"] as string | undefined,
-    );
-    result["table"] = parsed.table;
-    result["schema"] = parsed.schema;
-  }
-
-  return result;
-}
-
-/**
- * Preprocess distribution parameters:
- * - Alias: tableName → table, col → column
- */
-function preprocessDistributionParams(input: unknown): unknown {
-  if (typeof input !== "object" || input === null) {
-    return input;
-  }
-  const result = { ...(input as Record<string, unknown>) };
-  // Alias: tableName → table
-  if (result["tableName"] !== undefined && result["table"] === undefined) {
-    result["table"] = result["tableName"];
-  }
-  // Alias: col → column
-  if (result["col"] !== undefined && result["column"] === undefined) {
-    result["column"] = result["col"];
-  }
-  // Alias: filter → where
-  if (result["filter"] !== undefined && result["where"] === undefined) {
-    result["where"] = result["filter"];
-  }
-  // Parse schema.table format (embedded schema takes priority)
-  if (typeof result["table"] === "string" && result["table"].includes(".")) {
-    const parsed = parseSchemaTable(
-      result["table"],
-      result["schema"] as string | undefined,
-    );
-    result["table"] = parsed.table;
-    result["schema"] = parsed.schema;
-  }
-  return result;
-}
-
-/**
- * Preprocess sampling parameters:
- * - Alias: tableName → table, columns → select
- */
-function preprocessSamplingParams(input: unknown): unknown {
-  if (typeof input !== "object" || input === null) {
-    return input;
-  }
-  const result = { ...(input as Record<string, unknown>) };
-  // Alias: tableName → table
-  if (result["tableName"] !== undefined && result["table"] === undefined) {
-    result["table"] = result["tableName"];
-  }
-  // Alias: columns → select
-  if (result["columns"] !== undefined && result["select"] === undefined) {
-    result["select"] = result["columns"];
-  }
-  // Alias: filter → where
-  if (result["filter"] !== undefined && result["where"] === undefined) {
-    result["where"] = result["filter"];
-  }
-  // Parse schema.table format (embedded schema takes priority)
-  if (typeof result["table"] === "string" && result["table"].includes(".")) {
-    const parsed = parseSchemaTable(
-      result["table"],
-      result["schema"] as string | undefined,
-    );
-    result["table"] = parsed.table;
-    result["schema"] = parsed.schema;
-  }
-  return result;
-}
-
-// =============================================================================
-// Advanced Statistics Schemas
-// =============================================================================
-
-export const StatsTimeSeriesSchema = z.preprocess(
-  preprocessTimeSeriesParams,
-  z.object({
-    table: z.string().describe("Table name"),
-    valueColumn: z.string().describe("Numeric column to aggregate"),
-    timeColumn: z.string().describe("Timestamp column"),
-    interval: z
-      .enum(["second", "minute", "hour", "day", "week", "month", "year"])
-      .describe("Time bucket size (default: day)"),
-    aggregation: z
-      .enum(["sum", "avg", "min", "max", "count"])
-      .optional()
-      .describe("Aggregation function (default: avg)"),
-    schema: z.string().optional().describe("Schema name"),
-    where: z.string().optional().describe("Filter condition"),
-    limit: z.number().optional().describe("Max time buckets to return"),
-    groupBy: z.string().optional().describe("Column to group time series by"),
-  }),
-);
-
-export const StatsDistributionSchema = z.preprocess(
-  preprocessDistributionParams,
-  z
-    .object({
-      table: z.string().describe("Table name"),
-      column: z.string().describe("Numeric column"),
-      buckets: z
-        .number()
-        .optional()
-        .describe("Number of histogram buckets (default: 10)"),
-      schema: z.string().optional().describe("Schema name"),
-      where: z.string().optional().describe("Filter condition"),
-      groupBy: z
-        .string()
-        .optional()
-        .describe("Column to group distribution by"),
-    })
-    .refine((data) => data.buckets === undefined || data.buckets > 0, {
-      message: "buckets must be greater than 0",
-      path: ["buckets"],
-    }),
-);
-
-export const StatsHypothesisSchema = z.preprocess(
-  preprocessHypothesisParams,
-  z
-    .object({
-      table: z.string().describe("Table name"),
-      column: z.string().describe("Numeric column"),
-      testType: z
-        .enum(["t_test", "z_test"])
-        .describe(
-          "Type of hypothesis test: t_test or z_test (accepts shorthand: t, z, ttest, ztest)",
-        ),
-      hypothesizedMean: z
-        .number()
-        .optional()
-        .describe("Hypothesized population mean"),
-      mean: z.number().optional().describe("Alias for hypothesizedMean"),
-      expected: z.number().optional().describe("Alias for hypothesizedMean"),
-      populationStdDev: z
-        .number()
-        .optional()
-        .describe("Known population standard deviation (required for z-test)"),
-      sigma: z.number().optional().describe("Alias for populationStdDev"),
-      schema: z.string().optional().describe("Schema name"),
-      where: z.string().optional().describe("Filter condition"),
-      groupBy: z
-        .string()
-        .optional()
-        .describe("Column to group hypothesis test by"),
-    })
-    .transform((data) => ({
-      table: data.table,
-      column: data.column,
-      testType: data.testType,
-      hypothesizedMean:
-        data.hypothesizedMean ?? data.mean ?? data.expected ?? 0,
-      populationStdDev: data.populationStdDev ?? data.sigma,
-      schema: data.schema,
-      where: data.where,
-      groupBy: data.groupBy,
-    }))
-    .refine(
-      (data) => data.hypothesizedMean !== 0 || data.hypothesizedMean === 0,
-      {
-        // This allows 0 as a valid hypothesized mean - refinement always passes
-        message: "hypothesizedMean (or mean/expected alias) is required",
-      },
-    )
-    .refine(
-      (data) =>
-        data.populationStdDev === undefined || data.populationStdDev > 0,
-      {
-        message: "populationStdDev must be greater than 0",
-        path: ["populationStdDev"],
-      },
-    ),
-);
-
-export const StatsSamplingSchema = z.preprocess(
-  preprocessSamplingParams,
-  z
-    .object({
-      table: z.string().describe("Table name"),
-      method: z
-        .enum(["random", "bernoulli", "system"])
-        .optional()
-        .describe(
-          "Sampling method (default: random). Note: system uses page-level sampling and may return 0 rows on small tables",
-        ),
-      sampleSize: z
-        .number()
-        .optional()
-        .describe("Number of rows for random sampling (must be > 0)"),
-      percentage: z
-        .number()
-        .optional()
-        .describe("Percentage for bernoulli/system sampling (0-100)"),
-      schema: z.string().optional().describe("Schema name"),
-      select: z.array(z.string()).optional().describe("Columns to select"),
-      where: z.string().optional().describe("Filter condition"),
-    })
-    .refine((data) => data.sampleSize === undefined || data.sampleSize > 0, {
-      message: "sampleSize must be greater than 0",
-      path: ["sampleSize"],
-    })
-    .refine(
-      (data) =>
-        data.percentage === undefined ||
-        (data.percentage >= 0 && data.percentage <= 100),
-      {
-        message: "percentage must be between 0 and 100",
-        path: ["percentage"],
-      },
-    ),
-);
-
-// =============================================================================
 // Tool Implementations
 // =============================================================================
 
@@ -685,7 +283,7 @@ export function createStatsTimeSeriesTool(
     description:
       "Aggregate data into time buckets for time series analysis. Use groupBy to get separate time series per category.",
     group: "stats",
-    inputSchema: StatsTimeSeriesSchema,
+    inputSchema: StatsTimeSeriesSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Time Series Analysis"),
     icons: getToolIcons("stats", readOnly("Time Series Analysis")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -714,7 +312,15 @@ export function createStatsTimeSeriesTool(
       const schemaPrefix = schema ? `"${schema}".` : "";
       const whereClause = where ? `WHERE ${where}` : "";
       const agg = aggregation ?? "avg";
-      const lim = limit ?? 100;
+
+      // Handle limit: undefined uses default (100), 0 means no limit
+      // Track whether user explicitly provided a limit
+      const userProvidedLimit = limit !== undefined;
+      const DEFAULT_LIMIT = 100;
+      // limit === 0 means "no limit", otherwise use provided limit or default
+      const effectiveLimit = limit === 0 ? undefined : (limit ?? DEFAULT_LIMIT);
+      const usingDefaultLimit =
+        !userProvidedLimit && effectiveLimit !== undefined;
 
       // First check if table exists
       const schemaName = schema ?? "public";
@@ -826,13 +432,23 @@ export function createStatsTimeSeriesTool(
           unknown,
           { timeBucket: Date; value: number; count: number }[]
         >();
+        const groupsTotalCount = new Map<unknown, number>();
+
         for (const row of rows) {
           const key = row["group_key"];
           if (!groupsMap.has(key)) {
             groupsMap.set(key, []);
+            groupsTotalCount.set(key, 0);
           }
+          const currentTotal = groupsTotalCount.get(key) ?? 0;
+          groupsTotalCount.set(key, currentTotal + 1);
+
           const bucketList = groupsMap.get(key);
-          if (bucketList !== undefined && bucketList.length < lim) {
+          // Only add if no limit or under limit
+          if (
+            bucketList !== undefined &&
+            (effectiveLimit === undefined || bucketList.length < effectiveLimit)
+          ) {
             bucketList.push(mapBucket(row));
           }
         }
@@ -856,7 +472,26 @@ export function createStatsTimeSeriesTool(
         };
       }
 
-      // Ungrouped time series (original behavior)
+      // Ungrouped time series
+      // Build LIMIT clause: no LIMIT if effectiveLimit is undefined (limit: 0)
+      const limitClause =
+        effectiveLimit !== undefined ? `LIMIT ${String(effectiveLimit)}` : "";
+
+      // Get total count if using default limit (for truncation indicator)
+      let totalCount: number | undefined;
+      if (usingDefaultLimit) {
+        const countSql = `
+          SELECT COUNT(DISTINCT DATE_TRUNC('${interval}', "${timeColumn}")) as total_buckets
+          FROM ${schemaPrefix}"${table}"
+          ${whereClause}
+        `;
+        const countResult = await adapter.executeQuery(countSql);
+        const countRow = countResult.rows?.[0] as
+          | { total_buckets: string | number }
+          | undefined;
+        totalCount = countRow ? Number(countRow.total_buckets) : undefined;
+      }
+
       const sql = `
                 SELECT 
                     DATE_TRUNC('${interval}', "${timeColumn}") as time_bucket,
@@ -866,14 +501,15 @@ export function createStatsTimeSeriesTool(
                 ${whereClause}
                 GROUP BY DATE_TRUNC('${interval}', "${timeColumn}")
                 ORDER BY time_bucket DESC
-                LIMIT ${String(lim)}
+                ${limitClause}
             `;
 
       const result = await adapter.executeQuery(sql);
 
       const buckets = (result.rows ?? []).map((row) => mapBucket(row));
 
-      return {
+      // Build response
+      const response: Record<string, unknown> = {
         table: `${schema ?? "public"}.${table}`,
         valueColumn,
         timeColumn,
@@ -881,6 +517,14 @@ export function createStatsTimeSeriesTool(
         aggregation: agg,
         buckets,
       };
+
+      // Add truncation indicators when default limit was applied
+      if (usingDefaultLimit && totalCount !== undefined) {
+        response["truncated"] = buckets.length < totalCount;
+        response["totalCount"] = totalCount;
+      }
+
+      return response;
     },
   };
 }
@@ -896,7 +540,7 @@ export function createStatsDistributionTool(
     description:
       "Analyze data distribution with histogram buckets, skewness, and kurtosis. Use groupBy to get distribution per category.",
     group: "stats",
-    inputSchema: StatsDistributionSchema,
+    inputSchema: StatsDistributionSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Distribution Analysis"),
     icons: getToolIcons("stats", readOnly("Distribution Analysis")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -1117,7 +761,7 @@ export function createStatsHypothesisTool(
     description:
       "Perform one-sample t-test or z-test against a hypothesized mean. For z-test, provide populationStdDev (sigma) for accurate results. Use groupBy to test each group separately.",
     group: "stats",
-    inputSchema: StatsHypothesisSchema,
+    inputSchema: StatsHypothesisSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Hypothesis Testing"),
     icons: getToolIcons("stats", readOnly("Hypothesis Testing")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -1330,7 +974,7 @@ export function createStatsSamplingTool(
     description:
       "Get a random sample of rows. Use sampleSize for exact row count (any method), or percentage for approximate sampling with bernoulli/system methods.",
     group: "stats",
-    inputSchema: StatsSamplingSchema,
+    inputSchema: StatsSamplingSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Random Sampling"),
     icons: getToolIcons("stats", readOnly("Random Sampling")),
     handler: async (params: unknown, _context: RequestContext) => {

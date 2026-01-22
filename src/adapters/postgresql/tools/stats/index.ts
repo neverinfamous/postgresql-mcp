@@ -14,10 +14,6 @@ import {
   createStatsPercentilesTool,
   createStatsCorrelationTool,
   createStatsRegressionTool,
-  StatsDescriptiveSchema,
-  StatsPercentilesSchema,
-  StatsCorrelationSchema,
-  StatsRegressionSchema,
 } from "./basic.js";
 
 // Advanced statistics tools
@@ -26,11 +22,19 @@ import {
   createStatsDistributionTool,
   createStatsHypothesisTool,
   createStatsSamplingTool,
+} from "./advanced.js";
+
+// Schemas (now centralized in schemas/stats.ts)
+import {
+  StatsDescriptiveSchema,
+  StatsPercentilesSchema,
+  StatsCorrelationSchema,
+  StatsRegressionSchema,
   StatsTimeSeriesSchema,
   StatsDistributionSchema,
   StatsHypothesisSchema,
   StatsSamplingSchema,
-} from "./advanced.js";
+} from "../../schemas/index.js";
 
 /**
  * Get all statistics tools

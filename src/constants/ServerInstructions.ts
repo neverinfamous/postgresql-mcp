@@ -326,7 +326,7 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 
 Core: \`createExtension()\`, \`schedule()\`, \`scheduleInDatabase()\`, \`unschedule()\`, \`alterJob()\`, \`listJobs()\`, \`jobRunDetails()\`, \`cleanupHistory()\`
 
-- \`pg_cron_schedule\`: Schedule a cron job. \`schedule\` supports standard cron (\`0 5 * * *\`) or interval (\`30 seconds\`). Use \`name\`/\`jobName\` for identification. \`command\`/\`sql\`/\`query\` aliases supported
+- \`pg_cron_schedule\`: Schedule a cron job. \`schedule\` supports standard cron (\`0 5 * * *\`) or interval (\`1 second\` to \`59 seconds\`). ⚠️ Interval syntax only works for 1-59 seconds—for 60+ seconds, use cron syntax (e.g., \`* * * * *\` for every minute). Use \`name\`/\`jobName\` for identification. \`command\`/\`sql\`/\`query\` aliases supported. Note: pg_cron allows duplicate job names; use unique names to avoid confusion when unscheduling
 - \`pg_cron_schedule_in_database\`: Schedule job in specific database. \`database\`/\`db\` aliases. Optional \`username\`, \`active\` params
 - \`pg_cron_unschedule\`: Remove job by \`jobId\` or \`jobName\`. If both provided, \`jobName\` takes precedence (with warning)
 - \`pg_cron_alter_job\`: Modify existing job. Can change \`schedule\`, \`command\`, \`database\`, \`username\`, \`active\`. ⛔ Non-existent jobId throws error

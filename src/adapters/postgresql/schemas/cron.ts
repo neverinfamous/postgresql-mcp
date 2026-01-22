@@ -21,6 +21,36 @@ interface RawCronInput {
 }
 
 /**
+ * Validate pg_cron interval schedule format.
+ * pg_cron only accepts intervals from 1-59 seconds.
+ * For 60+ seconds, standard cron syntax must be used.
+ *
+ * Valid interval examples: "1 second", "5 seconds", "30 seconds", "59 seconds"
+ * Invalid: "60 seconds", "1 minute", "2 hours"
+ *
+ * @returns Error message if invalid, undefined if valid
+ */
+function validateIntervalSchedule(schedule: string): string | undefined {
+  // Match interval patterns like "N second", "N seconds"
+  const intervalRegex = /^(\d+)\s+seconds?$/i;
+  const intervalMatch = intervalRegex.exec(schedule);
+  if (!intervalMatch?.[1]) {
+    return undefined; // Not an interval format, let pg_cron handle validation
+  }
+
+  const seconds = parseInt(intervalMatch[1], 10);
+  if (seconds < 1 || seconds > 59) {
+    const minuteEquivalent =
+      seconds >= 60
+        ? `${String(Math.floor(seconds / 60))} minute(s)`
+        : "less than 1 second";
+    return `Invalid interval schedule: "${schedule}". pg_cron interval syntax only supports 1-59 seconds. For ${minuteEquivalent}, use standard cron syntax instead (e.g., "* * * * *" for every minute, "*/5 * * * *" for every 5 minutes).`;
+  }
+
+  return undefined; // Valid interval
+}
+
+/**
  * Preprocess cron parameters to normalize common input patterns
  */
 function preprocessCronParams(input: unknown): unknown {
@@ -77,7 +107,7 @@ export const CronScheduleSchemaBase = z
     schedule: z
       .string()
       .describe(
-        'Cron schedule expression (e.g., "0 10 * * *" or "30 seconds")',
+        'Cron schedule expression (e.g., "0 10 * * *") or interval ("1-59 seconds")',
       ),
     command: z.string().optional().describe("SQL command to execute"),
     sql: z.string().optional().describe("Alias for command"),
@@ -92,6 +122,16 @@ export const CronScheduleSchemaBase = z
       data.query !== undefined,
     {
       message: "Either command, sql, or query must be provided",
+    },
+  )
+  .refine(
+    (data) => {
+      const error = validateIntervalSchedule(data.schedule);
+      return error === undefined;
+    },
+    {
+      message:
+        "pg_cron interval syntax only supports 1-59 seconds. For 60+ seconds, use standard cron syntax.",
     },
   );
 
@@ -120,7 +160,11 @@ export const CronScheduleInDatabaseSchemaBase = z
   .object({
     jobName: z.string().optional().describe("Unique name for the job"),
     name: z.string().optional().describe("Alias for jobName"),
-    schedule: z.string().describe("Cron schedule expression"),
+    schedule: z
+      .string()
+      .describe(
+        'Cron schedule expression (e.g., "0 10 * * *") or interval ("1-59 seconds")',
+      ),
     command: z.string().optional().describe("SQL command to execute"),
     sql: z.string().optional().describe("Alias for command"),
     query: z.string().optional().describe("Alias for command"),
@@ -143,7 +187,17 @@ export const CronScheduleInDatabaseSchemaBase = z
   )
   .refine((data) => data.database !== undefined || data.db !== undefined, {
     message: "Either database or db must be provided",
-  });
+  })
+  .refine(
+    (data) => {
+      const error = validateIntervalSchedule(data.schedule);
+      return error === undefined;
+    },
+    {
+      message:
+        "pg_cron interval syntax only supports 1-59 seconds. For 60+ seconds, use standard cron syntax.",
+    },
+  );
 
 export const CronScheduleInDatabaseSchema = z.preprocess(
   preprocessCronParams,
@@ -173,14 +227,31 @@ export const CronUnscheduleSchema = z
     message: "Either jobId or jobName must be provided",
   });
 
-export const CronAlterJobSchema = z.object({
-  jobId: CoercibleJobId.describe("Job ID to modify"),
-  schedule: z.string().optional().describe("New cron schedule"),
-  command: z.string().optional().describe("New SQL command"),
-  database: z.string().optional().describe("New target database"),
-  username: z.string().optional().describe("New username"),
-  active: z.boolean().optional().describe("Enable/disable the job"),
-});
+export const CronAlterJobSchema = z
+  .object({
+    jobId: CoercibleJobId.describe("Job ID to modify"),
+    schedule: z
+      .string()
+      .optional()
+      .describe(
+        'New cron schedule (e.g., "0 10 * * *") or interval ("1-59 seconds")',
+      ),
+    command: z.string().optional().describe("New SQL command"),
+    database: z.string().optional().describe("New target database"),
+    username: z.string().optional().describe("New username"),
+    active: z.boolean().optional().describe("Enable/disable the job"),
+  })
+  .refine(
+    (data) => {
+      if (data.schedule === undefined) return true;
+      const error = validateIntervalSchedule(data.schedule);
+      return error === undefined;
+    },
+    {
+      message:
+        "pg_cron interval syntax only supports 1-59 seconds. For 60+ seconds, use standard cron syntax.",
+    },
+  );
 
 export const CronJobRunDetailsSchema = z
   .object({

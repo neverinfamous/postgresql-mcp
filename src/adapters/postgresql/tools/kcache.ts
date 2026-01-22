@@ -144,10 +144,18 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
     annotations: readOnly("Kcache Query Stats"),
     icons: getToolIcons("kcache", readOnly("Kcache Query Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { limit, orderBy, minCalls } = KcacheQueryStatsSchema.parse(params);
+      const { limit, orderBy, minCalls, queryPreviewLength } =
+        KcacheQueryStatsSchema.parse(params);
       const cols = await getKcacheColumnNames(adapter);
 
-      const limitVal = limit ?? 25;
+      const DEFAULT_LIMIT = 50;
+      const limitVal = limit ?? DEFAULT_LIMIT;
+      // Bound queryPreviewLength: 0 = full query, default 100, max 500
+      const previewLen =
+        queryPreviewLength === 0
+          ? 10000
+          : Math.min(queryPreviewLength ?? 100, 500);
+
       const orderColumn =
         orderBy === "cpu_time"
           ? `(k.${cols.userTime} + k.${cols.systemTime})`
@@ -169,10 +177,23 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
+      // Get total count first for truncation indicator
+      const countSql = `
+                SELECT COUNT(*) as total
+                FROM pg_stat_statements s
+                JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
+                    AND s.userid = k.userid 
+                    AND s.dbid = k.dbid
+                ${whereClause}
+            `;
+      const countResult = await adapter.executeQuery(countSql, queryParams);
+      const totalRaw = countResult.rows?.[0]?.["total"];
+      const totalCount = Number(totalRaw) || 0;
+
       const sql = `
                 SELECT 
                     s.queryid,
-                    LEFT(s.query, 100) as query_preview,
+                    LEFT(s.query, ${String(previewLen)}) as query_preview,
                     s.calls,
                     s.total_exec_time as total_time_ms,
                     s.mean_exec_time as mean_time_ms,
@@ -195,12 +216,22 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
             `;
 
       const result = await adapter.executeQuery(sql, queryParams);
+      const rowCount = result.rows?.length ?? 0;
+      const truncated = rowCount < totalCount;
 
-      return {
+      const response: Record<string, unknown> = {
         queries: result.rows ?? [],
-        count: result.rows?.length ?? 0,
+        count: rowCount,
         orderBy: orderBy ?? "total_time",
       };
+
+      // Only include truncation info when actually truncated
+      if (truncated) {
+        response["truncated"] = true;
+        response["totalCount"] = totalCount;
+      }
+
+      return response;
     },
   };
 }
@@ -450,10 +481,15 @@ Helps identify the root cause of performance issues - is the query computation-h
     annotations: readOnly("Kcache Resource Analysis"),
     icons: getToolIcons("kcache", readOnly("Kcache Resource Analysis")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { queryId, threshold, limit } =
+      const { queryId, threshold, limit, queryPreviewLength } =
         KcacheResourceAnalysisSchema.parse(params);
       const thresholdVal = threshold ?? 0.5;
       const limitVal = limit ?? 50;
+      // Bound queryPreviewLength: 0 = full query, default 100, max 500
+      const previewLen =
+        queryPreviewLength === 0
+          ? 10000
+          : Math.min(queryPreviewLength ?? 100, 500);
       const cols = await getKcacheColumnNames(adapter);
 
       const conditions: string[] = [];
@@ -472,11 +508,24 @@ Helps identify the root cause of performance issues - is the query computation-h
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
+      // Get total count first for truncation indicator
+      const countSql = `
+                SELECT COUNT(*) as total
+                FROM pg_stat_statements s
+                JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
+                    AND s.userid = k.userid 
+                    AND s.dbid = k.dbid
+                ${whereClause}
+            `;
+      const countResult = await adapter.executeQuery(countSql, queryParams);
+      const totalRaw = countResult.rows?.[0]?.["total"];
+      const totalCount = Number(totalRaw) || 0;
+
       const sql = `
                 WITH query_metrics AS (
                     SELECT 
                         s.queryid,
-                        LEFT(s.query, 100) as query_preview,
+                        LEFT(s.query, ${String(previewLen)}) as query_preview,
                         s.calls,
                         s.total_exec_time as total_time_ms,
                         (k.${cols.userTime} + k.${cols.systemTime}) as cpu_time,
@@ -521,6 +570,7 @@ Helps identify the root cause of performance issues - is the query computation-h
 
       const result = await adapter.executeQuery(sql, queryParams);
       const rows = result.rows ?? [];
+      const truncated = rows.length < totalCount;
 
       const cpuBound = rows.filter(
         (r: Record<string, unknown>) =>
@@ -535,7 +585,7 @@ Helps identify the root cause of performance issues - is the query computation-h
           r["resource_classification"] === "Balanced",
       ).length;
 
-      return {
+      const response: Record<string, unknown> = {
         queries: rows,
         count: rows.length,
         summary: {
@@ -552,6 +602,14 @@ Helps identify the root cause of performance issues - is the query computation-h
               : "Resource usage is balanced between CPU and I/O.",
         ],
       };
+
+      // Only include truncation info when actually truncated
+      if (truncated) {
+        response["truncated"] = true;
+        response["totalCount"] = totalCount;
+      }
+
+      return response;
     },
   };
 }

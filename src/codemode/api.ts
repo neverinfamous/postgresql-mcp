@@ -167,10 +167,10 @@ const METHOD_ALIASES: Record<string, Record<string, string>> = {
     kcacheCreateExtension: "createExtension",
     kcacheQueryStats: "queryStats",
     kcacheReset: "reset",
-    kcacheTopQueries: "topQueries",
+    kcacheTopCpu: "topCpu",
+    kcacheTopIo: "topIo",
+    kcacheDatabaseStats: "databaseStats",
     kcacheResourceAnalysis: "resourceAnalysis",
-    kcacheIoPatterns: "ioPatterns",
-    kcacheCpuProfiles: "cpuProfiles",
   },
   // Citext
   citext: {
@@ -322,9 +322,10 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
     "pg.partman.showPartitions({ parentTable: 'events' })",
   ],
   kcache: [
-    "pg.kcache.queryStats({ orderBy: 'total_time', limit: 10 })",
-    "pg.kcache.topQueries({ limit: 5 })",
-    "pg.kcache.ioPatterns()",
+    "pg.kcache.queryStats({ orderBy: 'cpu_time', limit: 10 })",
+    "pg.kcache.topCpu({ limit: 5 })",
+    "pg.kcache.topIo({ ioType: 'reads' })",
+    "pg.kcache.resourceAnalysis()",
   ],
   citext: [
     "pg.citext.convertColumn({ table: 'users', column: 'email' })",

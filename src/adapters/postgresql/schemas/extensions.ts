@@ -24,12 +24,18 @@ export const KcacheQueryStatsSchema = z.preprocess(
     limit: z
       .number()
       .optional()
-      .describe("Maximum number of queries to return (default: 25)"),
+      .describe("Maximum number of queries to return (default: 50)"),
     orderBy: z
       .enum(["total_time", "cpu_time", "reads", "writes"])
       .optional()
       .describe("Order results by metric (default: total_time)"),
     minCalls: z.number().optional().describe("Minimum call count to include"),
+    queryPreviewLength: z
+      .number()
+      .optional()
+      .describe(
+        "Characters for query preview (default: 100, max: 500, 0 for full)",
+      ),
   }),
 );
 
@@ -77,6 +83,12 @@ export const KcacheResourceAnalysisSchema = z.preprocess(
       .number()
       .optional()
       .describe("Maximum number of queries to return (default: 50)"),
+    queryPreviewLength: z
+      .number()
+      .optional()
+      .describe(
+        "Characters for query preview (default: 100, max: 500, 0 for full)",
+      ),
   }),
 );
 

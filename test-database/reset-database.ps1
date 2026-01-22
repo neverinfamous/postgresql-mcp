@@ -101,6 +101,7 @@ Write-Step "3" "Cleaning up pg_partman configurations..."
 
 $sql3 = @"
 DO `$`$
+DECLARE r RECORD;
 BEGIN
     -- Delete partman configs for test_* tables (prevents orphaned configs)
     IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'part_config' AND schemaname IN ('public', 'partman')) THEN

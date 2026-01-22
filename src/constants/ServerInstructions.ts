@@ -307,9 +307,9 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 - \`pg_point_in_polygon\`: Check if point is within table polygons. Returns \`{containingPolygons, count}\`. ⚠️ Validates point bounds
 
 **Geometry Operations (Table-based):**
-- \`pg_buffer\`: Create buffer zone around table geometries. \`distance\`/\`radius\`/\`meters\` aliases. Returns \`buffer_geojson\`
+- \`pg_buffer\`: Create buffer zone around table geometries. Default limit: 50 rows. Use \`simplify\` (tolerance in meters) to reduce polygon point count for large payloads. Returns \`truncated\`, \`totalCount\` when default limit applies. Use \`limit: 0\` for all rows
 - \`pg_geo_transform\`: Transform table geometries between SRIDs. \`fromSrid\`/\`sourceSrid\` and \`toSrid\`/\`targetSrid\` aliases
-- \`pg_geo_cluster\`: Spatial clustering (DBSCAN/K-Means). Returns centroids and convex hulls. \`k\`/\`numClusters\` aliases
+- \`pg_geo_cluster\`: Spatial clustering (DBSCAN/K-Means). K-Means: If \`numClusters\` exceeds row count, automatically clamps to available rows with \`warning\` field. DBSCAN: Returns contextual \`hints\` array explaining parameter effects (e.g., "All points formed single cluster—decrease eps") and \`parameterGuide\` explaining eps/minPoints trade-offs
 
 **Geometry Operations (Standalone WKT/GeoJSON):**
 - \`pg_geometry_buffer\`: Create buffer around WKT/GeoJSON. Returns \`{buffer_geojson, buffer_wkt, distance_meters}\`

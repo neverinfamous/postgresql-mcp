@@ -266,7 +266,8 @@ export function createDistanceTool(adapter: PostgresAdapter): ToolDefinition {
 export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_buffer",
-    description: "Create a buffer zone around geometries.",
+    description:
+      "Create a buffer zone around geometries. Default limit: 50 rows. Use simplify parameter to reduce polygon point count for large payloads.",
     group: "postgis",
     inputSchema: BufferSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Buffer Zone"),
@@ -283,6 +284,9 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
       );
       const columnName = sanitizeIdentifier(parsed.column);
 
+      // Default limit of 50 to prevent large payloads, use limit: 0 for all
+      const effectiveLimit = parsed.limit ?? 50;
+
       // Get non-geometry columns to avoid returning raw WKB
       const colQuery = `
         SELECT column_name FROM information_schema.columns 
@@ -298,16 +302,48 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
         .map((row) => sanitizeIdentifier(String(row["column_name"])))
         .join(", ");
 
+      // Build buffer expression with optional simplification
+      let bufferExpr = `ST_Buffer(${columnName}::geography, $1)::geometry`;
+      if (parsed.simplify !== undefined) {
+        // SimplifyPreserveTopology maintains valid geometries
+        bufferExpr = `ST_SimplifyPreserveTopology(${bufferExpr}, ${String(parsed.simplify)})`;
+      }
+
       // Select non-geometry columns + readable geometry representations
       const selectCols =
         nonGeomCols.length > 0
-          ? `${nonGeomCols}, ST_AsText(${columnName}) as geometry_text, ST_AsGeoJSON(ST_Buffer(${columnName}::geography, $1)::geometry) as buffer_geojson`
-          : `ST_AsText(${columnName}) as geometry_text, ST_AsGeoJSON(ST_Buffer(${columnName}::geography, $1)::geometry) as buffer_geojson`;
+          ? `${nonGeomCols}, ST_AsText(${columnName}) as geometry_text, ST_AsGeoJSON(${bufferExpr}) as buffer_geojson`
+          : `ST_AsText(${columnName}) as geometry_text, ST_AsGeoJSON(${bufferExpr}) as buffer_geojson`;
 
-      const sql = `SELECT ${selectCols} FROM ${qualifiedTable}${whereClause}`;
+      const limitClause =
+        effectiveLimit > 0 ? ` LIMIT ${String(effectiveLimit)}` : "";
+      const sql = `SELECT ${selectCols} FROM ${qualifiedTable}${whereClause}${limitClause}`;
 
       const result = await adapter.executeQuery(sql, [parsed.distance]);
-      return { results: result.rows };
+
+      // Build response with truncation indicators if default limit was applied
+      const response: Record<string, unknown> = { results: result.rows };
+
+      // When using default limit, check if more rows exist
+      if (parsed.limit === undefined && effectiveLimit > 0) {
+        const countSql = `SELECT COUNT(*) as cnt FROM ${qualifiedTable}${whereClause}`;
+        const countResult = await adapter.executeQuery(countSql);
+        const totalCount = Number(countResult.rows?.[0]?.["cnt"] ?? 0);
+
+        if (totalCount > effectiveLimit) {
+          response["truncated"] = true;
+          response["totalCount"] = totalCount;
+          response["limit"] = effectiveLimit;
+        }
+      }
+
+      // Add simplify indicator if used
+      if (parsed.simplify !== undefined) {
+        response["simplified"] = true;
+        response["simplifyTolerance"] = parsed.simplify;
+      }
+
+      return response;
     },
   };
 }

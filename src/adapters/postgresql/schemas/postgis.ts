@@ -317,6 +317,16 @@ export const BufferSchemaBase = z.object({
     .enum(["meters", "m", "kilometers", "km", "miles", "mi"])
     .optional()
     .describe("Distance unit (default: meters)"),
+  simplify: z
+    .number()
+    .optional()
+    .describe(
+      "Simplification tolerance in meters to reduce polygon point count. Higher values = fewer points. Default: no simplification",
+    ),
+  limit: z
+    .number()
+    .optional()
+    .describe("Maximum rows to return (default: 50 to prevent large payloads)"),
   where: z.string().optional(),
 });
 
@@ -330,6 +340,11 @@ export const BufferSchema = z
       column: data.column ?? data.geom ?? data.geometryColumn ?? "",
       distance: convertToMeters(rawDistance, data.unit),
       unit: data.unit,
+      simplify:
+        data.simplify !== undefined
+          ? convertToMeters(data.simplify, data.unit)
+          : undefined,
+      limit: data.limit,
       where: data.where,
     };
   })
@@ -342,6 +357,9 @@ export const BufferSchema = z
   .refine((data) => data.distance > 0, {
     message:
       "distance (or radius/meters alias) is required and must be positive",
+  })
+  .refine((data) => data.simplify === undefined || data.simplify > 0, {
+    message: "simplify must be a positive number if provided",
   });
 
 // =============================================================================

@@ -79,8 +79,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_vector_dimension_reduce table mode summarization** — `pg_vector_dimension_reduce` in table mode now returns reduced vectors in the compact `{preview, dimensions, truncated}` format by default, significantly reducing payload size. For example, 5 rows with 32-dim reduced vectors now return ~500 bytes instead of ~2KB. Use `summarize: false` to get full reduced vectors when needed for downstream processing
 - **pg_geo_index_optimize tableStats filtering** — `pg_geo_index_optimize` without a `table` parameter now returns `tableStats` only for tables with geometry/geography columns, instead of all tables in the schema. Prevents unnecessarily large payloads in databases with many non-spatial tables
 - **PostGIS tools raw WKB removal** — `pg_distance`, `pg_buffer`, `pg_point_in_polygon`, `pg_intersection`, `pg_bounding_box`, and `pg_geo_transform` no longer return the raw WKB hex string for geometry columns. Responses now include only readable `geometry_text` (WKT format) plus computed fields (`distance_meters`, `buffer_geojson`, `transformed_geojson`, `transformed_wkt`). Reduces payload size by ~50% for tables with geometry columns
+- **pg_buffer default limit** — `pg_buffer` now applies a default limit of 50 rows when no `limit` parameter is specified. Returns `{truncated: true, totalCount, limit}` metadata when results are limited. Buffer geometries can have large polygon coordinates; use `limit: 0` for all rows
+- **pg_buffer simplify parameter** — `pg_buffer` now accepts `simplify` parameter (tolerance in meters) to reduce buffer polygon point count using ST_SimplifyPreserveTopology. Higher values = fewer points. Returns `{simplified: true, simplifyTolerance}` when used. Useful for reducing payload size when high-precision buffer boundaries aren't needed
 
 ### Added
+
+- **pg_geo_cluster K>N warning** — `pg_geo_cluster` with K-Means now returns a `warning` field when requested `numClusters` exceeds available data points. Instead of erroring, K is automatically clamped to row count with `{warning, requestedClusters, actualClusters}` in response. Provides graceful handling instead of requiring users to know row count upfront
+- **pg_geo_cluster DBSCAN contextual hints** — `pg_geo_cluster` with DBSCAN now returns contextual `hints` array based on clustering results, explaining parameter trade-offs:
+  - When all points form a single cluster: "Consider decreasing eps to create more distinct clusters"
+  - When >50% of points are noise: "Consider increasing eps or decreasing minPoints"
+  - When no clusters formed: "Try increasing eps or decreasing minPoints"
+  - Also includes `parameterGuide` object explaining eps and minPoints effects
 
 - **pg_drop_table existed property** — `pg_drop_table` now returns `existed: boolean` in response, indicating whether the table existed before the drop operation. Consistent with `dropSchema()`, `dropView()`, and `dropSequence()` behavior
 - **pg_object_details materialized_view/partitioned_table support** — `pg_object_details` `type`/`objectType` parameter now accepts `materialized_view` and `partitioned_table` in addition to `table`, `view`, `function`, `sequence`, and `index`. Materialized views now return their `definition` SQL like regular views

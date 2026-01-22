@@ -15,6 +15,12 @@ import {
   sanitizeTableName,
 } from "../../../utils/identifiers.js";
 import {
+  // Base schemas for MCP visibility
+  CreatePartitionedTableSchemaBase,
+  CreatePartitionSchemaBase,
+  AttachPartitionSchemaBase,
+  DetachPartitionSchemaBase,
+  // Preprocessed schemas for handler parsing
   CreatePartitionedTableSchema,
   CreatePartitionSchema,
   AttachPartitionSchema,
@@ -217,7 +223,7 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Create a partitioned table. Columns: notNull, primaryKey, unique, default. Note: primaryKey/unique must include the partition key column.",
     group: "partitioning",
-    inputSchema: CreatePartitionedTableSchema,
+    inputSchema: CreatePartitionedTableSchemaBase, // Base schema for MCP visibility
     annotations: write("Create Partitioned Table"),
     icons: getToolIcons("partitioning", write("Create Partitioned Table")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -361,7 +367,7 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Create a partition. Use subpartitionBy/subpartitionKey to make it sub-partitionable for multi-level partitioning.",
     group: "partitioning",
-    inputSchema: CreatePartitionSchema,
+    inputSchema: CreatePartitionSchemaBase, // Base schema for MCP visibility
     annotations: write("Create Partition"),
     icons: getToolIcons("partitioning", write("Create Partition")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -441,7 +447,7 @@ function createAttachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
     name: "pg_attach_partition",
     description: "Attach an existing table as a partition.",
     group: "partitioning",
-    inputSchema: AttachPartitionSchema,
+    inputSchema: AttachPartitionSchemaBase, // Base schema for MCP visibility
     annotations: write("Attach Partition"),
     icons: getToolIcons("partitioning", write("Attach Partition")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -506,7 +512,7 @@ function createDetachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Detach a partition. Use concurrently: true for non-blocking. Use finalize: true only after an interrupted CONCURRENTLY detach.",
     group: "partitioning",
-    inputSchema: DetachPartitionSchema,
+    inputSchema: DetachPartitionSchemaBase, // Base schema for MCP visibility
     annotations: destructive("Detach Partition"),
     icons: getToolIcons("partitioning", destructive("Detach Partition")),
     handler: async (params: unknown, _context: RequestContext) => {

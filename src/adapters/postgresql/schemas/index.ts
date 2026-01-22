@@ -153,6 +153,12 @@ export {
 
 // Partitioning schemas
 export {
+  // Base schemas for MCP visibility
+  CreatePartitionedTableSchemaBase,
+  CreatePartitionSchemaBase,
+  AttachPartitionSchemaBase,
+  DetachPartitionSchemaBase,
+  // Transformed schemas for handler validation
   CreatePartitionedTableSchema,
   CreatePartitionSchema,
   AttachPartitionSchema,

@@ -237,118 +237,134 @@ function preprocessCreatePartitionedTable(input: unknown): unknown {
   return result;
 }
 
+// Base schema for MCP visibility (no preprocessing)
+export const CreatePartitionedTableSchemaBase = z.object({
+  name: z.string().describe("Table name"),
+  schema: z.string().optional().describe("Schema name"),
+  columns: z
+    .array(
+      z.object({
+        name: z.string(),
+        type: z.string(),
+        nullable: z
+          .boolean()
+          .optional()
+          .describe("Allow NULL values (default: true)"),
+        notNull: z.boolean().optional().describe("Alias for nullable: false"),
+        primaryKey: z
+          .boolean()
+          .optional()
+          .describe("Create PRIMARY KEY constraint"),
+        unique: z.boolean().optional().describe("Create UNIQUE constraint"),
+        default: z
+          .union([z.string(), z.number(), z.boolean(), z.null()])
+          .optional()
+          .describe("Default value"),
+      }),
+    )
+    .describe("Column definitions"),
+  partitionBy: z
+    .enum(["range", "list", "hash"])
+    .describe("Partition strategy (range, list, or hash)"),
+  partitionKey: z.string().describe("Partition key column(s)"),
+  primaryKey: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Table-level primary key columns. Must include partition key column.",
+    ),
+});
+
+// Preprocessed schema for handler parsing (with alias support)
 export const CreatePartitionedTableSchema = z.preprocess(
   preprocessCreatePartitionedTable,
-  z.object({
-    name: z.string().describe("Table name"),
-    schema: z.string().optional().describe("Schema name"),
-    columns: z
-      .array(
-        z.object({
-          name: z.string(),
-          type: z.string(),
-          nullable: z
-            .boolean()
-            .optional()
-            .describe("Allow NULL values (default: true)"),
-          notNull: z.boolean().optional().describe("Alias for nullable: false"),
-          primaryKey: z
-            .boolean()
-            .optional()
-            .describe("Create PRIMARY KEY constraint"),
-          unique: z.boolean().optional().describe("Create UNIQUE constraint"),
-          default: z
-            .union([z.string(), z.number(), z.boolean(), z.null()])
-            .optional()
-            .describe("Default value"),
-        }),
-      )
-      .describe("Column definitions"),
-    partitionBy: z
-      .enum(["range", "list", "hash"])
-      .describe("Partition strategy (range, list, or hash)"),
-    partitionKey: z.string().describe("Partition key column(s)"),
-    primaryKey: z
-      .array(z.string())
-      .optional()
-      .describe(
-        "Table-level primary key columns. Must include partition key column.",
-      ),
-  }),
+  CreatePartitionedTableSchemaBase,
 );
 
+// Base schema for MCP visibility (no preprocessing)
+export const CreatePartitionSchemaBase = z.object({
+  parent: z
+    .string()
+    .describe("Parent table name (aliases: parentTable, table)"),
+  name: z.string().describe("Partition name (alias: partitionName)"),
+  schema: z.string().optional().describe("Schema name"),
+  forValues: z
+    .string()
+    .describe(
+      "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
+    ),
+  // Sub-partitioning support for multi-level partitions
+  subpartitionBy: z
+    .enum(["range", "list", "hash"])
+    .optional()
+    .describe(
+      "Make this partition itself partitionable. For multi-level partitioning.",
+    ),
+  subpartitionKey: z
+    .string()
+    .optional()
+    .describe(
+      "Column(s) to partition sub-partitions by. Required if subpartitionBy is set.",
+    ),
+});
+
+// Preprocessed schema for handler parsing (with alias support)
 export const CreatePartitionSchema = z.preprocess(
   preprocessPartitionParams,
-  z.object({
-    parent: z
-      .string()
-      .describe("Parent table name (aliases: parentTable, table)"),
-    name: z.string().describe("Partition name (alias: partitionName)"),
-    schema: z.string().optional().describe("Schema name"),
-    forValues: z
-      .string()
-      .describe(
-        "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
-      ),
-    // Sub-partitioning support for multi-level partitions
-    subpartitionBy: z
-      .enum(["range", "list", "hash"])
-      .optional()
-      .describe(
-        "Make this partition itself partitionable. For multi-level partitioning.",
-      ),
-    subpartitionKey: z
-      .string()
-      .optional()
-      .describe(
-        "Column(s) to partition sub-partitions by. Required if subpartitionBy is set.",
-      ),
-  }),
+  CreatePartitionSchemaBase,
 );
 
+// Base schema for MCP visibility (no preprocessing)
+export const AttachPartitionSchemaBase = z.object({
+  parent: z
+    .string()
+    .describe("Parent table name (aliases: parentTable, table)"),
+  partition: z
+    .string()
+    .describe("Table to attach (aliases: partitionTable, partitionName)"),
+  schema: z
+    .string()
+    .optional()
+    .describe("Schema name (auto-parsed from schema.table format)"),
+  forValues: z
+    .string()
+    .describe(
+      "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
+    ),
+});
+
+// Preprocessed schema for handler parsing (with alias support)
 export const AttachPartitionSchema = z.preprocess(
   preprocessPartitionParams,
-  z.object({
-    parent: z
-      .string()
-      .describe("Parent table name (aliases: parentTable, table)"),
-    partition: z
-      .string()
-      .describe("Table to attach (aliases: partitionTable, partitionName)"),
-    schema: z
-      .string()
-      .optional()
-      .describe("Schema name (auto-parsed from schema.table format)"),
-    forValues: z
-      .string()
-      .describe(
-        "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
-      ),
-  }),
+  AttachPartitionSchemaBase,
 );
 
+// Base schema for MCP visibility (no preprocessing)
+export const DetachPartitionSchemaBase = z.object({
+  parent: z
+    .string()
+    .describe("Parent table name (aliases: parentTable, table)"),
+  partition: z
+    .string()
+    .describe("Partition to detach (aliases: partitionTable, partitionName)"),
+  schema: z
+    .string()
+    .optional()
+    .describe("Schema name (auto-parsed from schema.table format)"),
+  concurrently: z
+    .boolean()
+    .optional()
+    .describe("Detach concurrently (non-blocking)"),
+  finalize: z
+    .boolean()
+    .optional()
+    .describe(
+      "Complete an interrupted CONCURRENTLY detach. Only use after a prior CONCURRENTLY detach was interrupted.",
+    ),
+});
+
+// Preprocessed schema for handler parsing (with alias support)
 export const DetachPartitionSchema = z.preprocess(
   preprocessPartitionParams,
-  z.object({
-    parent: z
-      .string()
-      .describe("Parent table name (aliases: parentTable, table)"),
-    partition: z
-      .string()
-      .describe("Partition to detach (aliases: partitionTable, partitionName)"),
-    schema: z
-      .string()
-      .optional()
-      .describe("Schema name (auto-parsed from schema.table format)"),
-    concurrently: z
-      .boolean()
-      .optional()
-      .describe("Detach concurrently (non-blocking)"),
-    finalize: z
-      .boolean()
-      .optional()
-      .describe(
-        "Complete an interrupted CONCURRENTLY detach. Only use after a prior CONCURRENTLY detach was interrupted.",
-      ),
-  }),
+  DetachPartitionSchemaBase,
 );

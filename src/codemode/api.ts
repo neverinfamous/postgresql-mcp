@@ -1601,6 +1601,65 @@ export class PgApi {
       }
     }
 
+    // Add top-level PostGIS aliases for convenience: pg.postgisXxx() → pg.postgis.xxx()
+    const postgisApi = bindings["postgis"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (postgisApi !== undefined) {
+      // Extension
+      if (postgisApi["createExtension"] !== undefined) {
+        bindings["postgisCreateExtension"] = postgisApi["createExtension"];
+      }
+      // Geometry creation
+      if (postgisApi["geocode"] !== undefined) {
+        bindings["postgisGeocode"] = postgisApi["geocode"];
+      }
+      if (postgisApi["geometryColumn"] !== undefined) {
+        bindings["postgisGeometryColumn"] = postgisApi["geometryColumn"];
+      }
+      if (postgisApi["spatialIndex"] !== undefined) {
+        bindings["postgisSpatialIndex"] = postgisApi["spatialIndex"];
+      }
+      // Spatial queries
+      if (postgisApi["distance"] !== undefined) {
+        bindings["postgisDistance"] = postgisApi["distance"];
+      }
+      if (postgisApi["boundingBox"] !== undefined) {
+        bindings["postgisBoundingBox"] = postgisApi["boundingBox"];
+      }
+      if (postgisApi["intersection"] !== undefined) {
+        bindings["postgisIntersection"] = postgisApi["intersection"];
+      }
+      if (postgisApi["pointInPolygon"] !== undefined) {
+        bindings["postgisPointInPolygon"] = postgisApi["pointInPolygon"];
+      }
+      // Table operations
+      if (postgisApi["buffer"] !== undefined) {
+        bindings["postgisBuffer"] = postgisApi["buffer"];
+      }
+      if (postgisApi["geoTransform"] !== undefined) {
+        bindings["postgisGeoTransform"] = postgisApi["geoTransform"];
+      }
+      if (postgisApi["geoCluster"] !== undefined) {
+        bindings["postgisGeoCluster"] = postgisApi["geoCluster"];
+      }
+      // Standalone geometry operations
+      if (postgisApi["geometryBuffer"] !== undefined) {
+        bindings["postgisGeometryBuffer"] = postgisApi["geometryBuffer"];
+      }
+      if (postgisApi["geometryTransform"] !== undefined) {
+        bindings["postgisGeometryTransform"] = postgisApi["geometryTransform"];
+      }
+      if (postgisApi["geometryIntersection"] !== undefined) {
+        bindings["postgisGeometryIntersection"] =
+          postgisApi["geometryIntersection"];
+      }
+      // Administration
+      if (postgisApi["geoIndexOptimize"] !== undefined) {
+        bindings["postgisGeoIndexOptimize"] = postgisApi["geoIndexOptimize"];
+      }
+    }
+
     return bindings;
   }
 }

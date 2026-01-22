@@ -347,6 +347,34 @@ export const BufferSchema = z
 // =============================================================================
 // pg_intersection
 // =============================================================================
+
+/**
+ * Preprocess intersection params:
+ * - Handles postgis params (table/schema parsing)
+ * - Converts geometry objects to JSON strings (for GeoJSON object support)
+ */
+function preprocessIntersectionParams(input: unknown): unknown {
+  // First apply standard postgis preprocessing
+  const processed = preprocessPostgisParams(input);
+
+  if (typeof processed !== "object" || processed === null) {
+    return processed;
+  }
+
+  const result = { ...(processed as Record<string, unknown>) };
+
+  // Convert geometry object to JSON string if needed
+  if (
+    typeof result["geometry"] === "object" &&
+    result["geometry"] !== null &&
+    !Array.isArray(result["geometry"])
+  ) {
+    result["geometry"] = JSON.stringify(result["geometry"]);
+  }
+
+  return result;
+}
+
 export const IntersectionSchemaBase = z.object({
   table: z.string().optional().describe("Table name"),
   tableName: z.string().optional().describe("Alias for table"),
@@ -355,10 +383,10 @@ export const IntersectionSchemaBase = z.object({
   geom: z.string().optional().describe("Alias for column"),
   geometryColumn: z.string().optional().describe("Alias for column"),
   geometry: z
-    .string()
+    .union([z.string(), z.record(z.string(), z.unknown())])
     .optional()
     .describe(
-      'GeoJSON or WKT geometry to check intersection (e.g., "POINT(0 0)" or GeoJSON)',
+      'GeoJSON or WKT geometry to check intersection (e.g., "POINT(0 0)" or GeoJSON object)',
     ),
   srid: z
     .number()
@@ -370,15 +398,22 @@ export const IntersectionSchemaBase = z.object({
 });
 
 export const IntersectionSchema = z
-  .preprocess(preprocessPostgisParams, IntersectionSchemaBase)
-  .transform((data) => ({
-    table: data.table ?? data.tableName ?? "",
-    schema: data.schema,
-    column: data.column ?? data.geom ?? data.geometryColumn ?? "",
-    geometry: data.geometry ?? "",
-    srid: data.srid,
-    select: data.select,
-  }))
+  .preprocess(preprocessIntersectionParams, IntersectionSchemaBase)
+  .transform((data) => {
+    // Ensure geometry is a string (preprocessor should have converted objects)
+    const geometry =
+      typeof data.geometry === "object"
+        ? JSON.stringify(data.geometry)
+        : (data.geometry ?? "");
+    return {
+      table: data.table ?? data.tableName ?? "",
+      schema: data.schema,
+      column: data.column ?? data.geom ?? data.geometryColumn ?? "",
+      geometry,
+      srid: data.srid,
+      select: data.select,
+    };
+  })
   .refine((data) => data.table !== "", {
     message: "table (or tableName alias) is required",
   })
@@ -386,7 +421,8 @@ export const IntersectionSchema = z
     message: "column (or geom/geometryColumn alias) is required",
   })
   .refine((data) => data.geometry !== "", {
-    message: "geometry is required (WKT like 'POINT(0 0)' or GeoJSON string)",
+    message:
+      "geometry is required (WKT like 'POINT(0 0)' or GeoJSON string/object)",
   });
 
 // =============================================================================

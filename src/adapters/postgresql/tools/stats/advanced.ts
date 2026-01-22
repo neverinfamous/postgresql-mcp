@@ -1028,12 +1028,15 @@ export function createStatsSamplingTool(
         }
       } else {
         // TABLESAMPLE with percentage (approximate row count)
+        // Apply default limit to prevent large payloads
         const pct = percentage ?? 10;
+        const DEFAULT_TABLESAMPLE_LIMIT = 100;
         sql = `
                     SELECT ${columns}
                     FROM ${schemaPrefix}"${table}"
                     TABLESAMPLE ${samplingMethod.toUpperCase()}(${String(pct)})
                     ${whereClause}
+                    LIMIT ${String(DEFAULT_TABLESAMPLE_LIMIT + 1)}
                 `;
         // Add hint about system method unreliability for small tables
         const methodHint =
@@ -1044,13 +1047,29 @@ export function createStatsSamplingTool(
       }
 
       const result = await adapter.executeQuery(sql);
-      const rows = result.rows ?? [];
+      let rows = result.rows ?? [];
+
+      // Check if we need to truncate due to default limit for TABLESAMPLE methods
+      let truncated = false;
+      let totalSampled: number | undefined;
+      const DEFAULT_TABLESAMPLE_LIMIT = 100;
+      if (
+        sampleSize === undefined &&
+        samplingMethod !== "random" &&
+        rows.length > DEFAULT_TABLESAMPLE_LIMIT
+      ) {
+        totalSampled = rows.length;
+        rows = rows.slice(0, DEFAULT_TABLESAMPLE_LIMIT);
+        truncated = true;
+      }
 
       const response: {
         table: string;
         method: string;
         sampleSize: number;
         rows: unknown[];
+        truncated?: boolean;
+        totalSampled?: number;
         note?: string;
       } = {
         table: `${schema ?? "public"}.${table}`,
@@ -1058,6 +1077,12 @@ export function createStatsSamplingTool(
         sampleSize: rows.length,
         rows,
       };
+
+      // Add truncation indicators if applicable
+      if (truncated && totalSampled !== undefined) {
+        response.truncated = truncated;
+        response.totalSampled = totalSampled;
+      }
 
       if (note !== undefined) {
         response.note = note;

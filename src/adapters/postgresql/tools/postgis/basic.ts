@@ -159,7 +159,28 @@ export function createPointInPolygonTool(
       const isPolygonType =
         geomType?.toUpperCase()?.includes("POLYGON") ?? false;
 
-      const sql = `SELECT *, ST_AsText(${columnName}) as geometry_text
+      // Get non-geometry columns to avoid returning raw WKB
+      const colQuery = `
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = $1 AND table_name = $2 
+        AND udt_name NOT IN ('geometry', 'geography')
+        ORDER BY ordinal_position
+      `;
+      const colResult = await adapter.executeQuery(colQuery, [
+        schemaName,
+        table,
+      ]);
+      const nonGeomCols = (colResult.rows ?? [])
+        .map((row) => sanitizeIdentifier(String(row["column_name"])))
+        .join(", ");
+
+      // Select non-geometry columns + readable geometry representation
+      const selectCols =
+        nonGeomCols.length > 0
+          ? `${nonGeomCols}, ST_AsText(${columnName}) as geometry_text`
+          : `ST_AsText(${columnName}) as geometry_text`;
+
+      const sql = `SELECT ${selectCols}
                         FROM ${tableName}
                         WHERE ST_Contains(${columnName}, ST_SetSRID(ST_MakePoint($1, $2), 4326))`;
 
@@ -205,11 +226,30 @@ export function createDistanceTool(adapter: PostgresAdapter): ToolDefinition {
           ? `WHERE distance_meters <= ${String(maxDistance)}`
           : "";
 
+      // Get non-geometry columns to avoid returning raw WKB
+      const colQuery = `
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = $1 AND table_name = $2 
+        AND udt_name NOT IN ('geometry', 'geography')
+        ORDER BY ordinal_position
+      `;
+      const colResult = await adapter.executeQuery(colQuery, [
+        schemaName,
+        table,
+      ]);
+      const nonGeomCols = (colResult.rows ?? [])
+        .map((row) => sanitizeIdentifier(String(row["column_name"])))
+        .join(", ");
+
+      // Select non-geometry columns + readable geometry representation + distance
+      const selectCols =
+        nonGeomCols.length > 0
+          ? `${nonGeomCols}, ST_AsText(${columnName}) as geometry_text, ST_Distance(${columnName}::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) as distance_meters`
+          : `ST_AsText(${columnName}) as geometry_text, ST_Distance(${columnName}::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) as distance_meters`;
+
       // Use CTE for consistent distance calculation and filtering
       const sql = `WITH distances AS (
-                SELECT *, 
-                    ST_AsText(${columnName}) as geometry_text,
-                    ST_Distance(${columnName}::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) as distance_meters
+                SELECT ${selectCols}
                 FROM ${tableName}
             )
             SELECT * FROM distances
@@ -243,8 +283,28 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
       );
       const columnName = sanitizeIdentifier(parsed.column);
 
-      const sql = `SELECT *, ST_AsText(${columnName}) as geometry_text, ST_AsGeoJSON(ST_Buffer(${columnName}::geography, $1)::geometry) as buffer_geojson
-                        FROM ${qualifiedTable}${whereClause}`;
+      // Get non-geometry columns to avoid returning raw WKB
+      const colQuery = `
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = $1 AND table_name = $2 
+        AND udt_name NOT IN ('geometry', 'geography')
+        ORDER BY ordinal_position
+      `;
+      const colResult = await adapter.executeQuery(colQuery, [
+        schemaName,
+        parsed.table,
+      ]);
+      const nonGeomCols = (colResult.rows ?? [])
+        .map((row) => sanitizeIdentifier(String(row["column_name"])))
+        .join(", ");
+
+      // Select non-geometry columns + readable geometry representations
+      const selectCols =
+        nonGeomCols.length > 0
+          ? `${nonGeomCols}, ST_AsText(${columnName}) as geometry_text, ST_AsGeoJSON(ST_Buffer(${columnName}::geography, $1)::geometry) as buffer_geojson`
+          : `ST_AsText(${columnName}) as geometry_text, ST_AsGeoJSON(ST_Buffer(${columnName}::geography, $1)::geometry) as buffer_geojson`;
+
+      const sql = `SELECT ${selectCols} FROM ${qualifiedTable}${whereClause}`;
 
       const result = await adapter.executeQuery(sql, [parsed.distance]);
       return { results: result.rows };

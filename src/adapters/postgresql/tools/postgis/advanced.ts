@@ -172,6 +172,12 @@ export function createGeoIndexOptimizeTool(
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE n.nspname = $1
                     ${parsed.table !== undefined ? `AND c.relname = '${parsed.table}'` : ""}
+                    AND EXISTS (
+                        SELECT 1 FROM information_schema.columns ic
+                        WHERE ic.table_schema = n.nspname 
+                        AND ic.table_name = c.relname 
+                        AND ic.udt_name IN ('geometry', 'geography')
+                    )
                 `,
           [schemaName],
         ),

@@ -132,6 +132,15 @@ describe("PostGIS Tools", () => {
 
   describe("pg_point_in_polygon", () => {
     it("should find polygons containing a point", async () => {
+      // First mock: geometry type check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ geom_type: "POLYGON" }],
+      });
+      // Second mock: column query to get non-geometry columns
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }, { column_name: "name" }],
+      });
+      // Third mock: actual point in polygon query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ id: 1, name: "Zone A", geometry_text: "POLYGON(...)" }],
       });
@@ -154,6 +163,10 @@ describe("PostGIS Tools", () => {
     });
 
     it("should use schema parameter for non-public schemas", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ geom_type: "POLYGON" }],
+      });
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_point_in_polygon");
@@ -176,6 +189,11 @@ describe("PostGIS Tools", () => {
 
   describe("pg_distance", () => {
     it("should find nearby geometries", async () => {
+      // First mock: column query to get non-geometry columns
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }, { column_name: "name" }],
+      });
+      // Second mock: actual distance query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [
           { id: 1, name: "Store 1", distance_meters: 150 },
@@ -202,6 +220,9 @@ describe("PostGIS Tools", () => {
     });
 
     it("should use schema parameter for non-public schemas", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_distance");
@@ -222,6 +243,9 @@ describe("PostGIS Tools", () => {
     });
 
     it("should filter by max distance", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_distance");
@@ -242,6 +266,9 @@ describe("PostGIS Tools", () => {
     });
 
     it("should use CTE for consistent distance filtering", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_distance");
@@ -268,6 +295,9 @@ describe("PostGIS Tools", () => {
     });
 
     it("should accept geom as alias for column", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_distance");
@@ -287,6 +317,9 @@ describe("PostGIS Tools", () => {
     });
 
     it("should accept geometry as alias for column", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_distance");
@@ -308,6 +341,11 @@ describe("PostGIS Tools", () => {
 
   describe("pg_buffer", () => {
     it("should create buffer zones", async () => {
+      // First mock: column query to get non-geometry columns
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }],
+      });
+      // Second mock: actual buffer query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ id: 1, buffer_geojson: '{"type":"Polygon",...}' }],
       });
@@ -330,6 +368,9 @@ describe("PostGIS Tools", () => {
     });
 
     it("should apply where clause", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_buffer");

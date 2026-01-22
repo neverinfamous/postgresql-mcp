@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **pg_geometry_column schema.table format support** — `pg_geometry_column` now supports `schema.table` format (e.g., `'myschema.locations'` → auto-parsed to schema='myschema', table='locations'). Previously, passing `schema.table` format caused "Table does not exist in schema public" errors because the schema wasn't being extracted from the table name. Consistent with other PostGIS tools like `pg_spatial_index`, `pg_distance`, `pg_buffer`, etc.
+- **pg_geo_cluster numeric type normalization** — `pg_geo_cluster` now returns `summary.num_clusters`, `summary.noise_points`, `summary.total_points` and `clusters[].point_count` as JavaScript numbers instead of strings. Consistent with other tools' numeric response handling
+
+### Performance
+
+- **pg_buffer default simplify** — `pg_buffer` now applies a default simplification tolerance of 10 meters to reduce polygon point count in GeoJSON output. Reduces payload size by ~50-70% for typical buffer geometries without noticeable precision loss. Set `simplify: 0` to disable simplification, or use higher values (e.g., `simplify: 100`) for more aggressive reduction. Returns `{simplified: true, simplifyTolerance: 10}` in response when applied
+
 - **pg_dump_table limit parameter support** — `pg_dump_table` (`dumpTable()`) now respects the `limit` parameter when `includeData: true` is specified. Previously, the `limit` parameter was completely ignored and all rows were returned (up to hardcoded 1000). Now applies a default limit of 500 rows to prevent large payloads. Use `limit: 0` for all rows, or specify a custom limit (e.g., `limit: 50`). This is consistent with `pg_copy_export` payload optimization behavior
 - **pg_copy_export truncated flag consistency** — `pg_copy_export` (`copyExport()`) now returns `truncated: true` and `limit: N` whenever any limit (default or explicit) causes truncation, not just when the default limit is applied. This provides consistent feedback to LLMs about whether the result set was limited. Previously, explicit limits (e.g., `limit: 100`) did not include truncation metadata even when the data was actually cut off
 - **pg_cluster response consistency** — `pg_cluster` with table+index now returns a `message` field (e.g., `"Clustered users using index idx_users_email"`) for consistency with the no-args version which returns `"Re-clustered all previously-clustered tables"`. Previously, table-specific cluster returned only `{success, table, index}` without a message

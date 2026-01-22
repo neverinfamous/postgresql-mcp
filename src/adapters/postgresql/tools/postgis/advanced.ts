@@ -365,7 +365,7 @@ export function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
                 ${limitClause}
             `;
 
-      const [clusters, summary] = await Promise.all([
+      const [clustersResult, summaryResult] = await Promise.all([
         adapter.executeQuery(sql),
         adapter.executeQuery(`
                     WITH clustered AS (
@@ -381,6 +381,20 @@ export function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
                 `),
       ]);
 
+      // Normalize cluster point_count to numbers
+      const normalizedClusters = (clustersResult.rows ?? []).map((row) => ({
+        ...row,
+        point_count: Number(row["point_count"]),
+      }));
+
+      // Normalize summary values to numbers for consistency
+      const rawSummary = summaryResult.rows?.[0] ?? {};
+      const normalizedSummary = {
+        num_clusters: Number(rawSummary["num_clusters"] ?? 0),
+        noise_points: Number(rawSummary["noise_points"] ?? 0),
+        total_points: Number(rawSummary["total_points"] ?? 0),
+      };
+
       // Build response
       const response: Record<string, unknown> = {
         method,
@@ -388,8 +402,8 @@ export function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
           method === "kmeans"
             ? { numClusters: effectiveNumClusters }
             : { eps: parsed.eps ?? 100, minPoints: parsed.minPoints ?? 3 },
-        summary: summary.rows?.[0],
-        clusters: clusters.rows,
+        summary: normalizedSummary,
+        clusters: normalizedClusters,
       };
 
       // Add warning if K was clamped
@@ -400,9 +414,9 @@ export function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       // Add contextual hints based on method and results
-      const numClusters = Number(summary.rows?.[0]?.["num_clusters"] ?? 0);
-      const noisePoints = Number(summary.rows?.[0]?.["noise_points"] ?? 0);
-      const totalPoints = Number(summary.rows?.[0]?.["total_points"] ?? 0);
+      const numClusters = normalizedSummary.num_clusters;
+      const noisePoints = normalizedSummary.noise_points;
+      const totalPoints = normalizedSummary.total_points;
 
       if (method === "dbscan") {
         const eps = parsed.eps ?? 100;

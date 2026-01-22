@@ -267,7 +267,7 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
   return {
     name: "pg_buffer",
     description:
-      "Create a buffer zone around geometries. Default limit: 50 rows. Use simplify parameter to reduce polygon point count for large payloads.",
+      "Create a buffer zone around geometries. Default limit: 50 rows, default simplify: 10m (set simplify: 0 to disable). Simplification reduces polygon point count for LLM-friendly payloads.",
     group: "postgis",
     inputSchema: BufferSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Buffer Zone"),
@@ -302,11 +302,15 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
         .map((row) => sanitizeIdentifier(String(row["column_name"])))
         .join(", ");
 
-      // Build buffer expression with optional simplification
+      // Default simplify of 10m reduces polygon points for LLM-friendly payloads
+      // User can set simplify: 0 to disable or higher values for more aggressive reduction
+      const effectiveSimplify = parsed.simplify ?? 10;
+
+      // Build buffer expression with simplification (applied by default)
       let bufferExpr = `ST_Buffer(${columnName}::geography, $1)::geometry`;
-      if (parsed.simplify !== undefined) {
+      if (effectiveSimplify > 0) {
         // SimplifyPreserveTopology maintains valid geometries
-        bufferExpr = `ST_SimplifyPreserveTopology(${bufferExpr}, ${String(parsed.simplify)})`;
+        bufferExpr = `ST_SimplifyPreserveTopology(${bufferExpr}, ${String(effectiveSimplify)})`;
       }
 
       // Select non-geometry columns + readable geometry representations
@@ -337,10 +341,10 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
         }
       }
 
-      // Add simplify indicator if used
-      if (parsed.simplify !== undefined) {
+      // Add simplify indicator if simplification was applied
+      if (effectiveSimplify > 0) {
         response["simplified"] = true;
-        response["simplifyTolerance"] = parsed.simplify;
+        response["simplifyTolerance"] = effectiveSimplify;
       }
 
       return response;

@@ -153,16 +153,16 @@ export const GeometryColumnSchemaBase = z.object({
     ),
 });
 
-export const GeometryColumnSchema = GeometryColumnSchemaBase.transform(
-  (data) => ({
+export const GeometryColumnSchema = z
+  .preprocess(preprocessPostgisParams, GeometryColumnSchemaBase)
+  .transform((data) => ({
     table: data.table ?? data.tableName ?? "",
     column: data.column ?? data.geom ?? data.geometryColumn ?? "",
     srid: data.srid,
     type: data.type,
     schema: data.schema,
     ifNotExists: data.ifNotExists,
-  }),
-)
+  }))
   .refine((data) => data.table !== "", {
     message: "table (or tableName alias) is required",
   })
@@ -321,7 +321,7 @@ export const BufferSchemaBase = z.object({
     .number()
     .optional()
     .describe(
-      "Simplification tolerance in meters to reduce polygon point count. Higher values = fewer points. Default: no simplification",
+      "Simplification tolerance in meters (default: 10). Higher values = fewer points. Set to 0 to disable.",
     ),
   limit: z
     .number()

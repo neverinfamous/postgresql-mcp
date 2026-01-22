@@ -311,8 +311,9 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
     "pg.stats.timeSeries({ table: 'metrics', timeColumn: 'ts', valueColumn: 'value', interval: '1 hour' })",
   ],
   cron: [
-    "pg.cron.schedule({ name: 'cleanup', schedule: '0 3 * * *', command: 'DELETE FROM logs WHERE created_at < NOW() - INTERVAL 30 day' })",
+    "pg.cron.schedule({ name: 'cleanup', schedule: '0 3 * * *', command: \"DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'\" })",
     "pg.cron.listJobs()",
+    "pg.cron.listJobs({ limit: 0 })", // Get all jobs
     "pg.cron.unschedule({ jobId: 1 })",
   ],
   partman: [

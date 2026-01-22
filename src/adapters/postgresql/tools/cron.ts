@@ -284,12 +284,16 @@ or active status. Only specify the parameters you want to change.`,
 function createCronListJobsTool(adapter: PostgresAdapter): ToolDefinition {
   const ListJobsSchema = z.object({
     active: z.boolean().optional().describe("Filter by active status"),
+    limit: z
+      .number()
+      .optional()
+      .describe("Maximum jobs to return (default: 50, use 0 for all)"),
   });
 
   return {
     name: "pg_cron_list_jobs",
     description:
-      "List all scheduled cron jobs. Shows job ID, name, schedule, command, and status. Jobs without names (jobname: null) must be referenced by jobId.",
+      "List all scheduled cron jobs. Shows job ID, name, schedule, command, and status. Jobs without names (jobname: null) must be referenced by jobId. Default limit: 50 rows.",
     group: "cron",
     inputSchema: ListJobsSchema,
     annotations: readOnly("List Cron Jobs"),
@@ -319,6 +323,25 @@ function createCronListJobsTool(adapter: PostgresAdapter): ToolDefinition {
 
       sql += " ORDER BY jobid";
 
+      // Get total count first if we're limiting
+      const limitVal = parsed.limit === 0 ? null : (parsed.limit ?? 50);
+      let totalCount: number | undefined;
+
+      if (limitVal !== null) {
+        let countSql = "SELECT COUNT(*)::int as total FROM cron.job";
+        if (parsed.active !== undefined) {
+          countSql += " WHERE active = $1";
+        }
+        const countResult = await adapter.executeQuery(
+          countSql,
+          parsed.active !== undefined ? [parsed.active] : [],
+        );
+        totalCount = (countResult.rows?.[0] as { total: number } | undefined)
+          ?.total;
+
+        sql += ` LIMIT ${String(limitVal)}`;
+      }
+
       const result = await adapter.executeQuery(sql, queryParams);
 
       // Normalize jobid to number (PostgreSQL BIGINT may return as string)
@@ -335,9 +358,16 @@ function createCronListJobsTool(adapter: PostgresAdapter): ToolDefinition {
         (j) => (j as Record<string, unknown>)["jobname"] === null,
       ).length;
 
+      // Determine if results were truncated
+      const truncated =
+        limitVal !== null &&
+        totalCount !== undefined &&
+        jobs.length < totalCount;
+
       return {
         jobs,
         count: jobs.length,
+        ...(truncated ? { truncated: true, totalCount } : {}),
         hint:
           unnamedCount > 0
             ? `${String(unnamedCount)} job(s) have no name. Use jobId to reference them with alterJob or unschedule.`
@@ -381,6 +411,12 @@ Useful for monitoring and debugging scheduled jobs.`,
 
       const limitVal = limit ?? 100;
 
+      // Get total count for truncation indicator
+      const countSql = `SELECT COUNT(*)::int as total FROM cron.job_run_details ${whereClause}`;
+      const countResult = await adapter.executeQuery(countSql, queryParams);
+      const totalCount =
+        (countResult.rows?.[0] as { total: number } | undefined)?.total ?? 0;
+
       const sql = `
                 SELECT 
                     runid,
@@ -423,9 +459,13 @@ Useful for monitoring and debugging scheduled jobs.`,
         (r: Record<string, unknown>) => r["status"] === "running",
       ).length;
 
+      // Determine if results were truncated
+      const truncated = rows.length < totalCount;
+
       return {
         runs: rows,
         count: rows.length,
+        ...(truncated ? { truncated: true, totalCount } : {}),
         summary: {
           succeeded,
           failed,

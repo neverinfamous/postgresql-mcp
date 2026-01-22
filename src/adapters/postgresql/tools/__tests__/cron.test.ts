@@ -329,6 +329,11 @@ describe("pg_cron_list_jobs", () => {
   });
 
   it("should list all jobs", async () => {
+    // Mock COUNT query first (for pagination)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total: 2 }],
+    });
+    // Mock main query
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
         {
@@ -347,7 +352,8 @@ describe("pg_cron_list_jobs", () => {
       count: number;
     };
 
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+    expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+      2,
       expect.stringContaining("FROM cron.job"),
       [],
     );
@@ -355,12 +361,18 @@ describe("pg_cron_list_jobs", () => {
   });
 
   it("should filter by active status", async () => {
+    // Mock COUNT query first (for pagination)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total: 0 }],
+    });
+    // Mock main query
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_cron_list_jobs")!;
     await tool.handler({ active: true }, mockContext);
 
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+    expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+      2,
       expect.stringContaining("WHERE active = $1"),
       [true],
     );
@@ -380,6 +392,11 @@ describe("pg_cron_job_run_details", () => {
   });
 
   it("should get job run details", async () => {
+    // Mock COUNT query first (for truncation indicator)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total: 3 }],
+    });
+    // Mock main query
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
         {
@@ -410,7 +427,8 @@ describe("pg_cron_job_run_details", () => {
       summary: { succeeded: number; failed: number; running: number };
     };
 
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+    expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+      2,
       expect.stringContaining("FROM cron.job_run_details"),
       [],
     );
@@ -420,24 +438,36 @@ describe("pg_cron_job_run_details", () => {
   });
 
   it("should filter by job ID", async () => {
+    // Mock COUNT query first (for truncation indicator)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total: 0 }],
+    });
+    // Mock main query
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_cron_job_run_details")!;
     await tool.handler({ jobId: 5 }, mockContext);
 
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+    expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+      2,
       expect.stringContaining("jobid = $1"),
       [5],
     );
   });
 
   it("should filter by status", async () => {
+    // Mock COUNT query first (for truncation indicator)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total: 0 }],
+    });
+    // Mock main query
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_cron_job_run_details")!;
     await tool.handler({ status: "failed" }, mockContext);
 
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+    expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+      2,
       expect.stringContaining("status = $"),
       ["failed"],
     );
@@ -633,6 +663,11 @@ describe("pg_cron string jobId coercion", () => {
   });
 
   it("should accept string jobId in pg_cron_job_run_details", async () => {
+    // Mock COUNT query first (for truncation indicator)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total: 1 }],
+    });
+    // Mock main query
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ runid: "101", jobid: "5", status: "succeeded" }],
     });
@@ -645,7 +680,8 @@ describe("pg_cron string jobId coercion", () => {
       mockContext,
     )) as { runs: Array<{ runid: number; jobid: number }>; count: number };
 
-    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+    expect(mockAdapter.executeQuery).toHaveBeenNthCalledWith(
+      2,
       expect.stringContaining("jobid = $1"),
       [5], // Coerced to number
     );
@@ -656,6 +692,11 @@ describe("pg_cron string jobId coercion", () => {
   });
 
   it("should normalize list_jobs output to numbers", async () => {
+    // Mock COUNT query first (for pagination)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total: 2 }],
+    });
+    // Mock main query
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
         { jobid: "1", jobname: "test", schedule: "* * * * *", active: true },

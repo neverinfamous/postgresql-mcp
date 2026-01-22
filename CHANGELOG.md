@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg.cronXxx() top-level aliases** — Code mode now supports top-level cron method aliases for convenience: `pg.cronCreateExtension()`, `pg.cronSchedule()`, `pg.cronScheduleInDatabase()`, `pg.cronUnschedule()`, `pg.cronAlterJob()`, `pg.cronListJobs()`, `pg.cronJobRunDetails()`, `pg.cronCleanupHistory()`. These map directly to `pg.cron.xxx()` methods, matching the aliases documented in `pg.cron.help()`
 - **pg_cron interval schedule validation** — `pg_cron_schedule`, `pg_cron_schedule_in_database`, and `pg_cron_alter_job` now validate interval schedules client-side. pg_cron only supports intervals from 1-59 seconds; for 60+ seconds, standard cron syntax must be used. Error message now explains the limitation and suggests cron syntax alternatives (e.g., `* * * * *` for every minute). Previously, invalid intervals like `60 seconds` or `1 minute` produced cryptic PostgreSQL errors
 
+### Performance
+
+- **pg_cron_list_jobs default limit** — `pg_cron_list_jobs` now applies a default limit of 50 jobs when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all jobs. Prevents large payloads in environments with many scheduled jobs
+- **pg_cron_job_run_details truncation indicators** — `pg_cron_job_run_details` now returns `truncated: boolean` and `totalCount: number` in the response when the default limit (100) causes truncation. Helps LLMs understand when execution history has been limited and how much data is available
+
+
 ### Fixed
 
 - **pg_geometry_column schema.table format support** — `pg_geometry_column` now supports `schema.table` format (e.g., `'myschema.locations'` → auto-parsed to schema='myschema', table='locations'). Previously, passing `schema.table` format caused "Table does not exist in schema public" errors because the schema wasn't being extracted from the table name. Consistent with other PostGIS tools like `pg_spatial_index`, `pg_distance`, `pg_buffer`, etc.

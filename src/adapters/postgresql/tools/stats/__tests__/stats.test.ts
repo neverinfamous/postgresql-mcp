@@ -1922,7 +1922,7 @@ describe("pg_stats_sampling additional branches", () => {
     );
 
     expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
-      expect.stringContaining("LIMIT 100"), // default sampleSize
+      expect.stringContaining("LIMIT 20"), // default sampleSize (optimized for LLM context)
     );
   });
 });

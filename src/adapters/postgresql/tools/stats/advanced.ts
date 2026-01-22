@@ -1014,8 +1014,8 @@ export function createStatsSamplingTool(
           note = `Using ORDER BY RANDOM() LIMIT for exact ${String(sampleSize)} row count. TABLESAMPLE ${samplingMethod.toUpperCase()} is percentage-based and cannot guarantee exact counts.`;
         }
       } else if (samplingMethod === "random") {
-        // Default random sampling with default limit
-        const limit = 100;
+        // Default random sampling with default limit (20 to reduce LLM context usage)
+        const limit = 20;
         sql = `
                     SELECT ${columns}
                     FROM ${schemaPrefix}"${table}"
@@ -1035,7 +1035,12 @@ export function createStatsSamplingTool(
                     TABLESAMPLE ${samplingMethod.toUpperCase()}(${String(pct)})
                     ${whereClause}
                 `;
-        note = `TABLESAMPLE ${samplingMethod.toUpperCase()}(${String(pct)}%) returns approximately ${String(pct)}% of rows. Actual count varies based on table size and sampling algorithm.`;
+        // Add hint about system method unreliability for small tables
+        const methodHint =
+          samplingMethod === "system"
+            ? " Consider using 'bernoulli' or 'random' method for more reliable results on small tables."
+            : "";
+        note = `TABLESAMPLE ${samplingMethod.toUpperCase()}(${String(pct)}%) returns approximately ${String(pct)}% of rows. Actual count varies based on table size and sampling algorithm.${methodHint}`;
       }
 
       const result = await adapter.executeQuery(sql);

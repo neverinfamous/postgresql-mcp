@@ -68,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_list_partitions default limit** — `pg_list_partitions` now applies a default limit of 50 partitions when no `limit` parameter is specified. Returns `{truncated: true, totalCount}` metadata when results are limited. Use `limit: 0` for all partitions. Prevents large payloads for heavily-partitioned tables
 - **pg_list_partitions bounds field consistency** — `pg_list_partitions` now uses the `bounds` field name instead of `partition_bounds`, consistent with `pg_partition_info`. Provides uniform field naming across partitioning tools
 - **pg_list_partitions truncated field** — `pg_list_partitions` now always includes the `truncated` field in the response (set to `true` or `false`) for consistent response structure, matching the pattern used by other list tools
+- **pg_stats_sampling default limit** — `pg_stats_sampling` now applies a default limit of 20 rows when no `sampleSize` parameter is specified (reduced from 100). Optimized for LLM context usage. Use `sampleSize: 100` or higher for larger samples
+- **pg_stats_sampling system method hint** — `pg_stats_sampling` with `method: 'system'` now includes an inline hint in the response: "Consider using 'bernoulli' or 'random' method for more reliable results on small tables." Helps users understand why 0 rows may be returned
 
 ### Added
 

@@ -511,11 +511,19 @@ Example: undoPartition({ parentTable: "public.events", targetTable: "public.even
       const sql = `CALL ${partmanSchema}.undo_partition_proc(${args.join(", ")})`;
       await adapter.executeQuery(sql);
 
+      // Note: pg_partman's undo_partition detaches child partitions but leaves them as standalone tables
+      // This allows data recovery if needed, but users should clean up manually
+      const keepTableValue = keepTable ?? true;
+
       return {
         success: true,
-        parentTable,
-        targetTable,
-        message: `Partition set removed for ${parentTable}. Data consolidated.`,
+        parentTable: validatedParentTable,
+        targetTable: validatedTargetTable,
+        message: `Partition set removed for ${validatedParentTable}. Data consolidated to ${validatedTargetTable}.`,
+        note: keepTableValue
+          ? "Child partitions were detached and now exist as standalone tables. " +
+            "To clean up, drop them manually: DROP TABLE <partition_name>;"
+          : undefined,
       };
     },
   };

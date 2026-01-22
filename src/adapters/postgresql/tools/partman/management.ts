@@ -287,11 +287,16 @@ Maintains all partition sets if no specific parent table is specified.`,
             message: `Maintenance completed for ${parentTable}`,
           };
         } catch (e) {
-          const errorMsg = e instanceof Error ? e.message : String(e);
+          // Extract clean error message (first line only, remove PL/pgSQL context)
+          let errorMsg = e instanceof Error ? e.message : String(e);
+          const fullError = errorMsg;
+          errorMsg = errorMsg.split("\n")[0] ?? errorMsg;
+          errorMsg = errorMsg.replace(/\s+CONTEXT:.*$/i, "").trim();
+
           // Catch pg_partman internal errors about NULL child tables
           if (
-            errorMsg.includes("Child table given does not exist") ||
-            errorMsg.includes("<NULL>")
+            fullError.includes("Child table given does not exist") ||
+            fullError.includes("<NULL>")
           ) {
             return {
               success: false,
@@ -302,7 +307,16 @@ Maintains all partition sets if no specific parent table is specified.`,
                 "Insert data first, then run maintenance, or specify a valid startPartition when creating the parent.",
             };
           }
-          throw e; // Re-throw other errors
+
+          // Return clean error response instead of throwing with stack trace
+          return {
+            success: false,
+            parentTable,
+            error: errorMsg,
+            hint:
+              "Check that the parent table exists, is properly partitioned, and has valid pg_partman configuration. " +
+              "Use pg_partman_show_config to verify configuration.",
+          };
         }
       }
 

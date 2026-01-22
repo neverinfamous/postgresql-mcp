@@ -35,7 +35,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $SqlFile = Join-Path $ScriptDir "test-database.sql"
 
 # Colors for output
-function Write-Step { param($Step, $Message) Write-Host "`n[$Step/6] " -ForegroundColor Cyan -NoNewline; Write-Host $Message -ForegroundColor White }
+function Write-Step { param($Step, $Message) Write-Host "`n[$Step/7] " -ForegroundColor Cyan -NoNewline; Write-Host $Message -ForegroundColor White }
 function Write-Success { param($Message) Write-Host "  ✓ " -ForegroundColor Green -NoNewline; Write-Host $Message }
 function Write-Info { param($Message) Write-Host "  → " -ForegroundColor DarkGray -NoNewline; Write-Host $Message -ForegroundColor DarkGray }
 function Write-Error { param($Message) Write-Host "  ✗ " -ForegroundColor Red -NoNewline; Write-Host $Message -ForegroundColor Red }
@@ -95,11 +95,40 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # ============================================================================
-# Step 3: Drop test_* tables
+# Step 3: Clean up pg_partman configurations
 # ============================================================================
-Write-Step "3" "Dropping test_* tables..."
+Write-Step "3" "Cleaning up pg_partman configurations..."
 
 $sql3 = @"
+DO `$`$
+BEGIN
+    -- Delete partman configs for test_* tables (prevents orphaned configs)
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'part_config' AND schemaname IN ('public', 'partman')) THEN
+        DELETE FROM public.part_config WHERE parent_table LIKE 'public.test_%';
+        DELETE FROM public.part_config WHERE parent_table LIKE 'public.temp_%';
+    END IF;
+    
+    -- Drop template tables created by partman for test tables
+    FOR r IN SELECT schemaname, tablename FROM pg_tables 
+             WHERE tablename LIKE 'template_public_test_%' AND schemaname = 'public'
+    LOOP
+        EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.schemaname) || '.' || quote_ident(r.tablename) || ' CASCADE';
+    END LOOP;
+END`$`$;
+"@
+$result = docker exec postgres-server psql -U postgres -d postgres -c $sql3 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Success "Cleaned up pg_partman configurations and template tables"
+} else {
+    Write-Info "pg_partman cleanup skipped (extension may not be installed)"
+}
+
+# ============================================================================
+# Step 4: Drop test_* tables
+# ============================================================================
+Write-Step "4" "Dropping test_* tables..."
+
+$sql4 = @"
 DO `$`$
 DECLARE r RECORD;
 BEGIN
@@ -110,7 +139,7 @@ BEGIN
     END LOOP;
 END`$`$;
 "@
-$result = docker exec postgres-server psql -U postgres -d postgres -c $sql3 2>&1
+$result = docker exec postgres-server psql -U postgres -d postgres -c $sql4 2>&1
 if ($LASTEXITCODE -eq 0) {
     Write-Success "Dropped all test_* tables"
 } else {
@@ -118,11 +147,11 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # ============================================================================
-# Step 4: Drop ai_test_* tables
+# Step 5: Drop ai_test_* tables
 # ============================================================================
-Write-Step "4" "Dropping ai_test_* tables..."
+Write-Step "5" "Dropping ai_test_* tables..."
 
-$sql4 = @"
+$sql5 = @"
 DO `$`$
 DECLARE r RECORD;
 BEGIN
@@ -133,7 +162,7 @@ BEGIN
     END LOOP;
 END`$`$;
 "@
-$result = docker exec postgres-server psql -U postgres -d postgres -c $sql4 2>&1
+$result = docker exec postgres-server psql -U postgres -d postgres -c $sql5 2>&1
 if ($LASTEXITCODE -eq 0) {
     Write-Success "Dropped all ai_test_* tables"
 } else {
@@ -141,12 +170,12 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # ============================================================================
-# Step 5: Drop other accumulated artifacts
+# Step 6: Drop other accumulated artifacts
 # ============================================================================
-Write-Step "5" "Dropping other accumulated artifacts..."
+Write-Step "6" "Dropping other accumulated artifacts..."
 Write-Info "partman_*, prompt_*, mcp_*, orders_*, ltree_*, fts_*, spatial_places*, jsonb_*, notebook_*, empty_*, batch_*, etc."
 
-$sql5 = @"
+$sql6 = @"
 DO `$`$
 DECLARE r RECORD;
 BEGIN
@@ -172,7 +201,7 @@ BEGIN
     END LOOP;
 END`$`$;
 "@
-$result = docker exec postgres-server psql -U postgres -d postgres -c $sql5 2>&1
+$result = docker exec postgres-server psql -U postgres -d postgres -c $sql6 2>&1
 if ($LASTEXITCODE -eq 0) {
     Write-Success "Dropped all accumulated artifact tables"
 } else {
@@ -180,9 +209,9 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # ============================================================================
-# Step 6: Re-seed the database
+# Step 7: Re-seed the database
 # ============================================================================
-Write-Step "6" "Re-seeding the database..."
+Write-Step "7" "Re-seeding the database..."
 
 # Copy SQL file to container
 $copyResult = docker cp $SqlFile postgres-server:/tmp/test-database.sql 2>&1

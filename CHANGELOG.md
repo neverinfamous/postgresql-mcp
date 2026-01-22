@@ -60,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_list_views definition truncation** — `pg_list_views` now truncates view definitions to 500 characters by default (reduced from 1000), further reducing payload size for databases with complex system views (e.g., PostGIS). Returns `{definitionTruncated: true}` per view and `{truncatedDefinitions: N}` in response. Use `truncateDefinition: 0` for full definitions
 - **pg_list_views default limit** — `pg_list_views` now applies a default limit of 50 views when no `limit` parameter is specified. Returns `{truncated: true, note}` metadata when results are limited. Use `limit: 0` for all views. Prevents large payloads in databases with many system and extension views
 - **pg_list_views truncated field consistency** — `pg_list_views` now always includes the `truncated` field in the response (set to `true` or `false`) for consistent response structure. Previously, the field was only included when `truncated: true`, which required callers to check for field existence
+- **pg_list_partitions default limit** — `pg_list_partitions` now applies a default limit of 50 partitions when no `limit` parameter is specified. Returns `{truncated: true, totalCount}` metadata when results are limited. Use `limit: 0` for all partitions. Prevents large payloads for heavily-partitioned tables
+- **pg_list_partitions bounds field consistency** — `pg_list_partitions` now uses the `bounds` field name instead of `partition_bounds`, consistent with `pg_partition_info`. Provides uniform field naming across partitioning tools
+- **pg_list_partitions truncated field** — `pg_list_partitions` now always includes the `truncated` field in the response (set to `true` or `false`) for consistent response structure, matching the pattern used by other list tools
 
 ### Added
 

@@ -99,6 +99,7 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: z.object({
       table: z.string(),
       schema: z.string().optional(),
+      limit: z.number().optional(),
     }),
     annotations: readOnly("List Partitions"),
     icons: getToolIcons("partitioning", readOnly("List Partitions")),
@@ -109,6 +110,7 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
         parentTable?: string;
         name?: string;
         schema?: string;
+        limit?: number;
       };
 
       // Resolve table name from aliases
@@ -134,6 +136,7 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
         return {
           partitions: [],
           count: 0,
+          truncated: false,
           warning: `Table '${schemaName}.${resolvedTable}' does not exist.`,
         };
       }
@@ -141,13 +144,18 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
         return {
           partitions: [],
           count: 0,
+          truncated: false,
           warning: `Table '${schemaName}.${resolvedTable}' exists but is not partitioned. Use pg_create_partitioned_table to create a partitioned table.`,
         };
       }
 
-      const sql = `SELECT 
+      // Resolve limit: default 50, 0 = no limit
+      const limit = parsed.limit ?? 50;
+
+      // Build query with optional limit
+      let sql = `SELECT 
                         c.relname as partition_name,
-                        pg_get_expr(c.relpartbound, c.oid) as partition_bounds,
+                        pg_get_expr(c.relpartbound, c.oid) as bounds,
                         pg_table_size(c.oid) as size_bytes,
                         (SELECT relname FROM pg_class WHERE oid = i.inhparent) as parent_table
                         FROM pg_class c
@@ -156,13 +164,21 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
                         WHERE i.inhparent = ($1 || '.' || $2)::regclass
                         ORDER BY c.relname`;
 
+      if (limit > 0) {
+        sql += ` LIMIT ${String(limit + 1)}`; // Fetch one extra to detect truncation
+      }
+
       const result = await adapter.executeQuery(sql, [
         schemaName,
         resolvedTable,
       ]);
 
+      const allRows = result.rows ?? [];
+      const truncated = limit > 0 && allRows.length > limit;
+      const rowsToReturn = truncated ? allRows.slice(0, limit) : allRows;
+
       // Format sizes consistently and coerce size_bytes to number
-      const partitions = (result.rows ?? []).map((row) => {
+      const partitions = rowsToReturn.map((row) => {
         const sizeBytes = Number(row["size_bytes"] ?? 0);
         return {
           ...row,
@@ -171,7 +187,26 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
         };
       });
 
-      return { partitions, count: partitions.length };
+      // Build response with truncation indicators
+      const response: Record<string, unknown> = {
+        partitions,
+        count: partitions.length,
+        truncated,
+      };
+
+      if (truncated) {
+        // Get total count when truncated
+        const countSql = `SELECT COUNT(*) as total FROM pg_inherits WHERE inhparent = ($1 || '.' || $2)::regclass`;
+        const countResult = await adapter.executeQuery(countSql, [
+          schemaName,
+          resolvedTable,
+        ]);
+        response["totalCount"] = Number(
+          countResult.rows?.[0]?.["total"] ?? partitions.length,
+        );
+      }
+
+      return response;
     },
   };
 }

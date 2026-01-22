@@ -66,7 +66,7 @@ describe("pg_list_partitions", () => {
       rows: [
         {
           partition_name: "events_2023",
-          partition_bounds: "FOR VALUES FROM ('2023-01-01') TO ('2024-01-01')",
+          bounds: "FOR VALUES FROM ('2023-01-01') TO ('2024-01-01')",
           size_bytes: 104857600,
         },
       ],
@@ -133,6 +133,7 @@ describe("pg_list_partitions", () => {
     )) as {
       partitions: unknown[];
       count: number;
+      truncated: boolean;
       warning: string;
     };
 
@@ -140,6 +141,7 @@ describe("pg_list_partitions", () => {
     expect(result.partitions).toHaveLength(0);
     expect(result.warning).toContain("exists but is not partitioned");
     expect(result.warning).toContain("regular_table");
+    expect(result.truncated).toBe(false);
     expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(1);
   });
 
@@ -156,6 +158,7 @@ describe("pg_list_partitions", () => {
     )) as {
       partitions: unknown[];
       count: number;
+      truncated: boolean;
       warning: string;
     };
 
@@ -163,7 +166,62 @@ describe("pg_list_partitions", () => {
     expect(result.partitions).toHaveLength(0);
     expect(result.warning).toContain("does not exist");
     expect(result.warning).toContain("nonexistent_table");
+    expect(result.truncated).toBe(false);
     expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("should include truncated: false for successful responses", async () => {
+    // First call: checkTablePartitionStatus - partitioned table
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: partition listing
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          partition_name: "events_2023",
+          bounds: "FOR VALUES FROM ('2023-01-01') TO ('2024-01-01')",
+          size_bytes: 8192,
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_list_partitions")!;
+    const result = (await tool.handler(
+      {
+        table: "events",
+      },
+      mockContext,
+    )) as {
+      partitions: unknown[];
+      count: number;
+      truncated: boolean;
+    };
+
+    expect(result.count).toBe(1);
+    expect(result.truncated).toBe(false);
+  });
+
+  it("should respect limit parameter", async () => {
+    // First call: checkTablePartitionStatus - partitioned table
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: partition listing
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_partitions")!;
+    await tool.handler(
+      {
+        table: "events",
+        limit: 10,
+      },
+      mockContext,
+    );
+
+    // Should use LIMIT 11 (limit + 1) to detect truncation
+    const call = mockAdapter.executeQuery.mock.calls[1][0] as string;
+    expect(call).toContain("LIMIT 11");
   });
 });
 

@@ -312,8 +312,8 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 - \`pg_geo_cluster\`: Spatial clustering (DBSCAN/K-Means). K-Means: If \`numClusters\` exceeds row count, automatically clamps to available rows with \`warning\` field. DBSCAN: Returns contextual \`hints\` array explaining parameter effects (e.g., "All points formed single cluster—decrease eps") and \`parameterGuide\` explaining eps/minPoints trade-offs
 
 **Geometry Operations (Standalone WKT/GeoJSON):**
-- \`pg_geometry_buffer\`: Create buffer around WKT/GeoJSON. Returns \`{buffer_geojson, buffer_wkt, distance_meters}\`
-- \`pg_geometry_transform\`: Transform WKT/GeoJSON between SRIDs. Returns transformed geometry in both formats
+- \`pg_geometry_buffer\`: Create buffer around WKT/GeoJSON. Returns \`{buffer_geojson, buffer_wkt, distance_meters}\`. Optional \`simplify\` param (meters) reduces polygon complexity—returns \`simplified\`, \`simplifyTolerance\` when applied
+- \`pg_geometry_transform\`: Transform WKT/GeoJSON between SRIDs. Returns \`{transformed_geojson, transformed_wkt, fromSrid, toSrid}\`
 - \`pg_geometry_intersection\`: Compute intersection of two geometries. Returns \`{intersects, intersection_geojson, intersection_area_sqm}\`. Normalizes SRID (4326) automatically—safe to mix GeoJSON and WKT
 
 **Administration:**

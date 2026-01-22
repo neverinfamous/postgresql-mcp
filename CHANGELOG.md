@@ -98,6 +98,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - When no clusters formed: "Try increasing eps or decreasing minPoints"
   - Also includes `parameterGuide` object explaining eps and minPoints effects
 
+- **pg_geometry_buffer simplify parameter** — `pg_geometry_buffer` (standalone geometry buffer) now accepts optional `simplify` parameter (tolerance in meters) to reduce buffer polygon point count, matching `pg_buffer` behavior. Returns `{simplified: true, simplifyTolerance}` when applied. Useful for reducing payload size when high-precision buffer boundaries aren't needed
+
+### Fixed
+
+- **pg_geometry_transform camelCase field naming** — `pg_geometry_transform` now returns `fromSrid` and `toSrid` (camelCase) instead of `from_srid` and `to_srid` (snake_case). Consistent with `pg_geo_transform` response field naming
+
 - **pg_drop_table existed property** — `pg_drop_table` now returns `existed: boolean` in response, indicating whether the table existed before the drop operation. Consistent with `dropSchema()`, `dropView()`, and `dropSequence()` behavior
 - **pg_object_details materialized_view/partitioned_table support** — `pg_object_details` `type`/`objectType` parameter now accepts `materialized_view` and `partitioned_table` in addition to `table`, `view`, `function`, `sequence`, and `index`. Materialized views now return their `definition` SQL like regular views
 - **pg_create_table now() auto-conversion** — `defaultValue: 'now()'` is now automatically converted to `CURRENT_TIMESTAMP` to prevent PostgreSQL "cannot use column reference in DEFAULT expression" error. Also converts `current_date()`, `current_time()`, and `current_timestamp()` to their SQL keyword equivalents

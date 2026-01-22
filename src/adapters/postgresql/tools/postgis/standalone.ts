@@ -67,26 +67,42 @@ export function createGeometryBufferTool(
     annotations: readOnly("Geometry Buffer"),
     icons: getToolIcons("postgis", readOnly("Geometry Buffer")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { geometry, distance, srid } = GeometryBufferSchema.parse(
+      const { geometry, distance, srid, simplify } = GeometryBufferSchema.parse(
         params ?? {},
       );
       const sridVal = srid ?? 4326;
       const { sql: geomExpr, isGeoJson } = parseGeometry(geometry);
 
-      // Use geography type for accurate meter-based buffer on Earth
+      // Build buffer expression
+      const bufferExpr = `ST_Buffer(ST_SetSRID(${geomExpr}, ${String(sridVal)})::geography, $2)::geometry`;
+
+      // Apply optional simplification
+      const outputExpr =
+        simplify !== undefined && simplify > 0
+          ? `ST_Simplify(${bufferExpr}, ${String(simplify / 111000)})` // Convert meters to degrees approx
+          : bufferExpr;
+
       const sql = `
                 SELECT 
-                    ST_AsGeoJSON(ST_Buffer(ST_SetSRID(${geomExpr}, ${String(sridVal)})::geography, $2)::geometry) as buffer_geojson,
-                    ST_AsText(ST_Buffer(ST_SetSRID(${geomExpr}, ${String(sridVal)})::geography, $2)::geometry) as buffer_wkt,
+                    ST_AsGeoJSON(${outputExpr}) as buffer_geojson,
+                    ST_AsText(${outputExpr}) as buffer_wkt,
                     $2 as distance_meters,
                     ${String(sridVal)} as srid
             `;
 
       const result = await adapter.executeQuery(sql, [geometry, distance]);
-      return {
+      const response: Record<string, unknown> = {
         ...result.rows?.[0],
         inputFormat: isGeoJson ? "GeoJSON" : "WKT",
       };
+
+      // Include simplification info if applied
+      if (simplify !== undefined && simplify > 0) {
+        response["simplified"] = true;
+        response["simplifyTolerance"] = simplify;
+      }
+
+      return response;
     },
   };
 }
@@ -160,14 +176,14 @@ export function createGeometryTransformTool(
       const sql = `
                 SELECT 
                     ST_AsGeoJSON(ST_Transform(ST_SetSRID(${geomExpr}, ${String(fromSrid)}), ${String(toSrid)})) as transformed_geojson,
-                    ST_AsText(ST_Transform(ST_SetSRID(${geomExpr}, ${String(fromSrid)}), ${String(toSrid)})) as transformed_wkt,
-                    ${String(fromSrid)} as from_srid,
-                    ${String(toSrid)} as to_srid
+                    ST_AsText(ST_Transform(ST_SetSRID(${geomExpr}, ${String(fromSrid)}), ${String(toSrid)})) as transformed_wkt
             `;
 
       const result = await adapter.executeQuery(sql, [geometry]);
       return {
         ...result.rows?.[0],
+        fromSrid,
+        toSrid,
         inputFormat: isGeoJson ? "GeoJSON" : "WKT",
       };
     },

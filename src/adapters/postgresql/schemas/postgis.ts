@@ -359,7 +359,8 @@ export const BufferSchema = z
       "distance (or radius/meters alias) is required and must be positive",
   })
   .refine((data) => data.simplify === undefined || data.simplify >= 0, {
-    message: "simplify must be a non-negative number if provided (0 to disable)",
+    message:
+      "simplify must be a non-negative number if provided (0 to disable)",
   });
 
 // =============================================================================
@@ -676,6 +677,12 @@ export const GeometryBufferSchemaBase = z.object({
     .enum(["meters", "m", "kilometers", "km", "miles", "mi"])
     .optional()
     .describe("Distance unit (default: meters)"),
+  simplify: z
+    .number()
+    .optional()
+    .describe(
+      "Simplification tolerance in meters (default: none). Higher values = fewer points. Set to reduce payload size.",
+    ),
   srid: z
     .number()
     .optional()
@@ -689,6 +696,10 @@ export const GeometryBufferSchema = GeometryBufferSchemaBase.transform(
       geometry: data.geometry ?? data.wkt ?? data.geojson ?? "",
       distance: convertToMeters(rawDistance, data.unit),
       unit: data.unit,
+      simplify:
+        data.simplify !== undefined
+          ? convertToMeters(data.simplify, data.unit)
+          : undefined,
       srid: data.srid,
     };
   },
@@ -699,6 +710,9 @@ export const GeometryBufferSchema = GeometryBufferSchemaBase.transform(
   .refine((data) => data.distance > 0, {
     message:
       "distance (or radius/meters alias) is required and must be positive",
+  })
+  .refine((data) => data.simplify === undefined || data.simplify >= 0, {
+    message: "simplify must be a non-negative number if provided",
   });
 
 // pg_geometry_intersection

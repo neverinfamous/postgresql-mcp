@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_dump_table partitioned table support** — `pg_dump_table` now detects partitioned tables and includes the `PARTITION BY` clause in the DDL output. Returns `type: 'partitioned_table'` instead of `type: 'table'` for partitioned tables. Supports RANGE, LIST, and HASH partitioning strategies with correct partition key columns. Note provides guidance to use `pg_list_partitions` for partition children
 - **createSchema/createSequence `alreadyExisted` response field** — `pg_create_schema` and `pg_create_sequence` now return `alreadyExisted: boolean` when `ifNotExists: true` is used, indicating whether the object already existed before the operation. Consistent with `drop` operations which return `existed` field
 - **createView `alreadyExisted` response field** — `pg_create_view` now returns `alreadyExisted: boolean` when `orReplace: true` is used, indicating whether the view was replaced or created new. Provides parity with `drop` operations for response consistency
+- **pg.descriptive() and 7 more top-level stats aliases** — Code mode now supports top-level stats method aliases for convenience: `pg.descriptive()`, `pg.percentiles()`, `pg.correlation()`, `pg.regression()`, `pg.timeSeries()`, `pg.distribution()`, `pg.hypothesis()`, `pg.sampling()`. These map directly to `pg.stats.xxx()` methods for improved ergonomics, matching the pattern of other tool groups
 
 ### Fixed
 

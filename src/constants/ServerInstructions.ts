@@ -111,6 +111,8 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 - \`regression\`: Use \`xColumn\`/\`yColumn\`, aliases \`x\`/\`y\`, or \`column1\`/\`column2\` (for consistency with correlation). Returns nested \`regression\` object containing \`slope\`, \`intercept\`, \`rSquared\`, \`equation\`, \`avgX\`, \`avgY\`, \`sampleSize\`. Access via \`reg.regression.slope\`
 - ⚠️ WARNING: \`sampling\` with \`system\` method unreliable for small tables—use \`bernoulli\` or \`random\`
 
+**Top-Level Aliases**: \`pg.descriptive()\`, \`pg.percentiles()\`, \`pg.correlation()\`, \`pg.regression()\`, \`pg.timeSeries()\`, \`pg.distribution()\`, \`pg.hypothesis()\`, \`pg.sampling()\`
+
 ## Performance Tools
 
 Core: \`explain()\`, \`explainAnalyze()\`, \`indexStats()\`, \`tableStats()\`, \`statStatements()\`, \`locks()\`, \`bloatCheck()\`, \`cacheHitRatio()\`, \`indexRecommendations()\`

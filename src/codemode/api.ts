@@ -1568,6 +1568,39 @@ export class PgApi {
       }
     }
 
+    // Add top-level stats aliases for convenience: pg.descriptive() → pg.stats.descriptive()
+    const statsApi = bindings["stats"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (statsApi !== undefined) {
+      // Core statistics
+      if (statsApi["descriptive"] !== undefined) {
+        bindings["descriptive"] = statsApi["descriptive"];
+      }
+      if (statsApi["percentiles"] !== undefined) {
+        bindings["percentiles"] = statsApi["percentiles"];
+      }
+      if (statsApi["correlation"] !== undefined) {
+        bindings["correlation"] = statsApi["correlation"];
+      }
+      if (statsApi["regression"] !== undefined) {
+        bindings["regression"] = statsApi["regression"];
+      }
+      // Advanced statistics
+      if (statsApi["timeSeries"] !== undefined) {
+        bindings["timeSeries"] = statsApi["timeSeries"];
+      }
+      if (statsApi["distribution"] !== undefined) {
+        bindings["distribution"] = statsApi["distribution"];
+      }
+      if (statsApi["hypothesis"] !== undefined) {
+        bindings["hypothesis"] = statsApi["hypothesis"];
+      }
+      if (statsApi["sampling"] !== undefined) {
+        bindings["sampling"] = statsApi["sampling"];
+      }
+    }
+
     return bindings;
   }
 }

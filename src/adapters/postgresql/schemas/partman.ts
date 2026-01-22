@@ -201,6 +201,12 @@ export const PartmanShowPartitionsSchema = z
         .enum(["asc", "desc"])
         .optional()
         .describe("Order of partitions by boundary"),
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          "Maximum number of partitions to return (default: 50, use 0 for all)",
+        ),
     }),
   )
   .default({});

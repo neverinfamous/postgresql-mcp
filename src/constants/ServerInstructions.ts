@@ -254,7 +254,8 @@ Response Structures:
 - \`pg_partman_create_parent\`: Interval uses PostgreSQL syntax ('1 day', '1 month') NOT keywords ('daily'). \`startPartition\` accepts 'now' shorthand for current date. Required params: \`parentTable\`, \`controlColumn\`/\`control\`, \`interval\`
 - \`pg_partman_run_maintenance\`: Without \`parentTable\`, maintains ALL partition sets. Returns \`partial: true\` when some tables are skipped. \`orphaned\` object groups orphaned configs with \`count\`, \`tables\`, and cleanup \`hint\`. \`errors\` array for other failures
 - \`pg_partman_show_config\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`orphaned\` flag per config. Supports \`schema.table\` or plain table name (auto-prefixes \`public.\`)
-- \`pg_partman_show_partitions\`/\`check_default\`/\`partition_data\`: \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
+- \`pg_partman_show_partitions\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
+- \`pg_partman_check_default\`/\`partition_data\`: \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
 - \`pg_partman_set_retention\`: \`retentionKeepTable: true\` = detach only, \`false\` = DROP. Pass \`retention: null\` to disable retention
 - \`pg_partman_undo_partition\`: \`targetTable\` MUST exist before calling. Requires both \`parentTable\` and \`targetTable\`/\`target\`
 - \`pg_partman_analyze_partition_health\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`summary.overallHealth\`: 'healthy'|'warnings'|'issues_found'

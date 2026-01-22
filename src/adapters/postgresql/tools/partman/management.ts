@@ -152,7 +152,7 @@ A startPartition far in the past (e.g., '2024-01-01' with daily intervals) creat
             hint:
               "Use pg_partman_show_config to view existing configuration. " +
               "To recreate: use pg_partman_undo_partition first, or if the table was dropped, clean up with: " +
-              `DELETE FROM partman.part_config WHERE parent_table = '${validatedParentTable}';`,
+              `DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '${validatedParentTable}';`,
           };
         }
         if (
@@ -399,7 +399,7 @@ Maintains all partition sets if no specific parent table is specified.`,
             ? {
                 count: orphanedTables.length,
                 tables: orphanedTables,
-                hint: "Remove orphaned configs: DELETE FROM partman.part_config WHERE parent_table = '<table_name>';",
+                hint: `Remove orphaned configs: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`,
               }
             : undefined,
         errors: errors.length > 0 ? errors : undefined,
@@ -419,6 +419,9 @@ Maintains all partition sets if no specific parent table is specified.`,
 export function createPartmanShowPartitionsTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
+  // Default limit for partitions (consistent with other partman tools)
+  const DEFAULT_PARTITION_LIMIT = 50;
+
   return {
     name: "pg_partman_show_partitions",
     description:
@@ -428,8 +431,10 @@ export function createPartmanShowPartitionsTool(
     annotations: readOnly("Show Partman Partitions"),
     icons: getToolIcons("partman", readOnly("Show Partman Partitions")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { parentTable, includeDefault, order } =
-        PartmanShowPartitionsSchema.parse(params);
+      const parsed = PartmanShowPartitionsSchema.parse(params);
+      const { parentTable, includeDefault, order } = parsed;
+      const limit =
+        (parsed as { limit?: number }).limit ?? DEFAULT_PARTITION_LIMIT;
 
       // parentTable is required - provide clear error if missing
       if (!parentTable) {
@@ -460,21 +465,41 @@ export function createPartmanShowPartitionsTool(
         };
       }
 
-      const sql = `
+      // First get total count for pagination
+      const countSql = `
+                SELECT COUNT(*) as total FROM ${partmanSchema}.show_partitions(
+                    p_parent_table := '${parentTable}',
+                    p_include_default := ${String(includeDefaultVal)},
+                    p_order := '${orderDir}'
+                )
+            `;
+      const countResult = await adapter.executeQuery(countSql);
+      const totalCount = Number(countResult.rows?.[0]?.["total"] ?? 0);
+
+      // Apply limit (0 means no limit)
+      const applyLimit = limit > 0;
+      let sql = `
                 SELECT * FROM ${partmanSchema}.show_partitions(
                     p_parent_table := '${parentTable}',
                     p_include_default := ${String(includeDefaultVal)},
                     p_order := '${orderDir}'
                 )
             `;
+      if (applyLimit) {
+        sql += ` LIMIT ${String(limit)}`;
+      }
 
       const result = await adapter.executeQuery(sql);
+      const partitions = result.rows ?? [];
+      const truncated = applyLimit && totalCount > limit;
 
       return {
         success: true,
         parentTable,
-        partitions: result.rows ?? [],
-        count: result.rows?.length ?? 0,
+        partitions,
+        count: partitions.length,
+        truncated: truncated ? true : undefined,
+        totalCount: truncated ? totalCount : undefined,
       };
     },
   };
@@ -644,7 +669,7 @@ export function createPartmanShowConfigTool(
           notFoundHint ??
           (orphanedCount > 0
             ? `${String(orphanedCount)} orphaned config(s) found - parent table no longer exists. ` +
-              `To clean up, use raw SQL: DELETE FROM partman.part_config WHERE parent_table = '<table_name>';`
+              `To clean up, use raw SQL: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`
             : undefined),
       };
     },

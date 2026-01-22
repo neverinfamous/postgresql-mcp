@@ -712,7 +712,25 @@ export function createVectorPerformanceTool(
                     LIMIT 10
                 `;
         const benchResult = await adapter.executeQuery(benchSql);
-        benchmark = benchResult.rows;
+
+        // Truncate large vectors in EXPLAIN output to reduce payload size
+        // Pattern matches vector literals like '[0.1,0.2,...,0.9]'::vector
+        const vectorPattern = /\[[\d.,\s-e]+\]'::vector/g;
+        const truncatedRows = (benchResult.rows ?? []).map(
+          (row: Record<string, unknown>) => {
+            const planLine = row["QUERY PLAN"] as string | undefined;
+            if (planLine && planLine.length > 200) {
+              // Truncate long vector literals in query plan
+              const truncated = planLine.replace(
+                vectorPattern,
+                `[...${String(testVector.length)} dims]'::vector`,
+              );
+              return { "QUERY PLAN": truncated };
+            }
+            return row;
+          },
+        );
+        benchmark = truncatedRows;
       }
 
       const response: Record<string, unknown> = {

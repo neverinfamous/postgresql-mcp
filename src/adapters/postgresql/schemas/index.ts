@@ -110,8 +110,13 @@ export {
 
 // pgvector schemas
 export {
+  // Base schemas for MCP visibility (Split Schema pattern)
+  VectorSearchSchemaBase,
+  VectorCreateIndexSchemaBase,
+  // Transformed schemas for handler validation
   VectorSearchSchema,
   VectorCreateIndexSchema,
+  // Utilities
   FiniteNumberArray,
 } from "./vector.js";
 

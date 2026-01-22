@@ -30,7 +30,7 @@ export const FiniteNumberArray = z
   });
 
 // Base schema for MCP exposure (shows all accepted parameters)
-const VectorSearchSchemaBase = z.object({
+export const VectorSearchSchemaBase = z.object({
   table: z.string().optional().describe("Table name"),
   tableName: z.string().optional().describe("Alias for table"),
   column: z.string().optional().describe("Vector column name"),
@@ -79,7 +79,7 @@ export const VectorSearchSchema = VectorSearchSchemaBase.transform((data) => {
 });
 
 // Base schema for MCP exposure
-const VectorCreateIndexSchemaBase = z.object({
+export const VectorCreateIndexSchemaBase = z.object({
   table: z.string().optional().describe("Table name"),
   tableName: z.string().optional().describe("Alias for table"),
   column: z.string().optional().describe("Vector column name"),

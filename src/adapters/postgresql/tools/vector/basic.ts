@@ -15,6 +15,10 @@ import {
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
 import {
+  // Base schemas for MCP visibility (Split Schema pattern)
+  VectorSearchSchemaBase,
+  VectorCreateIndexSchemaBase,
+  // Transformed schemas for handler validation
   VectorSearchSchema,
   VectorCreateIndexSchema,
 } from "../../schemas/index.js";
@@ -77,36 +81,38 @@ export function createVectorExtensionTool(
 export function createVectorAddColumnTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
-  // Schema with parameter smoothing: tableName -> table, col -> column
-  const AddColumnSchema = z
-    .object({
-      table: z.string().optional(),
-      tableName: z.string().optional(),
-      column: z.string().optional(),
-      col: z.string().optional(),
-      dimensions: z
-        .number()
-        .describe("Vector dimensions (e.g., 1536 for OpenAI)"),
-      schema: z.string().optional(),
-      ifNotExists: z
-        .boolean()
-        .optional()
-        .describe("Skip if column already exists (default: false)"),
-    })
-    .transform((data) => ({
-      table: data.table ?? data.tableName ?? "",
-      column: data.column ?? data.col ?? "",
-      dimensions: data.dimensions,
-      schema: data.schema,
-      ifNotExists: data.ifNotExists ?? false,
-    }));
+  // Base schema for MCP visibility (Split Schema pattern)
+  const AddColumnSchemaBase = z.object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Alias for table"),
+    column: z.string().optional().describe("Column name"),
+    col: z.string().optional().describe("Alias for column"),
+    dimensions: z
+      .number()
+      .describe("Vector dimensions (e.g., 1536 for OpenAI)"),
+    schema: z.string().optional().describe("Database schema (default: public)"),
+    ifNotExists: z
+      .boolean()
+      .optional()
+      .describe("Skip if column already exists (default: false)"),
+  });
+
+  // Transformed schema with alias resolution for handler
+  const AddColumnSchema = AddColumnSchemaBase.transform((data) => ({
+    table: data.table ?? data.tableName ?? "",
+    column: data.column ?? data.col ?? "",
+    dimensions: data.dimensions,
+    schema: data.schema,
+    ifNotExists: data.ifNotExists ?? false,
+  }));
 
   return {
     name: "pg_vector_add_column",
     description:
       "Add a vector column to a table. Requires: table, column, dimensions.",
     group: "vector",
-    inputSchema: AddColumnSchema,
+    // Use base schema for MCP visibility
+    inputSchema: AddColumnSchemaBase,
     annotations: write("Add Vector Column"),
     icons: getToolIcons("vector", write("Add Vector Column")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -377,10 +383,12 @@ export function createVectorSearchTool(
     description:
       'Search for similar vectors. Requires: table, column, vector. Use select param to include identifying columns (e.g., select: ["id", "name"]).',
     group: "vector",
-    inputSchema: VectorSearchSchema,
+    // Use base schema for MCP visibility (Split Schema pattern)
+    inputSchema: VectorSearchSchemaBase,
     annotations: readOnly("Vector Search"),
     icons: getToolIcons("vector", readOnly("Vector Search")),
     handler: async (params: unknown, _context: RequestContext) => {
+      // Use transformed schema for alias resolution
       const { table, column, vector, metric, limit, select, where, schema } =
         VectorSearchSchema.parse(params);
 
@@ -520,10 +528,12 @@ export function createVectorCreateIndexTool(
     description:
       "Create vector index. Requires: table, column, type (ivfflat or hnsw).",
     group: "vector",
-    inputSchema: VectorCreateIndexSchema,
+    // Use base schema for MCP visibility (Split Schema pattern)
+    inputSchema: VectorCreateIndexSchemaBase,
     annotations: write("Create Vector Index"),
     icons: getToolIcons("vector", write("Create Vector Index")),
     handler: async (params: unknown, _context: RequestContext) => {
+      // Use transformed schema for alias resolution
       const {
         table,
         column,

@@ -313,9 +313,9 @@ Maintains all partition sets if no specific parent table is specified.`,
 
       const configs = configsResult.rows ?? [];
       const maintained: string[] = [];
-      const skipped: {
+      const orphanedTables: string[] = [];
+      const errors: {
         table: string;
-        type: "orphaned" | "error";
         reason: string;
       }[] = [];
 
@@ -336,12 +336,7 @@ Maintains all partition sets if no specific parent table is specified.`,
         );
 
         if ((tableExistsResult.rows?.length ?? 0) === 0) {
-          skipped.push({
-            table,
-            type: "orphaned" as const,
-            reason:
-              "Parent table no longer exists - consider removing orphaned config",
-          });
+          orphanedTables.push(table);
           continue;
         }
 
@@ -367,17 +362,17 @@ Maintains all partition sets if no specific parent table is specified.`,
               'TIP: Use pg_partman_create_parent with startPartition (e.g., "now" or a specific date) to bootstrap partitions.';
           }
 
-          skipped.push({
+          errors.push({
             table,
-            type: "error" as const,
             reason,
           });
         }
       }
 
       // Determine success status
-      const allFailed = maintained.length === 0 && skipped.length > 0;
-      const partial = maintained.length > 0 && skipped.length > 0;
+      const skippedCount = orphanedTables.length + errors.length;
+      const allFailed = maintained.length === 0 && skippedCount > 0;
+      const partial = maintained.length > 0 && skippedCount > 0;
 
       return {
         success: !allFailed,
@@ -385,11 +380,19 @@ Maintains all partition sets if no specific parent table is specified.`,
         parentTable: "all",
         analyze: analyze ?? true,
         maintained,
-        skipped: skipped.length > 0 ? skipped : undefined,
+        orphaned:
+          orphanedTables.length > 0
+            ? {
+                count: orphanedTables.length,
+                tables: orphanedTables,
+                hint: "Remove orphaned configs: DELETE FROM partman.part_config WHERE parent_table = '<table_name>';",
+              }
+            : undefined,
+        errors: errors.length > 0 ? errors : undefined,
         message: allFailed
-          ? `Maintenance failed for all ${String(skipped.length)} partition sets due to errors.`
-          : skipped.length > 0
-            ? `Maintenance completed for ${String(maintained.length)} partition sets. ${String(skipped.length)} skipped due to errors.`
+          ? `Maintenance failed for all ${String(skippedCount)} partition sets due to errors.`
+          : skippedCount > 0
+            ? `Maintenance completed for ${String(maintained.length)} partition sets. ${String(skippedCount)} skipped (${String(orphanedTables.length)} orphaned, ${String(errors.length)} errors).`
             : `Maintenance completed for all ${String(maintained.length)} partition sets`,
       };
     },
@@ -474,7 +477,11 @@ export function createPartmanShowConfigTool(
     .preprocess(
       (input) => {
         if (typeof input !== "object" || input === null) return input;
-        const raw = input as { table?: string; parentTable?: string };
+        const raw = input as {
+          table?: string;
+          parentTable?: string;
+          limit?: number;
+        };
         const result = { ...raw };
 
         // Alias: table → parentTable
@@ -495,6 +502,12 @@ export function createPartmanShowConfigTool(
           .string()
           .optional()
           .describe("Parent table name (all configs if omitted)"),
+        limit: z
+          .number()
+          .optional()
+          .describe(
+            "Maximum number of configs to return (default: 50, use 0 for all)",
+          ),
       }),
     )
     .default({});
@@ -546,6 +559,20 @@ export function createPartmanShowConfigTool(
         columns.push("inherit_fk");
       }
 
+      // Get total count first for pagination
+      let countSql = `SELECT COUNT(*) as total FROM ${partmanSchema}.part_config`;
+      const countParams: unknown[] = [];
+      if (parsed.parentTable !== undefined) {
+        countSql += " WHERE parent_table = $1";
+        countParams.push(parsed.parentTable);
+      }
+      const countResult = await adapter.executeQuery(countSql, countParams);
+      const totalCount = Number(countResult.rows?.[0]?.["total"] ?? 0);
+
+      // Apply limit (default 50, 0 means no limit)
+      const limit = parsed.limit ?? 50;
+      const applyLimit = limit > 0;
+
       let sql = `SELECT ${columns.join(", ")} FROM ${partmanSchema}.part_config`;
 
       const queryParams: unknown[] = [];
@@ -555,6 +582,10 @@ export function createPartmanShowConfigTool(
       }
 
       sql += " ORDER BY parent_table";
+
+      if (applyLimit) {
+        sql += ` LIMIT ${String(limit)}`;
+      }
 
       const result = await adapter.executeQuery(sql, queryParams);
       const configs = result.rows ?? [];
@@ -581,6 +612,7 @@ export function createPartmanShowConfigTool(
       );
 
       const orphanedCount = configsWithStatus.filter((c) => c.orphaned).length;
+      const truncated = applyLimit && totalCount > limit;
 
       // Provide hint if a specific table was requested but not found
       let notFoundHint: string | undefined;
@@ -591,6 +623,8 @@ export function createPartmanShowConfigTool(
       return {
         configs: configsWithStatus,
         count: configsWithStatus.length,
+        truncated: truncated ? true : undefined,
+        totalCount: truncated ? totalCount : undefined,
         orphanedCount: orphanedCount > 0 ? orphanedCount : undefined,
         hint:
           notFoundHint ??

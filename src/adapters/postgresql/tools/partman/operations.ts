@@ -537,7 +537,11 @@ stale maintenance, and retention configuration.`,
       .preprocess(
         (input) => {
           if (typeof input !== "object" || input === null) return input;
-          const raw = input as { table?: string; parentTable?: string };
+          const raw = input as {
+            table?: string;
+            parentTable?: string;
+            limit?: number;
+          };
           const result = { ...raw };
 
           // Alias: table → parentTable
@@ -557,6 +561,12 @@ stale maintenance, and retention configuration.`,
             .string()
             .optional()
             .describe("Specific parent table to analyze (all if omitted)"),
+          limit: z
+            .number()
+            .optional()
+            .describe(
+              "Maximum number of partition sets to analyze (default: 50, use 0 for all)",
+            ),
         }),
       )
       .default({}),
@@ -567,7 +577,11 @@ stale maintenance, and retention configuration.`,
         .preprocess(
           (input) => {
             if (typeof input !== "object" || input === null) return input;
-            const raw = input as { table?: string; parentTable?: string };
+            const raw = input as {
+              table?: string;
+              parentTable?: string;
+              limit?: number;
+            };
             const result = { ...raw };
 
             // Alias: table → parentTable
@@ -584,12 +598,27 @@ stale maintenance, and retention configuration.`,
           },
           z.object({
             parentTable: z.string().optional(),
+            limit: z.number().optional(),
           }),
         )
         .default({});
       const parsed = AnalyzeHealthSchema.parse(params ?? {});
       const queryParams: unknown[] = [];
       const partmanSchema = await getPartmanSchema(adapter);
+
+      // Get total count first for pagination
+      let countSql = `SELECT COUNT(*) as total FROM ${partmanSchema}.part_config`;
+      const countParams: unknown[] = [];
+      if (parsed.parentTable !== undefined) {
+        countSql += " WHERE parent_table = $1";
+        countParams.push(parsed.parentTable);
+      }
+      const countResult = await adapter.executeQuery(countSql, countParams);
+      const totalCount = Number(countResult.rows?.[0]?.["total"] ?? 0);
+
+      // Apply limit (default 50, 0 means no limit)
+      const limit = parsed.limit ?? 50;
+      const applyLimit = limit > 0;
 
       let configSql = `
                 SELECT 
@@ -606,6 +635,10 @@ stale maintenance, and retention configuration.`,
       if (parsed.parentTable !== undefined) {
         configSql += " WHERE parent_table = $1";
         queryParams.push(parsed.parentTable);
+      }
+      configSql += " ORDER BY parent_table";
+      if (applyLimit) {
+        configSql += ` LIMIT ${String(limit)}`;
       }
 
       const configResult = await adapter.executeQuery(configSql, queryParams);
@@ -764,10 +797,14 @@ stale maintenance, and retention configuration.`,
         0,
       );
 
+      const truncated = applyLimit && totalCount > limit;
+
       return {
         partitionSets: healthChecks,
+        truncated: truncated ? true : undefined,
+        totalCount: truncated ? totalCount : undefined,
         summary: {
-          totalPartitionSets: healthChecks.length,
+          totalPartitionSets: truncated ? totalCount : healthChecks.length,
           totalIssues,
           totalWarnings,
           overallHealth:

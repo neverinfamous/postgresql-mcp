@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **pg_cron_list_jobs default limit** — `pg_cron_list_jobs` now applies a default limit of 50 jobs when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all jobs. Prevents large payloads in environments with many scheduled jobs
 - **pg_cron_job_run_details truncation indicators** — `pg_cron_job_run_details` now returns `truncated: boolean` and `totalCount: number` in the response when the default limit (100) causes truncation. Helps LLMs understand when execution history has been limited and how much data is available
+- **pg_partman_show_config default limit** — `pg_partman_show_config` now applies a default limit of 50 configs when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all configs. Prevents large payloads in databases with many partition sets (especially those with orphaned configs from prior testing)
+- **pg_partman_analyze_partition_health default limit** — `pg_partman_analyze_partition_health` now applies a default limit of 50 partition sets when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all. Prevents large payloads when analyzing databases with many partition sets
+- **pg_partman_run_maintenance orphaned grouping** — `pg_partman_run_maintenance` (without `parentTable`) now groups orphaned configs in the response instead of repeating individual entries. Returns `orphaned: {count, tables, hint}` object for cleaner payload structure. `errors` array contains only non-orphan failures. Message includes breakdown: `"X skipped (Y orphaned, Z errors)"`
 
 
 ### Fixed

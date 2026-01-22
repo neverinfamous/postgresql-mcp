@@ -358,8 +358,8 @@ export const BufferSchema = z
     message:
       "distance (or radius/meters alias) is required and must be positive",
   })
-  .refine((data) => data.simplify === undefined || data.simplify > 0, {
-    message: "simplify must be a positive number if provided",
+  .refine((data) => data.simplify === undefined || data.simplify >= 0, {
+    message: "simplify must be a non-negative number if provided (0 to disable)",
   });
 
 // =============================================================================

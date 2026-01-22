@@ -1063,17 +1063,27 @@ export class PgApi {
       const canonicalMethodNames = allMethodNames.filter(
         (name) => !aliasNames.has(name),
       );
-      const aliasMethodNames = allMethodNames.filter((name) =>
-        aliasNames.has(name),
-      );
+
+      // Filter aliases to only show useful shorthand aliases in help output
+      // Exclude redundant prefix aliases (e.g., partmanShowConfig, cronListJobs) that
+      // just add the group name prefix - these are fallback catches, not intended API
+      const usefulAliases = allMethodNames.filter((name) => {
+        if (!aliasNames.has(name)) return false;
+        // Exclude aliases that start with the group name (redundant prefixes)
+        const lowerGroupName = groupName.toLowerCase();
+        const lowerAlias = name.toLowerCase();
+        return !lowerAlias.startsWith(lowerGroupName);
+      });
 
       // Add all methods plus a 'help' property that lists them
       bindings[groupName] = {
         ...groupApi,
-        // Help returns all methods - canonical first, then aliases, plus examples
+        // Help returns all methods - canonical first, then method aliases, plus examples
+        // Note: methodAliases are alternate names within THIS group (e.g., pg.partman.analyzeHealth → pg.partman.analyzePartitionHealth)
+        // They are NOT top-level pg.* aliases. Redundant prefix aliases (e.g., partmanShowConfig) are excluded.
         help: () => ({
           methods: canonicalMethodNames,
-          aliases: aliasMethodNames.length > 0 ? aliasMethodNames : undefined,
+          methodAliases: usefulAliases.length > 0 ? usefulAliases : undefined,
           examples: GROUP_EXAMPLES[groupName],
         }),
       };

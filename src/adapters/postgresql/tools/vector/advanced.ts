@@ -934,23 +934,29 @@ export function createVectorDimensionReduceTool(
 }
 
 export function createVectorEmbedTool(): ToolDefinition {
+  const EmbedSchema = z.object({
+    text: z.string().describe("Text to embed"),
+    dimensions: z
+      .number()
+      .optional()
+      .describe("Vector dimensions (default: 384)"),
+    summarize: z
+      .boolean()
+      .optional()
+      .describe("Truncate embedding for display (default: true)"),
+  });
+
   return {
     name: "pg_vector_embed",
     description:
       "Generate text embeddings. Returns a simple hash-based embedding for demos (use external APIs for production).",
     group: "vector",
-    inputSchema: z.object({
-      text: z.string().describe("Text to embed"),
-      dimensions: z
-        .number()
-        .optional()
-        .describe("Vector dimensions (default: 384)"),
-    }),
+    inputSchema: EmbedSchema,
     annotations: readOnly("Vector Embed"),
     icons: getToolIcons("vector", readOnly("Vector Embed")),
     // eslint-disable-next-line @typescript-eslint/require-await
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as { text: string; dimensions?: number };
+      const parsed = EmbedSchema.parse(params ?? {});
 
       // Validate non-empty text
       if (parsed.text === undefined || parsed.text === "") {
@@ -962,6 +968,7 @@ export function createVectorEmbedTool(): ToolDefinition {
       }
 
       const dims = parsed.dimensions ?? 384;
+      const shouldSummarize = parsed.summarize ?? true;
 
       const vector: number[] = [];
 
@@ -976,8 +983,13 @@ export function createVectorEmbedTool(): ToolDefinition {
       const magnitude = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
       const normalized = vector.map((x) => x / magnitude);
 
+      // Summarize embedding if requested (default) to reduce LLM context size
+      const embeddingOutput = shouldSummarize
+        ? truncateVector(normalized)
+        : normalized;
+
       return {
-        embedding: normalized,
+        embedding: embeddingOutput,
         dimensions: dims,
         textLength: parsed.text.length,
         warning:

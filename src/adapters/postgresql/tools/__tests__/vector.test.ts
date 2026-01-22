@@ -622,10 +622,21 @@ describe("Vector Tools", () => {
           text: "Hello world",
         },
         mockContext,
-      )) as { embedding: number[]; dimensions: number; warning: string };
+      )) as {
+        embedding: {
+          preview: number[];
+          dimensions: number;
+          truncated: boolean;
+        };
+        dimensions: number;
+        warning: string;
+      };
 
       expect(result.dimensions).toBe(384);
-      expect(result.embedding).toHaveLength(384);
+      // Embedding is summarized by default (preview shows first/last 5 values)
+      expect(result.embedding.dimensions).toBe(384);
+      expect(result.embedding.truncated).toBe(true);
+      expect(result.embedding.preview).toHaveLength(10); // 5 first + 5 last
       expect(result.warning).toContain("demo");
       expect(mockAdapter.executeQuery).not.toHaveBeenCalled();
     });
@@ -638,10 +649,33 @@ describe("Vector Tools", () => {
           dimensions: 768,
         },
         mockContext,
-      )) as { dimensions: number; embedding: number[] };
+      )) as {
+        dimensions: number;
+        embedding: {
+          preview: number[];
+          dimensions: number;
+          truncated: boolean;
+        };
+      };
 
       expect(result.dimensions).toBe(768);
-      expect(result.embedding).toHaveLength(768);
+      expect(result.embedding.dimensions).toBe(768);
+      expect(result.embedding.truncated).toBe(true);
+    });
+
+    it("should return raw embedding when summarize is false", async () => {
+      const tool = findTool("pg_vector_embed");
+      const result = (await tool!.handler(
+        {
+          text: "Test",
+          dimensions: 384,
+          summarize: false,
+        },
+        mockContext,
+      )) as { dimensions: number; embedding: number[] };
+
+      expect(result.dimensions).toBe(384);
+      expect(result.embedding).toHaveLength(384);
     });
   });
 

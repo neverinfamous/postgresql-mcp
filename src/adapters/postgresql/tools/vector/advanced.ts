@@ -791,6 +791,12 @@ export function createVectorDimensionReduceTool(
       .describe("Target number of dimensions"),
     dimensions: z.number().optional().describe("Alias for targetDimensions"),
     seed: z.number().optional().describe("Random seed for reproducibility"),
+    summarize: z
+      .boolean()
+      .optional()
+      .describe(
+        "Summarize reduced vectors to preview format in table mode (default: true)",
+      ),
   });
 
   // Schema with alias resolution applied via refinement
@@ -897,11 +903,20 @@ export function createVectorDimensionReduceTool(
           };
         }
 
+        // Determine if we should summarize (default true for table mode)
+        const shouldSummarize = parsed.summarize ?? true;
+
         // Parse and reduce each vector
         const reducedRows: {
           id: unknown;
           original_dimensions: number;
-          reduced: number[];
+          reduced:
+            | number[]
+            | {
+                preview: number[] | null;
+                dimensions: number;
+                truncated: boolean;
+              };
         }[] = [];
         let originalDim = 0;
 
@@ -918,14 +933,19 @@ export function createVectorDimensionReduceTool(
 
           if (targetDim >= vector.length) continue;
 
+          const reducedVector = reduceVector(vector, targetDim, seed);
+
+          // Apply summarization if requested
           reducedRows.push({
             id: row["id"],
             original_dimensions: vector.length,
-            reduced: reduceVector(vector, targetDim, seed),
+            reduced: shouldSummarize
+              ? truncateVector(reducedVector)
+              : reducedVector,
           });
         }
 
-        return {
+        const response: Record<string, unknown> = {
           mode: "table",
           table: parsed.table,
           column: parsed.column,
@@ -936,6 +956,15 @@ export function createVectorDimensionReduceTool(
           method: "random_projection",
           note: "For PCA or UMAP, use external libraries",
         };
+
+        // Add summarize indicator when summarization was applied
+        if (shouldSummarize) {
+          response["summarized"] = true;
+          response["hint"] =
+            "Vectors summarized to preview format. Use summarize: false for full vectors.";
+        }
+
+        return response;
       }
 
       return {

@@ -74,7 +74,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 - \`pg_vector_batch_insert\`: \`vectors\` expects \`[{vector: [...], data?: {...}}]\` objects, not raw arrays
 - \`pg_vector_normalize\`: Returns \`{normalized: [...], magnitude: N}\`. Note: \`magnitude\` is the **original** vector length (not 1)
 - \`pg_vector_aggregate\`: Supports \`schema.table\` format (auto-parsed). ⛔ Validates column is vector type. Returns \`{average_vector: {preview, dimensions, truncated}, count}\` or \`{groups: [{group_key, average_vector, count}]}\` with groupBy. ⚠️ \`groupBy\` only supports simple column names (not expressions)
-- \`pg_vector_dimension_reduce\`: Direct mode returns \`{reduced: [...], originalDimensions, targetDimensions}\`. Table mode returns \`{rows: [{id, original_dimensions, reduced}], processedCount}\`
+- \`pg_vector_dimension_reduce\`: Direct mode returns \`{reduced: [...], originalDimensions, targetDimensions}\`. Table mode returns \`{rows: [{id, original_dimensions, reduced}], processedCount, summarized}\`. Default \`summarize: true\` in table mode returns compact \`{preview, dimensions, truncated}\` format. Use \`summarize: false\` for full vectors
 - \`pg_vector_distance\`: Calculate distance between two vectors. \`metric\`: 'l2' (default), 'cosine', 'inner_product'. Returns \`{distance, metric}\`
 - \`pg_vector_cluster\`: \`clusters\` = \`k\`. Returns centroids with \`{preview, dimensions, truncated}\` format for large vectors (>10 dims)—use \`pg_vector_distance\` to assign rows
 - \`pg_vector_create_index\`: Use \`type\` (or alias \`method\`) with values 'ivfflat' or 'hnsw'. IVFFlat: \`lists\` param. HNSW: \`m\`, \`efConstruction\` params

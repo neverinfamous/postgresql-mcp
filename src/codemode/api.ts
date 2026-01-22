@@ -1660,6 +1660,40 @@ export class PgApi {
       }
     }
 
+    // Add top-level cron aliases for convenience: pg.cronSchedule() → pg.cron.schedule()
+    const cronApi = bindings["cron"] as
+      | Record<string, (...args: unknown[]) => Promise<unknown>>
+      | undefined;
+    if (cronApi !== undefined) {
+      // Extension
+      if (cronApi["createExtension"] !== undefined) {
+        bindings["cronCreateExtension"] = cronApi["createExtension"];
+      }
+      // Scheduling
+      if (cronApi["schedule"] !== undefined) {
+        bindings["cronSchedule"] = cronApi["schedule"];
+      }
+      if (cronApi["scheduleInDatabase"] !== undefined) {
+        bindings["cronScheduleInDatabase"] = cronApi["scheduleInDatabase"];
+      }
+      if (cronApi["unschedule"] !== undefined) {
+        bindings["cronUnschedule"] = cronApi["unschedule"];
+      }
+      // Job management
+      if (cronApi["alterJob"] !== undefined) {
+        bindings["cronAlterJob"] = cronApi["alterJob"];
+      }
+      if (cronApi["listJobs"] !== undefined) {
+        bindings["cronListJobs"] = cronApi["listJobs"];
+      }
+      if (cronApi["jobRunDetails"] !== undefined) {
+        bindings["cronJobRunDetails"] = cronApi["jobRunDetails"];
+      }
+      if (cronApi["cleanupHistory"] !== undefined) {
+        bindings["cronCleanupHistory"] = cronApi["cleanupHistory"];
+      }
+    }
+
     return bindings;
   }
 }

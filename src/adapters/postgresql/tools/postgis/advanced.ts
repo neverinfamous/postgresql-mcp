@@ -81,6 +81,7 @@ export function createGeoTransformTool(
         schemaName !== "public"
           ? `"${schemaName}"."${parsed.table}"`
           : `"${parsed.table}"`;
+      const columnName = `"${parsed.column}"`;
 
       const whereClause =
         parsed.where !== undefined ? `WHERE ${parsed.where}` : "";
@@ -89,16 +90,28 @@ export function createGeoTransformTool(
           ? `LIMIT ${String(parsed.limit)}`
           : "";
 
-      const sql = `
-                SELECT 
-                    *,
-                    ST_AsGeoJSON(ST_Transform(ST_SetSRID("${parsed.column}", ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_geojson,
-                    ST_AsText(ST_Transform(ST_SetSRID("${parsed.column}", ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_wkt,
-                    ${String(parsed.toSrid)} as output_srid
-                FROM ${qualifiedTable}
-                ${whereClause}
-                ${limitClause}
-            `;
+      // Get non-geometry columns to avoid returning raw WKB
+      const colQuery = `
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_schema = $1 AND table_name = $2 
+        AND udt_name NOT IN ('geometry', 'geography')
+        ORDER BY ordinal_position
+      `;
+      const colResult = await adapter.executeQuery(colQuery, [
+        schemaName,
+        parsed.table,
+      ]);
+      const nonGeomCols = (colResult.rows ?? [])
+        .map((row) => `"${String(row["column_name"])}"`)
+        .join(", ");
+
+      // Select non-geometry columns + transformed geometry representations
+      const selectCols =
+        nonGeomCols.length > 0
+          ? `${nonGeomCols}, ST_AsGeoJSON(ST_Transform(ST_SetSRID(${columnName}, ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_geojson, ST_AsText(ST_Transform(ST_SetSRID(${columnName}, ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_wkt, ${String(parsed.toSrid)} as output_srid`
+          : `ST_AsGeoJSON(ST_Transform(ST_SetSRID(${columnName}, ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_geojson, ST_AsText(ST_Transform(ST_SetSRID(${columnName}, ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_wkt, ${String(parsed.toSrid)} as output_srid`;
+
+      const sql = `SELECT ${selectCols} FROM ${qualifiedTable} ${whereClause} ${limitClause}`;
 
       const result = await adapter.executeQuery(sql);
       return {

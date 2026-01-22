@@ -393,8 +393,16 @@ describe("PostGIS Tools", () => {
 
   describe("pg_intersection", () => {
     it("should find intersecting geometries with GeoJSON", async () => {
+      // First mock: column query to get non-geometry columns
       mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ id: 1 }, { id: 2 }],
+        rows: [{ column_name: "id" }, { column_name: "name" }],
+      });
+      // Second mock: actual intersection query
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [
+          { id: 1, geometry_text: "POINT(...)" },
+          { id: 2, geometry_text: "POINT(...)" },
+        ],
       });
 
       const tool = findTool("pg_intersection");
@@ -416,6 +424,11 @@ describe("PostGIS Tools", () => {
     });
 
     it("should find intersecting geometries with WKT", async () => {
+      // First mock: column query to get non-geometry columns
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ column_name: "id" }],
+      });
+      // Second mock: actual intersection query
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_intersection");
@@ -437,8 +450,17 @@ describe("PostGIS Tools", () => {
 
   describe("pg_bounding_box", () => {
     it("should find geometries in bounding box", async () => {
+      // First mock: column query to get non-geometry columns
       mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        rows: [{ column_name: "id" }, { column_name: "name" }],
+      });
+      // Second mock: actual bounding box query
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [
+          { id: 1, geometry_text: "POINT(...)" },
+          { id: 2, geometry_text: "POINT(...)" },
+          { id: 3, geometry_text: "POINT(...)" },
+        ],
       });
 
       const tool = findTool("pg_bounding_box");
@@ -604,8 +626,20 @@ describe("PostGIS Tools", () => {
 
   describe("pg_geo_transform", () => {
     it("should transform geometry between SRIDs", async () => {
+      // First mock: column query to get non-geometry columns
       mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ transformed_geojson: "{}", transformed_wkt: "POINT(...)" }],
+        rows: [{ column_name: "id" }, { column_name: "name" }],
+      });
+      // Second mock: actual transform query
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 1,
+            name: "Test",
+            transformed_geojson: "{}",
+            transformed_wkt: "POINT(...)",
+          },
+        ],
       });
 
       const tool = findTool("pg_geo_transform");

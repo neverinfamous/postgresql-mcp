@@ -331,10 +331,31 @@ export function createIntersectionTool(
         schemaName !== "public" ? schemaName : undefined,
       );
       const columnName = sanitizeIdentifier(parsed.column);
-      const selectCols =
-        parsed.select !== undefined && parsed.select.length > 0
-          ? parsed.select.map((c) => sanitizeIdentifier(c)).join(", ")
-          : "*";
+
+      // Build select columns - user-specified or non-geometry columns to avoid raw WKB
+      let selectCols: string;
+      if (parsed.select !== undefined && parsed.select.length > 0) {
+        selectCols = parsed.select.map((c) => sanitizeIdentifier(c)).join(", ");
+      } else {
+        // Get non-geometry columns to avoid returning raw WKB
+        const colQuery = `
+          SELECT column_name FROM information_schema.columns 
+          WHERE table_schema = $1 AND table_name = $2 
+          AND udt_name NOT IN ('geometry', 'geography')
+          ORDER BY ordinal_position
+        `;
+        const colResult = await adapter.executeQuery(colQuery, [
+          schemaName,
+          parsed.table,
+        ]);
+        const nonGeomCols = (colResult.rows ?? [])
+          .map((row) => sanitizeIdentifier(String(row["column_name"])))
+          .join(", ");
+        selectCols =
+          nonGeomCols.length > 0
+            ? `${nonGeomCols}, ST_AsText(${columnName}) as geometry_text`
+            : `ST_AsText(${columnName}) as geometry_text`;
+      }
 
       const isGeoJson = parsed.geometry.trim().startsWith("{");
 
@@ -405,10 +426,27 @@ export function createBoundingBoxTool(
         schemaName !== "public" ? schemaName : undefined,
       );
       const columnName = sanitizeIdentifier(parsed.column);
-      const selectCols =
-        parsed.select !== undefined && parsed.select.length > 0
-          ? parsed.select.map((c) => sanitizeIdentifier(c)).join(", ")
-          : "*";
+
+      // Build select columns - user-specified or non-geometry columns to avoid raw WKB
+      let selectCols: string;
+      if (parsed.select !== undefined && parsed.select.length > 0) {
+        selectCols = parsed.select.map((c) => sanitizeIdentifier(c)).join(", ");
+      } else {
+        // Get non-geometry columns to avoid returning raw WKB
+        const colQuery = `
+          SELECT column_name FROM information_schema.columns 
+          WHERE table_schema = $1 AND table_name = $2 
+          AND udt_name NOT IN ('geometry', 'geography')
+          ORDER BY ordinal_position
+        `;
+        const colResult = await adapter.executeQuery(colQuery, [
+          schemaName,
+          parsed.table,
+        ]);
+        selectCols = (colResult.rows ?? [])
+          .map((row) => sanitizeIdentifier(String(row["column_name"])))
+          .join(", ");
+      }
 
       // Auto-correct swapped bounds
       const corrections: string[] = [];

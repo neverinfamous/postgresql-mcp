@@ -332,8 +332,8 @@ Looks for common patterns like email, username, name, slug, etc.`,
         excludeSystemSchemas?: boolean;
       };
 
-      // Default limit of 100 to prevent large payloads
-      const DEFAULT_LIMIT = 100;
+      // Default limit of 50 to prevent large payloads and transport truncation
+      const DEFAULT_LIMIT = 50;
       const effectiveLimit =
         userLimit === 0 ? undefined : (userLimit ?? DEFAULT_LIMIT);
 

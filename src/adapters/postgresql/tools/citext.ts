@@ -439,8 +439,9 @@ Looks for common patterns like email, username, name, slug, etc.`,
       const truncated =
         effectiveLimit !== undefined && candidates.length < totalCount;
 
-      const highConfidence: Record<string, unknown>[] = [];
-      const mediumConfidence: Record<string, unknown>[] = [];
+      // Count high/medium confidence candidates without storing duplicates
+      let highConfidenceCount = 0;
+      let mediumConfidenceCount = 0;
 
       for (const row of candidates) {
         const colName = (row["column_name"] as string).toLowerCase();
@@ -449,9 +450,9 @@ Looks for common patterns like email, username, name, slug, etc.`,
           colName.includes("username") ||
           colName === "login"
         ) {
-          highConfidence.push(row);
+          highConfidenceCount++;
         } else {
-          mediumConfidence.push(row);
+          mediumConfidenceCount++;
         }
       }
 
@@ -464,11 +465,9 @@ Looks for common patterns like email, username, name, slug, etc.`,
         ...(table !== undefined && { table }),
         ...(schema !== undefined && { schema }),
         summary: {
-          highConfidence: highConfidence.length,
-          mediumConfidence: mediumConfidence.length,
+          highConfidence: highConfidenceCount,
+          mediumConfidence: mediumConfidenceCount,
         },
-        highConfidenceCandidates: highConfidence,
-        mediumConfidenceCandidates: mediumConfidence,
         recommendation:
           candidates.length > 0
             ? "Consider converting these columns to citext for case-insensitive comparisons"

@@ -91,6 +91,30 @@ function createLtreeQueryTool(adapter: PostgresAdapter): ToolDefinition {
       // Detect if path contains lquery pattern characters
       const isLqueryPattern = /[*?{!@|]/.test(path);
 
+      // Get total count when limit is applied for truncation indicators
+      let totalCount: number | undefined;
+      if (limit !== undefined) {
+        let countSql: string;
+        if (isLqueryPattern) {
+          countSql = `SELECT COUNT(*)::int as total FROM ${qualifiedTable} WHERE "${column}" ~ $1::lquery`;
+        } else {
+          let operator: string;
+          switch (queryMode) {
+            case "ancestors":
+              operator = "@>";
+              break;
+            case "exact":
+              operator = "=";
+              break;
+            default:
+              operator = "<@";
+          }
+          countSql = `SELECT COUNT(*)::int as total FROM ${qualifiedTable} WHERE "${column}" ${operator} $1::ltree`;
+        }
+        const countResult = await adapter.executeQuery(countSql, [path]);
+        totalCount = countResult.rows?.[0]?.["total"] as number;
+      }
+
       let sql: string;
       if (isLqueryPattern) {
         // Use lquery pattern matching with ~ operator
@@ -116,13 +140,22 @@ function createLtreeQueryTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       const result = await adapter.executeQuery(sql, [path]);
-      return {
+      const resultCount = result.rows?.length ?? 0;
+      const response: Record<string, unknown> = {
         path,
         mode: isLqueryPattern ? "pattern" : queryMode,
         isPattern: isLqueryPattern,
         results: result.rows ?? [],
-        count: result.rows?.length ?? 0,
+        count: resultCount,
       };
+
+      // Add truncation indicators when limit is applied
+      if (limit !== undefined && totalCount !== undefined) {
+        response["truncated"] = resultCount < totalCount;
+        response["totalCount"] = totalCount;
+      }
+
+      return response;
     },
   };
 }
@@ -214,13 +247,31 @@ function createLtreeMatchTool(adapter: PostgresAdapter): ToolDefinition {
       const schemaName = schema ?? "public";
       const qualifiedTable = `"${schemaName}"."${table}"`;
       const limitClause = limit !== undefined ? `LIMIT ${String(limit)}` : "";
+
+      // Get total count when limit is applied for truncation indicators
+      let totalCount: number | undefined;
+      if (limit !== undefined) {
+        const countSql = `SELECT COUNT(*)::int as total FROM ${qualifiedTable} WHERE "${column}" ~ $1::lquery`;
+        const countResult = await adapter.executeQuery(countSql, [pattern]);
+        totalCount = countResult.rows?.[0]?.["total"] as number;
+      }
+
       const sql = `SELECT *, nlevel("${column}") as depth FROM ${qualifiedTable} WHERE "${column}" ~ $1::lquery ORDER BY "${column}" ${limitClause}`;
       const result = await adapter.executeQuery(sql, [pattern]);
-      return {
+      const resultCount = result.rows?.length ?? 0;
+      const response: Record<string, unknown> = {
         pattern,
         results: result.rows ?? [],
-        count: result.rows?.length ?? 0,
+        count: resultCount,
       };
+
+      // Add truncation indicators when limit is applied
+      if (limit !== undefined && totalCount !== undefined) {
+        response["truncated"] = resultCount < totalCount;
+        response["totalCount"] = totalCount;
+      }
+
+      return response;
     },
   };
 }
@@ -302,6 +353,20 @@ function createLtreeConvertColumnTool(
           success: true,
           message: `Column ${column} is already ltree`,
           wasAlreadyLtree: true,
+        };
+      }
+
+      // Validate source column is text-based (like citext tool does)
+      const allowedTypes = ["text", "varchar", "character varying", "bpchar"];
+      const normalizedType = dataType.toLowerCase();
+      if (!allowedTypes.includes(normalizedType)) {
+        return {
+          success: false,
+          error: `Cannot convert column "${column}" of type "${currentType}" to ltree. Only text-based columns can be converted.`,
+          currentType,
+          allowedTypes: ["text", "varchar", "character varying"],
+          suggestion:
+            "Create a new TEXT column with ltree-formatted paths, then convert that column.",
         };
       }
 

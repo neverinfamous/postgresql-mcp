@@ -135,23 +135,36 @@ describe("Ltree Tools", () => {
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ udt_name: "ltree" }],
       });
-      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+      // Mock COUNT query for truncation
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ total: 15 }],
+      });
+      // Mock actual query
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [
+          { id: 1, path: "root.a" },
+          { id: 2, path: "root.b" },
+        ],
+      });
 
       const tool = findTool("pg_ltree_query");
-      await tool!.handler(
+      const result = (await tool!.handler(
         {
           table: "categories",
           column: "path",
           path: "root",
-          limit: 10,
+          limit: 2,
         },
         mockContext,
-      );
+      )) as { count: number; truncated: boolean; totalCount: number };
 
       expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
-        expect.stringContaining("LIMIT 10"),
+        expect.stringContaining("LIMIT 2"),
         expect.anything(),
       );
+      expect(result.count).toBe(2);
+      expect(result.truncated).toBe(true);
+      expect(result.totalCount).toBe(15);
     });
   });
 
@@ -402,6 +415,32 @@ describe("Ltree Tools", () => {
         ["root.*.leaf"],
       );
     });
+
+    it("should return truncation indicators when limit is applied", async () => {
+      // Mock COUNT query for truncation
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ total: 20 }],
+      });
+      // Mock actual query
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ id: 1, path: "root.a" }],
+      });
+
+      const tool = findTool("pg_ltree_match");
+      const result = (await tool!.handler(
+        {
+          table: "categories",
+          column: "path",
+          pattern: "root.*",
+          limit: 1,
+        },
+        mockContext,
+      )) as { count: number; truncated: boolean; totalCount: number };
+
+      expect(result.count).toBe(1);
+      expect(result.truncated).toBe(true);
+      expect(result.totalCount).toBe(20);
+    });
   });
 
   describe("pg_ltree_list_columns", () => {
@@ -515,6 +554,38 @@ describe("Ltree Tools", () => {
 
       expect(result.success).toBe(true);
       expect(result.wasAlreadyLtree).toBe(true);
+    });
+
+    it("should reject non-text columns with helpful error", async () => {
+      // Mock extension check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ installed: true }],
+      });
+      // Mock column check - integer column
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ data_type: "integer", udt_name: "int4" }],
+      });
+
+      const tool = findTool("pg_ltree_convert_column");
+      const result = (await tool!.handler(
+        {
+          table: "categories",
+          column: "id",
+        },
+        mockContext,
+      )) as {
+        success: boolean;
+        error?: string;
+        currentType?: string;
+        allowedTypes?: string[];
+        suggestion?: string;
+      };
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Only text-based columns");
+      expect(result.currentType).toBe("integer");
+      expect(result.allowedTypes).toContain("text");
+      expect(result.suggestion).toBeDefined();
     });
   });
 

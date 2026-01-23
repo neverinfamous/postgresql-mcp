@@ -134,6 +134,8 @@ Aliases: \`cacheStats\`→\`cacheHitRatio\`, \`queryStats\`→\`statStatements\`
 
 Wrappers: \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQueries({ seconds | minDuration }?)\` filters by duration, \`analyzeTable({ table })\` runs ANALYZE (accepts \`schema.table\` format)
 
+📍 **Code Mode Note**: \`pg_performance_baseline\` → \`pg.performance.baseline()\` (not \`performanceBaseline\`). \`indexRecommendations\` accepts \`query\` alias for \`sql\`
+
 **Top-Level Aliases**: \`pg.explain()\`, \`pg.explainAnalyze()\`, \`pg.cacheHitRatio()\`, \`pg.indexStats()\`, \`pg.tableStats()\`, \`pg.indexRecommendations()\`, \`pg.bloatCheck()\`, \`pg.vacuumStats()\`, \`pg.unusedIndexes()\`, \`pg.duplicateIndexes()\`, \`pg.seqScanTables()\`
 
 ## Monitoring Tools

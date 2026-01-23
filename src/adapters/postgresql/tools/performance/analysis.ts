@@ -79,30 +79,34 @@ export function createSeqScanTablesTool(
 export function createIndexRecommendationsTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
+  // Base schema for MCP visibility (no preprocess)
+  const IndexRecommendationsSchemaBase = z.object({
+    table: z.string().optional().describe("Table name to analyze"),
+    sql: z
+      .string()
+      .optional()
+      .describe("SQL query to analyze for index recommendations"),
+    query: z
+      .string()
+      .optional()
+      .describe("Alias for sql - SQL query to analyze"),
+    params: z
+      .array(z.unknown())
+      .optional()
+      .describe("Query parameters for $1, $2, etc. placeholders"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  });
+
   // Preprocess for query alias and handle undefined params
-  const IndexRecommendationsSchema = z.preprocess(
-    (input) => {
-      const normalized = (input ?? {}) as Record<string, unknown>;
-      const result = { ...normalized };
-      // Alias: query → sql
-      if (result["sql"] === undefined && result["query"] !== undefined) {
-        result["sql"] = result["query"];
-      }
-      return result;
-    },
-    z.object({
-      table: z.string().optional().describe("Table name to analyze"),
-      sql: z
-        .string()
-        .optional()
-        .describe("SQL query to analyze for index recommendations"),
-      params: z
-        .array(z.unknown())
-        .optional()
-        .describe("Query parameters for $1, $2, etc. placeholders"),
-      schema: z.string().optional().describe("Schema name (default: public)"),
-    }),
-  );
+  const IndexRecommendationsSchema = z.preprocess((input) => {
+    const normalized = (input ?? {}) as Record<string, unknown>;
+    const result = { ...normalized };
+    // Alias: query → sql
+    if (result["sql"] === undefined && result["query"] !== undefined) {
+      result["sql"] = result["query"];
+    }
+    return result;
+  }, IndexRecommendationsSchemaBase);
 
   // Helper to check if HypoPG extension is available
   const checkHypoPG = async (): Promise<boolean> => {
@@ -176,7 +180,7 @@ export function createIndexRecommendationsTool(
     description:
       "Suggest missing indexes based on table statistics or query analysis. When sql is provided and HypoPG is installed, creates hypothetical indexes to measure potential performance improvement.",
     group: "performance",
-    inputSchema: IndexRecommendationsSchema,
+    inputSchema: IndexRecommendationsSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Index Recommendations"),
     icons: getToolIcons("performance", readOnly("Index Recommendations")),
     handler: async (params: unknown, _context: RequestContext) => {

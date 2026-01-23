@@ -57,7 +57,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 **Positional args work**: \`readQuery("SELECT...")\`, \`exists("users", "id=1")\`, \`createIndex("users", ["email"])\`
 
-**Discovery**: \`pg.help()\` lists all groups. \`pg.core.help()\`, \`pg.jsonb.help()\` for group-specific methods.
+**Discovery**: \`pg.help()\` returns \`{group: methods[]}\` mapping (e.g., \`{core: ['readQuery', ...], jsonb: [...]}\`). \`pg.core.help()\`, \`pg.jsonb.help()\` for group-specific methods.
 
 ## Format Auto-Resolution
 

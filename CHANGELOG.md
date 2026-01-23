@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **pg.help() code mode documentation** — Updated `ServerInstructions.ts` to clarify that `pg.help()` returns `{group: methods[]}` mapping object (e.g., `{core: ['readQuery', ...], jsonb: [...]}`), not just "lists all groups". Prevents errors when trying to access non-existent `.groups` property
+
 ### Added
 
 - **MCP Resource Annotations** — All 20 resources now include MCP Resource Annotations (SDK 1.25+)

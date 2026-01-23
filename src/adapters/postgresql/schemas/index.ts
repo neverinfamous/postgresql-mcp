@@ -6,9 +6,12 @@
 
 // Core tool schemas (queries, tables, indexes, transactions)
 export {
+  ReadQuerySchemaBase,
   ReadQuerySchema,
+  WriteQuerySchemaBase,
   WriteQuerySchema,
   ListTablesSchema,
+  DescribeTableSchemaBase,
   DescribeTableSchema,
   CreateTableSchema,
   DropTableSchema,

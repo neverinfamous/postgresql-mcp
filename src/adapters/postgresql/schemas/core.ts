@@ -13,8 +13,24 @@ const defaultToEmpty = (val: unknown): unknown => val ?? {};
 // Query Schemas
 // =============================================================================
 
-// Base schema for MCP visibility (shows both sql and query)
-const ReadQuerySchemaBase = z.object({
+// MCP visibility schema - shows sql as REQUIRED (query as optional alias)
+export const ReadQuerySchemaBase = z.object({
+  sql: z.string().describe("SELECT query to execute"),
+  query: z.string().optional().describe("Alias for sql"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Query parameters ($1, $2, etc.)"),
+  transactionId: z
+    .string()
+    .optional()
+    .describe("Transaction ID to execute within (from pg_transaction_begin)"),
+  txId: z.string().optional().describe("Alias for transactionId"),
+  tx: z.string().optional().describe("Alias for transactionId"),
+});
+
+// Internal parsing schema - sql optional for alias resolution
+const ReadQueryParseSchema = z.object({
   sql: z.string().optional().describe("SELECT query to execute"),
   query: z.string().optional().describe("Alias for sql"),
   params: z
@@ -29,8 +45,8 @@ const ReadQuerySchemaBase = z.object({
   tx: z.string().optional().describe("Alias for transactionId"),
 });
 
-// Transformed schema with alias resolution
-export const ReadQuerySchema = ReadQuerySchemaBase.transform((data) => ({
+// Transformed schema with alias resolution (for handler parsing)
+export const ReadQuerySchema = ReadQueryParseSchema.transform((data) => ({
   sql: data.sql ?? data.query ?? "",
   params: data.params,
   transactionId: data.transactionId ?? data.txId ?? data.tx,
@@ -38,8 +54,24 @@ export const ReadQuerySchema = ReadQuerySchemaBase.transform((data) => ({
   message: "sql (or query alias) is required",
 });
 
-// Base schema for MCP visibility (shows both sql and query)
-const WriteQuerySchemaBase = z.object({
+// MCP visibility schema - shows sql as REQUIRED (query as optional alias)
+export const WriteQuerySchemaBase = z.object({
+  sql: z.string().describe("INSERT/UPDATE/DELETE query to execute"),
+  query: z.string().optional().describe("Alias for sql"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Query parameters ($1, $2, etc.)"),
+  transactionId: z
+    .string()
+    .optional()
+    .describe("Transaction ID to execute within (from pg_transaction_begin)"),
+  txId: z.string().optional().describe("Alias for transactionId"),
+  tx: z.string().optional().describe("Alias for transactionId"),
+});
+
+// Internal parsing schema - sql optional for alias resolution
+const WriteQueryParseSchema = z.object({
   sql: z.string().optional().describe("INSERT/UPDATE/DELETE query to execute"),
   query: z.string().optional().describe("Alias for sql"),
   params: z
@@ -54,8 +86,8 @@ const WriteQuerySchemaBase = z.object({
   tx: z.string().optional().describe("Alias for transactionId"),
 });
 
-// Transformed schema with alias resolution
-export const WriteQuerySchema = WriteQuerySchemaBase.transform((data) => ({
+// Transformed schema with alias resolution (for handler parsing)
+export const WriteQuerySchema = WriteQueryParseSchema.transform((data) => ({
   sql: data.sql ?? data.query ?? "",
   params: data.params,
   transactionId: data.transactionId ?? data.txId ?? data.tx,
@@ -113,8 +145,15 @@ export const ListTablesSchema = z.preprocess(
   }),
 );
 
-// Base schema for MCP visibility (shows both table and tableName)
-const DescribeTableSchemaBase = z.object({
+// MCP visibility schema - shows table as REQUIRED
+export const DescribeTableSchemaBase = z.object({
+  table: z.string().describe("Table name (supports schema.table format)"),
+  tableName: z.string().optional().describe("Alias for table"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+});
+
+// Internal parsing schema - table optional for alias resolution
+const DescribeTableParseSchema = z.object({
   table: z
     .string()
     .optional()
@@ -125,7 +164,7 @@ const DescribeTableSchemaBase = z.object({
 
 // Transformed schema with alias resolution and schema.table parsing
 export const DescribeTableSchema = z
-  .preprocess(preprocessTableParams, DescribeTableSchemaBase)
+  .preprocess(preprocessTableParams, DescribeTableParseSchema)
   .transform((data) => ({
     table: data.table ?? data.tableName ?? "",
     schema: data.schema,
@@ -268,11 +307,11 @@ export const CreateTableSchema = z
       // Parse string references like 'users(id)' → {table: 'users', column: 'id'}
       type RefType =
         | {
-            table: string;
-            column: string;
-            onDelete?: string;
-            onUpdate?: string;
-          }
+          table: string;
+          column: string;
+          onDelete?: string;
+          onUpdate?: string;
+        }
         | undefined;
       let references: RefType = undefined;
 
@@ -281,7 +320,7 @@ export const CreateTableSchema = z
         if (!parsed) {
           throw new Error(
             `Invalid references format: '${col.references}'. ` +
-              `Use object syntax {table: 'name', column: 'col'} or string syntax 'table(column)'.`,
+            `Use object syntax {table: 'name', column: 'col'} or string syntax 'table(column)'.`,
           );
         }
         references = parsed;

@@ -72,8 +72,32 @@ function preprocessUpsertParams(input: unknown): unknown {
   return obj;
 }
 
-// Base schema for upsert
-const UpsertSchemaBase = z.object({
+// MCP visibility schema - shows table and data as REQUIRED
+export const UpsertSchemaBase = z.object({
+  table: z.string().describe("Table name (supports schema.table format)"),
+  tableName: z.string().optional().describe("Alias for table"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  data: z
+    .record(z.string(), z.unknown())
+    .describe("Column-value pairs to insert"),
+  values: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Alias for data"),
+  conflictColumns: z
+    .array(z.string())
+    .describe("Columns that form the unique constraint (ON CONFLICT)"),
+  updateColumns: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Columns to update on conflict (default: all except conflict columns)",
+    ),
+  returning: z.array(z.string()).optional().describe("Columns to return"),
+});
+
+// Internal parsing schema - optional fields for alias resolution
+const UpsertParseSchema = z.object({
   table: z
     .string()
     .optional()
@@ -101,7 +125,7 @@ const UpsertSchemaBase = z.object({
 });
 
 export const UpsertSchema = z
-  .preprocess(preprocessUpsertParams, UpsertSchemaBase)
+  .preprocess(preprocessUpsertParams, UpsertParseSchema)
   .transform((d) => ({
     ...d,
     table: d.table ?? d.tableName ?? "",
@@ -119,8 +143,19 @@ export const UpsertSchema = z
       "conflictColumns must not be empty - specify columns for ON CONFLICT clause",
   });
 
-// Base schema for batch insert
-const BatchInsertSchemaBase = z.object({
+// MCP visibility schema - shows table and rows as REQUIRED
+export const BatchInsertSchemaBase = z.object({
+  table: z.string().describe("Table name (supports schema.table format)"),
+  tableName: z.string().optional().describe("Alias for table"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  rows: z
+    .array(z.record(z.string(), z.unknown()))
+    .describe("Array of row objects to insert"),
+  returning: z.array(z.string()).optional().describe("Columns to return"),
+});
+
+// Internal parsing schema - table optional for alias resolution
+const BatchInsertParseSchema = z.object({
   table: z
     .string()
     .optional()
@@ -134,7 +169,7 @@ const BatchInsertSchemaBase = z.object({
 });
 
 export const BatchInsertSchema = z
-  .preprocess(preprocessTableParams, BatchInsertSchemaBase)
+  .preprocess(preprocessTableParams, BatchInsertParseSchema)
   .transform((data) => ({
     ...data,
     table: data.table ?? data.tableName ?? "",
@@ -147,8 +182,27 @@ export const BatchInsertSchema = z
     message: "rows must not be empty",
   });
 
-// Base schema for count
-const CountSchemaBase = z.object({
+// MCP visibility schema - shows table as REQUIRED
+export const CountSchemaBase = z.object({
+  table: z.string().describe("Table name (supports schema.table format)"),
+  tableName: z.string().optional().describe("Alias for table"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  where: z
+    .string()
+    .optional()
+    .describe("WHERE clause (supports $1, $2 placeholders)"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for WHERE clause placeholders"),
+  column: z
+    .string()
+    .optional()
+    .describe("Column to count (default: * for all rows)"),
+});
+
+// Internal parsing schema - table optional for alias resolution
+const CountParseSchema = z.object({
   table: z
     .string()
     .optional()
@@ -172,7 +226,7 @@ const CountSchemaBase = z.object({
 export const CountSchema = z
   .preprocess(
     (val: unknown) => preprocessTableParams(val ?? {}),
-    CountSchemaBase,
+    CountParseSchema,
   )
   .transform((data) => ({
     ...data,
@@ -183,8 +237,25 @@ export const CountSchema = z
       'table (or tableName alias) is required. Usage: pg_count({ table: "users" }) or pg_count({ table: "users", where: "active = true" })',
   });
 
-// Base schema for exists
-const ExistsSchemaBase = z.object({
+// MCP visibility schema - shows table as REQUIRED
+export const ExistsSchemaBase = z.object({
+  table: z.string().describe("Table name (supports schema.table format)"),
+  tableName: z.string().optional().describe("Alias for table"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  where: z
+    .string()
+    .optional()
+    .describe("WHERE clause (supports $1, $2 placeholders)"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for WHERE clause placeholders"),
+  condition: z.string().optional().describe("Alias for where"),
+  filter: z.string().optional().describe("Alias for where"),
+});
+
+// Internal parsing schema - table optional for alias resolution
+const ExistsParseSchema = z.object({
   table: z
     .string()
     .optional()
@@ -223,7 +294,7 @@ function preprocessExistsParams(input: unknown): unknown {
 }
 
 export const ExistsSchema = z
-  .preprocess(preprocessExistsParams, ExistsSchemaBase)
+  .preprocess(preprocessExistsParams, ExistsParseSchema)
   .transform((data) => ({
     ...data,
     table: data.table ?? data.tableName ?? "",
@@ -234,8 +305,23 @@ export const ExistsSchema = z
       'table (or tableName alias) is required. Usage: pg_exists({ table: "users" }) or pg_exists({ table: "users", where: "id = 1" })',
   });
 
-// Base schema for truncate
-const TruncateSchemaBase = z.object({
+// MCP visibility schema - shows table as REQUIRED
+export const TruncateSchemaBase = z.object({
+  table: z.string().describe("Table name (supports schema.table format)"),
+  tableName: z.string().optional().describe("Alias for table"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  cascade: z
+    .boolean()
+    .optional()
+    .describe("Use CASCADE to truncate dependent tables"),
+  restartIdentity: z
+    .boolean()
+    .optional()
+    .describe("Restart identity sequences"),
+});
+
+// Internal parsing schema - table optional for alias resolution
+const TruncateParseSchema = z.object({
   table: z
     .string()
     .optional()
@@ -253,7 +339,7 @@ const TruncateSchemaBase = z.object({
 });
 
 export const TruncateSchema = z
-  .preprocess(preprocessTableParams, TruncateSchemaBase)
+  .preprocess(preprocessTableParams, TruncateParseSchema)
   .transform((data) => ({
     ...data,
     table: data.table ?? data.tableName ?? "",
@@ -276,7 +362,7 @@ export function createUpsertTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Insert a row or update if it already exists (INSERT ... ON CONFLICT DO UPDATE). Specify conflict columns for uniqueness check. Use data or values for column-value pairs.",
     group: "core",
-    inputSchema: UpsertSchema,
+    inputSchema: UpsertSchemaBase, // Base schema for MCP visibility
     annotations: write("Upsert"),
     icons: getToolIcons("core", write("Upsert")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -359,7 +445,7 @@ export function createUpsertTool(adapter: PostgresAdapter): ToolDefinition {
           if (msg.includes("no unique or exclusion constraint")) {
             throw new Error(
               `conflictColumns [${parsed.conflictColumns.join(", ")}] must reference columns with a UNIQUE constraint or PRIMARY KEY. ` +
-                `Create a unique constraint first: ALTER TABLE ${qualifiedTable} ADD CONSTRAINT unique_name UNIQUE (${conflictCols})`,
+              `Create a unique constraint first: ALTER TABLE ${qualifiedTable} ADD CONSTRAINT unique_name UNIQUE (${conflictCols})`,
             );
           }
         }
@@ -380,7 +466,7 @@ export function createBatchInsertTool(
     description:
       "Insert multiple rows in a single statement. More efficient than individual inserts. Rows array must not be empty.",
     group: "core",
-    inputSchema: BatchInsertSchema,
+    inputSchema: BatchInsertSchemaBase, // Base schema for MCP visibility
     annotations: write("Batch Insert"),
     icons: getToolIcons("core", write("Batch Insert")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -390,7 +476,7 @@ export function createBatchInsertTool(
       if (parsed.rows.length === 0) {
         throw new Error(
           "rows array must not be empty. Provide at least one row to insert, " +
-            'e.g., rows: [{column: "value"}]',
+          'e.g., rows: [{column: "value"}]',
         );
       }
 
@@ -489,7 +575,7 @@ export function createCountTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Count rows in a table, optionally with a WHERE clause or specific column.",
     group: "core",
-    inputSchema: CountSchema,
+    inputSchema: CountSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Count"),
     icons: getToolIcons("core", readOnly("Count")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -523,7 +609,7 @@ export function createExistsTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Check if rows exist in a table. WHERE clause is optional: with WHERE = checks matching rows; without WHERE = checks if table has any rows at all. For table *schema* existence, use pg_list_tables.",
     group: "core",
-    inputSchema: ExistsSchema,
+    inputSchema: ExistsSchemaBase, // Base schema for MCP visibility
     annotations: readOnly("Exists"),
     icons: getToolIcons("core", readOnly("Exists")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -563,7 +649,7 @@ export function createTruncateTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Truncate a table, removing all rows quickly. Use cascade to truncate dependent tables.",
     group: "core",
-    inputSchema: TruncateSchema,
+    inputSchema: TruncateSchemaBase, // Base schema for MCP visibility
     annotations: write("Truncate"),
     icons: getToolIcons("core", write("Truncate")),
     handler: async (params: unknown, _context: RequestContext) => {

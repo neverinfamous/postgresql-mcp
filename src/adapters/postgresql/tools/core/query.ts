@@ -11,7 +11,12 @@ import type {
 } from "../../../../types/index.js";
 import { readOnly, write } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
-import { ReadQuerySchema, WriteQuerySchema } from "../../schemas/index.js";
+import {
+  ReadQuerySchemaBase,
+  ReadQuerySchema,
+  WriteQuerySchemaBase,
+  WriteQuerySchema,
+} from "../../schemas/index.js";
 
 /**
  * Execute a read-only SQL query
@@ -22,7 +27,7 @@ export function createReadQueryTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Execute a read-only SQL query (SELECT, WITH). Returns rows as JSON. Pass transactionId to execute within a transaction.",
     group: "core",
-    inputSchema: ReadQuerySchema,
+    inputSchema: ReadQuerySchemaBase, // Base schema for MCP visibility (sql required)
     annotations: readOnly("Read Query"),
     icons: getToolIcons("core", readOnly("Read Query")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -68,7 +73,7 @@ export function createWriteQueryTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Execute a write SQL query (INSERT, UPDATE, DELETE). Returns affected row count. Pass transactionId to execute within a transaction.",
     group: "core",
-    inputSchema: WriteQuerySchema,
+    inputSchema: WriteQuerySchemaBase, // Base schema for MCP visibility (sql required)
     annotations: write("Write Query"),
     icons: getToolIcons("core", write("Write Query")),
     handler: async (params: unknown, _context: RequestContext) => {

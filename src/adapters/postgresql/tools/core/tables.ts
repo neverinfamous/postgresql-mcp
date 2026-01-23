@@ -13,6 +13,7 @@ import { readOnly, write, destructive } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
 import {
   ListTablesSchema,
+  DescribeTableSchemaBase,
   DescribeTableSchema,
   CreateTableSchema,
   DropTableSchema,
@@ -70,7 +71,7 @@ export function createDescribeTableTool(
     description:
       "Get detailed table structure including columns, types, and constraints. For tables/views only, not sequences.",
     group: "core",
-    inputSchema: DescribeTableSchema,
+    inputSchema: DescribeTableSchemaBase, // Base schema for MCP visibility (table required)
     annotations: readOnly("Describe Table"),
     icons: getToolIcons("core", readOnly("Describe Table")),
     handler: async (params: unknown, _context: RequestContext) => {

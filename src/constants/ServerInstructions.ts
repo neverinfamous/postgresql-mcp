@@ -197,7 +197,7 @@ Response Structures:
 
 📦 **AI-Optimized Payloads**: \`copyExport\` limits results to 500 rows by default to prevent large payloads. Use \`limit: 0\` for all rows, or specify a custom limit.
 
-- \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). Format: \`csv\` (default), \`text\`. ⛔ \`binary\` not supported via MCP—use \`pg_dump_schema\` for binary exports. Default \`limit: 500\` (use \`0\` for all rows). Optional \`header\` (default: true), \`delimiter\`
+- \`pg_copy_export\`: Use \`query\`/\`sql\` OR \`table\`. ⚠️ If both provided, \`query\` takes precedence with warning. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). Format: \`csv\` (default, comma-delimited), \`text\` (tab-delimited). Both formats support \`header: true\` (default). ⛔ \`binary\` not supported via MCP—use \`pg_dump_schema\` for binary exports. Default \`limit: 500\` (use \`0\` for all rows). Optional \`delimiter\` to customize
 - \`pg_dump_table\`: Returns \`ddl\` + \`insertStatements\` when \`includeData: true\`. Supports sequences (\`type: 'sequence'\`), views (\`type: 'view'\`), and partitioned tables (\`type: 'partitioned_table'\` with \`PARTITION BY\` clause). **PRIMARY KEYS, INDEXES, CONSTRAINTS NOT included**—use \`pg_get_indexes\`/\`pg_get_constraints\`. Supports \`schema.table\` format
 - \`pg_dump_schema\`: Generates pg_dump command. Optional \`schema\`, \`table\`, \`filename\`
 - \`pg_copy_import\`: Generates COPY FROM command. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). \`columns\` array, \`filePath\`, \`format\`, \`header\`, \`delimiter\`

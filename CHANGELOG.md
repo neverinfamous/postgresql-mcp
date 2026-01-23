@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Monitoring `tables` alias** — Code mode monitoring group now supports `tables` as a shorthand alias for `tableSizes` (e.g., `pg.monitoring.tables({ limit: 10 })`), consistent with other group aliases like `connections` → `connectionStats`
 
+### Documentation
+
+- **pg_copy_export enhanced documentation** — Updated `ServerInstructions.ts` to clarify: (1) warning is returned when both `query` and `table` parameters are provided (query takes precedence), (2) `text` format uses tab-delimited output by default but supports `header: true` like CSV format, (3) `delimiter` parameter can customize the field separator for both formats
+
 ### Fixed
 
 - **pg_query_plan_stats `limit: 0` behavior** — `pg_query_plan_stats` now correctly returns all rows when `limit: 0` is specified. Previously, `limit: 0` was incorrectly applied as SQL `LIMIT 0`, returning zero results instead of all results. Now consistent with other tools (`tableStats`, `vacuumStats`, `unusedIndexes`) where `limit: 0` means "no limit / return all"

@@ -240,6 +240,15 @@ describe("Citext Tools", () => {
   });
 
   describe("pg_citext_analyze_candidates", () => {
+    // System schemas excluded by default when no schema/table filter
+    const systemSchemas = [
+      "cron",
+      "topology",
+      "partman",
+      "tiger",
+      "tiger_data",
+    ];
+
     it("should find email and username columns", async () => {
       // Mock count query first, then main query
       mockAdapter.executeQuery
@@ -265,10 +274,13 @@ describe("Citext Tools", () => {
       const result = (await tool!.handler({}, mockContext)) as {
         count: number;
         summary: { highConfidence: number };
+        excludedSchemas?: string[];
       };
 
       expect(result.count).toBe(2);
       expect(result.summary.highConfidence).toBe(2);
+      // Should include system schema exclusion info
+      expect(result.excludedSchemas).toEqual(systemSchemas);
     });
 
     it("should use custom patterns when provided", async () => {
@@ -300,6 +312,60 @@ describe("Citext Tools", () => {
       };
 
       expect(result.recommendation).toContain("Consider converting");
+    });
+
+    it("should exclude system schemas by default", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const tool = findTool("pg_citext_analyze_candidates");
+      const result = (await tool!.handler({}, mockContext)) as {
+        excludedSchemas: string[];
+      };
+
+      // Query should include system schema exclusion
+      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining("table_schema NOT IN"),
+        expect.arrayContaining(systemSchemas),
+      );
+      expect(result.excludedSchemas).toEqual(systemSchemas);
+    });
+
+    it("should include all schemas when excludeSystemSchemas: false", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const tool = findTool("pg_citext_analyze_candidates");
+      const result = (await tool!.handler(
+        { excludeSystemSchemas: false },
+        mockContext,
+      )) as {
+        excludedSchemas?: string[];
+      };
+
+      // Query should NOT include extra system schema exclusion params
+      expect(mockAdapter.executeQuery).not.toHaveBeenCalledWith(
+        expect.stringContaining("table_schema NOT IN"),
+        expect.arrayContaining(["cron"]),
+      );
+      // Should not have excludedSchemas in response
+      expect(result.excludedSchemas).toBeUndefined();
+    });
+
+    it("should not exclude system schemas when table filter is specified", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const tool = findTool("pg_citext_analyze_candidates");
+      const result = (await tool!.handler({ table: "users" }, mockContext)) as {
+        excludedSchemas?: string[];
+      };
+
+      // Should not have excludedSchemas when filtering by table
+      expect(result.excludedSchemas).toBeUndefined();
     });
   });
 

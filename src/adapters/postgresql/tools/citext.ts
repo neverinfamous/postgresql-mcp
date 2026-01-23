@@ -323,12 +323,22 @@ Looks for common patterns like email, username, name, slug, etc.`,
         schema,
         table,
         limit: userLimit,
-      } = CitextAnalyzeCandidatesSchema.parse(params);
+        excludeSystemSchemas: userExcludeSystemSchemas,
+      } = CitextAnalyzeCandidatesSchema.parse(params) as {
+        patterns?: string[];
+        schema?: string;
+        table?: string;
+        limit?: number;
+        excludeSystemSchemas?: boolean;
+      };
 
       // Default limit of 100 to prevent large payloads
       const DEFAULT_LIMIT = 100;
       const effectiveLimit =
         userLimit === 0 ? undefined : (userLimit ?? DEFAULT_LIMIT);
+
+      // Exclude system schemas by default when no table filter is specified
+      const excludeSystemSchemas = userExcludeSystemSchemas ?? true;
 
       const searchPatterns = patterns ?? [
         "email",
@@ -349,12 +359,31 @@ Looks for common patterns like email, username, name, slug, etc.`,
         "identifier",
       ];
 
+      // System/extension schemas to exclude by default (reduces noise from extension tables)
+      const systemSchemas = [
+        "cron",
+        "topology",
+        "partman",
+        "tiger",
+        "tiger_data",
+      ];
+
       const conditions: string[] = [
         "data_type IN ('text', 'character varying')",
         "table_schema NOT IN ('pg_catalog', 'information_schema')",
       ];
       const queryParams: unknown[] = [];
       let paramIndex = 1;
+
+      // Only apply system schema exclusion when no specific schema/table is requested
+      if (excludeSystemSchemas && schema === undefined && table === undefined) {
+        const placeholders = systemSchemas.map(() => {
+          const idx = paramIndex++;
+          return `$${String(idx)}`;
+        });
+        conditions.push(`table_schema NOT IN (${placeholders.join(", ")})`);
+        queryParams.push(...systemSchemas);
+      }
 
       if (schema !== undefined) {
         conditions.push(`table_schema = $${String(paramIndex++)}`);
@@ -444,6 +473,12 @@ Looks for common patterns like email, username, name, slug, etc.`,
           candidates.length > 0
             ? "Consider converting these columns to citext for case-insensitive comparisons"
             : "No obvious candidates found. Use custom patterns if needed.",
+        // Include excluded schemas info when filtering is applied
+        ...(excludeSystemSchemas &&
+          schema === undefined &&
+          table === undefined && {
+            excludedSchemas: systemSchemas,
+          }),
       };
     },
   };

@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_partman_show_partitions default limit** — `pg_partman_show_partitions` now applies a default limit of 50 partitions when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all partitions. Prevents large payloads for partition sets with many children
 - **pg_citext_analyze_candidates default limit** — `pg_citext_analyze_candidates` now applies a default limit of 100 candidates when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all candidates. Prevents large payloads in databases with many tables matching citext patterns
 - **pg_citext_list_columns default limit** — `pg_citext_list_columns` now applies a default limit of 100 columns when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all columns. Prevents large payloads in databases with many citext columns
+- **pg_citext_analyze_candidates system schema exclusion** — `pg_citext_analyze_candidates` now excludes extension/system schemas (`cron`, `topology`, `partman`, `tiger`, `tiger_data`) by default when no `schema` or `table` filter is specified. Returns `excludedSchemas` field listing filtered schemas. Use `excludeSystemSchemas: false` to include all schemas. Reduces noise from extension tables in candidate results
 
 ### Fixed
 

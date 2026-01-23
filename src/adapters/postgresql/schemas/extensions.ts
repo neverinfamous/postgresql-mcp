@@ -207,6 +207,12 @@ export const CitextAnalyzeCandidatesSchemaBase = z.object({
     .number()
     .optional()
     .describe("Maximum number of candidates to return"),
+  excludeSystemSchemas: z
+    .boolean()
+    .optional()
+    .describe(
+      "Exclude extension/system schemas like cron, topology, partman (default: true)",
+    ),
 });
 
 /**

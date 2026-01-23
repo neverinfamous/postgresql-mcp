@@ -12,6 +12,7 @@ import type {
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
 import {
+  ListObjectsSchemaBase,
   ListObjectsSchema,
   ObjectDetailsSchema,
   ObjectDetailsSchemaBase,
@@ -30,7 +31,7 @@ export function createListObjectsTool(
     group: "core",
     annotations: readOnly("List Objects"),
     icons: getToolIcons("core", readOnly("List Objects")),
-    inputSchema: ListObjectsSchema,
+    inputSchema: ListObjectsSchemaBase,
     handler: async (params: unknown, _context: RequestContext) => {
       const { schema, types, limit } = ListObjectsSchema.parse(params);
 

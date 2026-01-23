@@ -37,37 +37,41 @@ function preprocessListObjectsParams(input: unknown): unknown {
   return result;
 }
 
+// Base schema for MCP visibility - exposes all parameters without transform
+export const ListObjectsSchemaBase = z.object({
+  schema: z
+    .string()
+    .optional()
+    .describe("Schema name (default: all user schemas)"),
+  types: z
+    .array(
+      z.enum([
+        "table",
+        "view",
+        "materialized_view",
+        "function",
+        "procedure",
+        "sequence",
+        "index",
+        "trigger",
+      ]),
+    )
+    .optional()
+    .describe("Object types to include"),
+  type: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .describe("Alias for types (singular or array)"),
+  limit: z
+    .number()
+    .optional()
+    .describe("Maximum number of objects to return (default: 100)"),
+});
+
+// Transformed schema with preprocess for handler parsing
 export const ListObjectsSchema = z.preprocess(
   preprocessListObjectsParams,
-  z.object({
-    schema: z
-      .string()
-      .optional()
-      .describe("Schema name (default: all user schemas)"),
-    types: z
-      .array(
-        z.enum([
-          "table",
-          "view",
-          "materialized_view",
-          "function",
-          "procedure",
-          "sequence",
-          "index",
-          "trigger",
-        ]),
-      )
-      .optional()
-      .describe("Object types to include"),
-    type: z
-      .union([z.string(), z.array(z.string())])
-      .optional()
-      .describe("Alias for types (singular or array)"),
-    limit: z
-      .number()
-      .optional()
-      .describe("Maximum number of objects to return (default: 100)"),
-  }),
+  ListObjectsSchemaBase,
 );
 
 // Inner schema for ObjectDetails (used by preprocess and as base for MCP visibility)

@@ -72,13 +72,17 @@ function preprocessUpsertParams(input: unknown): unknown {
   return obj;
 }
 
-// MCP visibility schema - shows table and data as REQUIRED
+// MCP visibility schema - table OR tableName required, data OR values required
 export const UpsertSchemaBase = z.object({
-  table: z.string().describe("Table name (supports schema.table format)"),
+  table: z
+    .string()
+    .optional()
+    .describe("Table name (supports schema.table format)"),
   tableName: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
   data: z
     .record(z.string(), z.unknown())
+    .optional()
     .describe("Column-value pairs to insert"),
   values: z
     .record(z.string(), z.unknown())
@@ -143,9 +147,12 @@ export const UpsertSchema = z
       "conflictColumns must not be empty - specify columns for ON CONFLICT clause",
   });
 
-// MCP visibility schema - shows table and rows as REQUIRED
+// MCP visibility schema - table OR tableName required
 export const BatchInsertSchemaBase = z.object({
-  table: z.string().describe("Table name (supports schema.table format)"),
+  table: z
+    .string()
+    .optional()
+    .describe("Table name (supports schema.table format)"),
   tableName: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
   rows: z
@@ -182,9 +189,12 @@ export const BatchInsertSchema = z
     message: "rows must not be empty",
   });
 
-// MCP visibility schema - shows table as REQUIRED
+// MCP visibility schema - table OR tableName required
 export const CountSchemaBase = z.object({
-  table: z.string().describe("Table name (supports schema.table format)"),
+  table: z
+    .string()
+    .optional()
+    .describe("Table name (supports schema.table format)"),
   tableName: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
   where: z
@@ -237,9 +247,12 @@ export const CountSchema = z
       'table (or tableName alias) is required. Usage: pg_count({ table: "users" }) or pg_count({ table: "users", where: "active = true" })',
   });
 
-// MCP visibility schema - shows table as REQUIRED
+// MCP visibility schema - table OR tableName required
 export const ExistsSchemaBase = z.object({
-  table: z.string().describe("Table name (supports schema.table format)"),
+  table: z
+    .string()
+    .optional()
+    .describe("Table name (supports schema.table format)"),
   tableName: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
   where: z
@@ -305,9 +318,12 @@ export const ExistsSchema = z
       'table (or tableName alias) is required. Usage: pg_exists({ table: "users" }) or pg_exists({ table: "users", where: "id = 1" })',
   });
 
-// MCP visibility schema - shows table as REQUIRED
+// MCP visibility schema - table OR tableName required
 export const TruncateSchemaBase = z.object({
-  table: z.string().describe("Table name (supports schema.table format)"),
+  table: z
+    .string()
+    .optional()
+    .describe("Table name (supports schema.table format)"),
   tableName: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
   cascade: z

@@ -13,9 +13,9 @@ const defaultToEmpty = (val: unknown): unknown => val ?? {};
 // Query Schemas
 // =============================================================================
 
-// MCP visibility schema - shows sql as REQUIRED (query as optional alias)
+// MCP visibility schema - sql OR query required (both optional in schema, refine enforces)
 export const ReadQuerySchemaBase = z.object({
-  sql: z.string().describe("SELECT query to execute"),
+  sql: z.string().optional().describe("SELECT query to execute"),
   query: z.string().optional().describe("Alias for sql"),
   params: z
     .array(z.unknown())
@@ -54,9 +54,9 @@ export const ReadQuerySchema = ReadQueryParseSchema.transform((data) => ({
   message: "sql (or query alias) is required",
 });
 
-// MCP visibility schema - shows sql as REQUIRED (query as optional alias)
+// MCP visibility schema - sql OR query required (both optional in schema, refine enforces)
 export const WriteQuerySchemaBase = z.object({
-  sql: z.string().describe("INSERT/UPDATE/DELETE query to execute"),
+  sql: z.string().optional().describe("INSERT/UPDATE/DELETE query to execute"),
   query: z.string().optional().describe("Alias for sql"),
   params: z
     .array(z.unknown())
@@ -145,9 +145,12 @@ export const ListTablesSchema = z.preprocess(
   }),
 );
 
-// MCP visibility schema - shows table as REQUIRED
+// MCP visibility schema - table OR tableName required (both optional in schema, refine enforces)
 export const DescribeTableSchemaBase = z.object({
-  table: z.string().describe("Table name (supports schema.table format)"),
+  table: z
+    .string()
+    .optional()
+    .describe("Table name (supports schema.table format)"),
   tableName: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
 });

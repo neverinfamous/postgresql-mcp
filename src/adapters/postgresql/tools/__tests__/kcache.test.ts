@@ -323,7 +323,9 @@ describe("Kcache Tools", () => {
     it("should classify queries as CPU-bound or I/O-bound", async () => {
       // First call: column detection
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
-      // Second call: actual query
+      // Second call: COUNT query for totalCount
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ total: 3 }] });
+      // Third call: actual query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [
           {
@@ -391,7 +393,9 @@ describe("Kcache Tools", () => {
     it("should provide recommendations based on analysis", async () => {
       // First call: column detection
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
-      // Second call: actual query
+      // Second call: COUNT query for totalCount
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ total: 3 }] });
+      // Third call: actual query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [
           { resource_classification: "CPU-bound" },
@@ -411,7 +415,9 @@ describe("Kcache Tools", () => {
     it("should recommend I/O optimization when I/O-bound > CPU-bound", async () => {
       // First call: column detection
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
-      // Second call: actual query
+      // Second call: COUNT query for totalCount
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ total: 4 }] });
+      // Third call: actual query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [
           { resource_classification: "I/O-bound" },
@@ -435,7 +441,9 @@ describe("Kcache Tools", () => {
     it("should recommend balanced optimization when workload is balanced", async () => {
       // First call: column detection
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
-      // Second call: actual query
+      // Second call: COUNT query for totalCount
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ total: 3 }] });
+      // Third call: actual query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [
           { resource_classification: "Balanced" },

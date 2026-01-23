@@ -10,6 +10,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { MEDIUM_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface StatsRecommendation {
   priority: "HIGH" | "MEDIUM" | "INFO";
@@ -60,6 +61,7 @@ export function createStatsResource(
     description:
       "Table and index statistics, cache hit ratios, and stale statistics detection",
     mimeType: "application/json",
+    annotations: MEDIUM_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       // Table stats with statsStale calculation
       const tableStats = await adapter.executeQuery(`

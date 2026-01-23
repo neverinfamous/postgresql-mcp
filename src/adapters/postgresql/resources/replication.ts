@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { LOW_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface ReplicationInfo {
   role: string;
@@ -28,6 +29,7 @@ export function createReplicationResource(
     description:
       "Primary/replica status, replication slots, WAL status, and lag monitoring",
     mimeType: "application/json",
+    annotations: LOW_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       // Check if we're on primary or replica
       const roleResult = await adapter.executeQuery(

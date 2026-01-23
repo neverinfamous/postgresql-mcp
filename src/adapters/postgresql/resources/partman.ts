@@ -6,6 +6,7 @@
 
 import type { PostgresAdapter } from "../PostgresAdapter.js";
 import type { ResourceDefinition } from "../../../types/index.js";
+import { LOW_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 /** Safely convert unknown value to string */
 function toStr(value: unknown): string {
@@ -55,6 +56,7 @@ export function createPartmanResource(
     description:
       "pg_partman partition set configuration, partition counts, and health status",
     mimeType: "application/json",
+    annotations: LOW_PRIORITY,
     handler: async (): Promise<string> => {
       const result: PartmanResourceData = {
         extensionInstalled: false,

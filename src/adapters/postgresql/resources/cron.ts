@@ -6,6 +6,7 @@
 
 import type { PostgresAdapter } from "../PostgresAdapter.js";
 import type { ResourceDefinition } from "../../../types/index.js";
+import { LOW_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 /** Safely convert unknown value to string */
 function toStr(value: unknown): string {
@@ -50,6 +51,7 @@ export function createCronResource(
     description:
       "pg_cron job scheduling status, active jobs, and execution history",
     mimeType: "application/json",
+    annotations: LOW_PRIORITY,
     handler: async (): Promise<string> => {
       const result: CronResourceData = {
         extensionInstalled: false,

@@ -6,6 +6,7 @@
 
 import type { PostgresAdapter } from "../PostgresAdapter.js";
 import type { ResourceDefinition } from "../../../types/index.js";
+import { LOW_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 /** Safely convert unknown value to string */
 function toStr(value: unknown): string {
@@ -62,6 +63,7 @@ export function createCryptoResource(
     description:
       "pgcrypto extension availability, algorithms, and security recommendations",
     mimeType: "application/json",
+    annotations: LOW_PRIORITY,
     handler: async (): Promise<string> => {
       const result: CryptoResourceData = {
         extensionInstalled: false,

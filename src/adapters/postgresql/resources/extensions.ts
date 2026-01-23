@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { LOW_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface ExtensionRecommendation {
   extension: string;
@@ -26,6 +27,7 @@ export function createExtensionsResource(
     description:
       "Installed extensions with versions and installation recommendations",
     mimeType: "application/json",
+    annotations: LOW_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       // Get installed extensions
       const installedResult = await adapter.executeQuery(`

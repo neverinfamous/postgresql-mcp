@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { MEDIUM_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface VacuumWarning {
   severity: "CRITICAL" | "HIGH" | "MEDIUM" | "INFO";
@@ -49,6 +50,7 @@ export function createVacuumResource(
     description:
       "Vacuum statistics, dead tuples, and transaction ID wraparound warnings",
     mimeType: "application/json",
+    annotations: MEDIUM_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       // Get vacuum statistics
       const vacuumResult = await adapter.executeQuery(`

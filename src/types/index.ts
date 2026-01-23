@@ -58,6 +58,7 @@ export type {
   ToolIcon,
   ToolDefinition,
   ResourceDefinition,
+  ResourceAnnotations,
   PromptDefinition,
 } from "./adapters.js";
 

@@ -11,6 +11,7 @@ import type {
   RequestContext,
   TableInfo,
 } from "../../../types/index.js";
+import { HIGH_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface TableStatsModification {
   schemaname: string;
@@ -43,6 +44,7 @@ export function createSchemaResource(
     description:
       "Comprehensive database schema: tables with columns/constraints/indexes, views, and statsStale detection. Use postgres://tables for a lightweight table listing.",
     mimeType: "application/json",
+    annotations: HIGH_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       const schema = await adapter.getSchema();
 

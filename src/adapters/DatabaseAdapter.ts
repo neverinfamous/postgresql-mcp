@@ -285,6 +285,8 @@ export abstract class DatabaseAdapter {
       {
         description: resource.description,
         mimeType: resource.mimeType ?? "application/json",
+        // Pass annotations if defined (SDK 1.25+)
+        ...(resource.annotations && { annotations: resource.annotations }),
       },
       async (uri: URL) => {
         const context = this.createContext();
@@ -298,6 +300,10 @@ export abstract class DatabaseAdapter {
                 typeof result === "string"
                   ? result
                   : JSON.stringify(result, null, 2),
+              // Include annotations in contents response for resource reads
+              ...(resource.annotations && {
+                annotations: resource.annotations,
+              }),
             },
           ],
         };

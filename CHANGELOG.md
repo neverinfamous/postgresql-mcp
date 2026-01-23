@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MCP Resource Annotations** — All 20 resources now include MCP Resource Annotations (SDK 1.25+)
+  - `audience` — Indicates target readers: `["user", "assistant"]` for most resources, `["assistant"]` for agent-focused resources
+  - `priority` — Float from 0.0-1.0 indicating resource importance: HIGH_PRIORITY (0.9), MEDIUM_PRIORITY (0.6), LOW_PRIORITY (0.4), ASSISTANT_FOCUSED (0.5)
+  - Priority assignments: health/schema/activity at 0.9 (critical), performance/indexes/tables/vacuum/locks/stats at 0.6 (monitoring), pool/extensions/replication/cron/partman/kcache/vector/postgis/crypto at 0.4 (supplementary), settings/capabilities at 0.5 (agent-focused)
+  - New `ResourceAnnotations` type in `types/adapters.ts` and reusable presets in `utils/resourceAnnotations.ts`
+  - `DatabaseAdapter.registerResource()` now passes annotations to the MCP SDK
 - **pg.textXxx() top-level aliases** — Code mode now supports top-level text method aliases for convenience: `pg.textSearch()`, `pg.textRank()`, `pg.textHeadline()`, `pg.textNormalize()`, `pg.textSentiment()`, `pg.textToVector()`, `pg.textToQuery()`, `pg.textSearchConfig()`, `pg.textTrigramSimilarity()`, `pg.textFuzzyMatch()`, `pg.textLikeSearch()`, `pg.textRegexpMatch()`, `pg.textCreateFtsIndex()`. These map directly to `pg.text.xxx()` methods, matching the aliases documented in `pg.text.help()`
 - **Text tools schema.table format support** — All 13 text tools now support `schema.table` format (auto-parsed, embedded schema takes priority over explicit `schema` parameter). Consistent with other tool groups like stats, vector, partitioning
 - **pg.jsonbXxx() top-level aliases** — Code mode now supports top-level JSONB method aliases for convenience: `pg.jsonbExtract()`, `pg.jsonbSet()`, `pg.jsonbInsert()`, `pg.jsonbDelete()`, `pg.jsonbContains()`, `pg.jsonbPathQuery()`, `pg.jsonbAgg()`, `pg.jsonbObject()`, `pg.jsonbArray()`, `pg.jsonbKeys()`, `pg.jsonbStripNulls()`, `pg.jsonbTypeof()`, `pg.jsonbValidatePath()`, `pg.jsonbMerge()`, `pg.jsonbNormalize()`, `pg.jsonbDiff()`, `pg.jsonbIndexSuggest()`, `pg.jsonbSecurityScan()`, `pg.jsonbStats()`. These map directly to `pg.jsonb.xxx()` methods, matching the aliases documented in `pg.jsonb.help()`

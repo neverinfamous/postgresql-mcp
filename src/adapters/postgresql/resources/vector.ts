@@ -6,6 +6,7 @@
 
 import type { PostgresAdapter } from "../PostgresAdapter.js";
 import type { ResourceDefinition } from "../../../types/index.js";
+import { LOW_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 /** Safely convert unknown value to string */
 function toStr(value: unknown): string {
@@ -63,6 +64,7 @@ export function createVectorResource(
     description:
       "pgvector extension status, vector columns, index types, and performance recommendations",
     mimeType: "application/json",
+    annotations: LOW_PRIORITY,
     handler: async (): Promise<string> => {
       const result: VectorResourceData = {
         extensionInstalled: false,

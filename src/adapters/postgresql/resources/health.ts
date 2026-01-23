@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { HIGH_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface HealthCheck {
   status: "healthy" | "warning" | "critical";
@@ -25,6 +26,7 @@ export function createHealthResource(
     description:
       "Comprehensive database health status across multiple dimensions",
     mimeType: "application/json",
+    annotations: HIGH_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       const checks: Record<string, HealthCheck> = {};
 

@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { MEDIUM_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 export function createPerformanceResource(
   adapter: PostgresAdapter,
@@ -18,6 +19,7 @@ export function createPerformanceResource(
     name: "Query Performance",
     description: "Query performance metrics from pg_stat_statements",
     mimeType: "application/json",
+    annotations: MEDIUM_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       // Check if pg_stat_statements is available
       const extResult = await adapter.executeQuery(`

@@ -127,8 +127,25 @@ export interface ResourceDefinition {
   /** MIME type */
   mimeType?: string;
 
+  /** MCP Resource Annotations for behavior hints */
+  annotations?: ResourceAnnotations;
+
   /** Resource handler */
   handler: (uri: string, context: RequestContext) => Promise<unknown>;
+}
+
+/**
+ * MCP Resource Annotations (SDK 1.25+)
+ * Provides metadata hints about resource content to help clients
+ * manage and display resources appropriately.
+ */
+export interface ResourceAnnotations {
+  /** Intended audience for the resource content */
+  audience?: ("user" | "assistant")[];
+  /** Priority hint for display ordering (0-1 range) */
+  priority?: number;
+  /** ISO 8601 timestamp of last modification for cache invalidation */
+  lastModified?: string;
 }
 
 /**

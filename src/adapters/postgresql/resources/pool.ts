@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { LOW_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface ExternalPoolerInfo {
   detected: boolean;
@@ -25,6 +26,7 @@ export function createPoolResource(
     description:
       "MCP server connection pool statistics with external pooler detection",
     mimeType: "application/json",
+    annotations: LOW_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       const pool = adapter.getPool();
       if (!pool) {

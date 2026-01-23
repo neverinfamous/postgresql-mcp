@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { MEDIUM_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface LockWarning {
   severity: "HIGH" | "MEDIUM" | "INFO";
@@ -40,6 +41,7 @@ export function createLocksResource(
     name: "Lock Information",
     description: "Current lock information with contention detection",
     mimeType: "application/json",
+    annotations: MEDIUM_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       // Get lock information
       const locksResult = await adapter.executeQuery(`

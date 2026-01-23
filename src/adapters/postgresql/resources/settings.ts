@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { ASSISTANT_FOCUSED } from "../../../utils/resourceAnnotations.js";
 
 interface ProductionRecommendation {
   setting: string;
@@ -28,6 +29,7 @@ export function createSettingsResource(
     description:
       "Current PostgreSQL configuration settings with production defaults analysis",
     mimeType: "application/json",
+    annotations: ASSISTANT_FOCUSED,
     handler: async (_uri: string, _context: RequestContext) => {
       // Get all settings
       const result = await adapter.executeQuery(`

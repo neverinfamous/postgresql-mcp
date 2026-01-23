@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { MEDIUM_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 export function createTablesResource(
   adapter: PostgresAdapter,
@@ -19,6 +20,7 @@ export function createTablesResource(
     description:
       "Lightweight table listing with sizes and row counts. Use postgres://schema for full DDL structure with columns, constraints, and indexes.",
     mimeType: "application/json",
+    annotations: MEDIUM_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       const tables = await adapter.listTables();
       return { tables, count: tables.length };

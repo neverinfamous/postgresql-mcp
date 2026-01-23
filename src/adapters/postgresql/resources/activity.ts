@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { HIGH_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 /** Safely convert unknown value to string */
 function toStr(value: unknown): string {
@@ -36,6 +37,7 @@ export function createActivityResource(
     description:
       "Current database connections, running queries with duration, and blocking relationship detection",
     mimeType: "application/json",
+    annotations: HIGH_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       // Get connections with formatted duration
       const result = await adapter.executeQuery(`

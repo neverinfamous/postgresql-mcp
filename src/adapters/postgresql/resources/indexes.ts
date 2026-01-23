@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { MEDIUM_PRIORITY } from "../../../utils/resourceAnnotations.js";
 
 interface IndexRecommendation {
   type:
@@ -51,6 +52,7 @@ export function createIndexesResource(
     description:
       "Index usage statistics with unused/rarely-used detection and DROP recommendations",
     mimeType: "application/json",
+    annotations: MEDIUM_PRIORITY,
     handler: async (_uri: string, _context: RequestContext) => {
       // Get index usage statistics including last scan time and table row count
       const indexResult = await adapter.executeQuery(`

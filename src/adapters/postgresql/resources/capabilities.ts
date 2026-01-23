@@ -9,6 +9,7 @@ import type {
   ResourceDefinition,
   RequestContext,
 } from "../../../types/index.js";
+import { ASSISTANT_FOCUSED } from "../../../utils/resourceAnnotations.js";
 
 interface ExtensionStatus {
   installed: boolean;
@@ -33,6 +34,7 @@ export function createCapabilitiesResource(
     description:
       "PostgreSQL version, installed extensions, tool categories, and recommendations",
     mimeType: "application/json",
+    annotations: ASSISTANT_FOCUSED,
     handler: async (_uri: string, _context: RequestContext) => {
       // Get PostgreSQL version
       const versionResult = await adapter.executeQuery("SELECT version()");

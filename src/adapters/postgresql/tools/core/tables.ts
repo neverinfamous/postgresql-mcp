@@ -15,7 +15,9 @@ import {
   ListTablesSchema,
   DescribeTableSchemaBase,
   DescribeTableSchema,
+  CreateTableSchemaBase,
   CreateTableSchema,
+  DropTableSchemaBase,
   DropTableSchema,
 } from "../../schemas/index.js";
 
@@ -136,7 +138,7 @@ export function createCreateTableTool(
     description:
       "Create a new table with specified columns and constraints. Supports composite primary keys and table-level constraints.",
     group: "core",
-    inputSchema: CreateTableSchema,
+    inputSchema: CreateTableSchemaBase,
     annotations: write("Create Table"),
     icons: getToolIcons("core", write("Create Table")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -249,7 +251,7 @@ export function createDropTableTool(adapter: PostgresAdapter): ToolDefinition {
     name: "pg_drop_table",
     description: "Drop a table from the database.",
     group: "core",
-    inputSchema: DropTableSchema,
+    inputSchema: DropTableSchemaBase,
     annotations: destructive("Drop Table"),
     icons: getToolIcons("core", destructive("Drop Table")),
     handler: async (params: unknown, _context: RequestContext) => {

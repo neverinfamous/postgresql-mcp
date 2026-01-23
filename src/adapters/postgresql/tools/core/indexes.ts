@@ -11,7 +11,11 @@ import type {
 } from "../../../../types/index.js";
 import { readOnly, write } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
-import { GetIndexesSchema, CreateIndexSchema } from "../../schemas/index.js";
+import {
+  GetIndexesSchema,
+  CreateIndexSchemaBase,
+  CreateIndexSchema,
+} from "../../schemas/index.js";
 
 /**
  * Get indexes for a table
@@ -75,7 +79,7 @@ export function createCreateIndexTool(
     description:
       "Create an index on a table. Supports btree, hash, gin, gist, brin index types.",
     group: "core",
-    inputSchema: CreateIndexSchema,
+    inputSchema: CreateIndexSchemaBase,
     annotations: write("Create Index"),
     icons: getToolIcons("core", write("Create Index")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -211,31 +215,32 @@ function preprocessDropIndexParams(input: unknown): unknown {
   return result;
 }
 
+// Base schema for MCP visibility - exported for inputSchema
+export const DropIndexSchemaBase = z.object({
+  name: z
+    .string()
+    .optional()
+    .describe("Index name (supports schema.name format)"),
+  index: z.string().optional().describe("Alias for name"),
+  indexName: z.string().optional().describe("Alias for name"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  ifExists: z
+    .boolean()
+    .optional()
+    .describe("Use IF EXISTS to avoid errors if index does not exist"),
+  cascade: z
+    .boolean()
+    .optional()
+    .describe("Use CASCADE to drop dependent objects"),
+  concurrently: z
+    .boolean()
+    .optional()
+    .describe("Drop concurrently (does not lock table)"),
+});
+
+// Transformed schema for handler validation
 const DropIndexSchema = z
-  .preprocess(
-    preprocessDropIndexParams,
-    z.object({
-      name: z
-        .string()
-        .optional()
-        .describe("Index name (supports schema.name format)"),
-      index: z.string().optional().describe("Alias for name"),
-      indexName: z.string().optional().describe("Alias for name"),
-      schema: z.string().optional().describe("Schema name (default: public)"),
-      ifExists: z
-        .boolean()
-        .optional()
-        .describe("Use IF EXISTS to avoid errors if index does not exist"),
-      cascade: z
-        .boolean()
-        .optional()
-        .describe("Use CASCADE to drop dependent objects"),
-      concurrently: z
-        .boolean()
-        .optional()
-        .describe("Drop concurrently (does not lock table)"),
-    }),
-  )
+  .preprocess(preprocessDropIndexParams, DropIndexSchemaBase)
   .transform((data) => ({
     ...data,
     name: data.name ?? data.index ?? data.indexName ?? "",
@@ -253,7 +258,7 @@ export function createDropIndexTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Drop an index from a table. Supports IF EXISTS, CASCADE, and CONCURRENTLY options.",
     group: "core",
-    inputSchema: DropIndexSchema,
+    inputSchema: DropIndexSchemaBase,
     annotations: write("Drop Index"),
     icons: getToolIcons("core", write("Drop Index")),
     handler: async (params: unknown, _context: RequestContext) => {

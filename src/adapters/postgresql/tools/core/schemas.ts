@@ -141,11 +141,42 @@ function preprocessObjectDetailsParams(val: unknown): unknown {
   return obj;
 }
 
-// Base schema for MCP visibility - shows all input params without transform
-export const ObjectDetailsSchemaBase = z.preprocess(
-  preprocessObjectDetailsParams,
-  ObjectDetailsInnerSchema,
-);
+// Base schema for MCP visibility - exported directly without preprocess wrapper
+// so MCP clients can see all input parameters
+export const ObjectDetailsSchemaBase = z.object({
+  name: z
+    .string()
+    .optional()
+    .describe("Object name (supports schema.name format)"),
+  object: z.string().optional().describe("Alias for name"),
+  objectName: z.string().optional().describe("Alias for name (Code Mode API)"),
+  table: z.string().optional().describe("Alias for name"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  type: z
+    .enum([
+      "table",
+      "view",
+      "materialized_view",
+      "partitioned_table",
+      "function",
+      "sequence",
+      "index",
+    ])
+    .optional()
+    .describe("Object type hint (case-insensitive)"),
+  objectType: z
+    .enum([
+      "table",
+      "view",
+      "materialized_view",
+      "partitioned_table",
+      "function",
+      "sequence",
+      "index",
+    ])
+    .optional()
+    .describe("Alias for type"),
+});
 
 // Full schema with transform for handler parsing
 export const ObjectDetailsSchema = z

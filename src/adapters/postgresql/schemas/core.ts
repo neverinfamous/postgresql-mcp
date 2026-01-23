@@ -177,10 +177,14 @@ export const DescribeTableSchema = z
       'table (or tableName alias) is required. Usage: pg_describe_table({ table: "users" }) or pg_describe_table({ table: "public.users" })',
   });
 
-// Base schema for MCP visibility
-const CreateTableSchemaBase = z.object({
-  name: z.string().optional().describe("Table name"),
-  table: z.string().optional().describe("Alias for name"),
+// Base schema for MCP visibility - exported for inputSchema
+export const CreateTableSchemaBase = z.object({
+  table: z
+    .string()
+    .optional()
+    .describe("Table name (supports schema.table format)"),
+  tableName: z.string().optional().describe("Alias for table"),
+  name: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
   columns: z
     .array(
@@ -261,8 +265,8 @@ function preprocessCreateTableParams(input: unknown): unknown {
   if (typeof input !== "object" || input === null) return input;
   const result = { ...(input as Record<string, unknown>) };
 
-  // Get table name from name or table alias
-  const tableName = result["name"] ?? result["table"];
+  // Get table name from table, tableName, or name aliases
+  const tableName = result["table"] ?? result["tableName"] ?? result["name"];
 
   // Parse schema.table format if schema not explicitly provided
   if (
@@ -273,11 +277,13 @@ function preprocessCreateTableParams(input: unknown): unknown {
     const parts = tableName.split(".");
     if (parts.length === 2) {
       result["schema"] = parts[0];
-      // Update the correct field
-      if (result["name"] !== undefined) {
-        result["name"] = parts[1];
-      } else {
+      // Update the correct field based on which was provided
+      if (result["table"] !== undefined) {
         result["table"] = parts[1];
+      } else if (result["tableName"] !== undefined) {
+        result["tableName"] = parts[1];
+      } else {
+        result["name"] = parts[1];
       }
     }
   }
@@ -304,7 +310,7 @@ function parseStringReference(
 export const CreateTableSchema = z
   .preprocess(preprocessCreateTableParams, CreateTableSchemaBase)
   .transform((data) => ({
-    name: data.name ?? data.table ?? "",
+    name: data.table ?? data.tableName ?? data.name ?? "",
     schema: data.schema,
     columns: data.columns.map((col) => {
       // Parse string references like 'users(id)' → {table: 'users', column: 'id'}
@@ -403,8 +409,8 @@ export const CreateTableSchema = z
     message: "columns must not be empty",
   });
 
-// Base schema for MCP visibility
-const DropTableSchemaBase = z.object({
+// Base schema for MCP visibility - exported for inputSchema
+export const DropTableSchemaBase = z.object({
   table: z
     .string()
     .optional()
@@ -502,12 +508,16 @@ function preprocessCreateIndexParams(input: unknown): unknown {
   return result;
 }
 
-// Base schema for MCP visibility
-const CreateIndexSchemaBase = z.object({
+// Base schema for MCP visibility - exported for inputSchema
+export const CreateIndexSchemaBase = z.object({
+  table: z
+    .string()
+    .optional()
+    .describe("Table name (supports schema.table format)"),
+  tableName: z.string().optional().describe("Alias for table"),
   name: z.string().optional().describe("Index name"),
   indexName: z.string().optional().describe("Alias for name"),
   index: z.string().optional().describe("Alias for name"),
-  table: z.string().describe("Table name"),
   schema: z.string().optional().describe("Schema name (default: public)"),
   columns: z.array(z.string()).optional().describe("Columns to index"),
   column: z
@@ -535,6 +545,9 @@ const CreateIndexSchemaBase = z.object({
 export const CreateIndexSchema = z
   .preprocess(preprocessCreateIndexParams, CreateIndexSchemaBase)
   .transform((data) => {
+    // Resolve table from aliases: table, tableName
+    const table = data.table ?? data.tableName ?? "";
+
     // Handle column → columns smoothing (wrap string in array)
     const columns = data.columns ?? (data.column ? [data.column] : []);
 
@@ -542,13 +555,13 @@ export const CreateIndexSchema = z
     let name = data.name ?? data.indexName ?? data.index ?? "";
 
     // Auto-generate index name if not provided: idx_{table}_{columns}
-    if (name === "" && columns.length > 0) {
-      name = `idx_${data.table}_${columns.join("_")}`;
+    if (name === "" && table !== "" && columns.length > 0) {
+      name = `idx_${table}_${columns.join("_")}`;
     }
 
     return {
       name,
-      table: data.table,
+      table,
       schema: data.schema,
       columns,
       unique: data.unique,
@@ -557,6 +570,9 @@ export const CreateIndexSchema = z
       concurrently: data.concurrently,
       ifNotExists: data.ifNotExists,
     };
+  })
+  .refine((data) => data.table !== "", {
+    message: "table (or tableName alias) is required",
   })
   .refine((data) => data.name !== "", {
     message:

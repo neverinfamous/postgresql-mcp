@@ -477,7 +477,7 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         .string()
         .optional()
         .describe(
-          "Column or expression to group by. Returns {groups: [{group_key, items}], count}",
+          "Column or expression to group by. Returns {result: [{group_key, items}], count, grouped: true}",
         ),
       orderBy: z
         .string()
@@ -538,7 +538,7 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         const aggOrderBy = parsed.orderBy ? ` ORDER BY ${parsed.orderBy}` : "";
         const sql = `SELECT ${groupExpr} as group_key, jsonb_agg(${selectExpr}${aggOrderBy}) as items FROM "${parsed.table}" t${whereClause}${groupClause}${limitClause}`;
         const result = await adapter.executeQuery(sql);
-        // Return result (groups is deprecated alias for backward compat)
+        // Return grouped result with group_key and items per group
         return {
           result: result.rows,
           count: result.rows?.length ?? 0,

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **pg_describe_table `name` alias Split Schema fix** — `pg_describe_table` direct MCP tool calls now correctly accept `name` as an alias for `table` parameter, matching `pg_create_table`, `pg_drop_table`, and code mode behavior. Previously, using `{ name: "table_name" }` caused "table (or tableName alias) is required" error because the `name` alias was not exposed in the MCP schema (only handled in handler parsing)
 - **pg.help() code mode documentation** — Updated `ServerInstructions.ts` to clarify that `pg.help()` returns `{group: methods[]}` mapping object (e.g., `{core: ['readQuery', ...], jsonb: [...]}`), not just "lists all groups". Prevents errors when trying to access non-existent `.groups` property
+- **pg_jsonb_agg response structure documentation** — Fixed documentation incorrectly stating `pg_jsonb_agg` with `groupBy` returns `{groups: [...]}`. Actual response uses `{result: [{group_key, items}], count, grouped: true}`. Updated `ServerInstructions.ts` response structures table and tool parameter description to match actual behavior
+
 
 ### Added
 

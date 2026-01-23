@@ -224,13 +224,9 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
         queries: result.rows ?? [],
         count: rowCount,
         orderBy: orderBy ?? "total_time",
+        truncated,
+        totalCount,
       };
-
-      // Only include truncation info when actually truncated
-      if (truncated) {
-        response["truncated"] = true;
-        response["totalCount"] = totalCount;
-      }
 
       return response;
     },
@@ -316,13 +312,9 @@ in user CPU (application code) vs system CPU (kernel operations).`,
         topCpuQueries: result.rows ?? [],
         count: rowCount,
         description: "Queries ranked by total CPU time (user + system)",
+        truncated,
+        totalCount,
       };
-
-      // Only include truncation info when actually truncated
-      if (truncated) {
-        response["truncated"] = true;
-        response["totalCount"] = totalCount;
-      }
 
       return response;
     },
@@ -435,13 +427,9 @@ which represent actual disk access (not just shared buffer hits).`,
         count: rowCount,
         ioType,
         description: `Queries ranked by ${ioType === "both" ? "total I/O" : ioType}`,
+        truncated,
+        totalCount,
       };
-
-      // Only include truncation info when actually truncated
-      if (truncated) {
-        response["truncated"] = true;
-        response["totalCount"] = totalCount;
-      }
 
       return response;
     },
@@ -534,7 +522,7 @@ Helps identify the root cause of performance issues - is the query computation-h
     annotations: readOnly("Kcache Resource Analysis"),
     icons: getToolIcons("kcache", readOnly("Kcache Resource Analysis")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { queryId, threshold, limit, queryPreviewLength } =
+      const { queryId, threshold, limit, minCalls, queryPreviewLength } =
         KcacheResourceAnalysisSchema.parse(params);
       const thresholdVal = threshold ?? 0.5;
       const DEFAULT_LIMIT = 50;
@@ -554,6 +542,11 @@ Helps identify the root cause of performance issues - is the query computation-h
       if (queryId !== undefined) {
         conditions.push(`s.queryid::text = $${String(paramIndex++)}`);
         queryParams.push(queryId);
+      }
+
+      if (minCalls !== undefined) {
+        conditions.push(`s.calls >= $${String(paramIndex++)}`);
+        queryParams.push(minCalls);
       }
 
       conditions.push(
@@ -656,13 +649,9 @@ Helps identify the root cause of performance issues - is the query computation-h
               ? "Most resource-intensive queries are I/O-bound. Consider more memory, faster storage, or better indexing."
               : "Resource usage is balanced between CPU and I/O.",
         ],
+        truncated,
+        totalCount,
       };
-
-      // Only include truncation info when actually truncated
-      if (truncated) {
-        response["truncated"] = true;
-        response["totalCount"] = totalCount;
-      }
 
       return response;
     },

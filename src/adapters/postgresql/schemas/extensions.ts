@@ -83,6 +83,7 @@ export const KcacheResourceAnalysisSchema = z.preprocess(
       .number()
       .optional()
       .describe("Maximum number of queries to return (default: 50)"),
+    minCalls: z.number().optional().describe("Minimum call count to include"),
     queryPreviewLength: z
       .number()
       .optional()

@@ -26,6 +26,10 @@ export function createSeqScanTablesTool(
         .optional()
         .describe("Minimum seq scans to include (default: 10)"),
       schema: z.string().optional().describe("Schema to filter"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max rows to return (default: 50, use 0 for all)"),
     }),
   );
 
@@ -40,6 +44,7 @@ export function createSeqScanTablesTool(
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = SeqScanTablesSchema.parse(params);
       const minScans = parsed.minScans ?? 10; // Default to 10 for better testing visibility
+      const limit = parsed.limit === 0 ? null : (parsed.limit ?? 50);
 
       let whereClause = `seq_scan > ${String(minScans)}`;
       if (parsed.schema !== undefined) {
@@ -52,7 +57,8 @@ export function createSeqScanTablesTool(
                         CASE WHEN idx_scan > 0 THEN round((100.0 * seq_scan / (seq_scan + idx_scan))::numeric, 2) ELSE 100 END as seq_scan_pct
                         FROM pg_stat_user_tables
                         WHERE ${whereClause}
-                        ORDER BY seq_scan DESC`;
+                        ORDER BY seq_scan DESC
+                        ${limit !== null ? `LIMIT ${String(limit)}` : ""}`;
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
@@ -66,12 +72,22 @@ export function createSeqScanTablesTool(
           seq_scan_pct: toNum(row["seq_scan_pct"]),
         }),
       );
-      return {
+
+      const response: Record<string, unknown> = {
         tables,
         count: tables.length,
         minScans,
         hint: "High seq_scan_pct indicates tables that could benefit from indexes.",
       };
+
+      // Add totalCount if results were limited
+      if (limit !== null && tables.length === limit) {
+        const countSql = `SELECT COUNT(*) as total FROM pg_stat_user_tables WHERE ${whereClause}`;
+        const countResult = await adapter.executeQuery(countSql);
+        response["totalCount"] = toNum(countResult.rows?.[0]?.["total"]);
+        response["truncated"] = true;
+      }
+      return response;
     },
   };
 }

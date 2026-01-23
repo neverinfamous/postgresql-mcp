@@ -10,7 +10,6 @@ import type {
 import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
-import { IndexStatsSchema } from "../../schemas/index.js";
 
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
@@ -20,15 +19,30 @@ const toNum = (val: unknown): number | null =>
   val === null || val === undefined ? null : Number(val);
 
 export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
+  // Define schema locally with limit parameter
+  const IndexStatsSchemaLocal = z.preprocess(
+    defaultToEmpty,
+    z.object({
+      table: z.string().optional().describe("Table name to filter indexes"),
+      schema: z.string().optional().describe("Schema name to filter indexes"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max rows to return (default: 50, use 0 for all)"),
+    }),
+  );
+
   return {
     name: "pg_index_stats",
     description: "Get index usage statistics.",
     group: "performance",
-    inputSchema: IndexStatsSchema,
+    inputSchema: IndexStatsSchemaLocal,
     annotations: readOnly("Index Stats"),
     icons: getToolIcons("performance", readOnly("Index Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { table, schema } = IndexStatsSchema.parse(params);
+      const parsed = IndexStatsSchemaLocal.parse(params);
+      const { table, schema } = parsed;
+      const limit = parsed.limit === 0 ? null : (parsed.limit ?? 50);
       let whereClause =
         "schemaname NOT IN ('pg_catalog', 'information_schema')";
       if (schema) whereClause += ` AND schemaname = '${schema}'`;
@@ -39,7 +53,8 @@ export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
                         pg_size_pretty(pg_relation_size(indexrelid)) as size
                         FROM pg_stat_user_indexes
                         WHERE ${whereClause}
-                        ORDER BY idx_scan DESC`;
+                        ORDER BY idx_scan DESC
+                        ${limit !== null ? `LIMIT ${String(limit)}` : ""}`;
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
@@ -51,7 +66,20 @@ export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
           tuples_fetched: toNum(row["tuples_fetched"]),
         }),
       );
-      return { indexes };
+
+      const response: Record<string, unknown> = {
+        indexes,
+        count: indexes.length,
+      };
+
+      // Add totalCount if results were limited
+      if (limit !== null && indexes.length === limit) {
+        const countSql = `SELECT COUNT(*) as total FROM pg_stat_user_indexes WHERE ${whereClause}`;
+        const countResult = await adapter.executeQuery(countSql);
+        response["totalCount"] = toNum(countResult.rows?.[0]?.["total"]);
+        response["truncated"] = true;
+      }
+      return response;
     },
   };
 }
@@ -342,6 +370,10 @@ export function createDuplicateIndexesTool(
         .string()
         .optional()
         .describe("Schema to filter (default: all user schemas)"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max rows to return (default: 50, use 0 for all)"),
     }),
   );
 
@@ -355,6 +387,7 @@ export function createDuplicateIndexesTool(
     icons: getToolIcons("performance", readOnly("Duplicate Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = DuplicateIndexesSchema.parse(params);
+      const limit = parsed.limit === 0 ? null : (parsed.limit ?? 50);
       const schemaFilter =
         parsed.schema !== undefined
           ? `AND n.nspname = '${parsed.schema}'`
@@ -394,14 +427,49 @@ export function createDuplicateIndexesTool(
                 AND (a.columns = b.columns
                     OR a.columns[1:array_length(b.columns, 1)] = b.columns
                     OR b.columns[1:array_length(a.columns, 1)] = a.columns)
-            ORDER BY a.schemaname, a.tablename, a.size_bytes DESC`;
+            ORDER BY a.schemaname, a.tablename, a.size_bytes DESC
+            ${limit !== null ? `LIMIT ${String(limit)}` : ""}`;
 
       const result = await adapter.executeQuery(sql);
-      return {
-        duplicateIndexes: result.rows,
-        count: result.rows?.length ?? 0,
+      const duplicates = result.rows ?? [];
+
+      const response: Record<string, unknown> = {
+        duplicateIndexes: duplicates,
+        count: duplicates.length,
         hint: "EXACT_DUPLICATE: Remove one. OVERLAPPING/SUBSET: Smaller index may be redundant.",
       };
+
+      // Add totalCount if results were limited
+      if (limit !== null && duplicates.length === limit) {
+        const countSql = `WITH index_cols AS (
+                  SELECT
+                      n.nspname as schemaname,
+                      t.relname as tablename,
+                      i.relname as indexname,
+                      array_agg(a.attname ORDER BY k.n) as columns,
+                      pg_relation_size(i.oid) as size_bytes
+                  FROM pg_class t
+                  JOIN pg_namespace n ON t.relnamespace = n.oid
+                  JOIN pg_index idx ON t.oid = idx.indrelid
+                  JOIN pg_class i ON idx.indexrelid = i.oid
+                  CROSS JOIN LATERAL unnest(idx.indkey) WITH ORDINALITY AS k(attnum, n)
+                  JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+                  WHERE t.relkind = 'r' ${schemaFilter}
+                  GROUP BY n.nspname, t.relname, i.relname, i.oid
+              )
+              SELECT COUNT(*) as total
+              FROM index_cols a
+              JOIN index_cols b ON a.schemaname = b.schemaname
+                  AND a.tablename = b.tablename
+                  AND a.indexname < b.indexname
+                  AND (a.columns = b.columns
+                      OR a.columns[1:array_length(b.columns, 1)] = b.columns
+                      OR b.columns[1:array_length(a.columns, 1)] = a.columns)`;
+        const countResult = await adapter.executeQuery(countSql);
+        response["totalCount"] = toNum(countResult.rows?.[0]?.["total"]);
+        response["truncated"] = true;
+      }
+      return response;
     },
   };
 }
@@ -501,7 +569,7 @@ export function createQueryPlanStatsTool(
       limit: z
         .number()
         .optional()
-        .describe("Number of queries to return (default: 20)"),
+        .describe("Number of queries to return (default: 20, use 0 for all)"),
       truncateQuery: z
         .number()
         .optional()
@@ -521,7 +589,7 @@ export function createQueryPlanStatsTool(
     icons: getToolIcons("performance", readOnly("Query Plan Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = QueryPlanStatsSchema.parse(params);
-      const limit = parsed.limit ?? 20;
+      const limit = parsed.limit === 0 ? null : (parsed.limit ?? 20);
       const truncateLen =
         parsed.truncateQuery === 0 ? null : (parsed.truncateQuery ?? 100);
 
@@ -548,7 +616,7 @@ export function createQueryPlanStatsTool(
                 END as cache_hit_pct
                 FROM pg_stat_statements
                 ORDER BY total_plan_time + total_exec_time DESC
-                LIMIT ${String(limit)}`;
+                ${limit !== null ? `LIMIT ${String(limit)}` : ""}`;
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers and optionally truncate query
@@ -576,11 +644,20 @@ export function createQueryPlanStatsTool(
           };
         },
       );
-      return {
+      const response: Record<string, unknown> = {
         queryPlanStats,
         count: queryPlanStats.length,
         hint: "High plan_pct indicates queries spending significant time in planning. Consider prepared statements.",
       };
+
+      // Add totalCount if results were limited
+      if (limit !== null && queryPlanStats.length === limit) {
+        const countSql = `SELECT COUNT(*) as total FROM pg_stat_statements`;
+        const countResult = await adapter.executeQuery(countSql);
+        response["totalCount"] = toNum(countResult.rows?.[0]?.["total"]);
+        response["truncated"] = true;
+      }
+      return response;
     },
   };
 }

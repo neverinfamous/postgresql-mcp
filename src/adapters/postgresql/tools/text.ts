@@ -77,8 +77,13 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       // Build qualified table name with schema support
+      // The preprocessor guarantees table is set (converts tableName → table)
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${parsed.table}"`;
+      const resolvedTable = parsed.table ?? parsed.tableName;
+      if (!resolvedTable) {
+        throw new Error("Either 'table' or 'tableName' is required");
+      }
+      const tableName = `${schemaPrefix}"${resolvedTable}"`;
       const sanitizedCols = sanitizeIdentifiers(cols);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -105,20 +110,28 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
 
 function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
   // Base schema for MCP visibility (no preprocess)
-  const TextRankSchemaBase = z.object({
-    table: z.string(),
-    column: z.string().optional().describe("Single column to search"),
-    columns: z
-      .array(z.string())
-      .optional()
-      .describe("Multiple columns to search (alternative to column)"),
-    query: z.string(),
-    config: z.string().optional(),
-    normalization: z.number().optional(),
-    select: z.array(z.string()).optional().describe("Columns to return"),
-    limit: z.number().optional().describe("Max results"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-  });
+  const TextRankSchemaBase = z
+    .object({
+      table: z.string().optional().describe("Table name"),
+      tableName: z.string().optional().describe("Table name (alias for table)"),
+      column: z.string().optional().describe("Single column to search"),
+      columns: z
+        .array(z.string())
+        .optional()
+        .describe("Multiple columns to search (alternative to column)"),
+      query: z.string(),
+      config: z.string().optional(),
+      normalization: z.number().optional(),
+      select: z.array(z.string()).optional().describe("Columns to return"),
+      limit: z.number().optional().describe("Max results"),
+      schema: z.string().optional().describe("Schema name (default: public)"),
+    })
+    .refine(
+      (data) => data.table !== undefined || data.tableName !== undefined,
+      {
+        message: "Either 'table' or 'tableName' is required",
+      },
+    );
 
   // Full schema with preprocess for handler parsing
   const TextRankSchema = z.preprocess(preprocessTextParams, TextRankSchemaBase);
@@ -146,9 +159,13 @@ function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
         throw new Error("Either column or columns parameter is required");
       }
 
-      // Build qualified table name with schema support
+      // The preprocessor guarantees table is set (converts tableName → table)
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${parsed.table}"`;
+      const resolvedTable = parsed.table ?? parsed.tableName;
+      if (!resolvedTable) {
+        throw new Error("Either 'table' or 'tableName' is required");
+      }
+      const tableName = `${schemaPrefix}"${resolvedTable}"`;
       const sanitizedCols = sanitizeIdentifiers(cols);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -189,9 +206,13 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
       const limitVal =
         parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
 
-      // Build qualified table name with schema support
+      // The preprocessor guarantees table is set (converts tableName → table)
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${parsed.table}"`;
+      const resolvedTable = parsed.table ?? parsed.tableName;
+      if (!resolvedTable) {
+        throw new Error("Either 'table' or 'tableName' is required");
+      }
+      const tableName = `${schemaPrefix}"${resolvedTable}"`;
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -212,25 +233,33 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
 
 function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
   // Base schema for MCP visibility (no preprocess)
-  const FuzzyMatchSchemaBase = z.object({
-    table: z.string(),
-    column: z.string(),
-    value: z.string(),
-    method: z.enum(["soundex", "levenshtein", "metaphone"]).optional(),
-    maxDistance: z
-      .number()
-      .optional()
-      .describe(
-        "Max Levenshtein distance (default: 3, use 5+ for longer strings)",
-      ),
-    select: z.array(z.string()).optional().describe("Columns to return"),
-    limit: z
-      .number()
-      .optional()
-      .describe("Max results (default: 100 to prevent large payloads)"),
-    where: z.string().optional().describe("Additional WHERE clause filter"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-  });
+  const FuzzyMatchSchemaBase = z
+    .object({
+      table: z.string().optional().describe("Table name"),
+      tableName: z.string().optional().describe("Table name (alias for table)"),
+      column: z.string(),
+      value: z.string(),
+      method: z.enum(["soundex", "levenshtein", "metaphone"]).optional(),
+      maxDistance: z
+        .number()
+        .optional()
+        .describe(
+          "Max Levenshtein distance (default: 3, use 5+ for longer strings)",
+        ),
+      select: z.array(z.string()).optional().describe("Columns to return"),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max results (default: 100 to prevent large payloads)"),
+      where: z.string().optional().describe("Additional WHERE clause filter"),
+      schema: z.string().optional().describe("Schema name (default: public)"),
+    })
+    .refine(
+      (data) => data.table !== undefined || data.tableName !== undefined,
+      {
+        message: "Either 'table' or 'tableName' is required",
+      },
+    );
 
   // Full schema with preprocess for handler parsing
   const FuzzyMatchSchema = z.preprocess(
@@ -257,9 +286,13 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
       const limitVal =
         parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
 
-      // Build qualified table name with schema support
+      // The preprocessor guarantees table is set (converts tableName → table)
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${parsed.table}"`;
+      const resolvedTable = parsed.table ?? parsed.tableName;
+      if (!resolvedTable) {
+        throw new Error("Either 'table' or 'tableName' is required");
+      }
+      const tableName = `${schemaPrefix}"${resolvedTable}"`;
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -293,9 +326,13 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = RegexpMatchSchema.parse(params);
 
-      // Build qualified table name with schema support
+      // The preprocessor guarantees table is set (converts tableName → table)
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${parsed.table}"`;
+      const resolvedTable = parsed.table ?? parsed.tableName;
+      if (!resolvedTable) {
+        throw new Error("Either 'table' or 'tableName' is required");
+      }
+      const tableName = `${schemaPrefix}"${resolvedTable}"`;
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -315,19 +352,27 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
 
 function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
   // Base schema for MCP visibility (no preprocess)
-  const LikeSearchSchemaBase = z.object({
-    table: z.string(),
-    column: z.string(),
-    pattern: z.string(),
-    caseSensitive: z
-      .boolean()
-      .optional()
-      .describe("Use case-sensitive LIKE (default: false, uses ILIKE)"),
-    select: z.array(z.string()).optional(),
-    limit: z.number().optional(),
-    where: z.string().optional().describe("Additional WHERE clause filter"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-  });
+  const LikeSearchSchemaBase = z
+    .object({
+      table: z.string().optional().describe("Table name"),
+      tableName: z.string().optional().describe("Table name (alias for table)"),
+      column: z.string(),
+      pattern: z.string(),
+      caseSensitive: z
+        .boolean()
+        .optional()
+        .describe("Use case-sensitive LIKE (default: false, uses ILIKE)"),
+      select: z.array(z.string()).optional(),
+      limit: z.number().optional(),
+      where: z.string().optional().describe("Additional WHERE clause filter"),
+      schema: z.string().optional().describe("Schema name (default: public)"),
+    })
+    .refine(
+      (data) => data.table !== undefined || data.tableName !== undefined,
+      {
+        message: "Either 'table' or 'tableName' is required",
+      },
+    );
 
   // Full schema with preprocess for handler parsing
   const LikeSearchSchema = z.preprocess(
@@ -346,9 +391,13 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = LikeSearchSchema.parse(params);
 
-      // Build qualified table name with schema support
+      // The preprocessor guarantees table is set (converts tableName → table)
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${parsed.table}"`;
+      const resolvedTable = parsed.table ?? parsed.tableName;
+      if (!resolvedTable) {
+        throw new Error("Either 'table' or 'tableName' is required");
+      }
+      const tableName = `${schemaPrefix}"${resolvedTable}"`;
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -370,34 +419,42 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
 
 function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
   // Base schema for MCP visibility (no preprocess)
-  const HeadlineSchemaBase = z.object({
-    table: z.string(),
-    column: z.string(),
-    query: z.string(),
-    config: z.string().optional(),
-    options: z
-      .string()
-      .optional()
-      .describe(
-        'Headline options (e.g., "MaxWords=20, MinWords=5"). Note: MinWords must be < MaxWords.',
-      ),
-    startSel: z
-      .string()
-      .optional()
-      .describe("Start selection marker (default: <b>)"),
-    stopSel: z
-      .string()
-      .optional()
-      .describe("Stop selection marker (default: </b>)"),
-    maxWords: z.number().optional().describe("Maximum words in headline"),
-    minWords: z.number().optional().describe("Minimum words in headline"),
-    select: z
-      .array(z.string())
-      .optional()
-      .describe('Columns to return for row identification (e.g., ["id"])'),
-    limit: z.number().optional().describe("Max results"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-  });
+  const HeadlineSchemaBase = z
+    .object({
+      table: z.string().optional().describe("Table name"),
+      tableName: z.string().optional().describe("Table name (alias for table)"),
+      column: z.string(),
+      query: z.string(),
+      config: z.string().optional(),
+      options: z
+        .string()
+        .optional()
+        .describe(
+          'Headline options (e.g., "MaxWords=20, MinWords=5"). Note: MinWords must be < MaxWords.',
+        ),
+      startSel: z
+        .string()
+        .optional()
+        .describe("Start selection marker (default: <b>)"),
+      stopSel: z
+        .string()
+        .optional()
+        .describe("Stop selection marker (default: </b>)"),
+      maxWords: z.number().optional().describe("Maximum words in headline"),
+      minWords: z.number().optional().describe("Minimum words in headline"),
+      select: z
+        .array(z.string())
+        .optional()
+        .describe('Columns to return for row identification (e.g., ["id"])'),
+      limit: z.number().optional().describe("Max results"),
+      schema: z.string().optional().describe("Schema name (default: public)"),
+    })
+    .refine(
+      (data) => data.table !== undefined || data.tableName !== undefined,
+      {
+        message: "Either 'table' or 'tableName' is required",
+      },
+    );
 
   // Full schema with preprocess for handler parsing
   const HeadlineSchema = z.preprocess(preprocessTextParams, HeadlineSchemaBase);
@@ -427,9 +484,13 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
         opts = optParts.join(", ");
       }
 
-      // Build qualified table name with schema support
+      // The preprocessor guarantees table is set (converts tableName → table)
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${parsed.table}"`;
+      const resolvedTable = parsed.table ?? parsed.tableName;
+      if (!resolvedTable) {
+        throw new Error("Either 'table' or 'tableName' is required");
+      }
+      const tableName = `${schemaPrefix}"${resolvedTable}"`;
       const columnName = sanitizeIdentifier(parsed.column);
       // Use provided select columns, or default to * (user should specify PK for stable identification)
       const selectCols =
@@ -453,17 +514,25 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
 
 function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
   // Base schema for MCP visibility (no preprocess)
-  const FtsIndexSchemaBase = z.object({
-    table: z.string(),
-    column: z.string(),
-    name: z.string().optional(),
-    config: z.string().optional(),
-    ifNotExists: z
-      .boolean()
-      .optional()
-      .describe("Skip if index already exists (default: true)"),
-    schema: z.string().optional().describe("Schema name (default: public)"),
-  });
+  const FtsIndexSchemaBase = z
+    .object({
+      table: z.string().optional().describe("Table name"),
+      tableName: z.string().optional().describe("Table name (alias for table)"),
+      column: z.string(),
+      name: z.string().optional(),
+      config: z.string().optional(),
+      ifNotExists: z
+        .boolean()
+        .optional()
+        .describe("Skip if index already exists (default: true)"),
+      schema: z.string().optional().describe("Schema name (default: public)"),
+    })
+    .refine(
+      (data) => data.table !== undefined || data.tableName !== undefined,
+      {
+        message: "Either 'table' or 'tableName' is required",
+      },
+    );
 
   // Full schema with preprocess for handler parsing
   const FtsIndexSchema = z.preprocess(preprocessTextParams, FtsIndexSchemaBase);
@@ -478,7 +547,12 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = FtsIndexSchema.parse(params);
       const cfg = parsed.config ?? "english";
-      const defaultIndexName = `idx_${parsed.table}_${parsed.column}_fts`;
+      // The preprocessor guarantees table is set (converts tableName → table)
+      const resolvedTable = parsed.table ?? parsed.tableName;
+      if (!resolvedTable) {
+        throw new Error("Either 'table' or 'tableName' is required");
+      }
+      const defaultIndexName = `idx_${resolvedTable}_${parsed.column}_fts`;
       const resolvedIndexName = parsed.name ?? defaultIndexName;
       const indexName = sanitizeIdentifier(resolvedIndexName);
       // Default to IF NOT EXISTS for safer operation (skip existing indexes)
@@ -487,7 +561,7 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
 
       // Build qualified table name with schema support
       const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${parsed.table}"`;
+      const tableName = `${schemaPrefix}"${resolvedTable}"`;
       const columnName = sanitizeIdentifier(parsed.column);
 
       // Check if index exists before creation (to accurately report 'skipped')

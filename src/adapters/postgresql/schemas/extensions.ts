@@ -179,6 +179,12 @@ export const CitextListColumnsSchema = z.preprocess(
       .string()
       .optional()
       .describe("Schema name to filter (all schemas if omitted)"),
+    limit: z
+      .number()
+      .optional()
+      .describe(
+        "Maximum number of columns to return (default: 100, 0 for all)",
+      ),
   }),
 );
 

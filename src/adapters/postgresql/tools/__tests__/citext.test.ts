@@ -127,25 +127,40 @@ describe("Citext Tools", () => {
 
   describe("pg_citext_list_columns", () => {
     it("should list all citext columns", async () => {
-      mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [
-          { table_schema: "public", table_name: "users", column_name: "email" },
-          {
-            table_schema: "public",
-            table_name: "users",
-            column_name: "username",
-          },
-        ],
-      });
+      // Mock count query first, then main query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 2 }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              table_schema: "public",
+              table_name: "users",
+              column_name: "email",
+            },
+            {
+              table_schema: "public",
+              table_name: "users",
+              column_name: "username",
+            },
+          ],
+        });
 
       const tool = findTool("pg_citext_list_columns");
       const result = (await tool!.handler({}, mockContext)) as {
         columns: unknown[];
         count: number;
+        totalCount: number;
+        truncated: boolean;
       };
 
       expect(result.count).toBe(2);
       expect(result.columns).toHaveLength(2);
+      expect(result.totalCount).toBe(2);
+      expect(result.truncated).toBe(false);
+      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining("COUNT(*)"),
+        [],
+      );
       expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining("udt_name = 'citext'"),
         [],
@@ -153,7 +168,9 @@ describe("Citext Tools", () => {
     });
 
     it("should filter by schema when provided", async () => {
-      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
 
       const tool = findTool("pg_citext_list_columns");
       await tool!.handler({ schema: "custom" }, mockContext);
@@ -163,26 +180,86 @@ describe("Citext Tools", () => {
         ["custom"],
       );
     });
+
+    it("should apply default limit and return truncation info", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 150 }] })
+        .mockResolvedValueOnce({
+          rows: Array(100)
+            .fill(null)
+            .map((_, i) => ({
+              table_schema: "public",
+              table_name: `table_${String(i)}`,
+              column_name: "col",
+            })),
+        });
+
+      const tool = findTool("pg_citext_list_columns");
+      const result = (await tool!.handler({}, mockContext)) as {
+        count: number;
+        totalCount: number;
+        truncated: boolean;
+        limit: number;
+      };
+
+      expect(result.count).toBe(100);
+      expect(result.totalCount).toBe(150);
+      expect(result.truncated).toBe(true);
+      expect(result.limit).toBe(100);
+    });
+
+    it("should return all results with limit: 0", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 3 }] })
+        .mockResolvedValueOnce({
+          rows: [
+            { table_schema: "public", table_name: "a", column_name: "col" },
+            { table_schema: "public", table_name: "b", column_name: "col" },
+            { table_schema: "public", table_name: "c", column_name: "col" },
+          ],
+        });
+
+      const tool = findTool("pg_citext_list_columns");
+      const result = (await tool!.handler({ limit: 0 }, mockContext)) as {
+        count: number;
+        totalCount: number;
+        truncated: boolean;
+        limit?: number;
+      };
+
+      expect(result.count).toBe(3);
+      expect(result.totalCount).toBe(3);
+      expect(result.truncated).toBe(false);
+      expect(result.limit).toBeUndefined();
+      // Verify no LIMIT clause in query
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+        expect.not.stringContaining("LIMIT"),
+        [],
+      );
+    });
   });
 
   describe("pg_citext_analyze_candidates", () => {
     it("should find email and username columns", async () => {
-      mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [
-          {
-            table_schema: "public",
-            table_name: "users",
-            column_name: "email",
-            data_type: "text",
-          },
-          {
-            table_schema: "public",
-            table_name: "users",
-            column_name: "username",
-            data_type: "character varying",
-          },
-        ],
-      });
+      // Mock count query first, then main query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 2 }] })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              table_schema: "public",
+              table_name: "users",
+              column_name: "email",
+              data_type: "text",
+            },
+            {
+              table_schema: "public",
+              table_name: "users",
+              column_name: "username",
+              data_type: "character varying",
+            },
+          ],
+        });
 
       const tool = findTool("pg_citext_analyze_candidates");
       const result = (await tool!.handler({}, mockContext)) as {
@@ -195,9 +272,11 @@ describe("Citext Tools", () => {
     });
 
     it("should use custom patterns when provided", async () => {
-      mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ column_name: "custom_field", data_type: "text" }],
-      });
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "custom_field", data_type: "text" }],
+        });
 
       const tool = findTool("pg_citext_analyze_candidates");
       await tool!.handler({ patterns: ["custom"] }, mockContext);
@@ -209,9 +288,11 @@ describe("Citext Tools", () => {
     });
 
     it("should return recommendation when candidates found", async () => {
-      mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ column_name: "email", data_type: "text" }],
-      });
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "email", data_type: "text" }],
+        });
 
       const tool = findTool("pg_citext_analyze_candidates");
       const result = (await tool!.handler({}, mockContext)) as {

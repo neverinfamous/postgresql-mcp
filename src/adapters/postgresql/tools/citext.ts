@@ -233,18 +233,43 @@ Useful for auditing case-insensitive columns.`,
     annotations: readOnly("List Citext Columns"),
     icons: getToolIcons("citext", readOnly("List Citext Columns")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { schema } = CitextListColumnsSchema.parse(params);
+      const parsed = CitextListColumnsSchema.parse(params) as {
+        schema?: string;
+        limit?: number;
+      };
+      const { schema, limit: userLimit } = parsed;
+
+      // Default limit of 100 to prevent large payloads
+      const DEFAULT_LIMIT = 100;
+      const effectiveLimit =
+        userLimit === 0 ? undefined : (userLimit ?? DEFAULT_LIMIT);
 
       const conditions: string[] = [
         "udt_name = 'citext'",
         "table_schema NOT IN ('pg_catalog', 'information_schema')",
       ];
       const queryParams: unknown[] = [];
+      let paramIndex = 1;
 
       if (schema !== undefined) {
-        conditions.push(`table_schema = $1`);
+        conditions.push(`table_schema = $${String(paramIndex++)}`);
         queryParams.push(schema);
       }
+
+      const whereClause = conditions.join(" AND ");
+
+      // Count total columns first
+      const countSql = `
+                SELECT COUNT(*) as total
+                FROM information_schema.columns
+                WHERE ${whereClause}
+            `;
+      const countResult = await adapter.executeQuery(countSql, queryParams);
+      const totalCount = Number(countResult.rows?.[0]?.["total"] ?? 0);
+
+      // Add LIMIT clause
+      const limitClause =
+        effectiveLimit !== undefined ? `LIMIT ${String(effectiveLimit)}` : "";
 
       const sql = `
                 SELECT 
@@ -254,15 +279,25 @@ Useful for auditing case-insensitive columns.`,
                     is_nullable,
                     column_default
                 FROM information_schema.columns
-                WHERE ${conditions.join(" AND ")}
+                WHERE ${whereClause}
                 ORDER BY table_schema, table_name, ordinal_position
+                ${limitClause}
             `;
 
       const result = await adapter.executeQuery(sql, queryParams);
+      const columns = result.rows ?? [];
+
+      // Determine if results were truncated
+      const truncated =
+        effectiveLimit !== undefined && columns.length < totalCount;
 
       return {
-        columns: result.rows ?? [],
-        count: result.rows?.length ?? 0,
+        columns,
+        count: columns.length,
+        totalCount,
+        truncated,
+        ...(effectiveLimit !== undefined && { limit: effectiveLimit }),
+        ...(schema !== undefined && { schema }),
       };
     },
   };

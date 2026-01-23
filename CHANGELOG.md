@@ -61,6 +61,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_citext_convert_column type validation** — `pg_citext_convert_column` now validates that the target column is a text-based type (text, varchar, character varying) before attempting conversion. Non-text columns (e.g., integer, boolean) now return `{success: false, error, currentType, allowedTypes, suggestion}` instead of proceeding with conversion which would break table operations. Previously, converting an integer column to citext succeeded but caused all subsequent queries with integer comparisons to fail with \"operator does not exist: citext = integer\"
 - **pg_citext_analyze_candidates consistent response fields** — `pg_citext_analyze_candidates` now always returns `summary`, `highConfidenceCandidates`, and `mediumConfidenceCandidates` fields regardless of whether a `table` filter is applied. Previously, these fields were only included when filtering by specific table, making the response structure inconsistent
 - **pg_citext_list_columns response consistency** — `pg_citext_list_columns` now always includes `totalCount` and `truncated` fields in responses for consistent structure with other paginated tools
+- **pg.{group}.help() methodAliases consistency** — `pg.{group}.help()` now always returns `methodAliases` as an array (empty when no aliases) instead of `undefined`. Provides consistent response shape across all tool groups, eliminating the need to check for field existence
+
+### Added
+
+- **pg_citext_analyze_candidates patternsUsed field** — `pg_citext_analyze_candidates` response now includes `patternsUsed` array showing which column name patterns were used for matching (e.g., `['email', 'username', 'name', ...]`). Provides transparency for users who want to understand or customize the analysis
 
 ### Performance
 

@@ -1084,7 +1084,7 @@ export class PgApi {
         // They are NOT top-level pg.* aliases. Redundant prefix aliases (e.g., partmanShowConfig) are excluded.
         help: () => ({
           methods: canonicalMethodNames,
-          methodAliases: usefulAliases.length > 0 ? usefulAliases : undefined,
+          methodAliases: usefulAliases,
           examples: GROUP_EXAMPLES[groupName],
         }),
       };

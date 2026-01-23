@@ -479,6 +479,8 @@ Looks for common patterns like email, username, name, slug, etc.`,
           table === undefined && {
             excludedSchemas: systemSchemas,
           }),
+        // Include patterns used for transparency
+        patternsUsed: searchPatterns,
       };
     },
   };

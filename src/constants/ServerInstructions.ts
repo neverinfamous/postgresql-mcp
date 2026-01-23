@@ -161,7 +161,7 @@ Core: \`databaseSize()\`, \`tableSizes()\`, \`connectionStats()\`, \`showSetting
 - \`tableSizes({ limit? })\`: Default 50 rows. Returns \`truncated: true\` + \`totalCount\` when limited. Use \`limit: 0\` for all
 - \`showSettings({ limit? })\`: Default 50 rows when no pattern specified. Use \`limit: 0\` for all or specify a pattern
 
-Aliases: \`connections\`→\`connectionStats\`, \`settings\`/\`config\`→\`showSettings\`, \`alerts\`/\`thresholds\`→\`alertThresholdSet\`
+Aliases: \`tables\`→\`tableSizes\`, \`connections\`→\`connectionStats\`, \`settings\`/\`config\`→\`showSettings\`, \`alerts\`/\`thresholds\`→\`alertThresholdSet\`
 
 **Top-Level Aliases**: \`pg.databaseSize()\`, \`pg.tableSizes()\`, \`pg.connectionStats()\`, \`pg.serverVersion()\`, \`pg.uptime()\`, \`pg.showSettings()\`, \`pg.recoveryStatus()\`, \`pg.replicationStatus()\`, \`pg.capacityPlanning()\`, \`pg.resourceUsageAnalyze()\`, \`pg.alertThresholdSet()\`
 

@@ -102,6 +102,7 @@ const METHOD_ALIASES: Record<string, Record<string, string>> = {
   },
   // Monitoring: intuitive aliases for common monitoring methods
   monitoring: {
+    tables: "tableSizes", // tables() → tableSizes()
     connections: "connectionStats", // connections() → connectionStats()
     settings: "showSettings", // settings() → showSettings()
     config: "showSettings", // config() → showSettings()

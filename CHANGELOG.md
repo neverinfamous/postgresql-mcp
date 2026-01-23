@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Monitoring `tables` alias** — Code mode monitoring group now supports `tables` as a shorthand alias for `tableSizes` (e.g., `pg.monitoring.tables({ limit: 10 })`), consistent with other group aliases like `connections` → `connectionStats`
+
 ### Fixed
 
 - **pg_query_plan_stats `limit: 0` behavior** — `pg_query_plan_stats` now correctly returns all rows when `limit: 0` is specified. Previously, `limit: 0` was incorrectly applied as SQL `LIMIT 0`, returning zero results instead of all results. Now consistent with other tools (`tableStats`, `vacuumStats`, `unusedIndexes`) where `limit: 0` means "no limit / return all"

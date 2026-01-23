@@ -12,6 +12,7 @@ import type {
 import { readOnly, write } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
 import {
+  GetIndexesSchemaBase,
   GetIndexesSchema,
   CreateIndexSchemaBase,
   CreateIndexSchema,
@@ -26,7 +27,7 @@ export function createGetIndexesTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "List indexes with usage statistics. When table is omitted, lists ALL database indexes (can be large). Use schema/limit to filter.",
     group: "core",
-    inputSchema: GetIndexesSchema,
+    inputSchema: GetIndexesSchemaBase,
     annotations: readOnly("Get Indexes"),
     icons: getToolIcons("core", readOnly("Get Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {

@@ -17,6 +17,7 @@ export {
   CreateTableSchema,
   DropTableSchemaBase,
   DropTableSchema,
+  GetIndexesSchemaBase,
   GetIndexesSchema,
   CreateIndexSchemaBase,
   CreateIndexSchema,

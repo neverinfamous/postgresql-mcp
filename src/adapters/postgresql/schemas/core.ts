@@ -439,8 +439,8 @@ export const DropTableSchema = z
 // Index Schemas
 // =============================================================================
 
-// Base schema for MCP visibility
-const GetIndexesSchemaBase = z.object({
+// Base schema for MCP visibility - exported for inputSchema (Split Schema pattern)
+export const GetIndexesSchemaBase = z.object({
   table: z
     .string()
     .optional()

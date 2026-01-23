@@ -126,6 +126,25 @@ Note: If views depend on this column, you must drop and recreate them manually b
         };
       }
 
+      // Validate that the column is a text-based type
+      const allowedTypes = [
+        "text",
+        "character varying",
+        "character",
+        "char",
+        "varchar",
+      ];
+      const normalizedType = dataType.toLowerCase();
+      if (!allowedTypes.includes(normalizedType)) {
+        return {
+          success: false,
+          error: `Column "${column}" is type "${currentType}", not a text-based type`,
+          currentType,
+          allowedTypes: ["text", "varchar", "character varying"],
+          suggestion: `citext conversion only works for text-based columns. Column "${column}" is "${currentType}" which cannot be converted.`,
+        };
+      }
+
       // Check for dependent views before attempting the conversion
       const depCheck = await adapter.executeQuery(
         `
@@ -264,8 +283,17 @@ Looks for common patterns like email, username, name, slug, etc.`,
     annotations: readOnly("Analyze Citext Candidates"),
     icons: getToolIcons("citext", readOnly("Analyze Citext Candidates")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { patterns, schema, table, limit } =
-        CitextAnalyzeCandidatesSchema.parse(params);
+      const {
+        patterns,
+        schema,
+        table,
+        limit: userLimit,
+      } = CitextAnalyzeCandidatesSchema.parse(params);
+
+      // Default limit of 100 to prevent large payloads
+      const DEFAULT_LIMIT = 100;
+      const effectiveLimit =
+        userLimit === 0 ? undefined : (userLimit ?? DEFAULT_LIMIT);
 
       const searchPatterns = patterns ?? [
         "email",
@@ -310,8 +338,21 @@ Looks for common patterns like email, username, name, slug, etc.`,
       });
       conditions.push(`(${patternConditions.join(" OR ")})`);
 
-      // Add LIMIT clause if specified
-      const limitClause = limit !== undefined ? `LIMIT ${String(limit)}` : "";
+      // Build WHERE clause for reuse
+      const whereClause = conditions.join(" AND ");
+
+      // Count total candidates first
+      const countSql = `
+                SELECT COUNT(*) as total
+                FROM information_schema.columns
+                WHERE ${whereClause}
+            `;
+      const countResult = await adapter.executeQuery(countSql, queryParams);
+      const totalCount = Number(countResult.rows?.[0]?.["total"] ?? 0);
+
+      // Add LIMIT clause
+      const limitClause =
+        effectiveLimit !== undefined ? `LIMIT ${String(effectiveLimit)}` : "";
 
       const sql = `
                 SELECT 
@@ -322,13 +363,17 @@ Looks for common patterns like email, username, name, slug, etc.`,
                     character_maximum_length,
                     is_nullable
                 FROM information_schema.columns
-                WHERE ${conditions.join(" AND ")}
+                WHERE ${whereClause}
                 ORDER BY table_schema, table_name, ordinal_position
                 ${limitClause}
             `;
 
       const result = await adapter.executeQuery(sql, queryParams);
       const candidates = result.rows ?? [];
+
+      // Determine if results were truncated
+      const truncated =
+        effectiveLimit !== undefined && candidates.length < totalCount;
 
       const highConfidence: Record<string, unknown>[] = [];
       const mediumConfidence: Record<string, unknown>[] = [];
@@ -349,7 +394,9 @@ Looks for common patterns like email, username, name, slug, etc.`,
       return {
         candidates,
         count: candidates.length,
-        ...(limit !== undefined && { limit }),
+        totalCount,
+        truncated,
+        ...(effectiveLimit !== undefined && { limit: effectiveLimit }),
         ...(table !== undefined && { table }),
         ...(schema !== undefined && { schema }),
         summary: {

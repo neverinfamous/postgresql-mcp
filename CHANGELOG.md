@@ -63,6 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_citext_analyze_candidates consistent response fields** — `pg_citext_analyze_candidates` now always returns `summary` with `highConfidence` and `mediumConfidence` counts regardless of whether a `table` filter is applied. Previously, these fields were only included when filtering by specific table, making the response structure inconsistent
 - **pg_citext_list_columns response consistency** — `pg_citext_list_columns` now always includes `totalCount` and `truncated` fields in responses for consistent structure with other paginated tools
 - **pg.{group}.help() methodAliases consistency** — `pg.{group}.help()` now always returns `methodAliases` as an array (empty when no aliases) instead of `undefined`. Provides consistent response shape across all tool groups, eliminating the need to check for field existence
+- **pg.ltree.help() examples correction** — `pg.ltree.help()` examples now correctly demonstrate actual method usage: `query()` uses `path` parameter (not `pattern`), and `subpath()`/`lca()` are standalone operations that don't require `table`/`column` parameters. Previously, following the help examples would result in validation errors
+- **pg_ltree_match lquery alias support** — `pg_ltree_match` direct MCP tool calls now correctly accept `lquery` or `query` as aliases for the `pattern` parameter. Previously, using aliases caused "Invalid input: expected string, received undefined" errors because the base schema marked `pattern` as required without considering aliases
 
 ### Added
 

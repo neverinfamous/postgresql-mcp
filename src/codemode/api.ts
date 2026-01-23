@@ -333,9 +333,10 @@ const GROUP_EXAMPLES: Record<string, string[]> = {
     "pg.citext.analyzeCandidates({ table: 'users' })",
   ],
   ltree: [
-    "pg.ltree.query({ table: 'categories', column: 'path', pattern: 'root.electronics.*' })",
-    "pg.ltree.subpath({ table: 'categories', column: 'path', offset: 1, length: 2 })",
-    "pg.ltree.lca({ table: 'categories', column: 'path', paths: ['root.a.b', 'root.a.c'] })",
+    "pg.ltree.query({ table: 'categories', column: 'path', path: 'electronics', mode: 'descendants' })",
+    "pg.ltree.match({ table: 'categories', column: 'path', pattern: '*.phones.*' })",
+    "pg.ltree.subpath({ path: 'a.b.c.d', offset: 1, length: 2 })",
+    "pg.ltree.lca({ paths: ['electronics.phones', 'electronics.accessories'] })",
   ],
   pgcrypto: [
     "pg.pgcrypto.hash({ data: 'password123', algorithm: 'sha256' })",

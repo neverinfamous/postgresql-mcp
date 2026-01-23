@@ -348,6 +348,7 @@ export const LtreeMatchSchemaBase = z.object({
   col: z.string().optional().describe("Alias for column"),
   pattern: z
     .string()
+    .optional()
     .describe('lquery pattern (e.g., "*.Science.*" or "Top.*{1,3}.Stars")'),
   query: z.string().optional().describe("Alias for pattern"),
   lquery: z.string().optional().describe("Alias for pattern"),

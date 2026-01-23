@@ -383,6 +383,25 @@ describe("Ltree Tools", () => {
         expect.anything(),
       );
     });
+
+    it("should accept lquery as alias for pattern", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+      const tool = findTool("pg_ltree_match");
+      await tool!.handler(
+        {
+          table: "categories",
+          column: "path",
+          lquery: "root.*.leaf", // Using lquery alias
+        },
+        mockContext,
+      );
+
+      expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining("~ $1::lquery"),
+        ["root.*.leaf"],
+      );
+    });
   });
 
   describe("pg_ltree_list_columns", () => {

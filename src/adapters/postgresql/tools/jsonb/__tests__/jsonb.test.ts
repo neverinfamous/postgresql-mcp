@@ -130,7 +130,7 @@ describe("Handler Execution", () => {
       )) as Record<string, unknown>;
 
       expect(mockAdapter.executeQuery).toHaveBeenCalled();
-      expect(result).toHaveProperty("results");
+      expect(result).toHaveProperty("rows");
     });
   });
 

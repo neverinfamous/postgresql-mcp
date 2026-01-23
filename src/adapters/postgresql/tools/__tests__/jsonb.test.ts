@@ -40,9 +40,9 @@ describe("JSONB Tools", () => {
           path: "$.name",
         },
         mockContext,
-      )) as { results: unknown[] };
+      )) as { rows: { value: unknown }[] };
 
-      expect(result.results).toEqual(["John"]);
+      expect(result.rows).toEqual([{ value: "John" }]);
       expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining("#>"),
         expect.anything(),

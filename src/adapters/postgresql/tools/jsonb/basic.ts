@@ -98,14 +98,19 @@ export function createJsonbExtractTool(
       }
 
       // Original behavior: return just the extracted values
-      const results = result.rows?.map((r) => r["extracted_value"]);
+      // Wrap each value in an object with 'value' key for consistency with select mode
+      const rows = result.rows?.map((r) => ({ value: r["extracted_value"] }));
       // Check if all results are null (path may not exist)
-      const allNulls = results?.every((v) => v === null) ?? false;
-      const response: { results: unknown; count: number; hint?: string } = {
-        results,
-        count: results?.length ?? 0,
+      const allNulls = rows?.every((r) => r.value === null) ?? false;
+      const response: {
+        rows: { value: unknown }[] | undefined;
+        count: number;
+        hint?: string;
+      } = {
+        rows,
+        count: rows?.length ?? 0,
       };
-      if (allNulls && (results?.length ?? 0) > 0) {
+      if (allNulls && (rows?.length ?? 0) > 0) {
         response.hint =
           "All values are null - path may not exist in data. Use pg_jsonb_typeof to check.";
       }

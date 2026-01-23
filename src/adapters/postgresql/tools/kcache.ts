@@ -149,7 +149,8 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
       const cols = await getKcacheColumnNames(adapter);
 
       const DEFAULT_LIMIT = 50;
-      const limitVal = limit ?? DEFAULT_LIMIT;
+      // limit: 0 means "no limit" (return all rows), undefined means use default
+      const limitVal = limit === 0 ? null : (limit ?? DEFAULT_LIMIT);
       // Bound queryPreviewLength: 0 = full query, default 100, max 500
       const previewLen =
         queryPreviewLength === 0
@@ -212,7 +213,7 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
                     AND s.dbid = k.dbid
                 ${whereClause}
                 ORDER BY ${orderColumn} DESC
-                LIMIT ${String(limitVal)}
+                ${limitVal !== null ? `LIMIT ${String(limitVal)}` : ""}
             `;
 
       const result = await adapter.executeQuery(sql, queryParams);
@@ -260,8 +261,24 @@ in user CPU (application code) vs system CPU (kernel operations).`,
       const parsed = z
         .object({ limit: z.number().optional() })
         .parse(params ?? {});
-      const limitVal = parsed.limit ?? 10;
+      const DEFAULT_LIMIT = 10;
+      // limit: 0 means "no limit" (return all rows), undefined means use default
+      const limitVal =
+        parsed.limit === 0 ? null : (parsed.limit ?? DEFAULT_LIMIT);
       const cols = await getKcacheColumnNames(adapter);
+
+      // Get total count first for truncation indicator
+      const countSql = `
+                SELECT COUNT(*) as total
+                FROM pg_stat_statements s
+                JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
+                    AND s.userid = k.userid 
+                    AND s.dbid = k.dbid
+                WHERE (k.${cols.userTime} + k.${cols.systemTime}) > 0
+            `;
+      const countResult = await adapter.executeQuery(countSql);
+      const totalRaw = countResult.rows?.[0]?.["total"];
+      const totalCount = Number(totalRaw) || 0;
 
       const sql = `
                 SELECT 
@@ -288,16 +305,26 @@ in user CPU (application code) vs system CPU (kernel operations).`,
                     AND s.dbid = k.dbid
                 WHERE (k.${cols.userTime} + k.${cols.systemTime}) > 0
                 ORDER BY (k.${cols.userTime} + k.${cols.systemTime}) DESC
-                LIMIT ${String(limitVal)}
+                ${limitVal !== null ? `LIMIT ${String(limitVal)}` : ""}
             `;
 
       const result = await adapter.executeQuery(sql);
+      const rowCount = result.rows?.length ?? 0;
+      const truncated = rowCount < totalCount;
 
-      return {
+      const response: Record<string, unknown> = {
         topCpuQueries: result.rows ?? [],
-        count: result.rows?.length ?? 0,
+        count: rowCount,
         description: "Queries ranked by total CPU time (user + system)",
       };
+
+      // Only include truncation info when actually truncated
+      if (truncated) {
+        response["truncated"] = true;
+        response["totalCount"] = totalCount;
+      }
+
+      return response;
     },
   };
 }
@@ -353,7 +380,10 @@ which represent actual disk access (not just shared buffer hits).`,
         })
         .parse(preprocessed);
       const ioType = parsed.type ?? "both";
-      const limitVal = parsed.limit ?? 10;
+      const DEFAULT_LIMIT = 10;
+      // limit: 0 means "no limit" (return all rows), undefined means use default
+      const limitVal =
+        parsed.limit === 0 ? null : (parsed.limit ?? DEFAULT_LIMIT);
       const cols = await getKcacheColumnNames(adapter);
 
       const orderColumn =
@@ -362,6 +392,19 @@ which represent actual disk access (not just shared buffer hits).`,
           : ioType === "writes"
             ? `k.${cols.writes}`
             : `(k.${cols.reads} + k.${cols.writes})`;
+
+      // Get total count first for truncation indicator
+      const countSql = `
+                SELECT COUNT(*) as total
+                FROM pg_stat_statements s
+                JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
+                    AND s.userid = k.userid 
+                    AND s.dbid = k.dbid
+                WHERE (k.${cols.reads} + k.${cols.writes}) > 0
+            `;
+      const countResult = await adapter.executeQuery(countSql);
+      const totalRaw = countResult.rows?.[0]?.["total"];
+      const totalCount = Number(totalRaw) || 0;
 
       const sql = `
                 SELECT 
@@ -380,17 +423,27 @@ which represent actual disk access (not just shared buffer hits).`,
                     AND s.dbid = k.dbid
                 WHERE (k.${cols.reads} + k.${cols.writes}) > 0
                 ORDER BY ${orderColumn} DESC
-                LIMIT ${String(limitVal)}
+                ${limitVal !== null ? `LIMIT ${String(limitVal)}` : ""}
             `;
 
       const result = await adapter.executeQuery(sql);
+      const rowCount = result.rows?.length ?? 0;
+      const truncated = rowCount < totalCount;
 
-      return {
+      const response: Record<string, unknown> = {
         topIoQueries: result.rows ?? [],
-        count: result.rows?.length ?? 0,
+        count: rowCount,
         ioType,
         description: `Queries ranked by ${ioType === "both" ? "total I/O" : ioType}`,
       };
+
+      // Only include truncation info when actually truncated
+      if (truncated) {
+        response["truncated"] = true;
+        response["totalCount"] = totalCount;
+      }
+
+      return response;
     },
   };
 }
@@ -484,7 +537,9 @@ Helps identify the root cause of performance issues - is the query computation-h
       const { queryId, threshold, limit, queryPreviewLength } =
         KcacheResourceAnalysisSchema.parse(params);
       const thresholdVal = threshold ?? 0.5;
-      const limitVal = limit ?? 50;
+      const DEFAULT_LIMIT = 50;
+      // limit: 0 means "no limit" (return all rows), undefined means use default
+      const limitVal = limit === 0 ? null : (limit ?? DEFAULT_LIMIT);
       // Bound queryPreviewLength: 0 = full query, default 100, max 500
       const previewLen =
         queryPreviewLength === 0
@@ -565,7 +620,7 @@ Helps identify the root cause of performance issues - is the query computation-h
                     pg_size_pretty(io_bytes::bigint) as io_pretty
                 FROM query_metrics
                 ORDER BY total_time_ms DESC
-                LIMIT ${String(limitVal)}
+                ${limitVal !== null ? `LIMIT ${String(limitVal)}` : ""}
             `;
 
       const result = await adapter.executeQuery(sql, queryParams);

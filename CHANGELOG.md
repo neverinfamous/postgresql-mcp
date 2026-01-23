@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Transactions documentation section** — Added comprehensive `## Transactions` section to `ServerInstructions.ts` documenting all 7 transaction tools: `pg_transaction_begin`, `pg_transaction_commit`, `pg_transaction_rollback`, `pg_transaction_savepoint`, `pg_transaction_rollback_to`, `pg_transaction_release`, `pg_transaction_execute`. Documents transaction lifecycle, savepoint behavior (including the caveat that rollback_to destroys later savepoints), atomic execution modes (auto-commit vs join existing), parameter aliases (`tx`/`txId`/`transactionId`, `name`/`savepoint`), response structures, and `pg.transactions.help()` discovery
 - **MCP Resource Annotations** — All 20 resources now include MCP Resource Annotations (SDK 1.25+)
   - `audience` — Indicates target readers: `["user", "assistant"]` for most resources, `["assistant"]` for agent-focused resources
   - `priority` — Float from 0.0-1.0 indicating resource importance: HIGH_PRIORITY (0.9), MEDIUM_PRIORITY (0.6), LOW_PRIORITY (0.4), ASSISTANT_FOCUSED (0.5)

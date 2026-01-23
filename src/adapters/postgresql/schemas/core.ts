@@ -145,13 +145,14 @@ export const ListTablesSchema = z.preprocess(
   }),
 );
 
-// MCP visibility schema - table OR tableName required (both optional in schema, refine enforces)
+// MCP visibility schema - table OR tableName/name required (all optional in schema, refine enforces)
 export const DescribeTableSchemaBase = z.object({
   table: z
     .string()
     .optional()
     .describe("Table name (supports schema.table format)"),
   tableName: z.string().optional().describe("Alias for table"),
+  name: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
 });
 
@@ -162,6 +163,7 @@ const DescribeTableParseSchema = z.object({
     .optional()
     .describe("Table name (supports schema.table format)"),
   tableName: z.string().optional().describe("Alias for table"),
+  name: z.string().optional().describe("Alias for table"),
   schema: z.string().optional().describe("Schema name (default: public)"),
 });
 
@@ -169,12 +171,12 @@ const DescribeTableParseSchema = z.object({
 export const DescribeTableSchema = z
   .preprocess(preprocessTableParams, DescribeTableParseSchema)
   .transform((data) => ({
-    table: data.table ?? data.tableName ?? "",
+    table: data.table ?? data.tableName ?? data.name ?? "",
     schema: data.schema,
   }))
   .refine((data) => data.table !== "", {
     message:
-      'table (or tableName alias) is required. Usage: pg_describe_table({ table: "users" }) or pg_describe_table({ table: "public.users" })',
+      'table (or tableName/name alias) is required. Usage: pg_describe_table({ table: "users" }) or pg_describe_table({ table: "public.users" })',
   });
 
 // Base schema for MCP visibility - exported for inputSchema

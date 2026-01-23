@@ -165,8 +165,14 @@ export function createStatStatementsTool(
   const StatStatementsSchema = z.preprocess(
     defaultToEmpty,
     z.object({
-      limit: z.number().optional(),
-      orderBy: z.enum(["total_time", "calls", "mean_time", "rows"]).optional(),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max statements to return (default: 20, use 0 for all)"),
+      orderBy: z
+        .enum(["total_time", "calls", "mean_time", "rows"])
+        .optional()
+        .describe("Sort order (default: total_time)"),
     }),
   );
 
@@ -180,7 +186,7 @@ export function createStatStatementsTool(
     icons: getToolIcons("performance", readOnly("Query Statistics")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = StatStatementsSchema.parse(params);
-      const limit = parsed.limit ?? 20;
+      const limit = parsed.limit === 0 ? null : (parsed.limit ?? 20);
       const orderBy = parsed.orderBy ?? "total_time";
 
       const sql = `SELECT query, calls, total_exec_time as total_time, 
@@ -188,7 +194,7 @@ export function createStatStatementsTool(
                         shared_blks_hit, shared_blks_read
                         FROM pg_stat_statements
                         ORDER BY ${orderBy === "total_time" ? "total_exec_time" : orderBy} DESC
-                        LIMIT ${String(limit)}`;
+                        ${limit !== null ? `LIMIT ${String(limit)}` : ""}`;
 
       const result = await adapter.executeQuery(sql);
       // Coerce numeric fields to JavaScript numbers
@@ -201,7 +207,17 @@ export function createStatStatementsTool(
           shared_blks_read: toNum(row["shared_blks_read"]),
         }),
       );
-      return { statements };
+
+      const response: Record<string, unknown> = { statements };
+
+      // Add totalCount if results were limited
+      if (limit !== null && statements.length === limit) {
+        const countSql = `SELECT COUNT(*) as total FROM pg_stat_statements`;
+        const countResult = await adapter.executeQuery(countSql);
+        response["totalCount"] = toNum(countResult.rows?.[0]?.["total"]);
+        response["truncated"] = true;
+      }
+      return response;
     },
   };
 }

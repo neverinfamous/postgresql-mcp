@@ -127,8 +127,10 @@ Core: \`explain()\`, \`explainAnalyze()\`, \`indexStats()\`, \`tableStats()\`, \
 Aliases: \`cacheStats\`→\`cacheHitRatio\`, \`queryStats\`→\`statStatements\`, \`activity\`→\`statActivity\`, \`vacuum\`→\`vacuumStats\`
 
 📦 **AI-Optimized Payloads**: Tools return limited results by default to reduce context size:
+- \`indexStats({ limit? })\`: Default 50 rows. Returns \`truncated: true\` + \`totalCount\` when limited. Use \`limit: 0\` for all
 - \`tableStats({ limit? })\`: Default 50 rows. Returns \`truncated: true\` + \`totalCount\` when limited. Use \`limit: 0\` for all
 - \`vacuumStats({ limit? })\`: Default 50 rows. Same truncation indicators. Use \`limit: 0\` for all
+- \`statStatements({ limit?, orderBy? })\`: Default 20 rows. Returns \`truncated: true\` + \`totalCount\` when limited. Use \`limit: 0\` for all
 - \`unusedIndexes({ limit?, summary? })\`: Default 20 rows. Use \`summary: true\` for aggregated stats by schema
 - \`queryPlanStats({ limit?, truncateQuery? })\`: Default 20 rows, queries truncated to 100 chars. Use \`truncateQuery: 0\` for full text
 

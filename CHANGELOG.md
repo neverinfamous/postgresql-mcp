@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Performance
 
+- **pg_stat_statements AI-optimized payloads** — `pg_stat_statements` now returns `truncated: true` + `totalCount` metadata when the default limit (20) truncates results. Supports `limit: 0` for all statements. Provides consistent truncation indicators matching `tableStats`, `vacuumStats`, `unusedIndexes`, and `queryPlanStats`. Documentation updated in `ServerInstructions.ts`
 - **pg_index_stats default limit** — `pg_index_stats` now applies a default limit of 50 rows when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all indexes. Prevents large payloads in databases with many indexes
 - **pg_seq_scan_tables default limit** — `pg_seq_scan_tables` now applies a default limit of 50 rows when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all tables. Consistent with other AI-optimized payload tools
 - **pg_duplicate_indexes default limit** — `pg_duplicate_indexes` now applies a default limit of 50 rows when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all duplicate index groups. Prevents large payloads when analyzing index overlaps

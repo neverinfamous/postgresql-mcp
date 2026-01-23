@@ -15,6 +15,7 @@ import {
   AnalyzeDbHealthSchema,
   AnalyzeWorkloadIndexesSchema,
   AnalyzeQueryIndexesSchema,
+  AnalyzeQueryIndexesSchemaBase,
 } from "./schemas.js";
 
 /**
@@ -350,7 +351,7 @@ export function createAnalyzeQueryIndexesTool(
     description:
       "Analyze a specific query for index recommendations using EXPLAIN ANALYZE.",
     group: "core",
-    inputSchema: AnalyzeQueryIndexesSchema,
+    inputSchema: AnalyzeQueryIndexesSchemaBase,
     annotations: readOnly("Analyze Query Indexes"),
     icons: getToolIcons("core", readOnly("Analyze Query Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {

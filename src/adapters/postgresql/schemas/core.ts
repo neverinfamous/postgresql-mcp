@@ -307,11 +307,11 @@ export const CreateTableSchema = z
       // Parse string references like 'users(id)' → {table: 'users', column: 'id'}
       type RefType =
         | {
-          table: string;
-          column: string;
-          onDelete?: string;
-          onUpdate?: string;
-        }
+            table: string;
+            column: string;
+            onDelete?: string;
+            onUpdate?: string;
+          }
         | undefined;
       let references: RefType = undefined;
 
@@ -320,7 +320,7 @@ export const CreateTableSchema = z
         if (!parsed) {
           throw new Error(
             `Invalid references format: '${col.references}'. ` +
-            `Use object syntax {table: 'name', column: 'col'} or string syntax 'table(column)'.`,
+              `Use object syntax {table: 'name', column: 'col'} or string syntax 'table(column)'.`,
           );
         }
         references = parsed;

@@ -33,9 +33,11 @@ import { getConvenienceTools } from "./convenience.js";
 export {
   ListObjectsSchema,
   ObjectDetailsSchema,
+  ObjectDetailsSchemaBase,
   AnalyzeDbHealthSchema,
   AnalyzeWorkloadIndexesSchema,
   AnalyzeQueryIndexesSchema,
+  AnalyzeQueryIndexesSchemaBase,
 } from "./schemas.js";
 export {
   UpsertSchema,

@@ -11,7 +11,11 @@ import type {
 } from "../../../../types/index.js";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
-import { ListObjectsSchema, ObjectDetailsSchema } from "./schemas.js";
+import {
+  ListObjectsSchema,
+  ObjectDetailsSchema,
+  ObjectDetailsSchemaBase,
+} from "./schemas.js";
 
 /**
  * List database objects
@@ -190,7 +194,7 @@ export function createObjectDetailsTool(
     description:
       "Get detailed metadata for a specific database object (table, view, function, sequence, index).",
     group: "core",
-    inputSchema: ObjectDetailsSchema,
+    inputSchema: ObjectDetailsSchemaBase,
     annotations: readOnly("Object Details"),
     icons: getToolIcons("core", readOnly("Object Details")),
     handler: async (params: unknown, _context: RequestContext) => {

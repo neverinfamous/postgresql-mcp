@@ -445,7 +445,7 @@ export function createUpsertTool(adapter: PostgresAdapter): ToolDefinition {
           if (msg.includes("no unique or exclusion constraint")) {
             throw new Error(
               `conflictColumns [${parsed.conflictColumns.join(", ")}] must reference columns with a UNIQUE constraint or PRIMARY KEY. ` +
-              `Create a unique constraint first: ALTER TABLE ${qualifiedTable} ADD CONSTRAINT unique_name UNIQUE (${conflictCols})`,
+                `Create a unique constraint first: ALTER TABLE ${qualifiedTable} ADD CONSTRAINT unique_name UNIQUE (${conflictCols})`,
             );
           }
         }
@@ -476,7 +476,7 @@ export function createBatchInsertTool(
       if (parsed.rows.length === 0) {
         throw new Error(
           "rows array must not be empty. Provide at least one row to insert, " +
-          'e.g., rows: [{column: "value"}]',
+            'e.g., rows: [{column: "value"}]',
         );
       }
 

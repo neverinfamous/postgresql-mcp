@@ -70,76 +70,82 @@ export const ListObjectsSchema = z.preprocess(
   }),
 );
 
+// Inner schema for ObjectDetails (used by preprocess and as base for MCP visibility)
+const ObjectDetailsInnerSchema = z.object({
+  name: z
+    .string()
+    .optional()
+    .describe("Object name (supports schema.name format)"),
+  object: z.string().optional().describe("Alias for name"),
+  objectName: z.string().optional().describe("Alias for name (Code Mode API)"),
+  table: z.string().optional().describe("Alias for name"),
+  schema: z.string().optional().describe("Schema name (default: public)"),
+  type: z
+    .enum([
+      "table",
+      "view",
+      "materialized_view",
+      "partitioned_table",
+      "function",
+      "sequence",
+      "index",
+    ])
+    .optional()
+    .describe("Object type hint (case-insensitive)"),
+  objectType: z
+    .enum([
+      "table",
+      "view",
+      "materialized_view",
+      "partitioned_table",
+      "function",
+      "sequence",
+      "index",
+    ])
+    .optional()
+    .describe("Alias for type"),
+});
+
+// Preprocess function for ObjectDetails
+function preprocessObjectDetailsParams(val: unknown): unknown {
+  const obj = (val ?? {}) as Record<string, unknown>;
+  // Support 'table', 'object', and 'objectName' as aliases for 'name'
+  if (obj["name"] === undefined) {
+    if (obj["table"] !== undefined) obj["name"] = obj["table"];
+    else if (obj["object"] !== undefined) obj["name"] = obj["object"];
+    else if (obj["objectName"] !== undefined) obj["name"] = obj["objectName"];
+  }
+  // Parse schema.name format if schema not explicitly provided
+  if (
+    typeof obj["name"] === "string" &&
+    obj["name"].includes(".") &&
+    obj["schema"] === undefined
+  ) {
+    const parts = obj["name"].split(".");
+    if (parts.length === 2) {
+      obj["schema"] = parts[0];
+      obj["name"] = parts[1];
+    }
+  }
+  // Normalize 'type' and 'objectType' to lowercase for case-insensitivity
+  if (typeof obj["type"] === "string") {
+    obj["type"] = obj["type"].toLowerCase();
+  }
+  if (typeof obj["objectType"] === "string") {
+    obj["objectType"] = obj["objectType"].toLowerCase();
+  }
+  return obj;
+}
+
+// Base schema for MCP visibility - shows all input params without transform
+export const ObjectDetailsSchemaBase = z.preprocess(
+  preprocessObjectDetailsParams,
+  ObjectDetailsInnerSchema,
+);
+
+// Full schema with transform for handler parsing
 export const ObjectDetailsSchema = z
-  .preprocess(
-    (val: unknown) => {
-      const obj = (val ?? {}) as Record<string, unknown>;
-      // Support 'table', 'object', and 'objectName' as aliases for 'name'
-      if (obj["name"] === undefined) {
-        if (obj["table"] !== undefined) obj["name"] = obj["table"];
-        else if (obj["object"] !== undefined) obj["name"] = obj["object"];
-        else if (obj["objectName"] !== undefined)
-          obj["name"] = obj["objectName"];
-      }
-      // Parse schema.name format if schema not explicitly provided
-      if (
-        typeof obj["name"] === "string" &&
-        obj["name"].includes(".") &&
-        obj["schema"] === undefined
-      ) {
-        const parts = obj["name"].split(".");
-        if (parts.length === 2) {
-          obj["schema"] = parts[0];
-          obj["name"] = parts[1];
-        }
-      }
-      // Normalize 'type' and 'objectType' to lowercase for case-insensitivity
-      if (typeof obj["type"] === "string") {
-        obj["type"] = obj["type"].toLowerCase();
-      }
-      if (typeof obj["objectType"] === "string") {
-        obj["objectType"] = obj["objectType"].toLowerCase();
-      }
-      return obj;
-    },
-    z.object({
-      name: z
-        .string()
-        .optional()
-        .describe("Object name (supports schema.name format)"),
-      object: z.string().optional().describe("Alias for name"),
-      objectName: z
-        .string()
-        .optional()
-        .describe("Alias for name (Code Mode API)"),
-      table: z.string().optional().describe("Alias for name"),
-      schema: z.string().optional().describe("Schema name (default: public)"),
-      type: z
-        .enum([
-          "table",
-          "view",
-          "materialized_view",
-          "partitioned_table",
-          "function",
-          "sequence",
-          "index",
-        ])
-        .optional()
-        .describe("Object type hint (case-insensitive)"),
-      objectType: z
-        .enum([
-          "table",
-          "view",
-          "materialized_view",
-          "partitioned_table",
-          "function",
-          "sequence",
-          "index",
-        ])
-        .optional()
-        .describe("Alias for type"),
-    }),
-  )
+  .preprocess(preprocessObjectDetailsParams, ObjectDetailsInnerSchema)
   .transform((data) => ({
     name: data.name ?? data.object ?? data.objectName ?? data.table ?? "",
     schema: data.schema,
@@ -178,8 +184,8 @@ export const AnalyzeWorkloadIndexesSchema = z.preprocess(
   }),
 );
 
-// Base schema for MCP visibility
-const AnalyzeQueryIndexesSchemaBase = z.object({
+// Base schema for MCP visibility - exported so tool can use it for inputSchema
+export const AnalyzeQueryIndexesSchemaBase = z.object({
   sql: z
     .string()
     .optional()

@@ -481,8 +481,10 @@ export const StatsPercentilesSchemaBase = z.object({
 
 export const StatsCorrelationSchemaBase = z.object({
   table: z.string().describe("Table name"),
-  column1: z.string().describe("First numeric column"),
-  column2: z.string().describe("Second numeric column"),
+  column1: z.string().optional().describe("First numeric column"),
+  column2: z.string().optional().describe("Second numeric column"),
+  x: z.string().optional().describe("Alias for column1"),
+  y: z.string().optional().describe("Alias for column2"),
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
   groupBy: z.string().optional().describe("Column to group correlation by"),
@@ -490,8 +492,18 @@ export const StatsCorrelationSchemaBase = z.object({
 
 export const StatsRegressionSchemaBase = z.object({
   table: z.string().describe("Table name"),
-  xColumn: z.string().describe("Independent variable (X)"),
-  yColumn: z.string().describe("Dependent variable (Y)"),
+  xColumn: z.string().optional().describe("Independent variable (X)"),
+  yColumn: z.string().optional().describe("Dependent variable (Y)"),
+  x: z.string().optional().describe("Alias for xColumn"),
+  y: z.string().optional().describe("Alias for yColumn"),
+  column1: z
+    .string()
+    .optional()
+    .describe("Alias for xColumn (consistency with correlation)"),
+  column2: z
+    .string()
+    .optional()
+    .describe("Alias for yColumn (consistency with correlation)"),
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
   groupBy: z.string().optional().describe("Column to group regression by"),
@@ -499,8 +511,10 @@ export const StatsRegressionSchemaBase = z.object({
 
 export const StatsTimeSeriesSchemaBase = z.object({
   table: z.string().describe("Table name"),
-  valueColumn: z.string().describe("Numeric column to aggregate"),
-  timeColumn: z.string().describe("Timestamp column"),
+  valueColumn: z.string().optional().describe("Numeric column to aggregate"),
+  timeColumn: z.string().optional().describe("Timestamp column"),
+  value: z.string().optional().describe("Alias for valueColumn"),
+  time: z.string().optional().describe("Alias for timeColumn"),
   interval: z
     .enum(["second", "minute", "hour", "day", "week", "month", "year"])
     .optional()
@@ -598,12 +612,24 @@ export const StatsPercentilesSchema = z.preprocess(
 
 export const StatsCorrelationSchema = z.preprocess(
   preprocessCorrelationParams,
-  StatsCorrelationSchemaBase,
+  StatsCorrelationSchemaBase.refine((data) => data.column1 !== undefined, {
+    message: "column1 (or alias 'x') is required",
+    path: ["column1"],
+  }).refine((data) => data.column2 !== undefined, {
+    message: "column2 (or alias 'y') is required",
+    path: ["column2"],
+  }),
 );
 
 export const StatsRegressionSchema = z.preprocess(
   preprocessRegressionParams,
-  StatsRegressionSchemaBase,
+  StatsRegressionSchemaBase.refine((data) => data.xColumn !== undefined, {
+    message: "xColumn (or alias 'x' or 'column1') is required",
+    path: ["xColumn"],
+  }).refine((data) => data.yColumn !== undefined, {
+    message: "yColumn (or alias 'y' or 'column2') is required",
+    path: ["yColumn"],
+  }),
 );
 
 export const StatsTimeSeriesSchema = z.preprocess(
@@ -612,7 +638,15 @@ export const StatsTimeSeriesSchema = z.preprocess(
     interval: z
       .enum(["second", "minute", "hour", "day", "week", "month", "year"])
       .describe("Time bucket size (default: day)"),
-  }),
+  })
+    .refine((data) => data.valueColumn !== undefined, {
+      message: "valueColumn (or alias 'value') is required",
+      path: ["valueColumn"],
+    })
+    .refine((data) => data.timeColumn !== undefined, {
+      message: "timeColumn (or alias 'time') is required",
+      path: ["timeColumn"],
+    }),
 );
 
 export const StatsDistributionSchema = z.preprocess(

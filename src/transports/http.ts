@@ -324,11 +324,11 @@ export class HttpTransport {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    // StreamableHTTPServerTransport usage guided by type feedback and introspection
+    // Create new transport for this connection
+    // Note: Do NOT call transport.start() here - the MCP SDK's Server.connect()
+    // calls start() internally, and calling it twice throws "Transport already started"
     const transport = new StreamableHTTPServerTransport();
     this.transport = transport;
-
-    await transport.start();
 
     if (this.onConnect) {
       this.onConnect(transport);

@@ -7,7 +7,6 @@
 
 import type { PostgresAdapter } from "../PostgresAdapter.js";
 import type { ToolDefinition, RequestContext } from "../../../types/index.js";
-import { z } from "zod";
 import { readOnly, write, destructive } from "../../../utils/annotations.js";
 import { getToolIcons } from "../../../utils/icons.js";
 import {
@@ -20,11 +19,15 @@ import {
   CreatePartitionSchemaBase,
   AttachPartitionSchemaBase,
   DetachPartitionSchemaBase,
+  ListPartitionsSchemaBase,
+  PartitionInfoSchemaBase,
   // Preprocessed schemas for handler parsing
   CreatePartitionedTableSchema,
   CreatePartitionSchema,
   AttachPartitionSchema,
   DetachPartitionSchema,
+  ListPartitionsSchema,
+  PartitionInfoSchema,
 } from "../schemas/index.js";
 
 /**
@@ -102,30 +105,21 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "List all partitions of a partitioned table. Returns warning if table is not partitioned.",
     group: "partitioning",
-    inputSchema: z.object({
-      table: z.string(),
-      schema: z.string().optional(),
-      limit: z.number().optional(),
-    }),
+    inputSchema: ListPartitionsSchemaBase, // Base schema for MCP visibility with alias support
     annotations: readOnly("List Partitions"),
     icons: getToolIcons("partitioning", readOnly("List Partitions")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table?: string;
-        parent?: string;
-        parentTable?: string;
-        name?: string;
+      // Use preprocessed schema for alias resolution
+      const parsed = ListPartitionsSchema.parse(params) as {
+        table: string;
         schema?: string;
         limit?: number;
       };
 
-      // Resolve table name from aliases
-      let tableName =
-        parsed.table ?? parsed.parent ?? parsed.parentTable ?? parsed.name;
-
       // Parse schema.table format if present
+      let tableName = parsed.table;
       let schemaName = parsed.schema ?? "public";
-      if (tableName?.includes(".")) {
+      if (tableName.includes(".")) {
         const parts = tableName.split(".");
         schemaName = parts[0] ?? "public";
         tableName = parts[1] ?? tableName;
@@ -371,6 +365,15 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: write("Create Partition"),
     icons: getToolIcons("partitioning", write("Create Partition")),
     handler: async (params: unknown, _context: RequestContext) => {
+      // Preprocessing resolves parent from parent/parentTable/table aliases
+      const parsed = CreatePartitionSchema.parse(params) as {
+        parent: string;
+        name: string;
+        schema?: string;
+        forValues: string;
+        subpartitionBy?: "range" | "list" | "hash";
+        subpartitionKey?: string;
+      };
       const {
         parent,
         name,
@@ -378,7 +381,7 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         forValues,
         subpartitionBy,
         subpartitionKey,
-      } = CreatePartitionSchema.parse(params);
+      } = parsed;
 
       // Validate sub-partitioning parameters
       if (subpartitionBy !== undefined && subpartitionKey === undefined) {
@@ -570,35 +573,27 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Get detailed information about a partitioned table. Returns warning if table is not partitioned.",
     group: "partitioning",
-    inputSchema: z.object({
-      table: z.string(),
-      schema: z.string().optional(),
-    }),
+    inputSchema: PartitionInfoSchemaBase, // Base schema for MCP visibility with alias support
     annotations: readOnly("Partition Info"),
     icons: getToolIcons("partitioning", readOnly("Partition Info")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table?: string;
-        parent?: string;
-        parentTable?: string;
-        name?: string;
+      // Use preprocessed schema for alias resolution
+      const parsed = PartitionInfoSchema.parse(params) as {
+        table: string;
         schema?: string;
       };
 
-      // Resolve table name from aliases
-      let tableName =
-        parsed.table ?? parsed.parent ?? parsed.parentTable ?? parsed.name;
-
       // Parse schema.table format if present
+      let tableName = parsed.table;
       let schemaName = parsed.schema ?? "public";
-      if (tableName?.includes(".")) {
+      if (tableName.includes(".")) {
         const parts = tableName.split(".");
         schemaName = parts[0] ?? "public";
         tableName = parts[1] ?? tableName;
       }
 
       // Check table existence and partition status
-      const resolvedTable = tableName ?? "";
+      const resolvedTable = tableName;
       const tableStatus = await checkTablePartitionStatus(
         adapter,
         resolvedTable,

@@ -170,11 +170,15 @@ export {
   CreatePartitionSchemaBase,
   AttachPartitionSchemaBase,
   DetachPartitionSchemaBase,
+  ListPartitionsSchemaBase,
+  PartitionInfoSchemaBase,
   // Transformed schemas for handler validation
   CreatePartitionedTableSchema,
   CreatePartitionSchema,
   AttachPartitionSchema,
   DetachPartitionSchema,
+  ListPartitionsSchema,
+  PartitionInfoSchema,
 } from "./partitioning.js";
 
 // pg_cron schemas

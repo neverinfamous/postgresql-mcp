@@ -4,9 +4,13 @@
 
 **Last updated January 24, 2026**
 
-**PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Provides **202 specialized tools**, **20 resources**, and **19 AI-powered prompts** and includes OAuth 2.1 authentication, code mode, connection pooling, tool filtering, plus support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, HypoPG, and advanced PostgreSQL features.
+**PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol.
 
-> **✅ Under Development** - 202 tools, 20 resources, and 19 prompts.
+**203 specialized tools** · **20 resources** · **19 AI-powered prompts**
+
+Features OAuth 2.1 authentication, Code Mode, connection pooling, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
+
+> **✅ Under Development** - 203 tools, 20 resources, and 19 prompts.
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -228,7 +232,7 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 
 Add one of these configurations to your IDE's MCP settings file:
 
-#### Option 1: Starter (49 Essential Tools)
+#### Option 1: Starter (58 Essential Tools)
 
 **Best for:** General PostgreSQL database work - CRUD operations, JSONB, schema management.
 
@@ -256,7 +260,7 @@ Add one of these configurations to your IDE's MCP settings file:
 }
 ```
 
-#### Option 2: AI Vector (46 Tools + pgvector)
+#### Option 2: AI Vector (47 Tools + pgvector)
 
 **Best for:** AI/ML workloads with semantic search and vector similarity.
 
@@ -387,27 +391,27 @@ Prompts provide step-by-step guidance for complex database tasks. Instead of fig
 
 This server includes **19 intelligent prompts** for guided workflows:
 
-| Prompt                     | Description                                       | Required Groups                    | Shortcut        |
-| -------------------------- | ------------------------------------------------- | ---------------------------------- | --------------- |
-| `pg_query_builder`         | Construct queries with CTEs and window functions  | core                               | `starter`       |
-| `pg_schema_design`         | Design schemas with constraints and indexes       | core                               | `starter`       |
-| `pg_performance_analysis`  | Analyze queries with EXPLAIN and optimization     | core, performance                  | `dba-monitor`   |
-| `pg_migration`             | Generate migration scripts with rollback support  | core                               | `starter`       |
-| `pg_tool_index`            | Lazy hydration - compact index of all tools       | —                                  | any             |
-| `pg_quick_query`           | Quick SQL query guidance for common operations    | core                               | `starter`       |
-| `pg_quick_schema`          | Quick reference for exploring database schema     | core                               | `starter`       |
-| `pg_database_health_check` | Comprehensive database health assessment          | core, performance, monitoring      | `dba-monitor`   |
-| `pg_backup_strategy`       | Enterprise backup planning with RTO/RPO           | core, monitoring, backup           | `dba-manage`    |
-| `pg_index_tuning`          | Index analysis and optimization workflow          | core, performance                  | `dba-monitor`   |
-| `pg_extension_setup`       | Extension installation and configuration guide    | core                               | `starter`       |
-| `pg_setup_pgvector`        | Complete pgvector setup for semantic search       | core, vector                       | `ai-vector`     |
-| `pg_setup_postgis`         | Complete PostGIS setup for geospatial operations  | core, postgis                      | `geo`           |
-| `pg_setup_pgcron`          | Complete pg_cron setup for job scheduling         | core                               | `ext-schedule`  |
-| `pg_setup_partman`         | Complete pg_partman setup for partition management| core, partman                      | `ext-schedule`  |
-| `pg_setup_kcache`          | Complete pg_stat_kcache setup for OS monitoring   | core, kcache                       | `ext-perf`      |
-| `pg_setup_citext`          | Complete citext setup for case-insensitive text   | core, citext                       | `base-ops`      |
-| `pg_setup_ltree`           | Complete ltree setup for hierarchical data        | core, ltree                        | `ext-geo`       |
-| `pg_setup_pgcrypto`        | Complete pgcrypto setup for cryptographic funcs   | core, pgcrypto                     | `ext-ai`        |
+| Prompt                     | Description                                        | Required Groups               | Shortcut       |
+| -------------------------- | -------------------------------------------------- | ----------------------------- | -------------- |
+| `pg_query_builder`         | Construct queries with CTEs and window functions   | core                          | `starter`      |
+| `pg_schema_design`         | Design schemas with constraints and indexes        | core                          | `starter`      |
+| `pg_performance_analysis`  | Analyze queries with EXPLAIN and optimization      | core, performance             | `dba-monitor`  |
+| `pg_migration`             | Generate migration scripts with rollback support   | core                          | `starter`      |
+| `pg_tool_index`            | Lazy hydration - compact index of all tools        | —                             | any            |
+| `pg_quick_query`           | Quick SQL query guidance for common operations     | core                          | `starter`      |
+| `pg_quick_schema`          | Quick reference for exploring database schema      | core                          | `starter`      |
+| `pg_database_health_check` | Comprehensive database health assessment           | core, performance, monitoring | `dba-monitor`  |
+| `pg_backup_strategy`       | Enterprise backup planning with RTO/RPO            | core, monitoring, backup      | `dba-manage`   |
+| `pg_index_tuning`          | Index analysis and optimization workflow           | core, performance             | `dba-monitor`  |
+| `pg_extension_setup`       | Extension installation and configuration guide     | core                          | `starter`      |
+| `pg_setup_pgvector`        | Complete pgvector setup for semantic search        | core, vector                  | `ai-vector`    |
+| `pg_setup_postgis`         | Complete PostGIS setup for geospatial operations   | core, postgis                 | `geo`          |
+| `pg_setup_pgcron`          | Complete pg_cron setup for job scheduling          | core                          | `ext-schedule` |
+| `pg_setup_partman`         | Complete pg_partman setup for partition management | core, partman                 | `ext-schedule` |
+| `pg_setup_kcache`          | Complete pg_stat_kcache setup for OS monitoring    | core, kcache                  | `ext-perf`     |
+| `pg_setup_citext`          | Complete citext setup for case-insensitive text    | core, citext                  | `base-ops`     |
+| `pg_setup_ltree`           | Complete ltree setup for hierarchical data         | core, ltree                   | `ext-geo`      |
+| `pg_setup_pgcrypto`        | Complete pgcrypto setup for cryptographic funcs    | core, pgcrypto                | `ext-ai`       |
 
 ---
 
@@ -484,7 +488,7 @@ This server provides **20 resources** for structured data access:
 ## 🏆 Why Choose postgres-mcp?
 
 ✅ **TypeScript Native** - Full type safety with strict mode  
-✅ **199 Specialized Tools** - Comprehensive PostgreSQL coverage  
+✅ **203 Specialized Tools** - Comprehensive PostgreSQL coverage  
 ✅ **Tool Annotations** - UX hints for read-only, destructive, and idempotent operations  
 ✅ **Connection Pooling** - Efficient PostgreSQL connection management  
 ✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements, pg_cron  

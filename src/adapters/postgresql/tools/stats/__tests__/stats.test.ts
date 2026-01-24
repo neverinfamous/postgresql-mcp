@@ -490,6 +490,10 @@ describe("pg_stats_time_series", () => {
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ data_type: "numeric" }],
     });
+    // Mock total group count query (for groupLimit truncation indicator)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ total_groups: 2 }],
+    });
     // Mock actual data
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
@@ -512,12 +516,16 @@ describe("pg_stats_time_series", () => {
     )) as {
       groups: Array<{ groupKey: string; buckets: unknown[] }>;
       count: number;
+      truncated?: boolean;
+      totalGroupCount?: number;
     };
 
     expect(result.groups).toBeDefined();
     expect(result.count).toBe(2);
     expect(result.groups[0].groupKey).toBe("A");
     expect(result.groups[0].buckets).toHaveLength(2);
+    expect(result.truncated).toBe(false);
+    expect(result.totalGroupCount).toBe(2);
   });
 
   // Parameter smoothing tests

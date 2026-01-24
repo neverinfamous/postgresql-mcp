@@ -297,6 +297,7 @@ export function createStatsTimeSeriesTool(
         where,
         limit,
         groupBy,
+        groupLimit,
       } = StatsTimeSeriesSchema.parse(params) as {
         table: string;
         valueColumn: string;
@@ -307,6 +308,7 @@ export function createStatsTimeSeriesTool(
         where?: string;
         limit?: number;
         groupBy?: string;
+        groupLimit?: number;
       };
 
       const schemaPrefix = schema ? `"${schema}".` : "";
@@ -411,6 +413,24 @@ export function createStatsTimeSeriesTool(
       });
 
       if (groupBy !== undefined) {
+        // Handle groupLimit: undefined uses default (20), 0 means no limit
+        const DEFAULT_GROUP_LIMIT = 20;
+        const userProvidedGroupLimit = groupLimit !== undefined;
+        const effectiveGroupLimit =
+          groupLimit === 0 ? undefined : (groupLimit ?? DEFAULT_GROUP_LIMIT);
+
+        // First get total count of distinct groups for truncation indicator
+        const groupCountSql = `
+          SELECT COUNT(DISTINCT "${groupBy}") as total_groups
+          FROM ${schemaPrefix}"${table}"
+          ${whereClause}
+        `;
+        const groupCountResult = await adapter.executeQuery(groupCountSql);
+        const totalGroupCount = Number(
+          (groupCountResult.rows?.[0] as { total_groups: string | number })
+            ?.total_groups ?? 0,
+        );
+
         // Grouped time series
         const sql = `
                     SELECT 
@@ -433,12 +453,21 @@ export function createStatsTimeSeriesTool(
           { timeBucket: Date; value: number; count: number }[]
         >();
         const groupsTotalCount = new Map<unknown, number>();
+        let groupsProcessed = 0;
 
         for (const row of rows) {
           const key = row["group_key"];
           if (!groupsMap.has(key)) {
+            // Check if we've hit the group limit
+            if (
+              effectiveGroupLimit !== undefined &&
+              groupsProcessed >= effectiveGroupLimit
+            ) {
+              continue;
+            }
             groupsMap.set(key, []);
             groupsTotalCount.set(key, 0);
+            groupsProcessed++;
           }
           const currentTotal = groupsTotalCount.get(key) ?? 0;
           groupsTotalCount.set(key, currentTotal + 1);
@@ -460,7 +489,8 @@ export function createStatsTimeSeriesTool(
           }),
         );
 
-        return {
+        // Build response with truncation indicators
+        const response: Record<string, unknown> = {
           table: `${schema ?? "public"}.${table}`,
           valueColumn,
           timeColumn,
@@ -470,6 +500,17 @@ export function createStatsTimeSeriesTool(
           groups,
           count: groups.length,
         };
+
+        // Add truncation indicators when groups are limited
+        const groupsTruncated =
+          effectiveGroupLimit !== undefined &&
+          totalGroupCount > effectiveGroupLimit;
+        if (groupsTruncated || !userProvidedGroupLimit) {
+          response["truncated"] = groupsTruncated;
+          response["totalGroupCount"] = totalGroupCount;
+        }
+
+        return response;
       }
 
       // Ungrouped time series
@@ -551,8 +592,10 @@ export function createStatsDistributionTool(
         schema?: string;
         where?: string;
         groupBy?: string;
+        groupLimit?: number;
       };
-      const { table, column, buckets, schema, where, groupBy } = parsed;
+      const { table, column, buckets, schema, where, groupBy, groupLimit } =
+        parsed;
 
       const schemaName = schema ?? "public";
       const schemaPrefix = schema ? `"${schema}".` : "";
@@ -664,6 +707,12 @@ export function createStatsDistributionTool(
       };
 
       if (groupBy !== undefined) {
+        // Handle groupLimit: undefined uses default (20), 0 means no limit
+        const DEFAULT_GROUP_LIMIT = 20;
+        const userProvidedGroupLimit = groupLimit !== undefined;
+        const effectiveGroupLimit =
+          groupLimit === 0 ? undefined : (groupLimit ?? DEFAULT_GROUP_LIMIT);
+
         // Get distinct groups first
         const groupsQuery = `
                     SELECT DISTINCT "${groupBy}" as group_key
@@ -672,7 +721,16 @@ export function createStatsDistributionTool(
                     ORDER BY "${groupBy}"
                 `;
         const groupsResult = await adapter.executeQuery(groupsQuery);
-        const groupKeys = (groupsResult.rows ?? []).map((r) => r["group_key"]);
+        const allGroupKeys = (groupsResult.rows ?? []).map(
+          (r) => r["group_key"],
+        );
+        const totalGroupCount = allGroupKeys.length;
+
+        // Apply group limit
+        const groupKeys =
+          effectiveGroupLimit !== undefined
+            ? allGroupKeys.slice(0, effectiveGroupLimit)
+            : allGroupKeys;
 
         // Process each group
         const groups: {
@@ -717,13 +775,25 @@ export function createStatsDistributionTool(
           });
         }
 
-        return {
+        // Build response with truncation indicators
+        const response: Record<string, unknown> = {
           table: `${schema ?? "public"}.${table}`,
           column,
           groupBy,
           groups,
           count: groups.length,
         };
+
+        // Add truncation indicators when groups are limited
+        const groupsTruncated =
+          effectiveGroupLimit !== undefined &&
+          totalGroupCount > effectiveGroupLimit;
+        if (groupsTruncated || !userProvidedGroupLimit) {
+          response["truncated"] = groupsTruncated;
+          response["totalGroupCount"] = totalGroupCount;
+        }
+
+        return response;
       }
 
       // Ungrouped distribution (existing logic)

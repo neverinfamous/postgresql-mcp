@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Monitoring `tables` alias** — Code mode monitoring group now supports `tables` as a shorthand alias for `tableSizes` (e.g., `pg.monitoring.tables({ limit: 10 })`), consistent with other group aliases like `connections` → `connectionStats`
+- **Stats tools `groupLimit` parameter** — `pg_stats_time_series` and `pg_stats_distribution` now support a `groupLimit` parameter when using `groupBy` to prevent large payloads. Default is 20 groups. Returns `truncated: true` + `totalGroupCount` metadata when groups are limited. Use `groupLimit: 0` for all groups. This addresses payload size concerns when groupBy produces many groups with many histogram buckets (distribution) or many time buckets (timeSeries)
 
 ### Documentation
 

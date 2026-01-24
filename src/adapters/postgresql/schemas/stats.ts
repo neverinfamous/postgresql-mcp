@@ -530,6 +530,12 @@ export const StatsTimeSeriesSchemaBase = z.object({
     .optional()
     .describe("Max time buckets to return (default: 100, 0 = no limit)"),
   groupBy: z.string().optional().describe("Column to group time series by"),
+  groupLimit: z
+    .number()
+    .optional()
+    .describe(
+      "Max number of groups when using groupBy (default: 20, 0 = no limit). Prevents large payloads with many groups",
+    ),
 });
 
 export const StatsDistributionSchemaBase = z.object({
@@ -542,6 +548,12 @@ export const StatsDistributionSchemaBase = z.object({
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
   groupBy: z.string().optional().describe("Column to group distribution by"),
+  groupLimit: z
+    .number()
+    .optional()
+    .describe(
+      "Max number of groups when using groupBy (default: 20, 0 = no limit). Prevents large payloads with many groups",
+    ),
 });
 
 export const StatsHypothesisSchemaBase = z.object({

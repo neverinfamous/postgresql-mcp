@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - **pg_copy_export enhanced documentation** — Updated `ServerInstructions.ts` to clarify: (1) warning is returned when both `query` and `table` parameters are provided (query takes precedence), (2) `text` format uses tab-delimited output by default but supports `header: true` like CSV format, (3) `delimiter` parameter can customize the field separator for both formats
+- **pg_buffer/pg_geo_transform truncation indicator clarification** — Updated `ServerInstructions.ts` to explicitly state that `truncated: true` + `totalCount` appear "when results are truncated" rather than "when default limit applies". Provides clearer documentation that these fields are only present when actual truncation occurs
 
 ### Fixed
 

@@ -319,8 +319,8 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 - \`pg_point_in_polygon\`: Check if point is within table polygons. Returns \`{containingPolygons, count}\`. ⚠️ Validates point bounds
 
 **Geometry Operations (Table-based):**
-- \`pg_buffer\`: Create buffer zone around table geometries. Default limit: 50 rows. Default simplify: 10m (set \`simplify: 0\` to disable). Returns \`truncated\`, \`totalCount\` when default limit applies. Use \`limit: 0\` for all rows
-- \`pg_geo_transform\`: Transform table geometries between SRIDs. Default limit: 50 rows. Returns \`truncated\`, \`totalCount\` when default limit applies. Use \`limit: 0\` for all rows. \`fromSrid\`/\`sourceSrid\` and \`toSrid\`/\`targetSrid\` aliases
+- \`pg_buffer\`: Create buffer zone around table geometries. Default limit: 50 rows. Default simplify: 10m (set \`simplify: 0\` to disable). Returns \`truncated: true\` + \`totalCount\` when results are truncated. Use \`limit: 0\` for all rows
+- \`pg_geo_transform\`: Transform table geometries between SRIDs. Default limit: 50 rows. Returns \`truncated: true\` + \`totalCount\` when results are truncated. Use \`limit: 0\` for all rows. \`fromSrid\`/\`sourceSrid\` and \`toSrid\`/\`targetSrid\` aliases
 - \`pg_geo_cluster\`: Spatial clustering (DBSCAN/K-Means). K-Means: If \`numClusters\` exceeds row count, automatically clamps to available rows with \`warning\` field. DBSCAN: Returns contextual \`hints\` array explaining parameter effects (e.g., "All points formed single cluster—decrease eps") and \`parameterGuide\` explaining eps/minPoints trade-offs
 
 **Geometry Operations (Standalone WKT/GeoJSON):**

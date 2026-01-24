@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **OAuth CLI example improvements** — Updated README OAuth 2.1 section with `--postgres` flag in CLI example (required for OAuth to work), updated realm naming from `db-mcp` to `postgres-mcp` for consistency, and added note for Keycloak users about required audience mapper configuration for `aud` claim validation
 - **pg_copy_export enhanced documentation** — Updated `ServerInstructions.ts` to clarify: (1) warning is returned when both `query` and `table` parameters are provided (query takes precedence), (2) `text` format uses tab-delimited output by default but supports `header: true` like CSV format, (3) `delimiter` parameter can customize the field separator for both formats
 - **pg_buffer/pg_geo_transform truncation indicator clarification** — Updated `ServerInstructions.ts` to explicitly state that `truncated: true` + `totalCount` appear "when results are truncated" rather than "when default limit applies". Provides clearer documentation that these fields are only present when actual truncation occurs
 - **pg_partman_set_retention default behavior clarification** — Updated `ServerInstructions.ts` to explicitly document that `retentionKeepTable` defaults to `false` (DROP behavior). Added warning indicator to emphasize the destructive default. Prevents accidental partition data loss

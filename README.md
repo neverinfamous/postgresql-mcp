@@ -323,9 +323,10 @@ When using HTTP/SSE transport, oauth 2.1 authentication can protect your MCP end
 node dist/cli.js \
   --transport http \
   --port 3000 \
+  --postgres "postgres://user:pass@localhost:5432/db" \
   --oauth-enabled \
-  --oauth-issuer http://localhost:8080/realms/db-mcp \
-  --oauth-audience postgres-mcp
+  --oauth-issuer http://localhost:8080/realms/postgres-mcp \
+  --oauth-audience postgres-mcp-client
 ```
 
 **Environment Variables:**
@@ -333,11 +334,11 @@ node dist/cli.js \
 ```bash
 # Required
 OAUTH_ENABLED=true
-OAUTH_ISSUER=http://localhost:8080/realms/db-mcp
-OAUTH_AUDIENCE=postgres-mcp
+OAUTH_ISSUER=http://localhost:8080/realms/postgres-mcp
+OAUTH_AUDIENCE=postgres-mcp-client
 
 # Optional (auto-discovered from issuer)
-OAUTH_JWKS_URI=http://localhost:8080/realms/db-mcp/protocol/openid-connect/certs
+OAUTH_JWKS_URI=http://localhost:8080/realms/postgres-mcp/protocol/openid-connect/certs
 OAUTH_CLOCK_TOLERANCE=60
 ```
 
@@ -364,6 +365,8 @@ This implementation follows:
 - **RFC 7591** — OAuth 2.0 Dynamic Client Registration
 
 The server exposes metadata at `/.well-known/oauth-protected-resource`.
+
+> **Note for Keycloak users:** Add an **Audience mapper** to your client (Client → Client scopes → dedicated scope → Add mapper → Audience) to include the correct `aud` claim in tokens.
 
 ---
 

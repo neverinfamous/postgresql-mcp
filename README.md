@@ -387,27 +387,27 @@ Prompts provide step-by-step guidance for complex database tasks. Instead of fig
 
 This server includes **19 intelligent prompts** for guided workflows:
 
-| Prompt                     | Description                                                 |
-| -------------------------- | ----------------------------------------------------------- |
-| `pg_query_builder`         | Construct PostgreSQL queries with CTEs and window functions |
-| `pg_schema_design`         | Design normalized schemas with constraints and indexes      |
-| `pg_performance_analysis`  | Analyze queries with EXPLAIN and optimization tips          |
-| `pg_migration`             | Generate migration scripts with rollback support            |
-| `pg_tool_index`            | Lazy hydration - compact index of all tools                 |
-| `pg_quick_query`           | Quick SQL query guidance for common operations              |
-| `pg_quick_schema`          | Quick reference for exploring database schema               |
-| `pg_database_health_check` | Comprehensive database health assessment                    |
-| `pg_backup_strategy`       | Enterprise backup planning with RTO/RPO                     |
-| `pg_index_tuning`          | Index analysis and optimization workflow                    |
-| `pg_extension_setup`       | Extension installation and configuration guide              |
-| `pg_setup_pgvector`        | Complete pgvector setup for semantic search                 |
-| `pg_setup_postgis`         | Complete PostGIS setup for geospatial operations            |
-| `pg_setup_pgcron`          | Complete pg_cron setup for job scheduling                   |
-| `pg_setup_partman`         | Complete pg_partman setup for partition management          |
-| `pg_setup_kcache`          | Complete pg_stat_kcache setup for OS-level monitoring       |
-| `pg_setup_citext`          | Complete citext setup for case-insensitive text             |
-| `pg_setup_ltree`           | Complete ltree setup for hierarchical data                  |
-| `pg_setup_pgcrypto`        | Complete pgcrypto setup for cryptographic functions         |
+| Prompt                     | Description                                       | Required Groups                    | Shortcut        |
+| -------------------------- | ------------------------------------------------- | ---------------------------------- | --------------- |
+| `pg_query_builder`         | Construct queries with CTEs and window functions  | core                               | `starter`       |
+| `pg_schema_design`         | Design schemas with constraints and indexes       | core                               | `starter`       |
+| `pg_performance_analysis`  | Analyze queries with EXPLAIN and optimization     | core, performance                  | `dba-monitor`   |
+| `pg_migration`             | Generate migration scripts with rollback support  | core                               | `starter`       |
+| `pg_tool_index`            | Lazy hydration - compact index of all tools       | —                                  | any             |
+| `pg_quick_query`           | Quick SQL query guidance for common operations    | core                               | `starter`       |
+| `pg_quick_schema`          | Quick reference for exploring database schema     | core                               | `starter`       |
+| `pg_database_health_check` | Comprehensive database health assessment          | core, performance, monitoring      | `dba-monitor`   |
+| `pg_backup_strategy`       | Enterprise backup planning with RTO/RPO           | core, monitoring, backup           | `dba-manage`    |
+| `pg_index_tuning`          | Index analysis and optimization workflow          | core, performance                  | `dba-monitor`   |
+| `pg_extension_setup`       | Extension installation and configuration guide    | core                               | `starter`       |
+| `pg_setup_pgvector`        | Complete pgvector setup for semantic search       | core, vector                       | `ai-vector`     |
+| `pg_setup_postgis`         | Complete PostGIS setup for geospatial operations  | core, postgis                      | `geo`           |
+| `pg_setup_pgcron`          | Complete pg_cron setup for job scheduling         | core, cron                         | `ext-schedule`  |
+| `pg_setup_partman`         | Complete pg_partman setup for partition management| core, partman                      | `ext-schedule`  |
+| `pg_setup_kcache`          | Complete pg_stat_kcache setup for OS monitoring   | core, kcache                       | `ext-perf`      |
+| `pg_setup_citext`          | Complete citext setup for case-insensitive text   | core, citext                       | `base-ops`      |
+| `pg_setup_ltree`           | Complete ltree setup for hierarchical data        | core, ltree                        | `ext-geo`       |
+| `pg_setup_pgcrypto`        | Complete pgcrypto setup for cryptographic funcs   | core, pgcrypto                     | `ext-ai`        |
 
 ---
 

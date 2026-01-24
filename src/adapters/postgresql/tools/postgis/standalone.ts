@@ -91,8 +91,9 @@ export function createGeometryBufferTool(
             `;
 
       const result = await adapter.executeQuery(sql, [geometry, distance]);
+      const row = result.rows?.[0];
       const response: Record<string, unknown> = {
-        ...result.rows?.[0],
+        ...row,
         inputFormat: isGeoJson ? "GeoJSON" : "WKT",
       };
 
@@ -100,6 +101,12 @@ export function createGeometryBufferTool(
       if (simplify !== undefined && simplify > 0) {
         response["simplified"] = true;
         response["simplifyTolerance"] = simplify;
+
+        // Check if simplification caused geometry to collapse to null
+        if (row?.["buffer_geojson"] === null || row?.["buffer_wkt"] === null) {
+          response["warning"] =
+            `Simplification tolerance (${String(simplify)}m) is too high relative to buffer distance (${String(distance)}m). The geometry collapsed to null. Reduce simplify value or set simplify: 0 to disable.`;
+        }
       }
 
       return response;

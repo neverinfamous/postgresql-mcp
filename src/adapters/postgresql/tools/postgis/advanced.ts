@@ -85,10 +85,11 @@ export function createGeoTransformTool(
 
       const whereClause =
         parsed.where !== undefined ? `WHERE ${parsed.where}` : "";
+
+      // Default limit of 50 to prevent large payloads, use limit: 0 for all
+      const effectiveLimit = parsed.limit ?? 50;
       const limitClause =
-        parsed.limit !== undefined && parsed.limit > 0
-          ? `LIMIT ${String(parsed.limit)}`
-          : "";
+        effectiveLimit > 0 ? `LIMIT ${String(effectiveLimit)}` : "";
 
       // Get non-geometry columns to avoid returning raw WKB
       const colQuery = `
@@ -114,12 +115,29 @@ export function createGeoTransformTool(
       const sql = `SELECT ${selectCols} FROM ${qualifiedTable} ${whereClause} ${limitClause}`;
 
       const result = await adapter.executeQuery(sql);
-      return {
+
+      // Build response with truncation indicators if default limit was applied
+      const response: Record<string, unknown> = {
         results: result.rows,
         count: result.rows?.length ?? 0,
         fromSrid: parsed.fromSrid,
         toSrid: parsed.toSrid,
       };
+
+      // When using default limit, check if more rows exist
+      if (parsed.limit === undefined && effectiveLimit > 0) {
+        const countSql = `SELECT COUNT(*) as cnt FROM ${qualifiedTable} ${whereClause}`;
+        const countResult = await adapter.executeQuery(countSql);
+        const totalCount = Number(countResult.rows?.[0]?.["cnt"] ?? 0);
+
+        if (totalCount > effectiveLimit) {
+          response["truncated"] = true;
+          response["totalCount"] = totalCount;
+          response["limit"] = effectiveLimit;
+        }
+      }
+
+      return response;
     },
   };
 }

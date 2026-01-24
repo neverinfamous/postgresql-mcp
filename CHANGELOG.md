@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Monitoring `tables` alias** — Code mode monitoring group now supports `tables` as a shorthand alias for `tableSizes` (e.g., `pg.monitoring.tables({ limit: 10 })`), consistent with other group aliases like `connections` → `connectionStats`
 - **Stats tools `groupLimit` parameter** — `pg_stats_time_series` and `pg_stats_distribution` now support a `groupLimit` parameter when using `groupBy` to prevent large payloads. Default is 20 groups. Returns `truncated: true` + `totalGroupCount` metadata when groups are limited. Use `groupLimit: 0` for all groups. This addresses payload size concerns when groupBy produces many groups with many histogram buckets (distribution) or many time buckets (timeSeries)
 
+### Performance
+
+- **pg_geo_transform default limit** — `pg_geo_transform` now applies a default limit of 50 rows when no `limit` parameter is specified. Returns `truncated: true` + `totalCount` metadata when results are limited. Use `limit: 0` for all rows. Consistent with `pg_buffer` and other AI-optimized payload tools
+
+### Fixed
+
+- **pg_geometry_buffer null geometry warning** — `pg_geometry_buffer` now returns a `warning` field when simplification tolerance is too high relative to buffer distance, causing the geometry to collapse to null. The warning explains the issue and suggests reducing the `simplify` value or setting `simplify: 0` to disable. Previously, aggressive simplification silently returned `null` for both `buffer_geojson` and `buffer_wkt` without explanation
+
 ### Documentation
 
 - **pg_copy_export enhanced documentation** — Updated `ServerInstructions.ts` to clarify: (1) warning is returned when both `query` and `table` parameters are provided (query takes precedence), (2) `text` format uses tab-delimited output by default but supports `header: true` like CSV format, (3) `delimiter` parameter can customize the field separator for both formats

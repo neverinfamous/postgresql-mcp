@@ -773,12 +773,14 @@ export function createVectorDimensionReduceTool(
       .array(z.number())
       .optional()
       .describe("Vector to reduce (for direct mode)"),
-    // Table-based mode
+    // Table-based mode - include aliases for Split Schema compliance
     table: z.string().optional().describe("Table name (for table mode)"),
+    tableName: z.string().optional().describe("Alias for table"),
     column: z
       .string()
       .optional()
       .describe("Vector column name (for table mode)"),
+    col: z.string().optional().describe("Alias for column"),
     idColumn: z
       .string()
       .optional()
@@ -802,10 +804,12 @@ export function createVectorDimensionReduceTool(
   // Schema with alias resolution applied via refinement
   const VectorDimensionReduceSchema = VectorDimensionReduceSchemaBase.transform(
     (data) => {
-      // Handle alias: dimensions -> targetDimensions
+      // Handle aliases: dimensions -> targetDimensions, tableName -> table, col -> column
       const resolvedTargetDimensions = data.targetDimensions ?? data.dimensions;
       return {
         ...data,
+        table: data.table ?? data.tableName,
+        column: data.column ?? data.col,
         targetDimensions: resolvedTargetDimensions,
       };
     },

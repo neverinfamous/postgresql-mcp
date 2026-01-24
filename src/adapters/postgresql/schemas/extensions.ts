@@ -302,10 +302,10 @@ function preprocessLtreeTableParams(input: unknown): unknown {
  * Base schema for MCP visibility - shows all parameters including aliases.
  */
 export const LtreeQuerySchemaBase = z.object({
-  table: z.string().describe("Table name"),
+  table: z.string().optional().describe("Table name"),
   tableName: z.string().optional().describe("Alias for table"),
   name: z.string().optional().describe("Alias for table"),
-  column: z.string().describe("ltree column name"),
+  column: z.string().optional().describe("ltree column name"),
   col: z.string().optional().describe("Alias for column"),
   path: z
     .string()
@@ -345,10 +345,10 @@ export const LtreeSubpathSchemaBase = z.object({
  * Base schema for MCP visibility - shows all parameters including aliases.
  */
 export const LtreeMatchSchemaBase = z.object({
-  table: z.string().describe("Table name"),
+  table: z.string().optional().describe("Table name"),
   tableName: z.string().optional().describe("Alias for table"),
   name: z.string().optional().describe("Alias for table"),
-  column: z.string().describe("ltree column name"),
+  column: z.string().optional().describe("ltree column name"),
   col: z.string().optional().describe("Alias for column"),
   pattern: z
     .string()
@@ -365,10 +365,10 @@ export const LtreeMatchSchemaBase = z.object({
  * Base schema for MCP visibility - shows all parameters including aliases.
  */
 export const LtreeConvertColumnSchemaBase = z.object({
-  table: z.string().describe("Table name"),
+  table: z.string().optional().describe("Table name"),
   tableName: z.string().optional().describe("Alias for table"),
   name: z.string().optional().describe("Alias for table"),
-  column: z.string().describe("Text column to convert to ltree"),
+  column: z.string().optional().describe("Text column to convert to ltree"),
   col: z.string().optional().describe("Alias for column"),
   schema: z.string().optional().describe("Schema name (default: public)"),
 });
@@ -377,10 +377,10 @@ export const LtreeConvertColumnSchemaBase = z.object({
  * Base schema for MCP visibility - shows all parameters including aliases.
  */
 export const LtreeIndexSchemaBase = z.object({
-  table: z.string().describe("Table name"),
+  table: z.string().optional().describe("Table name"),
   tableName: z.string().optional().describe("Alias for table"),
   name: z.string().optional().describe("Alias for table"),
-  column: z.string().describe("ltree column name"),
+  column: z.string().optional().describe("ltree column name"),
   col: z.string().optional().describe("Alias for column"),
   indexName: z
     .string()

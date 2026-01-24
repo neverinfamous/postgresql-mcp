@@ -402,7 +402,7 @@ This server includes **19 intelligent prompts** for guided workflows:
 | `pg_extension_setup`       | Extension installation and configuration guide    | core                               | `starter`       |
 | `pg_setup_pgvector`        | Complete pgvector setup for semantic search       | core, vector                       | `ai-vector`     |
 | `pg_setup_postgis`         | Complete PostGIS setup for geospatial operations  | core, postgis                      | `geo`           |
-| `pg_setup_pgcron`          | Complete pg_cron setup for job scheduling         | core, cron                         | `ext-schedule`  |
+| `pg_setup_pgcron`          | Complete pg_cron setup for job scheduling         | core                               | `ext-schedule`  |
 | `pg_setup_partman`         | Complete pg_partman setup for partition management| core, partman                      | `ext-schedule`  |
 | `pg_setup_kcache`          | Complete pg_stat_kcache setup for OS monitoring   | core, kcache                       | `ext-perf`      |
 | `pg_setup_citext`          | Complete citext setup for case-insensitive text   | core, citext                       | `base-ops`      |

@@ -409,14 +409,19 @@ Useful for monitoring and debugging scheduled jobs.`,
       const whereClause =
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      const limitVal = limit ?? 100;
+      // Handle limit: 0 as "no limit" (return all rows), consistent with other AI-optimized tools
+      const limitVal = limit === 0 ? null : (limit ?? 100);
 
-      // Get total count for truncation indicator
-      const countSql = `SELECT COUNT(*)::int as total FROM cron.job_run_details ${whereClause}`;
-      const countResult = await adapter.executeQuery(countSql, queryParams);
-      const totalCount =
-        (countResult.rows?.[0] as { total: number } | undefined)?.total ?? 0;
+      // Get total count for truncation indicator (only needed when limiting)
+      let totalCount: number | undefined;
+      if (limitVal !== null) {
+        const countSql = `SELECT COUNT(*)::int as total FROM cron.job_run_details ${whereClause}`;
+        const countResult = await adapter.executeQuery(countSql, queryParams);
+        totalCount =
+          (countResult.rows?.[0] as { total: number } | undefined)?.total ?? 0;
+      }
 
+      const limitClause = limitVal !== null ? `LIMIT ${String(limitVal)}` : "";
       const sql = `
                 SELECT 
                     runid,
@@ -432,7 +437,7 @@ Useful for monitoring and debugging scheduled jobs.`,
                 FROM cron.job_run_details
                 ${whereClause}
                 ORDER BY start_time DESC
-                LIMIT ${String(limitVal)}
+                ${limitClause}
             `;
 
       const result = await adapter.executeQuery(sql, queryParams);
@@ -459,8 +464,11 @@ Useful for monitoring and debugging scheduled jobs.`,
         (r: Record<string, unknown>) => r["status"] === "running",
       ).length;
 
-      // Determine if results were truncated
-      const truncated = rows.length < totalCount;
+      // Determine if results were truncated (only when limiting)
+      const truncated =
+        limitVal !== null &&
+        totalCount !== undefined &&
+        rows.length < totalCount;
 
       return {
         runs: rows,

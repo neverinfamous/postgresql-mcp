@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_buffer/pg_geo_transform truncation indicator clarification** — Updated `ServerInstructions.ts` to explicitly state that `truncated: true` + `totalCount` appear "when results are truncated" rather than "when default limit applies". Provides clearer documentation that these fields are only present when actual truncation occurs
 - **pg_partman_set_retention default behavior clarification** — Updated `ServerInstructions.ts` to explicitly document that `retentionKeepTable` defaults to `false` (DROP behavior). Added warning indicator to emphasize the destructive default. Prevents accidental partition data loss
 - **pg_partman comprehensive alias documentation** — Added new documentation note listing all supported aliases: `parentTable` accepts `table`, `parent`, `name`; `controlColumn` accepts `control`, `column`; `targetTable` accepts `target`
+- **pg_kcache_top_io parameter order clarification** — Updated `ServerInstructions.ts` to clarify that `type` is the primary parameter and `ioType` is the alias for `pg_kcache_top_io`, matching the actual MCP schema implementation
 
 ### Fixed
 

@@ -23,6 +23,7 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
     "pg_create_index",
     "pg_list_objects",
     "pg_object_details",
+    "pg_list_extensions",
     "pg_analyze_db_health",
     "pg_analyze_workload_indexes",
     "pg_analyze_query_indexes",

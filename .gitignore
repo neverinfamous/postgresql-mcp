@@ -42,3 +42,6 @@ temp/
 # Lock files (keep package-lock.json)
 yarn.lock
 pnpm-lock.yaml
+
+# Test database files
+test-database/

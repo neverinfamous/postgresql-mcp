@@ -99,7 +99,7 @@ test_embeddings (50 rows): id, content, category, embedding (vector(384))
 
 ## Testing Tools
 
-Core Tool Group (19 tools +1 for code mode):
+Core Tool Group (20 tools +1 for code mode):
 
 'pg_read_query'
 'pg_write_query'
@@ -111,6 +111,7 @@ Core Tool Group (19 tools +1 for code mode):
 'pg_create_index'
 'pg_list_objects'
 'pg_object_details'
+'pg_list_extensions'
 'pg_analyze_db_health'
 'pg_analyze_workload_indexes'
 'pg_analyze_query_indexes'

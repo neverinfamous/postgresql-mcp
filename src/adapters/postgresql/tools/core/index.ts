@@ -2,7 +2,7 @@
  * PostgreSQL Core Database Tools
  *
  * Fundamental database operations: read, write, table management, indexes, and convenience utilities.
- * 19 tools total.
+ * 20 tools total.
  */
 
 import type { PostgresAdapter } from "../../PostgresAdapter.js";
@@ -21,7 +21,11 @@ import {
   createCreateIndexTool,
   createDropIndexTool,
 } from "./indexes.js";
-import { createListObjectsTool, createObjectDetailsTool } from "./objects.js";
+import {
+  createListObjectsTool,
+  createObjectDetailsTool,
+  createListExtensionsTool,
+} from "./objects.js";
 import {
   createAnalyzeDbHealthTool,
   createAnalyzeWorkloadIndexesTool,
@@ -63,6 +67,7 @@ export function getCoreTools(adapter: PostgresAdapter): ToolDefinition[] {
     createDropIndexTool(adapter),
     createListObjectsTool(adapter),
     createObjectDetailsTool(adapter),
+    createListExtensionsTool(adapter),
     createAnalyzeDbHealthTool(adapter),
     createAnalyzeWorkloadIndexesTool(adapter),
     createAnalyzeQueryIndexesTool(adapter),

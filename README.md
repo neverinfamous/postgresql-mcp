@@ -201,7 +201,7 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 
 | Group          | Tools | Description                                                 |
 | -------------- | ----- | ----------------------------------------------------------- |
-| `core`         | 20    | Read/write queries, tables, indexes, convenience/drop tools |
+| `core`         | 21    | Read/write queries, tables, indexes, convenience/drop tools |
 | `transactions` | 8     | BEGIN, COMMIT, ROLLBACK, savepoints                         |
 | `jsonb`        | 20    | JSONB manipulation and queries                              |
 | `text`         | 14    | Full-text search, fuzzy matching                            |

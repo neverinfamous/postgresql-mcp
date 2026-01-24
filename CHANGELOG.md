@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Monitoring `tables` alias** — Code mode monitoring group now supports `tables` as a shorthand alias for `tableSizes` (e.g., `pg.monitoring.tables({ limit: 10 })`), consistent with other group aliases like `connections` → `connectionStats`
 - **Stats tools `groupLimit` parameter** — `pg_stats_time_series` and `pg_stats_distribution` now support a `groupLimit` parameter when using `groupBy` to prevent large payloads. Default is 20 groups. Returns `truncated: true` + `totalGroupCount` metadata when groups are limited. Use `groupLimit: 0` for all groups. This addresses payload size concerns when groupBy produces many groups with many histogram buckets (distribution) or many time buckets (timeSeries)
+- **pg_partman `parent` and `name` aliases** — All pg_partman tools now accept `parent` and `name` as additional aliases for `parentTable`, in addition to the existing `table` alias. Provides consistency with documentation and matches partitioning tools pattern. All aliases: `parentTable`, `table`, `parent`, `name`
 
 ### Performance
 
@@ -24,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **pg_copy_export enhanced documentation** — Updated `ServerInstructions.ts` to clarify: (1) warning is returned when both `query` and `table` parameters are provided (query takes precedence), (2) `text` format uses tab-delimited output by default but supports `header: true` like CSV format, (3) `delimiter` parameter can customize the field separator for both formats
 - **pg_buffer/pg_geo_transform truncation indicator clarification** — Updated `ServerInstructions.ts` to explicitly state that `truncated: true` + `totalCount` appear "when results are truncated" rather than "when default limit applies". Provides clearer documentation that these fields are only present when actual truncation occurs
+- **pg_partman_set_retention default behavior clarification** — Updated `ServerInstructions.ts` to explicitly document that `retentionKeepTable` defaults to `false` (DROP behavior). Added warning indicator to emphasize the destructive default. Prevents accidental partition data loss
+- **pg_partman comprehensive alias documentation** — Added new documentation note listing all supported aliases: `parentTable` accepts `table`, `parent`, `name`; `controlColumn` accepts `control`, `column`; `targetTable` accepts `target`
 
 ### Fixed
 

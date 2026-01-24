@@ -13,6 +13,8 @@ import { z } from "zod";
 interface RawPartmanInput {
   parentTable?: string;
   table?: string; // Common alias → parentTable
+  parent?: string; // Alias → parentTable (documented in ServerInstructions)
+  name?: string; // Alias → parentTable (documented in ServerInstructions)
   controlColumn?: string;
   column?: string; // Common alias → controlColumn
   control?: string; // pg_partman native name → controlColumn
@@ -56,6 +58,16 @@ function preprocessPartmanParams(input: unknown): unknown {
   // Alias: table → parentTable
   if (result.table && !result.parentTable) {
     result.parentTable = result.table;
+  }
+
+  // Alias: parent → parentTable (documented in ServerInstructions)
+  if (result.parent && !result.parentTable) {
+    result.parentTable = result.parent;
+  }
+
+  // Alias: name → parentTable (documented in ServerInstructions)
+  if (result.name && !result.parentTable) {
+    result.parentTable = result.name;
   }
 
   // Alias: column → controlColumn
@@ -277,7 +289,9 @@ export const PartmanRetentionSchema = z
       retentionKeepTable: z
         .boolean()
         .optional()
-        .describe("Keep tables after detaching (true) or drop them (false)"),
+        .describe(
+          "Keep tables after detaching (true) or drop them (false). Default: false (DROP). Use true to preserve partition data.",
+        ),
     }),
   )
   .default({});

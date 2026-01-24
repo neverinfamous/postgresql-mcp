@@ -511,13 +511,15 @@ export function createPartmanShowPartitionsTool(
 export function createPartmanShowConfigTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
-  // Preprocess to support table alias and auto-prefix public schema
+  // Preprocess to support table/parent/name aliases and auto-prefix public schema
   const inputSchema = z
     .preprocess(
       (input) => {
         if (typeof input !== "object" || input === null) return input;
         const raw = input as {
           table?: string;
+          parent?: string;
+          name?: string;
           parentTable?: string;
           limit?: number;
         };
@@ -526,6 +528,16 @@ export function createPartmanShowConfigTool(
         // Alias: table → parentTable
         if (result.table && !result.parentTable) {
           result.parentTable = result.table;
+        }
+
+        // Alias: parent → parentTable (documented in ServerInstructions)
+        if (result.parent && !result.parentTable) {
+          result.parentTable = result.parent;
+        }
+
+        // Alias: name → parentTable (documented in ServerInstructions)
+        if (result.name && !result.parentTable) {
+          result.parentTable = result.name;
         }
 
         // Auto-prefix public. for parentTable when no schema specified

@@ -261,7 +261,7 @@ Response Structures:
 - \`pg_partman_show_config\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`orphaned\` flag per config. Supports \`schema.table\` or plain table name (auto-prefixes \`public.\`)
 - \`pg_partman_show_partitions\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
 - \`pg_partman_check_default\`/\`partition_data\`: \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
-- \`pg_partman_set_retention\`: \`retentionKeepTable: true\` = detach only, \`false\` = DROP (⚠️ **default is false/DROP**). Pass \`retention: null\` to disable retention
+- \`pg_partman_set_retention\`: ⚠️ **CAUTION: Default is DROP** — \`retentionKeepTable: false\` (default) = DROP partitions, \`true\` = detach only (safer). Pass \`retention: null\` to disable retention
 - \`pg_partman_undo_partition\`: \`targetTable\` MUST exist before calling. Requires both \`parentTable\` and \`targetTable\`/\`target\`
 - \`pg_partman_analyze_partition_health\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`summary.overallHealth\`: 'healthy'|'warnings'|'issues_found'
 - 📝 **Schema Resolution**: All partman tools auto-prefix \`public.\` when no schema specified in \`parentTable\`

@@ -196,6 +196,24 @@ A startPartition far in the past (e.g., '2024-01-01' with daily intervals) creat
               "Example: CREATE TABLE events (ts TIMESTAMPTZ NOT NULL, ...) PARTITION BY RANGE (ts);",
           };
         }
+        // Catch invalid interval format error with user-friendly message
+        if (errorMsg.includes("invalid input syntax for type interval")) {
+          return {
+            success: false,
+            error: `Invalid interval format: '${validatedInterval}'.`,
+            hint:
+              "Use PostgreSQL interval syntax. Valid examples: '1 day', '1 week', '1 month', '3 months', '1 year'. " +
+              "Do NOT use keywords like 'daily' or 'monthly'.",
+            examples: [
+              "1 day",
+              "1 week",
+              "2 weeks",
+              "1 month",
+              "3 months",
+              "1 year",
+            ],
+          };
+        }
 
         throw e; // Re-throw other errors
       }

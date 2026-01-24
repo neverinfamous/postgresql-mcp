@@ -460,20 +460,6 @@ This server provides **20 resources** for structured data access:
 
 ---
 
-## 🏷️ Tool Annotations
-
-All 199 tools include **Tool Annotations** (MCP SDK 1.25+), providing UX hints to MCP clients about tool behavior:
-
-| Annotation        | Description                          | Example                         |
-| ----------------- | ------------------------------------ | ------------------------------- |
-| `title`           | Human-readable tool name             | "Execute Query", "Create Index" |
-| `readOnlyHint`    | Tool doesn't modify data             | `true` for SELECT queries       |
-| `destructiveHint` | Tool may delete/modify data          | `true` for DROP, DELETE         |
-| `idempotentHint`  | Safe to retry without side effects   | `true` for IF NOT EXISTS        |
-| `openWorldHint`   | Tool interacts with external systems | `false` for all tools           |
-
----
-
 ## 🔥 Core Capabilities
 
 - 📊 **Full SQL Support** - Execute any PostgreSQL query with parameter binding

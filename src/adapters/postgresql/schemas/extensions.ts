@@ -170,22 +170,26 @@ export const CitextConvertColumnSchema = z
   });
 
 /**
+ * Base schema for MCP visibility - shows all parameters for listColumns.
+ */
+export const CitextListColumnsSchemaBase = z.object({
+  schema: z
+    .string()
+    .optional()
+    .describe("Schema name to filter (all schemas if omitted)"),
+  limit: z
+    .number()
+    .optional()
+    .describe("Maximum number of columns to return (default: 100, 0 for all)"),
+});
+
+/**
  * Schema for listing citext columns.
+ * Preprocesses to handle empty/null params.
  */
 export const CitextListColumnsSchema = z.preprocess(
   normalizeOptionalParams,
-  z.object({
-    schema: z
-      .string()
-      .optional()
-      .describe("Schema name to filter (all schemas if omitted)"),
-    limit: z
-      .number()
-      .optional()
-      .describe(
-        "Maximum number of columns to return (default: 100, 0 for all)",
-      ),
-  }),
+  CitextListColumnsSchemaBase,
 );
 
 /**

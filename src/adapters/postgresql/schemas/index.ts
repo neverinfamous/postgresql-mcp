@@ -216,6 +216,7 @@ export {
   // citext
   CitextConvertColumnSchema,
   CitextConvertColumnSchemaBase,
+  CitextListColumnsSchemaBase,
   CitextListColumnsSchema,
   CitextAnalyzeCandidatesSchema,
   CitextAnalyzeCandidatesSchemaBase,

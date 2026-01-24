@@ -19,6 +19,7 @@ import {
   CitextConvertColumnSchema,
   CitextConvertColumnSchemaBase,
   CitextListColumnsSchema,
+  CitextListColumnsSchemaBase,
   CitextAnalyzeCandidatesSchema,
   CitextAnalyzeCandidatesSchemaBase,
   CitextSchemaAdvisorSchema,
@@ -229,7 +230,7 @@ function createCitextListColumnsTool(adapter: PostgresAdapter): ToolDefinition {
     description: `List all columns using the citext type in the database.
 Useful for auditing case-insensitive columns.`,
     group: "citext",
-    inputSchema: CitextListColumnsSchema,
+    inputSchema: CitextListColumnsSchemaBase,
     annotations: readOnly("List Citext Columns"),
     icons: getToolIcons("citext", readOnly("List Citext Columns")),
     handler: async (params: unknown, _context: RequestContext) => {

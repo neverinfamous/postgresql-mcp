@@ -44,21 +44,21 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "commander": "^14.0.0",
     "jose": "^6.0.0",
-    "pg": "^8.17.1",
-    "zod": "^4.3.5"
+    "pg": "^8.17.2",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.28.0",
-    "@types/node": "^25.0.9",
+    "@types/node": "^25.0.10",
     "@types/pg": "^8.11.0",
-    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.28.0",
-    "globals": "^17.0.0",
+    "globals": "^17.1.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.53.0",
-    "vitest": "^4.0.17"
+    "typescript-eslint": "^8.53.1",
+    "vitest": "^4.0.18"
   }
 }

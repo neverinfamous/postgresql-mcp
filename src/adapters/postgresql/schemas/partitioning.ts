@@ -294,8 +294,15 @@ export const CreatePartitionSchemaBase = z
     schema: z.string().optional().describe("Schema name"),
     forValues: z
       .string()
+      .optional()
       .describe(
         "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
+      ),
+    isDefault: z
+      .boolean()
+      .optional()
+      .describe(
+        "Create DEFAULT partition. Use instead of forValues for default partitions.",
       ),
     // Sub-partitioning support for multi-level partitions
     subpartitionBy: z
@@ -320,7 +327,12 @@ export const CreatePartitionSchemaBase = z
       message: "One of parent, parentTable, or table is required",
       path: ["parent"],
     },
-  );
+  )
+  .refine((data) => data.forValues !== undefined || data.isDefault === true, {
+    message:
+      "Either forValues or isDefault: true is required. Use isDefault: true for DEFAULT partitions.",
+    path: ["forValues"],
+  });
 
 // Preprocessed schema for handler parsing (with alias support)
 export const CreatePartitionSchema = z.preprocess(
@@ -349,8 +361,15 @@ export const AttachPartitionSchemaBase = z
       .describe("Schema name (auto-parsed from schema.table format)"),
     forValues: z
       .string()
+      .optional()
       .describe(
         "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
+      ),
+    isDefault: z
+      .boolean()
+      .optional()
+      .describe(
+        "Attach as DEFAULT partition. Use instead of forValues for default partitions.",
       ),
   })
   .refine(
@@ -372,7 +391,12 @@ export const AttachPartitionSchemaBase = z
       message: "One of partition, partitionTable, or partitionName is required",
       path: ["partition"],
     },
-  );
+  )
+  .refine((data) => data.forValues !== undefined || data.isDefault === true, {
+    message:
+      "Either forValues or isDefault: true is required. Use isDefault: true for DEFAULT partitions.",
+    path: ["forValues"],
+  });
 
 // Preprocessed schema for handler parsing (with alias support)
 export const AttachPartitionSchema = z.preprocess(

@@ -129,6 +129,7 @@ export function createMockPostgresAdapter(): Partial<PostgresAdapter> & {
   executeReadQuery: ReturnType<typeof vi.fn>;
   executeWriteQuery: ReturnType<typeof vi.fn>;
   getTableIndexes: ReturnType<typeof vi.fn>;
+  getAllIndexes: ReturnType<typeof vi.fn>;
   describeTable: ReturnType<typeof vi.fn>;
   listTables: ReturnType<typeof vi.fn>;
   listSchemas: ReturnType<typeof vi.fn>;
@@ -159,6 +160,7 @@ export function createMockPostgresAdapter(): Partial<PostgresAdapter> & {
     releaseSavepoint: vi.fn().mockResolvedValue(undefined),
     rollbackToSavepoint: vi.fn().mockResolvedValue(undefined),
     getTransactionConnection: vi.fn().mockReturnValue(undefined),
+    executeOnConnection: vi.fn().mockResolvedValue(createMockQueryResult()),
 
     // Schema methods
     getSchema: vi.fn().mockResolvedValue(createMockSchemaInfo()),
@@ -168,6 +170,10 @@ export function createMockPostgresAdapter(): Partial<PostgresAdapter> & {
     getTableIndexes: vi
       .fn()
       .mockResolvedValue([createMockIndexInfo("users", "users_pkey")]),
+    getAllIndexes: vi
+      .fn()
+      .mockResolvedValue([createMockIndexInfo("users", "users_pkey")]),
+
 
     // Capabilities
     getCapabilities: vi.fn().mockReturnValue({

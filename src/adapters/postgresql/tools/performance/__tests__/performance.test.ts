@@ -596,6 +596,76 @@ describe("pg_seq_scan_tables", () => {
     );
     expect(result.tables).toHaveLength(1);
   });
+
+  it("should filter by schema when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_seq_scan_tables")!;
+    await tool.handler({ schema: "analytics" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("schemaname = 'analytics'"),
+    );
+  });
+
+  it("should return all results when limit=0", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: Array(100).fill({ relname: "test", seq_scan: "500" }),
+    });
+
+    const tool = tools.find((t) => t.name === "pg_seq_scan_tables")!;
+    const result = (await tool.handler({ limit: 0 }, mockContext)) as {
+      tables: unknown[];
+    };
+
+    expect(result.tables).toHaveLength(100);
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.not.stringContaining("LIMIT"),
+    );
+  });
+
+  it("should add totalCount when results are truncated", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({
+        rows: Array(50).fill({ relname: "test", seq_scan: "500" }),
+      })
+      .mockResolvedValueOnce({
+        rows: [{ total: "150" }],
+      });
+
+    const tool = tools.find((t) => t.name === "pg_seq_scan_tables")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      totalCount: number;
+      truncated: boolean;
+    };
+
+    expect(result.totalCount).toBe(150);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("should coerce string numbers to JavaScript numbers", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          table_name: "users",
+          seq_scan: "12345",
+          seq_tup_read: "67890",
+          idx_scan: "1000",
+          idx_tup_fetch: "500",
+          seq_scan_pct: "92.5",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_seq_scan_tables")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      tables: { seq_scan: number; seq_tup_read: number; idx_scan: number }[];
+    };
+
+    expect(typeof result.tables[0].seq_scan).toBe("number");
+    expect(result.tables[0].seq_scan).toBe(12345);
+  });
 });
 
 describe("pg_index_recommendations", () => {
@@ -610,7 +680,7 @@ describe("pg_index_recommendations", () => {
     mockContext = createMockRequestContext();
   });
 
-  it("should recommend indexes", async () => {
+  it("should recommend indexes based on table statistics", async () => {
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [{ relname: "orders", seq_scan: 5000 }],
     });
@@ -618,10 +688,185 @@ describe("pg_index_recommendations", () => {
     const tool = tools.find((t) => t.name === "pg_index_recommendations")!;
     const result = (await tool.handler({}, mockContext)) as {
       recommendations: unknown[];
+      queryAnalysis: boolean;
     };
 
     expect(mockAdapter.executeQuery).toHaveBeenCalled();
     expect(result.recommendations).toBeDefined();
+    expect(result.queryAnalysis).toBe(false);
+  });
+
+  it("should analyze SQL query when provided (no HypoPG)", async () => {
+    // Check HypoPG - not available
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+    // Get baseline EXPLAIN plan with Seq Scan
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          "QUERY PLAN": [
+            {
+              Plan: {
+                "Node Type": "Seq Scan",
+                "Relation Name": "users",
+                Filter: "(email = 'test')",
+                "Total Cost": 100,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_index_recommendations")!;
+    const result = (await tool.handler(
+      { sql: "SELECT * FROM users WHERE email = 'test'" },
+      mockContext,
+    )) as {
+      queryAnalysis: boolean;
+      hypopgAvailable: boolean;
+      recommendations: { table: string; column: string }[];
+    };
+
+    expect(result.queryAnalysis).toBe(true);
+    expect(result.hypopgAvailable).toBe(false);
+    expect(result.recommendations.length).toBeGreaterThan(0);
+    expect(result.recommendations[0].table).toBe("users");
+    expect(result.recommendations[0].column).toBe("email");
+  });
+
+  it("should return no recommendations when query is well-indexed", async () => {
+    // Check HypoPG - not available
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+    // Get baseline EXPLAIN plan - index scan, no Seq Scan
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          "QUERY PLAN": [
+            {
+              Plan: {
+                "Node Type": "Index Scan",
+                "Relation Name": "users",
+                "Total Cost": 10,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_index_recommendations")!;
+    const result = (await tool.handler(
+      { sql: "SELECT * FROM users WHERE id = 1" },
+      mockContext,
+    )) as {
+      queryAnalysis: boolean;
+      recommendations: unknown[];
+      hint: string;
+    };
+
+    expect(result.queryAnalysis).toBe(true);
+    expect(result.recommendations).toHaveLength(0);
+    expect(result.hint).toContain("well-indexed");
+  });
+
+  it("should use query alias for sql parameter", async () => {
+    // Check HypoPG
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+    // EXPLAIN plan
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ "QUERY PLAN": [{ Plan: { "Node Type": "Index Scan" } }] }],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_index_recommendations")!;
+    await tool.handler({ query: "SELECT 1" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("EXPLAIN"),
+      [],
+    );
+  });
+
+  it("should filter by table when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_index_recommendations")!;
+    await tool.handler({ table: "orders" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("relname = 'orders'"),
+    );
+  });
+
+  it("should filter by schema when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_index_recommendations")!;
+    await tool.handler({ schema: "sales" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("schemaname = 'sales'"),
+    );
+  });
+
+  it("should handle HypoPG available and test hypothetical indexes", async () => {
+    // Check HypoPG - available
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ 1: 1 }] });
+    // Get baseline EXPLAIN plan with Seq Scan
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          "QUERY PLAN": [
+            {
+              Plan: {
+                "Node Type": "Seq Scan",
+                "Relation Name": "orders",
+                Filter: "(customer_id = 1)",
+                "Total Cost": 1000,
+              },
+            },
+          ],
+        },
+      ],
+    });
+    // hypopg_reset
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+    // hypopg_create_index
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ indexrelid: 12345 }] });
+    // Re-run EXPLAIN with hypothetical index - improved cost
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          "QUERY PLAN": [
+            {
+              Plan: {
+                "Node Type": "Index Scan",
+                "Relation Name": "orders",
+                "Total Cost": 50, // Much lower cost
+              },
+            },
+          ],
+        },
+      ],
+    });
+    // hypopg_reset after each candidate
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+    // hypopg_reset in finally
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_index_recommendations")!;
+    const result = (await tool.handler(
+      { sql: "SELECT * FROM orders WHERE customer_id = 1" },
+      mockContext,
+    )) as {
+      queryAnalysis: boolean;
+      hypopgAvailable: boolean;
+      recommendations: { improvement: string }[];
+    };
+
+    expect(result.queryAnalysis).toBe(true);
+    expect(result.hypopgAvailable).toBe(true);
+    expect(result.recommendations.length).toBeGreaterThan(0);
+    expect(result.recommendations[0].improvement).toContain("% cost reduction");
   });
 });
 
@@ -1597,5 +1842,813 @@ describe("Parameter Aliases", () => {
       expect.stringContaining("SELECT id FROM users"),
       [],
     );
+  });
+});
+
+// =============================================================================
+// Phase 4: Statistics Tools Coverage (stats.ts lines 295-489, 517-677)
+// =============================================================================
+
+describe("pg_unused_indexes comprehensive", () => {
+  let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+  let tools: ReturnType<typeof getPerformanceTools>;
+  let mockContext: ReturnType<typeof createMockRequestContext>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdapter = createMockPostgresAdapter();
+    tools = getPerformanceTools(mockAdapter as unknown as PostgresAdapter);
+    mockContext = createMockRequestContext();
+  });
+
+  it("should return unused indexes with default limit", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          table_name: "users",
+          index_name: "users_unused_idx",
+          scans: "0",
+          tuples_read: "0",
+          size: "1024 kB",
+          size_bytes: "1048576",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_unused_indexes")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      unusedIndexes: unknown[];
+      count: number;
+      hint: string;
+    };
+
+    expect(result.unusedIndexes).toHaveLength(1);
+    expect(result.count).toBe(1);
+    expect(result.hint).toContain("never been used");
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("idx_scan = 0"),
+    );
+  });
+
+  it("should filter by schema when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_unused_indexes")!;
+    await tool.handler({ schema: "sales" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("schemaname = 'sales'"),
+    );
+  });
+
+  it("should filter by minSize when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_unused_indexes")!;
+    await tool.handler({ minSize: "1 MB" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("pg_size_bytes('1 MB')"),
+    );
+  });
+
+  it("should return summary mode with aggregated stats", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          unused_count: "5",
+          total_size: "10 MB",
+          total_size_bytes: "10485760",
+        },
+        {
+          schemaname: "sales",
+          unused_count: "3",
+          total_size: "5 MB",
+          total_size_bytes: "5242880",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_unused_indexes")!;
+    const result = (await tool.handler({ summary: true }, mockContext)) as {
+      summary: boolean;
+      bySchema: { schema: string; unusedCount: number }[];
+      totalCount: number;
+      totalSizeBytes: number;
+      hint: string;
+    };
+
+    expect(result.summary).toBe(true);
+    expect(result.bySchema).toHaveLength(2);
+    expect(result.totalCount).toBe(8);
+    expect(result.totalSizeBytes).toBe(15728640);
+    expect(result.hint).toContain("summary=false");
+  });
+
+  it("should return all results when limit=0", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: Array(100).fill({
+        schemaname: "public",
+        table_name: "test",
+        index_name: "test_idx",
+        scans: "0",
+        tuples_read: "0",
+        size: "1 kB",
+        size_bytes: "1024",
+      }),
+    });
+
+    const tool = tools.find((t) => t.name === "pg_unused_indexes")!;
+    const result = (await tool.handler({ limit: 0 }, mockContext)) as {
+      unusedIndexes: unknown[];
+    };
+
+    expect(result.unusedIndexes).toHaveLength(100);
+    // Should not have LIMIT clause
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.not.stringContaining("LIMIT"),
+    );
+  });
+
+  it("should add totalCount when results are truncated", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({
+        rows: Array(20).fill({
+          schemaname: "public",
+          table_name: "test",
+          index_name: "test_idx",
+          scans: "0",
+          tuples_read: "0",
+          size: "1 kB",
+          size_bytes: "1024",
+        }),
+      })
+      .mockResolvedValueOnce({
+        rows: [{ total: "50" }],
+      });
+
+    const tool = tools.find((t) => t.name === "pg_unused_indexes")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      totalCount: number;
+      truncated: boolean;
+    };
+
+    expect(result.totalCount).toBe(50);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("should coerce string numbers to JavaScript numbers", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          table_name: "users",
+          index_name: "users_idx",
+          scans: "0",
+          tuples_read: "12345",
+          size: "1 MB",
+          size_bytes: "1048576",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_unused_indexes")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      unusedIndexes: { scans: number; tuples_read: number; size_bytes: number }[];
+    };
+
+    expect(typeof result.unusedIndexes[0].scans).toBe("number");
+    expect(typeof result.unusedIndexes[0].tuples_read).toBe("number");
+    expect(typeof result.unusedIndexes[0].size_bytes).toBe("number");
+    expect(result.unusedIndexes[0].tuples_read).toBe(12345);
+    expect(result.unusedIndexes[0].size_bytes).toBe(1048576);
+  });
+});
+
+describe("pg_duplicate_indexes comprehensive", () => {
+  let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+  let tools: ReturnType<typeof getPerformanceTools>;
+  let mockContext: ReturnType<typeof createMockRequestContext>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdapter = createMockPostgresAdapter();
+    tools = getPerformanceTools(mockAdapter as unknown as PostgresAdapter);
+    mockContext = createMockRequestContext();
+  });
+
+  it("should find exact duplicate indexes", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          tablename: "users",
+          index1: "users_email_idx",
+          index1_columns: ["email"],
+          index1_size: "1 MB",
+          index2: "users_email_idx2",
+          index2_columns: ["email"],
+          index2_size: "1 MB",
+          duplicate_type: "EXACT_DUPLICATE",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_duplicate_indexes")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      duplicateIndexes: { duplicate_type: string }[];
+      count: number;
+      hint: string;
+    };
+
+    expect(result.duplicateIndexes).toHaveLength(1);
+    expect(result.duplicateIndexes[0].duplicate_type).toBe("EXACT_DUPLICATE");
+    expect(result.hint).toContain("EXACT_DUPLICATE");
+  });
+
+  it("should find overlapping indexes", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          tablename: "orders",
+          index1: "orders_customer_date_idx",
+          index1_columns: ["customer_id", "created_at"],
+          index1_size: "2 MB",
+          index2: "orders_customer_idx",
+          index2_columns: ["customer_id"],
+          index2_size: "1 MB",
+          duplicate_type: "OVERLAPPING",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_duplicate_indexes")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      duplicateIndexes: { duplicate_type: string }[];
+    };
+
+    expect(result.duplicateIndexes[0].duplicate_type).toBe("OVERLAPPING");
+  });
+
+  it("should filter by schema when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_duplicate_indexes")!;
+    await tool.handler({ schema: "analytics" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("n.nspname = 'analytics'"),
+    );
+  });
+
+  it("should exclude system schemas by default", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_duplicate_indexes")!;
+    await tool.handler({}, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("NOT IN ('pg_catalog', 'information_schema')"),
+    );
+  });
+
+  it("should return all results when limit=0", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: Array(100).fill({
+        schemaname: "public",
+        tablename: "test",
+        index1: "idx1",
+        index1_columns: ["col"],
+        index1_size: "1 MB",
+        index2: "idx2",
+        index2_columns: ["col"],
+        index2_size: "1 MB",
+        duplicate_type: "EXACT_DUPLICATE",
+      }),
+    });
+
+    const tool = tools.find((t) => t.name === "pg_duplicate_indexes")!;
+    const result = (await tool.handler({ limit: 0 }, mockContext)) as {
+      duplicateIndexes: unknown[];
+    };
+
+    expect(result.duplicateIndexes).toHaveLength(100);
+  });
+
+  it("should add totalCount when results are truncated", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({
+        rows: Array(50).fill({
+          schemaname: "public",
+          tablename: "test",
+          index1: "idx1",
+          index1_columns: ["col"],
+          index1_size: "1 MB",
+          index2: "idx2",
+          index2_columns: ["col"],
+          index2_size: "1 MB",
+          duplicate_type: "EXACT_DUPLICATE",
+        }),
+      })
+      .mockResolvedValueOnce({
+        rows: [{ total: "200" }],
+      });
+
+    const tool = tools.find((t) => t.name === "pg_duplicate_indexes")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      totalCount: number;
+      truncated: boolean;
+    };
+
+    expect(result.totalCount).toBe(200);
+    expect(result.truncated).toBe(true);
+  });
+});
+
+describe("pg_vacuum_stats comprehensive", () => {
+  let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+  let tools: ReturnType<typeof getPerformanceTools>;
+  let mockContext: ReturnType<typeof createMockRequestContext>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdapter = createMockPostgresAdapter();
+    tools = getPerformanceTools(mockAdapter as unknown as PostgresAdapter);
+    mockContext = createMockRequestContext();
+  });
+
+  it("should return vacuum statistics with wraparound risk", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          table_name: "audit_logs",
+          live_tuples: "1000000",
+          dead_tuples: "50000",
+          dead_pct: "5.00",
+          last_vacuum: "2024-01-20T10:00:00Z",
+          last_autovacuum: "2024-01-21T15:00:00Z",
+          vacuum_count: "10",
+          autovacuum_count: "50",
+          last_analyze: "2024-01-21T16:00:00Z",
+          last_autoanalyze: "2024-01-21T16:00:00Z",
+          analyze_count: "5",
+          autoanalyze_count: "20",
+          xid_age: "100000000",
+          wraparound_risk: "OK",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      tables: {
+        live_tuples: number;
+        dead_tuples: number;
+        dead_pct: number;
+        wraparound_risk: string;
+      }[];
+      count: number;
+    };
+
+    expect(result.tables).toHaveLength(1);
+    expect(result.tables[0].live_tuples).toBe(1000000);
+    expect(result.tables[0].dead_tuples).toBe(50000);
+    expect(result.tables[0].dead_pct).toBe(5);
+    expect(result.tables[0].wraparound_risk).toBe("OK");
+  });
+
+  it("should identify WARNING wraparound risk", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          table_name: "high_traffic",
+          live_tuples: "5000000",
+          dead_tuples: "2000000",
+          dead_pct: "40.00",
+          xid_age: "600000000",
+          wraparound_risk: "WARNING",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      tables: { wraparound_risk: string }[];
+    };
+
+    expect(result.tables[0].wraparound_risk).toBe("WARNING");
+  });
+
+  it("should identify CRITICAL wraparound risk", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          table_name: "critical_table",
+          live_tuples: "10000000",
+          dead_tuples: "5000000",
+          dead_pct: "50.00",
+          xid_age: "1200000000",
+          wraparound_risk: "CRITICAL",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      tables: { wraparound_risk: string }[];
+    };
+
+    expect(result.tables[0].wraparound_risk).toBe("CRITICAL");
+  });
+
+  it("should filter by schema when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    await tool.handler({ schema: "logs" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("s.schemaname = 'logs'"),
+    );
+  });
+
+  it("should filter by table when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    await tool.handler({ table: "events" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("s.relname = 'events'"),
+    );
+  });
+
+  it("should filter by both schema and table when provided", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    await tool.handler({ schema: "analytics", table: "pageviews" }, mockContext);
+
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("s.schemaname = 'analytics'"),
+    );
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("s.relname = 'pageviews'"),
+    );
+  });
+
+  it("should return all results when limit=0", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: Array(75).fill({
+        schemaname: "public",
+        table_name: "test",
+        live_tuples: "100",
+        dead_tuples: "10",
+        dead_pct: "10.00",
+        wraparound_risk: "OK",
+      }),
+    });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    const result = (await tool.handler({ limit: 0 }, mockContext)) as {
+      tables: unknown[];
+    };
+
+    expect(result.tables).toHaveLength(75);
+  });
+
+  it("should add totalCount when results are truncated", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({
+        rows: Array(50).fill({
+          schemaname: "public",
+          table_name: "test",
+          live_tuples: "100",
+          dead_tuples: "10",
+          dead_pct: "10.00",
+          wraparound_risk: "OK",
+        }),
+      })
+      .mockResolvedValueOnce({
+        rows: [{ total: "150" }],
+      });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      totalCount: number;
+      truncated: boolean;
+    };
+
+    expect(result.totalCount).toBe(150);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("should coerce string numbers to JavaScript numbers", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          table_name: "users",
+          live_tuples: "999999",
+          dead_tuples: "12345",
+          dead_pct: "1.23",
+          vacuum_count: "7",
+          autovacuum_count: "42",
+          analyze_count: "3",
+          autoanalyze_count: "15",
+          wraparound_risk: "OK",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      tables: {
+        live_tuples: number;
+        dead_tuples: number;
+        dead_pct: number;
+        vacuum_count: number;
+        autovacuum_count: number;
+      }[];
+    };
+
+    expect(typeof result.tables[0].live_tuples).toBe("number");
+    expect(typeof result.tables[0].dead_tuples).toBe("number");
+    expect(typeof result.tables[0].dead_pct).toBe("number");
+    expect(result.tables[0].live_tuples).toBe(999999);
+    expect(result.tables[0].dead_tuples).toBe(12345);
+    expect(result.tables[0].dead_pct).toBe(1.23);
+    expect(result.tables[0].vacuum_count).toBe(7);
+    expect(result.tables[0].autovacuum_count).toBe(42);
+  });
+});
+
+describe("pg_query_plan_stats comprehensive", () => {
+  let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+  let tools: ReturnType<typeof getPerformanceTools>;
+  let mockContext: ReturnType<typeof createMockRequestContext>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdapter = createMockPostgresAdapter();
+    tools = getPerformanceTools(mockAdapter as unknown as PostgresAdapter);
+    mockContext = createMockRequestContext();
+  });
+
+  it("should return query plan statistics with planning vs execution time", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          query: "SELECT * FROM users WHERE id = $1",
+          calls: "1000",
+          total_plan_time: 50.5,
+          mean_plan_time: 0.05,
+          total_exec_time: 500.0,
+          mean_exec_time: 0.5,
+          rows: "1000",
+          plan_pct: "9.18",
+          shared_blks_hit: "50000",
+          shared_blks_read: "1000",
+          cache_hit_pct: "98.04",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_query_plan_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      queryPlanStats: {
+        query: string;
+        calls: number;
+        plan_pct: number;
+        cache_hit_pct: number;
+      }[];
+      count: number;
+      hint: string;
+    };
+
+    expect(result.queryPlanStats).toHaveLength(1);
+    expect(result.queryPlanStats[0].calls).toBe(1000);
+    expect(result.queryPlanStats[0].plan_pct).toBe(9.18);
+    expect(result.queryPlanStats[0].cache_hit_pct).toBe(98.04);
+    expect(result.hint).toContain("plan_pct");
+  });
+
+  it("should truncate long queries by default", async () => {
+    const longQuery = "SELECT " + "a, ".repeat(100) + "b FROM very_long_table";
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          query: longQuery,
+          calls: "10",
+          total_plan_time: 1.0,
+          mean_plan_time: 0.1,
+          total_exec_time: 10.0,
+          mean_exec_time: 1.0,
+          rows: "100",
+          plan_pct: "9.09",
+          shared_blks_hit: "100",
+          shared_blks_read: "10",
+          cache_hit_pct: "90.91",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_query_plan_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      queryPlanStats: { query: string; queryTruncated: boolean }[];
+    };
+
+    expect(result.queryPlanStats[0].query.length).toBe(103); // 100 + "..."
+    expect(result.queryPlanStats[0].query.endsWith("...")).toBe(true);
+    expect(result.queryPlanStats[0].queryTruncated).toBe(true);
+  });
+
+  it("should return full query when truncateQuery=0", async () => {
+    const longQuery = "SELECT " + "column_name, ".repeat(50) + "last_column FROM table";
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          query: longQuery,
+          calls: "5",
+          total_plan_time: 0.5,
+          mean_plan_time: 0.1,
+          total_exec_time: 5.0,
+          mean_exec_time: 1.0,
+          rows: "50",
+          plan_pct: "9.09",
+          shared_blks_hit: "50",
+          shared_blks_read: "5",
+          cache_hit_pct: "90.91",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_query_plan_stats")!;
+    const result = (await tool.handler({ truncateQuery: 0 }, mockContext)) as {
+      queryPlanStats: { query: string; queryTruncated: boolean }[];
+    };
+
+    expect(result.queryPlanStats[0].query).toBe(longQuery);
+    expect(result.queryPlanStats[0].queryTruncated).toBe(false);
+  });
+
+  it("should respect custom truncateQuery length", async () => {
+    const query = "SELECT id, name, email, created_at FROM users WHERE active = true";
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          query: query,
+          calls: "100",
+          total_plan_time: 1.0,
+          mean_plan_time: 0.01,
+          total_exec_time: 10.0,
+          mean_exec_time: 0.1,
+          rows: "100",
+          plan_pct: "9.09",
+          shared_blks_hit: "1000",
+          shared_blks_read: "0",
+          cache_hit_pct: "100.00",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_query_plan_stats")!;
+    const result = (await tool.handler({ truncateQuery: 30 }, mockContext)) as {
+      queryPlanStats: { query: string; queryTruncated: boolean }[];
+    };
+
+    expect(result.queryPlanStats[0].query.length).toBe(33); // 30 + "..."
+    expect(result.queryPlanStats[0].queryTruncated).toBe(true);
+  });
+
+  it("should return all results when limit=0", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: Array(50).fill({
+        query: "SELECT 1",
+        calls: "1",
+        total_plan_time: 0.1,
+        mean_plan_time: 0.1,
+        total_exec_time: 1.0,
+        mean_exec_time: 1.0,
+        rows: "1",
+        plan_pct: "9.09",
+        shared_blks_hit: "1",
+        shared_blks_read: "0",
+        cache_hit_pct: "100.00",
+      }),
+    });
+
+    const tool = tools.find((t) => t.name === "pg_query_plan_stats")!;
+    const result = (await tool.handler({ limit: 0 }, mockContext)) as {
+      queryPlanStats: unknown[];
+    };
+
+    expect(result.queryPlanStats).toHaveLength(50);
+  });
+
+  it("should add totalCount when results are truncated", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({
+        rows: Array(20).fill({
+          query: "SELECT 1",
+          calls: "1",
+          total_plan_time: 0.1,
+          mean_plan_time: 0.1,
+          total_exec_time: 1.0,
+          mean_exec_time: 1.0,
+          rows: "1",
+          plan_pct: "9.09",
+          shared_blks_hit: "1",
+          shared_blks_read: "0",
+          cache_hit_pct: "100.00",
+        }),
+      })
+      .mockResolvedValueOnce({
+        rows: [{ total: "100" }],
+      });
+
+    const tool = tools.find((t) => t.name === "pg_query_plan_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      totalCount: number;
+      truncated: boolean;
+    };
+
+    expect(result.totalCount).toBe(100);
+    expect(result.truncated).toBe(true);
+  });
+
+  it("should coerce string numbers to JavaScript numbers", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          query: "SELECT 1",
+          calls: "999",
+          total_plan_time: 1.5,
+          mean_plan_time: 0.0015,
+          total_exec_time: 15.0,
+          mean_exec_time: 0.015,
+          rows: "999",
+          plan_pct: "9.09",
+          shared_blks_hit: "10000",
+          shared_blks_read: "500",
+          cache_hit_pct: "95.24",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_query_plan_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      queryPlanStats: {
+        calls: number;
+        rows: number;
+        plan_pct: number;
+        cache_hit_pct: number;
+        shared_blks_hit: number;
+        shared_blks_read: number;
+      }[];
+    };
+
+    expect(typeof result.queryPlanStats[0].calls).toBe("number");
+    expect(typeof result.queryPlanStats[0].rows).toBe("number");
+    expect(typeof result.queryPlanStats[0].plan_pct).toBe("number");
+    expect(typeof result.queryPlanStats[0].cache_hit_pct).toBe("number");
+    expect(result.queryPlanStats[0].calls).toBe(999);
+    expect(result.queryPlanStats[0].rows).toBe(999);
+    expect(result.queryPlanStats[0].shared_blks_hit).toBe(10000);
+    expect(result.queryPlanStats[0].shared_blks_read).toBe(500);
+  });
+
+  it("should handle zero total time gracefully (avoid division by zero)", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          query: "SELECT 1",
+          calls: "1",
+          total_plan_time: 0,
+          mean_plan_time: 0,
+          total_exec_time: 0,
+          mean_exec_time: 0,
+          rows: "1",
+          plan_pct: "0",
+          shared_blks_hit: "0",
+          shared_blks_read: "0",
+          cache_hit_pct: "100",
+        },
+      ],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_query_plan_stats")!;
+    const result = (await tool.handler({}, mockContext)) as {
+      queryPlanStats: { plan_pct: number; cache_hit_pct: number }[];
+    };
+
+    expect(result.queryPlanStats[0].plan_pct).toBe(0);
+    expect(result.queryPlanStats[0].cache_hit_pct).toBe(100);
   });
 });

@@ -194,6 +194,75 @@ describe("pg_stats_descriptive", () => {
     expect(result.groups[0].statistics.count).toBe(50);
     expect(result.groups[1].groupKey).toBe("B");
   });
+
+  it("should throw error when table does not exist", async () => {
+    // Mock column type check - column not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [], // No column found
+    });
+    // Mock table check - table also not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [], // Table doesn't exist
+    });
+
+    const tool = tools.find((t) => t.name === "pg_stats_descriptive")!;
+
+    await expect(
+      tool.handler(
+        {
+          table: "nonexistent_table",
+          column: "amount",
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow('Table "public.nonexistent_table" not found');
+  });
+
+  it("should throw error when column does not exist", async () => {
+    // Mock column type check - column not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [], // No column found
+    });
+    // Mock table check - table exists
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ "1": 1 }], // Table exists
+    });
+
+    const tool = tools.find((t) => t.name === "pg_stats_descriptive")!;
+
+    await expect(
+      tool.handler(
+        {
+          table: "orders",
+          column: "nonexistent_column",
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow(
+      'Column "nonexistent_column" not found in table "public.orders"',
+    );
+  });
+
+  it("should throw error for non-numeric column type", async () => {
+    // Mock column type check - column exists but is text
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "text" }],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_stats_descriptive")!;
+
+    await expect(
+      tool.handler(
+        {
+          table: "orders",
+          column: "customer_name",
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow(
+      'Column "customer_name" is type "text" but must be a numeric type',
+    );
+  });
 });
 
 describe("pg_stats_percentiles", () => {
@@ -263,6 +332,48 @@ describe("pg_stats_percentiles", () => {
     expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
       expect.stringContaining("0.9"),
     );
+  });
+
+  it("should throw error when table does not exist via validateNumericColumn", async () => {
+    // Mock column type check - column not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [], // No column found
+    });
+    // Mock table check - table also not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [], // Table doesn't exist
+    });
+
+    const tool = tools.find((t) => t.name === "pg_stats_percentiles")!;
+
+    await expect(
+      tool.handler(
+        {
+          table: "missing_table",
+          column: "value",
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow('Table "public.missing_table" not found');
+  });
+
+  it("should throw error for non-numeric column in percentiles", async () => {
+    // Mock column type check - column exists but is text
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ data_type: "varchar" }],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_stats_percentiles")!;
+
+    await expect(
+      tool.handler(
+        {
+          table: "users",
+          column: "email",
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow('Column "email" is type "varchar" but must be a numeric');
   });
 });
 

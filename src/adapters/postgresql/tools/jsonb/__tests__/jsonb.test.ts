@@ -447,3 +447,294 @@ describe("Error Handling", () => {
     await expect(tool.handler({}, mockContext)).rejects.toThrow();
   });
 });
+
+describe("JSONB Validation and Error Paths", () => {
+  let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+  let tools: ReturnType<typeof getJsonbTools>;
+  let mockContext: ReturnType<typeof createMockRequestContext>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdapter = createMockPostgresAdapter();
+    tools = getJsonbTools(mockAdapter as unknown as PostgresAdapter);
+    mockContext = createMockRequestContext();
+  });
+
+  describe("pg_jsonb_set validations", () => {
+    it("should reject empty WHERE clause", async () => {
+      const tool = tools.find((t) => t.name === "pg_jsonb_set")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "metadata", path: "name", value: "test", where: "" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/WHERE clause/);
+    });
+
+    it("should reject when value is undefined", async () => {
+      const tool = tools.find((t) => t.name === "pg_jsonb_set")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "metadata", path: "name", where: "id = 1" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/value parameter/);
+    });
+
+    it("should handle empty path - replace entire column", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({ rowsAffected: 1 });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_set")!;
+      const result = (await tool.handler(
+        { table: "users", column: "metadata", path: [], value: { new: "data" }, where: "id = 1" },
+        mockContext,
+      )) as { rowsAffected: number; hint: string };
+
+      expect(result.hint).toContain("empty path");
+    });
+
+    it("should handle deep nested path with createMissing", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({ rowsAffected: 1 });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_set")!;
+      const result = (await tool.handler(
+        {
+          table: "users",
+          column: "metadata",
+          path: "a.b.c",
+          value: "deep",
+          where: "id = 1",
+          createMissing: true,
+        },
+        mockContext,
+      )) as { rowsAffected: number };
+
+      expect(result.rowsAffected).toBe(1);
+    });
+  });
+
+  describe("pg_jsonb_delete validations", () => {
+    it("should reject empty WHERE clause", async () => {
+      const tool = tools.find((t) => t.name === "pg_jsonb_delete")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "metadata", path: "key", where: "" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/WHERE clause/);
+    });
+
+    it("should reject empty path", async () => {
+      const tool = tools.find((t) => t.name === "pg_jsonb_delete")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "metadata", path: "", where: "id = 1" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/non-empty path/);
+    });
+
+    it("should reject empty array path", async () => {
+      const tool = tools.find((t) => t.name === "pg_jsonb_delete")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "metadata", path: [], where: "id = 1" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/non-empty path/);
+    });
+
+    it("should handle numeric path (array index)", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({ rowsAffected: 1 });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_delete")!;
+      const result = (await tool.handler(
+        { table: "users", column: "tags", path: 0, where: "id = 1" },
+        mockContext,
+      )) as { rowsAffected: number };
+
+      expect(result.rowsAffected).toBe(1);
+    });
+
+    it("should handle numeric string path (array index)", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({ rowsAffected: 1 });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_delete")!;
+      const result = (await tool.handler(
+        { table: "users", column: "tags", path: "0", where: "id = 1" },
+        mockContext,
+      )) as { rowsAffected: number };
+
+      expect(result.rowsAffected).toBe(1);
+    });
+  });
+
+  describe("pg_jsonb_insert validations", () => {
+    it("should reject empty WHERE clause", async () => {
+      const tool = tools.find((t) => t.name === "pg_jsonb_insert")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "tags", path: ["tags", 0], value: "new", where: "" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/WHERE clause/);
+    });
+
+    it("should reject NULL columns", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({
+        rows: [{ null_count: 1 }],
+      });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_insert")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "tags", path: [0], value: "new", where: "id = 1" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/NULL columns/);
+    });
+  });
+
+  describe("pg_jsonb_strip_nulls validations", () => {
+    it("should reject empty WHERE clause", async () => {
+      const tool = tools.find((t) => t.name === "pg_jsonb_strip_nulls")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "metadata", where: "" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/WHERE clause/);
+    });
+
+    it("should handle preview mode", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({
+        rows: [{ before: { a: null, b: 1 }, after: { b: 1 } }],
+      });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_strip_nulls")!;
+      const result = (await tool.handler(
+        { table: "users", column: "metadata", where: "id = 1", preview: true },
+        mockContext,
+      )) as { preview: boolean; rows: unknown[] };
+
+      expect(result.preview).toBe(true);
+      expect(result.rows).toBeDefined();
+    });
+  });
+
+  describe("pg_jsonb_keys error handling", () => {
+    it("should improve error for array columns", async () => {
+      mockAdapter.executeQuery.mockRejectedValue(
+        new Error("cannot call jsonb_object_keys on an array"),
+      );
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_keys")!;
+
+      await expect(
+        tool.handler(
+          { table: "users", column: "tags" },
+          mockContext,
+        ),
+      ).rejects.toThrow(/array columns/);
+    });
+  });
+
+  describe("pg_jsonb_contains edge cases", () => {
+    it("should warn about empty object matching all rows", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({
+        rows: [{ id: 1 }, { id: 2 }],
+      });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_contains")!;
+      const result = (await tool.handler(
+        { table: "users", column: "metadata", value: {} },
+        mockContext,
+      )) as { warning?: string };
+
+      expect(result.warning).toContain("Empty {}");
+    });
+  });
+
+  describe("pg_jsonb_extract with select columns", () => {
+    it("should include select columns in result", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({
+        rows: [{ id: 1, extracted_value: "test@example.com" }],
+      });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_extract")!;
+      const result = (await tool.handler(
+        {
+          table: "users",
+          column: "metadata",
+          path: "email",
+          select: ["id"],
+        },
+        mockContext,
+      )) as { rows: Array<{ id: number; value: string }> };
+
+      expect(result.rows[0]).toHaveProperty("id");
+      expect(result.rows[0]).toHaveProperty("value");
+    });
+
+    it("should add hint when all values are null", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({
+        rows: [{ extracted_value: null }],
+      });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_extract")!;
+      const result = (await tool.handler(
+        {
+          table: "users",
+          column: "metadata",
+          path: "nonexistent",
+        },
+        mockContext,
+      )) as { hint?: string };
+
+      expect(result.hint).toContain("null");
+    });
+  });
+
+  describe("pg_jsonb_agg groupBy mode", () => {
+    it("should return grouped results", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({
+        rows: [
+          { group_key: "admin", items: [{ id: 1 }] },
+          { group_key: "user", items: [{ id: 2 }] },
+        ],
+      });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_agg")!;
+      const result = (await tool.handler(
+        { table: "users", groupBy: "role" },
+        mockContext,
+      )) as { grouped: boolean; result: unknown[] };
+
+      expect(result.grouped).toBe(true);
+      expect(result.result.length).toBe(2);
+    });
+
+    it("should add hint for empty results", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({
+        rows: [{ result: [] }],
+      });
+
+      const tool = tools.find((t) => t.name === "pg_jsonb_agg")!;
+      const result = (await tool.handler(
+        { table: "users", where: "1=0" },
+        mockContext,
+      )) as { hint?: string; grouped: boolean };
+
+      expect(result.grouped).toBe(false);
+      expect(result.hint).toContain("No rows");
+    });
+  });
+});

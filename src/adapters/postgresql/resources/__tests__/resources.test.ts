@@ -4745,3 +4745,851 @@ describe("PostGIS Resource (Coverage)", () => {
     );
   });
 });
+
+// =============================================================================
+// SCHEMA RESOURCE TESTS (Branch coverage target: 80%)
+// =============================================================================
+describe("Schema Resource", () => {
+  let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+  let mockContext: ReturnType<typeof createMockRequestContext>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdapter = createMockPostgresAdapter();
+    mockContext = createMockRequestContext();
+  });
+
+  it("should have correct metadata", () => {
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    expect(resource.uri).toBe("postgres://schema");
+    expect(resource.name).toBe("Database Schema");
+    expect(resource.mimeType).toBe("application/json");
+  });
+
+  it("should mark table as statsStale when modification percentage > 10%", async () => {
+    // Mock getSchema with a table that has statsStale = false
+    mockAdapter.getSchema.mockResolvedValueOnce({
+      tables: [
+        {
+          name: "users",
+          schema: "public",
+          columns: [],
+          statsStale: false,
+        },
+      ],
+    });
+
+    // Mock pg_stat_user_tables with high modification count (>10%)
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          relname: "users",
+          n_mod_since_analyze: 2000, // 20% of 10000
+          n_live_tup: 10000,
+        },
+      ],
+    });
+
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://schema",
+      mockContext,
+    )) as {
+      tables: Array<{ name: string; statsStale: boolean }>;
+    };
+
+    expect(result.tables[0].statsStale).toBe(true);
+  });
+
+  it("should NOT mark table as statsStale when modification percentage <= 10%", async () => {
+    mockAdapter.getSchema.mockResolvedValueOnce({
+      tables: [
+        {
+          name: "products",
+          schema: "public",
+          columns: [],
+          statsStale: false,
+        },
+      ],
+    });
+
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          relname: "products",
+          n_mod_since_analyze: 500, // 5% of 10000
+          n_live_tup: 10000,
+        },
+      ],
+    });
+
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://schema",
+      mockContext,
+    )) as {
+      tables: Array<{ name: string; statsStale: boolean }>;
+    };
+
+    expect(result.tables[0].statsStale).toBe(false);
+  });
+
+  it("should preserve existing statsStale=true even with low modifications", async () => {
+    mockAdapter.getSchema.mockResolvedValueOnce({
+      tables: [
+        {
+          name: "orders",
+          schema: "public",
+          columns: [],
+          statsStale: true, // Already marked stale (reltuples = -1)
+        },
+      ],
+    });
+
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          relname: "orders",
+          n_mod_since_analyze: 50, // Only 0.5%
+          n_live_tup: 10000,
+        },
+      ],
+    });
+
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://schema",
+      mockContext,
+    )) as {
+      tables: Array<{ name: string; statsStale: boolean }>;
+    };
+
+    expect(result.tables[0].statsStale).toBe(true);
+  });
+
+  it("should handle tables with zero live tuples", async () => {
+    mockAdapter.getSchema.mockResolvedValueOnce({
+      tables: [
+        {
+          name: "empty_table",
+          schema: "public",
+          columns: [],
+          statsStale: false,
+        },
+      ],
+    });
+
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          relname: "empty_table",
+          n_mod_since_analyze: 0,
+          n_live_tup: 0, // Empty table
+        },
+      ],
+    });
+
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://schema",
+      mockContext,
+    )) as {
+      tables: Array<{ name: string; statsStale: boolean }>;
+    };
+
+    // Should not mark as stale due to division by zero protection
+    expect(result.tables[0].statsStale).toBe(false);
+  });
+
+  it("should handle null/undefined schema values gracefully", async () => {
+    mockAdapter.getSchema.mockResolvedValueOnce({
+      tables: [
+        {
+          name: "legacy_table",
+          schema: undefined, // No schema specified
+          columns: [],
+          statsStale: false,
+        },
+      ],
+    });
+
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public", // Default to public
+          relname: "legacy_table",
+          n_mod_since_analyze: 2000,
+          n_live_tup: 10000,
+        },
+      ],
+    });
+
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://schema",
+      mockContext,
+    )) as {
+      tables: Array<{ name: string; statsStale: boolean }>;
+    };
+
+    expect(result.tables[0].statsStale).toBe(true);
+  });
+
+  it("should handle table not in stats map", async () => {
+    mockAdapter.getSchema.mockResolvedValueOnce({
+      tables: [
+        {
+          name: "new_table",
+          schema: "public",
+          columns: [],
+          statsStale: false,
+        },
+      ],
+    });
+
+    // Empty stats - table not found in pg_stat_user_tables
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://schema",
+      mockContext,
+    )) as {
+      tables: Array<{ name: string; statsStale: boolean }>;
+    };
+
+    // Should preserve original statsStale value
+    expect(result.tables[0].statsStale).toBe(false);
+  });
+
+  it("should handle null values in stats query result", async () => {
+    mockAdapter.getSchema.mockResolvedValueOnce({
+      tables: [
+        {
+          name: "test_table",
+          schema: "public",
+          columns: [],
+          statsStale: false,
+        },
+      ],
+    });
+
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: null,
+          relname: null,
+          n_mod_since_analyze: null,
+          n_live_tup: null,
+        },
+      ],
+    });
+
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    // Should not throw
+    const result = await resource.handler("postgres://schema", mockContext);
+    expect(result).toHaveProperty("tables");
+  });
+
+  it("should handle numeric strings in stats values", async () => {
+    mockAdapter.getSchema.mockResolvedValueOnce({
+      tables: [
+        {
+          name: "string_stats",
+          schema: "public",
+          columns: [],
+          statsStale: false,
+        },
+      ],
+    });
+
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [
+        {
+          schemaname: "public",
+          relname: "string_stats",
+          n_mod_since_analyze: "1500", // String instead of number
+          n_live_tup: "10000",
+        },
+      ],
+    });
+
+    const resource = createSchemaResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://schema",
+      mockContext,
+    )) as {
+      tables: Array<{ name: string; statsStale: boolean }>;
+    };
+
+    expect(result.tables[0].statsStale).toBe(true); // 15% > 10%
+  });
+});
+
+// =============================================================================
+// SETTINGS RESOURCE TESTS (Branch coverage target: 80%)
+// =============================================================================
+describe("Settings Resource", () => {
+  let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+  let mockContext: ReturnType<typeof createMockRequestContext>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdapter = createMockPostgresAdapter();
+    mockContext = createMockRequestContext();
+  });
+
+  it("should have correct metadata", () => {
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    expect(resource.uri).toBe("postgres://settings");
+    expect(resource.name).toBe("Server Settings");
+    expect(resource.mimeType).toBe("application/json");
+  });
+
+  it("should generate HIGH priority for shared_buffers < 256MB", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] }) // All settings
+      .mockResolvedValueOnce({
+        rows: [
+          { name: "shared_buffers", setting: "16384", unit: "8kB" }, // 128MB
+        ],
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<{
+        setting: string;
+        priority: string;
+        category: string;
+      }>;
+    };
+
+    const rec = result.productionRecommendations.find(
+      (r) => r.setting === "shared_buffers",
+    );
+    expect(rec?.priority).toBe("HIGH");
+    expect(rec?.category).toBe("performance");
+  });
+
+  it("should NOT generate recommendation for shared_buffers >= 256MB", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          { name: "shared_buffers", setting: "65536", unit: "8kB" }, // 512MB
+        ],
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<{ setting: string }>;
+    };
+
+    const rec = result.productionRecommendations.find(
+      (r) => r.setting === "shared_buffers",
+    );
+    expect(rec).toBeUndefined();
+  });
+
+  it("should generate MEDIUM priority for work_mem < 8MB", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ name: "work_mem", setting: "4096", unit: "kB" }], // 4MB
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<{
+        setting: string;
+        priority: string;
+      }>;
+    };
+
+    const rec = result.productionRecommendations.find(
+      (r) => r.setting === "work_mem",
+    );
+    expect(rec?.priority).toBe("MEDIUM");
+  });
+
+  it("should generate MEDIUM priority for max_connections > 200", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ name: "max_connections", setting: "500", unit: null }],
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<{
+        setting: string;
+        priority: string;
+        recommendation: string;
+      }>;
+    };
+
+    const rec = result.productionRecommendations.find(
+      (r) => r.setting === "max_connections",
+    );
+    expect(rec?.priority).toBe("MEDIUM");
+    expect(rec?.recommendation).toContain("pooling");
+  });
+
+  it("should generate HIGH priority for wal_level = minimal", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ name: "wal_level", setting: "minimal", unit: null }],
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<{
+        setting: string;
+        priority: string;
+        category: string;
+      }>;
+    };
+
+    const rec = result.productionRecommendations.find(
+      (r) => r.setting === "wal_level",
+    );
+    expect(rec?.priority).toBe("HIGH");
+    expect(rec?.category).toBe("replication");
+  });
+
+  it("should generate HIGH priority for ssl = off", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ name: "ssl", setting: "off", unit: null }],
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<{
+        setting: string;
+        priority: string;
+        category: string;
+      }>;
+    };
+
+    const rec = result.productionRecommendations.find(
+      (r) => r.setting === "ssl",
+    );
+    expect(rec?.priority).toBe("HIGH");
+    expect(rec?.category).toBe("security");
+  });
+
+  it("should generate MEDIUM priority for password_encryption = md5", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ name: "password_encryption", setting: "md5", unit: null }],
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<{
+        setting: string;
+        priority: string;
+      }>;
+    };
+
+    const rec = result.productionRecommendations.find(
+      (r) => r.setting === "password_encryption",
+    );
+    expect(rec?.priority).toBe("MEDIUM");
+  });
+
+  it("should generate LOW priority for log_statement = none", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ name: "log_statement", setting: "none", unit: null }],
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<{
+        setting: string;
+        priority: string;
+        category: string;
+      }>;
+    };
+
+    const rec = result.productionRecommendations.find(
+      (r) => r.setting === "log_statement",
+    );
+    expect(rec?.priority).toBe("LOW");
+    expect(rec?.category).toBe("logging");
+  });
+
+  it("should generate memory context for all memory settings", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          { name: "shared_buffers", setting: "32768", unit: "8kB" }, // 256MB
+          { name: "work_mem", setting: "16384", unit: "kB" }, // 16MB
+          { name: "maintenance_work_mem", setting: "65536", unit: "kB" }, // 64MB
+          { name: "effective_cache_size", setting: "524288", unit: "8kB" }, // 4GB
+        ],
+      });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      memoryContext: Array<{ setting: string; currentMb: number }>;
+    };
+
+    expect(result.memoryContext.length).toBe(4);
+    expect(
+      result.memoryContext.find((m) => m.setting === "shared_buffers"),
+    ).toBeDefined();
+    expect(
+      result.memoryContext.find((m) => m.setting === "work_mem"),
+    ).toBeDefined();
+    expect(
+      result.memoryContext.find((m) => m.setting === "maintenance_work_mem"),
+    ).toBeDefined();
+    expect(
+      result.memoryContext.find((m) => m.setting === "effective_cache_size"),
+    ).toBeDefined();
+  });
+
+  it("should handle missing key settings gracefully", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] }); // No key settings
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      productionRecommendations: Array<unknown>;
+      memoryContext: Array<unknown>;
+    };
+
+    expect(result.productionRecommendations).toEqual([]);
+    expect(result.memoryContext).toEqual([]);
+  });
+
+  it("should include analysis note in response", async () => {
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const resource = createSettingsResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler(
+      "postgres://settings",
+      mockContext,
+    )) as {
+      analysisNote: string;
+    };
+
+    expect(result.analysisNote).toContain("general guidance");
+  });
+});
+
+// =============================================================================
+// POOL RESOURCE TESTS (Branch coverage target: 80%)
+// =============================================================================
+describe("Pool Resource", () => {
+  let mockAdapter: ReturnType<typeof createMockPostgresAdapter>;
+  let mockContext: ReturnType<typeof createMockRequestContext>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAdapter = createMockPostgresAdapter();
+    mockContext = createMockRequestContext();
+  });
+
+  it("should have correct metadata", () => {
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    expect(resource.uri).toBe("postgres://pool");
+    expect(resource.name).toBe("Connection Pool");
+    expect(resource.mimeType).toBe("application/json");
+  });
+
+  it("should return error when pool is not initialized", async () => {
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValueOnce(null);
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      error: string;
+    };
+
+    expect(result.error).toBe("Pool not initialized");
+  });
+
+  it("should return status = empty when total connections = 0", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 0, active: 0, idle: 0 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      status: string;
+      note: string;
+    };
+
+    expect(result.status).toBe("empty");
+    expect(result.note).toContain("0 are normal");
+  });
+
+  it("should return status = idle when no active connections", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 10, active: 0, idle: 10 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      status: string;
+    };
+
+    expect(result.status).toBe("idle");
+  });
+
+  it("should return status = active when some connections are active", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 10, active: 3, idle: 7 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      status: string;
+    };
+
+    expect(result.status).toBe("active");
+  });
+
+  it("should return status = busy when all connections are active", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 10, active: 10, idle: 0 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      status: string;
+    };
+
+    expect(result.status).toBe("busy");
+  });
+
+  it("should detect pgbouncer from pgbouncer database", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 5, active: 2, idle: 3 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ count: 1 }], // pgbouncer database exists
+    });
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      externalPooler: { detected: boolean; type: string; hint: string };
+      note: string;
+    };
+
+    expect(result.externalPooler.detected).toBe(true);
+    expect(result.externalPooler.type).toBe("pgbouncer");
+    expect(result.externalPooler.hint).toContain("SHOW POOLS");
+    expect(result.note).toContain("pgbouncer");
+  });
+
+  it("should detect pgbouncer from application_name", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 5, active: 2, idle: 3 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // No pgbouncer database
+      .mockResolvedValueOnce({ rows: [{ count: 1 }] }); // But has pooler in app_name
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      externalPooler: { detected: boolean; type: string };
+    };
+
+    expect(result.externalPooler.detected).toBe(true);
+    expect(result.externalPooler.type).toBe("pgbouncer");
+  });
+
+  it("should report no external pooler when none detected", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 5, active: 2, idle: 3 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ count: 0 }] }) // No pgbouncer database
+      .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // No pooler in app_name
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      externalPooler: { detected: boolean; type: string };
+      note: string;
+    };
+
+    expect(result.externalPooler.detected).toBe(false);
+    expect(result.externalPooler.type).toBe("none");
+    expect(result.note).toContain("PgBouncer");
+  });
+
+  it("should handle pooler detection errors gracefully", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 5, active: 2, idle: 3 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery.mockRejectedValueOnce(new Error("Query failed"));
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      externalPooler: { detected: boolean; type: string };
+    };
+
+    // Should not throw, should continue with default values
+    expect(result.externalPooler.detected).toBe(false);
+    expect(result.externalPooler.type).toBe("none");
+  });
+
+  it("should include pool health and initialization status", async () => {
+    const mockPool = {
+      getStats: vi.fn().mockReturnValue({ total: 5, active: 2, idle: 3 }),
+      checkHealth: vi.fn().mockResolvedValue({ healthy: true, latencyMs: 5 }),
+      isInitialized: vi.fn().mockReturnValue(true),
+    };
+    (mockAdapter.getPool as ReturnType<typeof vi.fn>).mockReturnValue(mockPool);
+    mockAdapter.executeQuery.mockResolvedValue({ rows: [{ count: 0 }] });
+
+    const resource = createPoolResource(
+      mockAdapter as unknown as PostgresAdapter,
+    );
+    const result = (await resource.handler("postgres://pool", mockContext)) as {
+      health: { healthy: boolean; latencyMs: number };
+      isInitialized: boolean;
+      stats: { total: number; active: number; idle: number };
+    };
+
+    expect(result.health.healthy).toBe(true);
+    expect(result.isInitialized).toBe(true);
+    expect(result.stats.total).toBe(5);
+  });
+});

@@ -411,4 +411,137 @@ describe("pg_transaction_execute", () => {
 
     expect(mockAdapterWithTxn.rollbackTransaction).toHaveBeenCalled();
   });
+
+  it("should join existing transaction when transactionId provided", async () => {
+    const mockAdapterWithTxn = createMockPostgresAdapterWithTransaction();
+    (
+      mockAdapterWithTxn as unknown as { executeOnConnection: typeof vi.fn }
+    ).executeOnConnection = vi
+      .fn()
+      .mockResolvedValue({ rows: [], rowsAffected: 1 });
+
+    const tools = getTransactionTools(
+      mockAdapterWithTxn as unknown as PostgresAdapter,
+    );
+    const tool = tools.find((t) => t.name === "pg_transaction_execute")!;
+
+    const result = (await tool.handler(
+      {
+        transactionId: "existing-txn-001",
+        statements: [{ sql: "UPDATE users SET name = 'Test' WHERE id = 1" }],
+      },
+      mockContext,
+    )) as {
+      success: boolean;
+      transactionId: string;
+    };
+
+    // Should NOT begin a new transaction
+    expect(mockAdapterWithTxn.beginTransaction).not.toHaveBeenCalled();
+    // Should NOT auto-commit (caller controls transaction)
+    expect(mockAdapterWithTxn.commitTransaction).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    expect(result.transactionId).toBe("existing-txn-001");
+  });
+
+  it("should throw error when connection is lost", async () => {
+    const mockAdapterWithTxn = createMockPostgresAdapterWithTransaction();
+    // Return null for connection
+    mockAdapterWithTxn.getTransactionConnection = vi.fn().mockReturnValue(null);
+
+    const tools = getTransactionTools(
+      mockAdapterWithTxn as unknown as PostgresAdapter,
+    );
+    const tool = tools.find((t) => t.name === "pg_transaction_execute")!;
+
+    await expect(
+      tool.handler(
+        {
+          statements: [{ sql: "SELECT 1" }],
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow("Transaction connection lost");
+  });
+
+  it("should throw error when joining non-existent transaction", async () => {
+    const mockAdapterWithTxn = createMockPostgresAdapterWithTransaction();
+    // Return undefined for non-existent transaction
+    mockAdapterWithTxn.getTransactionConnection = vi
+      .fn()
+      .mockReturnValue(undefined);
+
+    const tools = getTransactionTools(
+      mockAdapterWithTxn as unknown as PostgresAdapter,
+    );
+    const tool = tools.find((t) => t.name === "pg_transaction_execute")!;
+
+    await expect(
+      tool.handler(
+        {
+          transactionId: "non-existent-txn",
+          statements: [{ sql: "SELECT 1" }],
+        },
+        mockContext,
+      ),
+    ).rejects.toThrow("Transaction not found");
+  });
+
+  it("should include rows when RETURNING clause is used", async () => {
+    const mockAdapterWithTxn = createMockPostgresAdapterWithTransaction();
+    (
+      mockAdapterWithTxn as unknown as { executeOnConnection: typeof vi.fn }
+    ).executeOnConnection = vi.fn().mockResolvedValue({
+      rows: [{ id: 1, name: "Alice" }],
+      rowsAffected: 1,
+    });
+
+    const tools = getTransactionTools(
+      mockAdapterWithTxn as unknown as PostgresAdapter,
+    );
+    const tool = tools.find((t) => t.name === "pg_transaction_execute")!;
+
+    const result = (await tool.handler(
+      {
+        statements: [
+          {
+            sql: "INSERT INTO users (name) VALUES ($1) RETURNING id, name",
+            params: ["Alice"],
+          },
+        ],
+      },
+      mockContext,
+    )) as {
+      results: { rows: { id: number; name: string }[] }[];
+    };
+
+    expect(result.results[0].rows).toEqual([{ id: 1, name: "Alice" }]);
+  });
+
+  it("should parse string rowsAffected to number", async () => {
+    const mockAdapterWithTxn = createMockPostgresAdapterWithTransaction();
+    (
+      mockAdapterWithTxn as unknown as { executeOnConnection: typeof vi.fn }
+    ).executeOnConnection = vi.fn().mockResolvedValue({
+      rows: [],
+      rowsAffected: "5", // String instead of number
+    });
+
+    const tools = getTransactionTools(
+      mockAdapterWithTxn as unknown as PostgresAdapter,
+    );
+    const tool = tools.find((t) => t.name === "pg_transaction_execute")!;
+
+    const result = (await tool.handler(
+      {
+        statements: [{ sql: "UPDATE users SET active = true" }],
+      },
+      mockContext,
+    )) as {
+      results: { rowsAffected: number }[];
+    };
+
+    expect(result.results[0].rowsAffected).toBe(5);
+    expect(typeof result.results[0].rowsAffected).toBe("number");
+  });
 });

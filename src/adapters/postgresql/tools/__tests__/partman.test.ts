@@ -235,6 +235,120 @@ describe("pg_partman_create_parent", () => {
     expect(result.parentTable).toBe("public.events");
     expect(result.controlColumn).toBe("created_at");
   });
+
+  it("should return error for duplicate key (already managed by pg_partman)", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ table_schema: "public" }],
+    });
+    mockAdapter.executeQuery.mockRejectedValueOnce(
+      new Error("duplicate key value violates unique constraint"),
+    );
+
+    const tool = tools.find((t) => t.name === "pg_partman_create_parent")!;
+    const result = (await tool.handler(
+      {
+        parentTable: "public.events",
+        controlColumn: "created_at",
+        interval: "1 month",
+      },
+      mockContext,
+    )) as { success: boolean; error: string; hint: string };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("already managed by pg_partman");
+    expect(result.hint).toBeDefined();
+  });
+
+  it("should return error when table does not exist", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ table_schema: "public" }],
+    });
+    mockAdapter.executeQuery.mockRejectedValueOnce(
+      new Error('relation "public.nonexistent" does not exist'),
+    );
+
+    const tool = tools.find((t) => t.name === "pg_partman_create_parent")!;
+    const result = (await tool.handler(
+      {
+        parentTable: "public.nonexistent",
+        controlColumn: "ts",
+        interval: "1 day",
+      },
+      mockContext,
+    )) as { success: boolean; error: string };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("does not exist");
+  });
+
+  it("should return error when table is not partitioned", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ table_schema: "public" }],
+    });
+    mockAdapter.executeQuery.mockRejectedValueOnce(
+      new Error("table is not partitioned"),
+    );
+
+    const tool = tools.find((t) => t.name === "pg_partman_create_parent")!;
+    const result = (await tool.handler(
+      {
+        parentTable: "public.events",
+        controlColumn: "ts",
+        interval: "1 day",
+      },
+      mockContext,
+    )) as { success: boolean; error: string; hint: string };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not a partitioned table");
+    expect(result.hint).toContain("PARTITION BY");
+  });
+
+  it("should return error for invalid interval format", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ table_schema: "public" }],
+    });
+    mockAdapter.executeQuery.mockRejectedValueOnce(
+      new Error('invalid input syntax for type interval: "999xyz"'),
+    );
+
+    const tool = tools.find((t) => t.name === "pg_partman_create_parent")!;
+    const result = (await tool.handler(
+      {
+        parentTable: "public.events",
+        controlColumn: "ts",
+        interval: "999xyz", // Invalid interval format that passes Zod string check
+      },
+      mockContext,
+    )) as { success: boolean; error: string; examples: string[] };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Invalid interval format");
+    expect(result.examples).toContain("1 day");
+  });
+
+  it("should return error when control column lacks NOT NULL constraint", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ table_schema: "public" }],
+    });
+    mockAdapter.executeQuery.mockRejectedValueOnce(
+      new Error("control column cannot be null"),
+    );
+
+    const tool = tools.find((t) => t.name === "pg_partman_create_parent")!;
+    const result = (await tool.handler(
+      {
+        parentTable: "public.events",
+        controlColumn: "ts",
+        interval: "1 day",
+      },
+      mockContext,
+    )) as { success: boolean; error: string; hint: string };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("NOT NULL constraint");
+    expect(result.hint).toContain("NOT NULL");
+  });
 });
 
 describe("pg_partman_run_maintenance", () => {

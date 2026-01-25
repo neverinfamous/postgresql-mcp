@@ -508,6 +508,128 @@ describe("Bug Fixes", () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain("conflictValue");
     });
+
+    it("should return error when update finds no matching row", async () => {
+      mockAdapter.executeQuery.mockResolvedValue({ rowsAffected: 0 });
+
+      const tool = tools.find((t) => t.name === "pg_vector_insert")!;
+      const result = (await tool.handler(
+        {
+          table: "embeddings",
+          column: "vector",
+          vector: [0.1, 0.2, 0.3],
+          updateExisting: true,
+          conflictColumn: "id",
+          conflictValue: 999,
+        },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("No row found");
+    });
+
+    it("should parse dimension mismatch error from insert", async () => {
+      mockAdapter.executeQuery.mockRejectedValueOnce(
+        new Error("expected 384 dimensions, not 3"),
+      );
+
+      const tool = tools.find((t) => t.name === "pg_vector_insert")!;
+      const result = (await tool.handler(
+        {
+          table: "embeddings",
+          column: "vector",
+          vector: [0.1, 0.2, 0.3],
+        },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("dimension mismatch");
+      expect(result.expectedDimensions).toBe(384);
+      expect(result.providedDimensions).toBe(3);
+    });
+
+    it("should handle NOT NULL constraint violation on insert", async () => {
+      mockAdapter.executeQuery.mockRejectedValueOnce(
+        new Error('null value in column "id" violates not-null constraint'),
+      );
+
+      const tool = tools.find((t) => t.name === "pg_vector_insert")!;
+      const result = (await tool.handler(
+        {
+          table: "embeddings",
+          column: "vector",
+          vector: [0.1, 0.2, 0.3],
+        },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("NOT NULL");
+      expect(result.suggestion).toBeDefined();
+    });
+  });
+
+  describe("pg_vector_search validation", () => {
+    it("should return error when column does not exist", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] }); // column not found
+
+      const tool = tools.find((t) => t.name === "pg_vector_search")!;
+      const result = (await tool.handler(
+        {
+          table: "embeddings",
+          column: "nonexistent",
+          vector: [0.1, 0.2, 0.3],
+        },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("does not exist");
+    });
+
+    it("should return error when column is not vector type", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ udt_name: "text" }],
+      }); // column is text
+
+      const tool = tools.find((t) => t.name === "pg_vector_search")!;
+      const result = (await tool.handler(
+        {
+          table: "embeddings",
+          column: "name",
+          vector: [0.1, 0.2, 0.3],
+        },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not a vector column");
+    });
+
+    it("should parse dimension mismatch error from search", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ udt_name: "vector" }] }) // type check
+        .mockRejectedValueOnce(
+          new Error("different vector dimensions 384 and 3"),
+        );
+
+      const tool = tools.find((t) => t.name === "pg_vector_search")!;
+      const result = (await tool.handler(
+        {
+          table: "embeddings",
+          column: "vector",
+          vector: [0.1, 0.2, 0.3],
+        },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("dimension mismatch");
+      expect(result.expectedDimensions).toBe(384);
+      expect(result.providedDimensions).toBe(3);
+    });
   });
 
   describe("pg_vector_cluster clusters alias", () => {

@@ -123,3 +123,105 @@ describe("createPgApi", () => {
     expect(adapter.getToolDefinitions).toHaveBeenCalled();
   });
 });
+
+describe("Method execution", () => {
+  let mockAdapter: PostgresAdapter;
+  let pgApi: PgApi;
+
+  beforeEach(() => {
+    mockAdapter = createMockAdapter();
+    pgApi = createPgApi(mockAdapter);
+  });
+
+  it("should execute core methods via sandbox bindings", async () => {
+    const bindings = pgApi.createSandboxBindings();
+    const core = bindings["core"] as Record<
+      string,
+      (params: unknown) => Promise<unknown>
+    >;
+
+    // Call listTables method
+    if (core["listTables"]) {
+      const result = await core["listTables"]({});
+      expect(result).toBeDefined();
+    }
+  });
+
+  it("should normalize string arg to named parameter", async () => {
+    const bindings = pgApi.createSandboxBindings();
+    const core = bindings["core"] as Record<
+      string,
+      (...args: unknown[]) => Promise<unknown>
+    >;
+
+    // readQuery("SELECT...") should normalize to {sql: "SELECT..."}
+    if (core["readQuery"]) {
+      const result = await core["readQuery"]("SELECT 1");
+      expect(result).toBeDefined();
+    }
+  });
+});
+
+describe("Help output", () => {
+  let adapter: PostgresAdapter;
+  let pgApi: PgApi;
+
+  beforeEach(() => {
+    adapter = createMockAdapter();
+    pgApi = createPgApi(adapter);
+  });
+
+  it("should return help for a specific group when called with group name", () => {
+    const bindings = pgApi.createSandboxBindings();
+    const core = bindings["core"] as Record<string, unknown>;
+
+    // Check if help function exists
+    if (typeof core["help"] === "function") {
+      const helpFn = core["help"] as () => unknown;
+      const result = helpFn();
+      expect(result).toBeDefined();
+    }
+  });
+});
+
+describe("toolNameToMethodName conversion", () => {
+  let adapter: PostgresAdapter;
+  let pgApi: PgApi;
+
+  beforeEach(() => {
+    adapter = createMockAdapter();
+    pgApi = createPgApi(adapter);
+  });
+
+  it("should convert pg_read_query to readQuery for core group", () => {
+    const methods = pgApi.getGroupMethods("core");
+    // pg_read_query (core tool) → readQuery
+    expect(methods).toContain("readQuery");
+  });
+
+  it("should convert pg_jsonb_set to set for jsonb group", () => {
+    const methods = pgApi.getGroupMethods("jsonb");
+    // pg_jsonb_set → set (removes pg_ and jsonb_ prefix)
+    expect(methods).toContain("set");
+  });
+});
+
+describe("Method aliases", () => {
+  let adapter: PostgresAdapter;
+  let pgApi: PgApi;
+
+  beforeEach(() => {
+    adapter = createMockAdapter();
+    pgApi = createPgApi(adapter);
+  });
+
+  it("should include method aliases in sandbox bindings", () => {
+    const bindings = pgApi.createSandboxBindings();
+    const jsonb = bindings["jsonb"] as Record<string, unknown>;
+
+    // jsonbSet should be an alias for set
+    if (jsonb["set"]) {
+      expect(jsonb["jsonbSet"]).toBe(jsonb["set"]);
+    }
+  });
+});

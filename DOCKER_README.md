@@ -132,6 +132,8 @@ Restart Cursor or your MCP client and start querying PostgreSQL!
 
 > **Note for Docker**: Use `host.docker.internal` to connect to PostgreSQL running on your host machine.
 
+> **AntiGravity Users:** Server instructions are automatically sent to MCP clients during initialization. However, AntiGravity does not currently support MCP server instructions. For optimal Code Mode usage, manually provide the contents of [`src/constants/ServerInstructions.ts`](https://github.com/neverinfamous/postgresql-mcp/blob/master/src/constants/ServerInstructions.ts) to the agent in your prompt or user rules.
+
 ---
 
 ## ⚡ Install to Cursor IDE

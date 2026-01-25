@@ -162,6 +162,9 @@ The `vm` mode is fully functional and is the default. No configuration needed.
 
 📖 **Full documentation:** [docs/CODE_MODE.md](docs/CODE_MODE.md)
 
+> [!NOTE]
+> **AntiGravity Users:** Server instructions are automatically sent to MCP clients during initialization. However, AntiGravity does not currently support MCP server instructions. For optimal Code Mode usage in AntiGravity, manually provide the contents of [`src/constants/ServerInstructions.ts`](src/constants/ServerInstructions.ts) to the agent in your prompt or user rules.
+
 ---
 
 ## 🛠️ Tool Filtering

@@ -47,6 +47,36 @@
 | `ltree`              | Hierarchical tree labels       |
 | `pgcrypto`           | Hashing, encryption, UUIDs     |
 
+### MCP Resources (20)
+
+Real-time database meta-awareness - AI accesses these automatically:
+
+| Resource | Purpose |
+| -------- | ------- |
+| `database://schema` | Complete schema with tables, columns, indexes |
+| `database://health` | Comprehensive health status |
+| `database://performance` | Query performance metrics |
+| `database://capabilities` | Server features and extensions |
+| `database://indexes` | Index usage statistics |
+| `database://connections` | Active connections and pool status |
+
+**[Full resources list →](https://github.com/neverinfamous/postgresql-mcp#resources)**
+
+### MCP Prompts (19)
+
+Guided workflows for complex operations:
+
+| Prompt | Purpose |
+| ------ | ------- |
+| `optimize_query` | Step-by-step query optimization |
+| `index_tuning` | Comprehensive index analysis |
+| `database_health_check` | Full health assessment |
+| `setup_pgvector` | Complete pgvector setup guide |
+| `performance_baseline` | Establish performance baselines |
+| `backup_strategy` | Design backup strategy |
+
+**[Full prompts list →](https://github.com/neverinfamous/postgresql-mcp#prompts)**
+
 ---
 
 ## 🚀 Quick Start (2 Minutes)

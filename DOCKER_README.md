@@ -2,19 +2,19 @@
 
 **Last Updated January 24, 2026**
 
-[![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
-![GitHub Release](https://img.shields.io/github/v/release/neverinfamous/postgres-mcp)
+[![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgresql-mcp)
+![GitHub Release](https://img.shields.io/github/v/release/neverinfamous/postgresql-mcp)
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/postgres-mcp)](https://hub.docker.com/r/writenotenow/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-Registry-green.svg)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.neverinfamous/postgres-mcp)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![npm](https://img.shields.io/npm/v/@neverinfamous/postgres-mcp)](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)
-[![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/postgres-mcp/blob/master/SECURITY.md)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/postgres-mcp)
+[![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/postgresql-mcp/blob/master/SECURITY.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/postgresql-mcp)
 
 **PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
-**[GitHub](https://github.com/neverinfamous/postgres-mcp)** • **[npm Package](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)** • **[MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.neverinfamous/postgres-mcp)**
+**[GitHub](https://github.com/neverinfamous/postgresql-mcp)** • **[npm Package](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)** • **[MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.neverinfamous/postgres-mcp)**
 
 ## 🎯 What This Does
 
@@ -117,7 +117,7 @@ Click the button below to install directly into Cursor:
 - ✅ Docker installed and running
 - ✅ PostgreSQL database accessible
 
-**📖 [See Full Installation Guide →](https://github.com/neverinfamous/postgres-mcp#readme)**
+**📖 [See Full Installation Guide →](https://github.com/neverinfamous/postgresql-mcp#readme)**
 
 ---
 
@@ -167,7 +167,7 @@ Control which tools are exposed using `--tool-filter`:
 | `dba-monitor` | 58     | DBA Monitoring           |
 | `geo`         | 42     | Geospatial Workloads     |
 
-**[Complete tool filtering guide →](https://github.com/neverinfamous/postgres-mcp#-tool-filtering)**
+**[Complete tool filtering guide →](https://github.com/neverinfamous/postgresql-mcp#-tool-filtering)**
 
 ---
 
@@ -259,7 +259,7 @@ docker pull writenotenow/postgres-mcp@sha256:<manifest-digest>
 **Step 1: Clone the repository**
 
 ```bash
-git clone https://github.com/neverinfamous/postgres-mcp.git
+git clone https://github.com/neverinfamous/postgresql-mcp.git
 cd postgres-mcp
 ```
 
@@ -300,12 +300,12 @@ Update your `~/.cursor/mcp.json` to use the local build:
 
 ## 📚 Documentation & Resources
 
-- **[GitHub Repository](https://github.com/neverinfamous/postgres-mcp)** - Source code & full documentation
+- **[GitHub Repository](https://github.com/neverinfamous/postgresql-mcp)** - Source code & full documentation
 - **[npm Package](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)** - Node.js distribution
-- **[Issues](https://github.com/neverinfamous/postgres-mcp/issues)** - Bug reports & feature requests
+- **[Issues](https://github.com/neverinfamous/postgresql-mcp/issues)** - Bug reports & feature requests
 
 ---
 
 ## 📄 License
 
-MIT License - See [LICENSE](https://github.com/neverinfamous/postgres-mcp/blob/master/LICENSE)
+MIT License - See [LICENSE](https://github.com/neverinfamous/postgresql-mcp/blob/master/LICENSE)

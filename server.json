@@ -32,10 +32,10 @@
     "author": {
         "name": "Adamic.tech"
     },
-    "homepage": "https://github.com/neverinfamous/postgres-mcp",
+    "homepage": "https://github.com/neverinfamous/postgresql-mcp",
     "repository": {
         "type": "git",
-        "url": "https://github.com/neverinfamous/postgres-mcp.git",
+        "url": "https://github.com/neverinfamous/postgresql-mcp.git",
         "source": "github"
     },
     "license": "MIT"

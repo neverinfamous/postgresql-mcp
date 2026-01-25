@@ -10,12 +10,12 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
+[![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](SECURITY.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/memory-journal-mcp)
 [![Tests](https://img.shields.io/badge/Tests-2063_passed-success.svg)](https://github.com/neverinfamous/postgres-mcp)
 [![Coverage](https://img.shields.io/badge/Coverage-84.38%25-green.svg)](https://github.com/neverinfamous/postgres-mcp)
-
----
 
 ## 🚀 Quick Start
 

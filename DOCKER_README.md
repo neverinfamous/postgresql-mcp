@@ -1,6 +1,6 @@
 # postgres-mcp
 
-**Last Updated January 24, 2026**
+**Last Updated January 25, 2026**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgresql-mcp)
 ![GitHub Release](https://img.shields.io/github/v/release/neverinfamous/postgresql-mcp)
@@ -11,6 +11,8 @@
 [![npm](https://img.shields.io/npm/v/@neverinfamous/postgres-mcp)](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/postgresql-mcp/blob/master/SECURITY.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/postgresql-mcp)
+[![Tests](https://img.shields.io/badge/Tests-2063_passed-success.svg)](https://github.com/neverinfamous/postgresql-mcp)
+[![Coverage](https://img.shields.io/badge/Coverage-84.38%25-green.svg)](https://github.com/neverinfamous/postgresql-mcp)
 
 **PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
@@ -51,14 +53,14 @@
 
 Real-time database meta-awareness - AI accesses these automatically:
 
-| Resource | Purpose |
-| -------- | ------- |
-| `database://schema` | Complete schema with tables, columns, indexes |
-| `database://health` | Comprehensive health status |
-| `database://performance` | Query performance metrics |
-| `database://capabilities` | Server features and extensions |
-| `database://indexes` | Index usage statistics |
-| `database://connections` | Active connections and pool status |
+| Resource                  | Purpose                                       |
+| ------------------------- | --------------------------------------------- |
+| `database://schema`       | Complete schema with tables, columns, indexes |
+| `database://health`       | Comprehensive health status                   |
+| `database://performance`  | Query performance metrics                     |
+| `database://capabilities` | Server features and extensions                |
+| `database://indexes`      | Index usage statistics                        |
+| `database://connections`  | Active connections and pool status            |
 
 **[Full resources list →](https://github.com/neverinfamous/postgresql-mcp#resources)**
 
@@ -66,14 +68,14 @@ Real-time database meta-awareness - AI accesses these automatically:
 
 Guided workflows for complex operations:
 
-| Prompt | Purpose |
-| ------ | ------- |
-| `optimize_query` | Step-by-step query optimization |
-| `index_tuning` | Comprehensive index analysis |
-| `database_health_check` | Full health assessment |
-| `setup_pgvector` | Complete pgvector setup guide |
-| `performance_baseline` | Establish performance baselines |
-| `backup_strategy` | Design backup strategy |
+| Prompt                  | Purpose                         |
+| ----------------------- | ------------------------------- |
+| `optimize_query`        | Step-by-step query optimization |
+| `index_tuning`          | Comprehensive index analysis    |
+| `database_health_check` | Full health assessment          |
+| `setup_pgvector`        | Complete pgvector setup guide   |
+| `performance_baseline`  | Establish performance baselines |
+| `backup_strategy`       | Design backup strategy          |
 
 **[Full prompts list →](https://github.com/neverinfamous/postgresql-mcp#prompts)**
 
@@ -157,21 +159,28 @@ Click the button below to install directly into Cursor:
 
 ### Environment Variables
 
+**PostgreSQL Connection (required):**
+
 ```bash
-# PostgreSQL Connection (required)
 -e POSTGRES_HOST=localhost
 -e POSTGRES_PORT=5432
 -e POSTGRES_USER=your_user
 -e POSTGRES_PASSWORD=your_password
 -e POSTGRES_DATABASE=your_database
-
-# Or use a connection string
--e POSTGRES_URL=postgres://user:pass@host:5432/database
-
-# Performance (optional)
--e METADATA_CACHE_TTL_MS=30000  # Schema cache TTL, default 30s
--e LOG_LEVEL=info               # debug, info, warning, error
 ```
+
+**Or use a connection string:**
+
+```bash
+-e POSTGRES_URL=postgres://user:pass@host:5432/database
+```
+
+**Performance (optional):**
+
+| Variable                | Default | Description                 |
+| ----------------------- | ------- | --------------------------- |
+| `METADATA_CACHE_TTL_MS` | `30000` | Schema cache TTL (ms)       |
+| `LOG_LEVEL`             | `info`  | debug, info, warning, error |
 
 ### Tool Filtering
 
@@ -179,25 +188,21 @@ Control which tools are exposed using `--tool-filter`:
 
 ```json
 {
-  "args": [
-    "...",
-    "--tool-filter",
-    "starter"
-  ]
+  "args": ["...", "--tool-filter", "starter"]
 }
 ```
 
 **Available Shortcuts:**
 
-| Shortcut      | Tools  | Use Case                 |
-| ------------- | ------ | ------------------------ |
-| `starter`     | **58** | 🌟 **Recommended**       |
-| `essential`   | 46     | Minimal footprint        |
-| `dev-power`   | 53     | Power Developer          |
-| `ai-data`     | 59     | AI Data Analyst          |
-| `ai-vector`   | 47     | AI/ML with pgvector      |
-| `dba-monitor` | 58     | DBA Monitoring           |
-| `geo`         | 42     | Geospatial Workloads     |
+| Shortcut      | Tools  | Use Case             |
+| ------------- | ------ | -------------------- |
+| `starter`     | **58** | 🌟 **Recommended**   |
+| `essential`   | 46     | Minimal footprint    |
+| `dev-power`   | 53     | Power Developer      |
+| `ai-data`     | 59     | AI Data Analyst      |
+| `ai-vector`   | 47     | AI/ML with pgvector  |
+| `dba-monitor` | 58     | DBA Monitoring       |
+| `geo`         | 42     | Geospatial Workloads |
 
 **[Complete tool filtering guide →](https://github.com/neverinfamous/postgresql-mcp#-tool-filtering)**
 
@@ -265,8 +270,8 @@ docker pull writenotenow/postgres-mcp@sha256:<manifest-digest>
 
 ## 📦 Image Details
 
-| Platform                  | Features                           |
-| ------------------------- | ---------------------------------- |
+| Platform                  | Features                              |
+| ------------------------- | ------------------------------------- |
 | **AMD64** (x86_64)        | Complete: all tools, OAuth, Code Mode |
 | **ARM64** (Apple Silicon) | Complete: all tools, OAuth, Code Mode |
 

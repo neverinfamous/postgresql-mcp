@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.neverinfamous/postgres-mcp -->
 
-**Last updated January 24, 2026**
+**Last updated January 25, 2026**
 
 **PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
@@ -44,19 +44,29 @@ node dist/cli.js --transport stdio --postgres postgres://user:password@localhost
 
 ## Development
 
+**Clone and install:**
+
 ```bash
-# Clone and install
 git clone https://github.com/neverinfamous/postgresql-mcp.git
 cd postgres-mcp
 npm install
+```
 
-# Build
+**Build:**
+
+```bash
 npm run build
+```
 
-# Run checks
+**Run checks:**
+
+```bash
 npm run lint && npm run typecheck
+```
 
-# Test CLI
+**Test CLI:**
+
+```bash
 node dist/cli.js info
 node dist/cli.js list-tools
 ```
@@ -337,15 +347,17 @@ node dist/cli.js \
   --oauth-audience postgres-mcp-client
 ```
 
-**Environment Variables:**
+**Environment Variables (Required):**
 
 ```bash
-# Required
 OAUTH_ENABLED=true
 OAUTH_ISSUER=http://localhost:8080/realms/postgres-mcp
 OAUTH_AUDIENCE=postgres-mcp-client
+```
 
-# Optional (auto-discovered from issuer)
+**Environment Variables (Optional — auto-discovered from issuer):**
+
+```bash
 OAUTH_JWKS_URI=http://localhost:8080/realms/postgres-mcp/protocol/openid-connect/certs
 OAUTH_CLOCK_TOLERANCE=60
 ```

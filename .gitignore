@@ -45,3 +45,4 @@ pnpm-lock.yaml
 
 # Test database files
 test-database/
+.mcpregistry_*

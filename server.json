@@ -1,21 +1,21 @@
 {
-    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+    "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
     "name": "io.github.neverinfamous/postgres-mcp",
     "title": "PostgreSQL MCP Server",
     "description": "PostgreSQL MCP server with 203 tools, connection pooling, HTTP/SSE, OAuth 2.1, and tool filtering",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "packages": [
         {
             "registryType": "npm",
             "identifier": "@neverinfamous/postgres-mcp",
-            "version": "1.0.1",
+            "version": "1.0.2",
             "transport": {
                 "type": "stdio"
             }
         },
         {
             "registryType": "oci",
-            "identifier": "docker.io/writenotenow/postgres-mcp:v1.0.1",
+            "identifier": "docker.io/writenotenow/postgres-mcp:v1.0.2",
             "transport": {
                 "type": "stdio"
             }

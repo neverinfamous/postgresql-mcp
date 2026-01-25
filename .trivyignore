@@ -1,0 +1,7 @@
+# Trivy CVE Ignore List for postgres-mcp
+# Add CVEs here that are:
+# 1. False positives
+# 2. Upstream issues with no fix available
+# 3. Not applicable to our use case
+
+# Format: CVE-YYYY-NNNNN

@@ -1,0 +1,102 @@
+# postgres-mcp - PostgreSQL MCP Server
+# Multi-stage build for optimized production image
+FROM node:24-alpine AS builder
+
+WORKDIR /app
+
+# Upgrade packages for security and install curl from edge for CVE fixes
+RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main curl && \
+    apk upgrade --no-cache
+
+# Upgrade npm globally to get fixed versions of bundled packages
+RUN npm install -g npm@latest --force && npm cache clean --force
+
+# Fix GHSA-73rr-hh4g-fpgx: Manually update npm's bundled diff@8.0.2 to 8.0.3
+RUN cd /usr/local/lib/node_modules/npm && \
+    npm pack diff@8.0.3 && \
+    rm -rf node_modules/diff && \
+    tar -xzf diff-8.0.3.tgz && \
+    mv package node_modules/diff && \
+    rm diff-8.0.3.tgz
+
+# Fix CVE-2026-23950: Manually update npm's bundled tar to 7.5.4
+RUN cd /usr/local/lib/node_modules/npm && \
+    npm pack tar@7.5.4 && \
+    rm -rf node_modules/tar && \
+    tar -xzf tar-7.5.4.tgz && \
+    mv package node_modules/tar && \
+    rm tar-7.5.4.tgz
+
+# Copy package files first for better layer caching
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies for build)
+RUN npm ci
+
+# Copy source code
+COPY tsconfig.json ./
+COPY src/ ./src/
+
+# Build TypeScript
+RUN npm run build
+
+# Production stage
+FROM node:24-alpine
+
+WORKDIR /app
+
+# Install runtime dependencies with security fixes
+RUN apk add --no-cache ca-certificates && \
+    apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main curl && \
+    apk upgrade --no-cache && \
+    npm install -g npm@latest --force && npm cache clean --force
+
+# Fix GHSA-73rr-hh4g-fpgx: Manually update npm's bundled diff@8.0.2 to 8.0.3
+RUN cd /usr/local/lib/node_modules/npm && \
+    npm pack diff@8.0.3 && \
+    rm -rf node_modules/diff && \
+    tar -xzf diff-8.0.3.tgz && \
+    mv package node_modules/diff && \
+    rm diff-8.0.3.tgz
+
+# Fix CVE-2026-23950: Manually update npm's bundled tar to 7.5.4
+RUN cd /usr/local/lib/node_modules/npm && \
+    npm pack tar@7.5.4 && \
+    rm -rf node_modules/tar && \
+    tar -xzf tar-7.5.4.tgz && \
+    mv package node_modules/tar && \
+    rm tar-7.5.4.tgz
+
+# Copy built artifacts and production dependencies
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY package*.json ./
+COPY LICENSE ./
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup && \
+    chown -R appuser:appgroup /app
+
+# Set environment variables
+ENV NODE_ENV=production
+
+# Switch to non-root user
+USER appuser
+
+# Expose HTTP port for SSE transport (optional)
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD node -e "console.log('Server healthy')" || exit 1
+
+# Run the MCP server (default: stdio transport)
+CMD ["node", "dist/cli.js"]
+
+# Labels for Docker Hub
+LABEL maintainer="Adamic.tech"
+LABEL description="PostgreSQL MCP Server - AI-native PostgreSQL operations with 203 tools, 20 resources, 19 prompts"
+LABEL version="1.0.0"
+LABEL org.opencontainers.image.source="https://github.com/neverinfamous/postgres-mcp"
+LABEL io.modelcontextprotocol.server.name="io.github.neverinfamous/postgres-mcp"

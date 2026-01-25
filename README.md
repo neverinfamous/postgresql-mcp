@@ -9,12 +9,14 @@
 **203 specialized tools** · **20 resources** · **19 AI-powered prompts**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgres-mcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![GitHub Release](https://img.shields.io/github/v/release/neverinfamous/postgres-mcp)
+[![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/postgres-mcp)](https://hub.docker.com/r/writenotenow/postgres-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
-[![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](SECURITY.md)
+[![npm](https://img.shields.io/npm/v/postgres-mcp)](https://www.npmjs.com/package/postgres-mcp)
+[![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/postgres-mcp/blob/master/SECURITY.md)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/postgresql-mcp)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/postgres-mcp)
 [![Tests](https://img.shields.io/badge/Tests-2063_passed-success.svg)](https://github.com/neverinfamous/postgres-mcp)
 [![Coverage](https://img.shields.io/badge/Coverage-84.38%25-green.svg)](https://github.com/neverinfamous/postgres-mcp)
 

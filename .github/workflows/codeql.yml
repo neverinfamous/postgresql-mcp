@@ -15,8 +15,12 @@ on:
     - cron: "0 0 * * 1"
   workflow_dispatch:
 
+env:
+  CODEQL_ACTION_FEATURE_SANDWICH: false
+
 jobs:
   analyze:
+    name: Analyze
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -28,12 +32,20 @@ jobs:
       matrix:
         language: ["javascript-typescript"]
     steps:
-      - uses: actions/checkout@v6
-      - uses: github/codeql-action/init@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
-      - uses: github/codeql-action/autobuild@v4
-      - uses: github/codeql-action/analyze@v4
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{matrix.language}}"
+

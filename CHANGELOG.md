@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-01-24
+
+### Highlights
+
+🎉 **First stable TypeScript release** — Complete rewrite from Python with 203 tools, 20 resources, and 19 prompts.
+
+### Added (Infrastructure)
+
+- **Docker Hub Publication** — Multi-platform images (amd64/arm64) at `writenotenow/postgres-mcp`
+- **NPM Package** — Available via `npm install -g postgres-mcp`
+- **MCP Registry** — Listed as `io.github.neverinfamous/postgres-mcp`
+- **GitHub Workflows**:
+  - `lint-and-test.yml` — CI pipeline with Node.js 24/25 matrix
+  - `docker-publish.yml` — Docker Hub publication with security scanning
+  - `publish-npm.yml` — NPM publication on GitHub releases
+  - `secrets-scanning.yml` — TruffleHog and Gitleaks secret detection
+  - `dependabot-auto-merge.yml` — Auto-merge for minor/patch updates
+  - `security-update.yml` — Weekly Trivy vulnerability scanning
+- **Dockerfile** — Multi-stage build with security hardening
+- **DOCKER_README.md** — Docker Hub documentation
+
 ### Added
 
 - **pg_list_extensions tool** — New core tool (`pg_list_extensions`) lists installed PostgreSQL extensions with name, version, schema, and description. Available in both direct MCP tool calls and Code Mode (`pg.core.listExtensions()`)

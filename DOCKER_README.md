@@ -8,13 +8,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 ![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
-[![npm](https://img.shields.io/npm/v/postgres-mcp)](https://www.npmjs.com/package/postgres-mcp)
+[![npm](https://img.shields.io/npm/v/@neverinfamous/postgres-mcp)](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/postgres-mcp/blob/master/SECURITY.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/postgres-mcp)
 
-🐘 **PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features OAuth 2.1 authentication, Code Mode, connection pooling, tool filtering, and extension support.
+**PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
-**[GitHub](https://github.com/neverinfamous/postgres-mcp)** • **[npm Package](https://www.npmjs.com/package/postgres-mcp)** • **[MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.neverinfamous/postgres-mcp)**
+**[GitHub](https://github.com/neverinfamous/postgres-mcp)** • **[npm Package](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)** • **[MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.neverinfamous/postgres-mcp)**
 
 ## 🎯 What This Does
 
@@ -30,7 +30,7 @@
 ### Deployment Options
 
 - **[Docker Hub](https://hub.docker.com/r/writenotenow/postgres-mcp)** - Node.js Alpine-based multi-platform support
-- **[npm Package](https://www.npmjs.com/package/postgres-mcp)** - Simple `npm install -g` for local deployment
+- **[npm Package](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)** - Simple `npm install -g` for local deployment
 - **[MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.neverinfamous/postgres-mcp)**
 
 ### Extension Support
@@ -301,7 +301,7 @@ Update your `~/.cursor/mcp.json` to use the local build:
 ## 📚 Documentation & Resources
 
 - **[GitHub Repository](https://github.com/neverinfamous/postgres-mcp)** - Source code & full documentation
-- **[npm Package](https://www.npmjs.com/package/postgres-mcp)** - Node.js distribution
+- **[npm Package](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)** - Node.js distribution
 - **[Issues](https://github.com/neverinfamous/postgres-mcp/issues)** - Bug reports & feature requests
 
 ---

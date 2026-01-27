@@ -72,14 +72,20 @@ export {
 export {
   VacuumSchema,
   VacuumSchemaBase,
+  VacuumOutputSchema,
   AnalyzeSchema,
   AnalyzeSchemaBase,
+  AnalyzeOutputSchema,
   ReindexSchema,
   ReindexSchemaBase,
+  ReindexOutputSchema,
+  ClusterOutputSchema,
   TerminateBackendSchema,
   TerminateBackendSchemaBase,
   CancelBackendSchema,
   CancelBackendSchemaBase,
+  BackendOutputSchema,
+  ConfigOutputSchema,
 } from "./admin.js";
 
 // Monitoring schemas

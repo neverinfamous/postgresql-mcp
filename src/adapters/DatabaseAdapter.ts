@@ -192,6 +192,11 @@ export abstract class DatabaseAdapter {
       toolOptions["inputSchema"] = tool.inputSchema;
     }
 
+    // MCP 2025-11-25: Pass outputSchema for structured responses
+    if (tool.outputSchema !== undefined) {
+      toolOptions["outputSchema"] = tool.outputSchema;
+    }
+
     // MCP 2025-11-25: Pass annotations for behavioral hints
     if (tool.annotations) {
       toolOptions["annotations"] = tool.annotations;
@@ -202,11 +207,15 @@ export abstract class DatabaseAdapter {
       toolOptions["icons"] = tool.icons;
     }
 
+    // Track whether tool has outputSchema for response handling
+    const hasOutputSchema = Boolean(tool.outputSchema);
+
     server.registerTool(
       tool.name,
       toolOptions as {
         description?: string;
         inputSchema?: z.ZodType;
+        outputSchema?: z.ZodType;
       },
       async (args: unknown, extra: unknown) => {
         try {
@@ -223,6 +232,19 @@ export abstract class DatabaseAdapter {
             progressToken,
           );
           const result = await tool.handler(args, context);
+
+          // MCP 2025-11-25: Return structuredContent if outputSchema present
+          if (hasOutputSchema) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+              structuredContent: result as Record<string, unknown>,
+            };
+          }
 
           // Standard text content response
           return {

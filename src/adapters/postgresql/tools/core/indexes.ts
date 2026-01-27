@@ -17,6 +17,10 @@ import {
   CreateIndexSchemaBase,
   CreateIndexSchema,
 } from "../../schemas/index.js";
+import {
+  IndexListOutputSchema,
+  IndexOperationOutputSchema,
+} from "./schemas.js";
 
 /**
  * Get indexes for a table
@@ -28,6 +32,7 @@ export function createGetIndexesTool(adapter: PostgresAdapter): ToolDefinition {
       "List indexes with usage statistics. When table is omitted, lists ALL database indexes (can be large). Use schema/limit to filter.",
     group: "core",
     inputSchema: GetIndexesSchemaBase,
+    outputSchema: IndexListOutputSchema,
     annotations: readOnly("Get Indexes"),
     icons: getToolIcons("core", readOnly("Get Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -81,6 +86,7 @@ export function createCreateIndexTool(
       "Create an index on a table. Supports btree, hash, gin, gist, brin index types.",
     group: "core",
     inputSchema: CreateIndexSchemaBase,
+    outputSchema: IndexOperationOutputSchema,
     annotations: write("Create Index"),
     icons: getToolIcons("core", write("Create Index")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -260,6 +266,7 @@ export function createDropIndexTool(adapter: PostgresAdapter): ToolDefinition {
       "Drop an index from a table. Supports IF EXISTS, CASCADE, and CONCURRENTLY options.",
     group: "core",
     inputSchema: DropIndexSchemaBase,
+    outputSchema: IndexOperationOutputSchema,
     annotations: write("Drop Index"),
     icons: getToolIcons("core", write("Drop Index")),
     handler: async (params: unknown, _context: RequestContext) => {

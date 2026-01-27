@@ -17,14 +17,20 @@ import {
 import {
   VacuumSchema,
   VacuumSchemaBase,
+  VacuumOutputSchema,
   AnalyzeSchema,
   AnalyzeSchemaBase,
+  AnalyzeOutputSchema,
   ReindexSchema,
   ReindexSchemaBase,
+  ReindexOutputSchema,
+  ClusterOutputSchema,
   TerminateBackendSchema,
   TerminateBackendSchemaBase,
   CancelBackendSchema,
   CancelBackendSchemaBase,
+  BackendOutputSchema,
+  ConfigOutputSchema,
 } from "../schemas/index.js";
 
 /**
@@ -52,6 +58,7 @@ function createVacuumTool(adapter: PostgresAdapter): ToolDefinition {
       "Run VACUUM to reclaim storage and update visibility map. Use analyze: true to also update statistics. Verbose output goes to PostgreSQL server logs.",
     group: "admin",
     inputSchema: VacuumSchemaBase,
+    outputSchema: VacuumOutputSchema,
     annotations: admin("Vacuum"),
     icons: getToolIcons("admin", admin("Vacuum")),
     handler: async (params: unknown, context: RequestContext) => {
@@ -101,6 +108,7 @@ function createVacuumAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
       "Run VACUUM and ANALYZE together for optimal performance. Verbose output goes to PostgreSQL server logs.",
     group: "admin",
     inputSchema: VacuumSchemaBase,
+    outputSchema: VacuumOutputSchema,
     annotations: admin("Vacuum Analyze"),
     icons: getToolIcons("admin", admin("Vacuum Analyze")),
     handler: async (params: unknown, context: RequestContext) => {
@@ -147,6 +155,7 @@ function createAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Update table statistics for the query planner.",
     group: "admin",
     inputSchema: AnalyzeSchemaBase,
+    outputSchema: AnalyzeOutputSchema,
     annotations: admin("Analyze"),
     icons: getToolIcons("admin", admin("Analyze")),
     handler: async (params: unknown, context: RequestContext) => {
@@ -194,6 +203,7 @@ function createReindexTool(adapter: PostgresAdapter): ToolDefinition {
       "Rebuild indexes to improve performance. For target: database, name defaults to the current database if omitted.",
     group: "admin",
     inputSchema: ReindexSchemaBase,
+    outputSchema: ReindexOutputSchema,
     annotations: admin("Reindex"),
     icons: getToolIcons("admin", admin("Reindex")),
     handler: async (params: unknown, context: RequestContext) => {
@@ -245,6 +255,7 @@ function createTerminateBackendTool(adapter: PostgresAdapter): ToolDefinition {
       "Terminate a database connection (forceful, use with caution).",
     group: "admin",
     inputSchema: TerminateBackendSchemaBase,
+    outputSchema: BackendOutputSchema,
     annotations: destructive("Terminate Backend"),
     icons: getToolIcons("admin", destructive("Terminate Backend")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -267,6 +278,7 @@ function createCancelBackendTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Cancel a running query (graceful, preferred over terminate).",
     group: "admin",
     inputSchema: CancelBackendSchemaBase,
+    outputSchema: BackendOutputSchema,
     annotations: admin("Cancel Backend"),
     icons: getToolIcons("admin", admin("Cancel Backend")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -289,6 +301,7 @@ function createReloadConfTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Reload PostgreSQL configuration without restart.",
     group: "admin",
     inputSchema: z.object({}),
+    outputSchema: ConfigOutputSchema,
     annotations: admin("Reload Configuration"),
     icons: getToolIcons("admin", admin("Reload Configuration")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -350,6 +363,7 @@ function createSetConfigTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Set a configuration parameter for the current session.",
     group: "admin",
     inputSchema: SetConfigSchemaBase,
+    outputSchema: ConfigOutputSchema,
     annotations: admin("Set Configuration"),
     icons: getToolIcons("admin", admin("Set Configuration")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -393,6 +407,7 @@ function createResetStatsTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Reset statistics counters (requires superuser).",
     group: "admin",
     inputSchema: ResetStatsSchema,
+    outputSchema: ConfigOutputSchema,
     annotations: admin("Reset Statistics"),
     icons: getToolIcons("admin", admin("Reset Statistics")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -484,6 +499,7 @@ function createClusterTool(adapter: PostgresAdapter): ToolDefinition {
       "Physically reorder table data based on an index. Call with no args to re-cluster all previously-clustered tables.",
     group: "admin",
     inputSchema: ClusterSchemaBase,
+    outputSchema: ClusterOutputSchema,
     annotations: admin("Cluster Table"),
     icons: getToolIcons("admin", admin("Cluster Table")),
     handler: async (params: unknown, context: RequestContext) => {

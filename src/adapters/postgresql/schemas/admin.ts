@@ -68,6 +68,15 @@ export const VacuumSchema = z.preprocess(
   }),
 );
 
+// Output schema for MCP 2025-11-25 structuredContent
+export const VacuumOutputSchema = z.object({
+  success: z.boolean().describe("Whether the vacuum operation succeeded"),
+  message: z.string().describe("Human-readable result message"),
+  table: z.string().optional().describe("Table that was vacuumed"),
+  schema: z.string().optional().describe("Schema of the table"),
+  hint: z.string().optional().describe("Additional information"),
+});
+
 // ============== ANALYZE SCHEMA ==============
 // Base schema for MCP visibility
 export const AnalyzeSchemaBase = z.object({
@@ -216,3 +225,54 @@ export const CancelBackendSchema = z.preprocess(
     pid: z.number().describe("Process ID to cancel"),
   }),
 );
+
+// ============== OUTPUT SCHEMAS (MCP 2025-11-25 structuredContent) ==============
+
+// Output schema for ANALYZE operations
+export const AnalyzeOutputSchema = z.object({
+  success: z.boolean().describe("Whether the analyze operation succeeded"),
+  message: z.string().describe("Human-readable result message"),
+  table: z.string().optional().describe("Table that was analyzed"),
+  schema: z.string().optional().describe("Schema of the table"),
+  hint: z.string().optional().describe("Additional information"),
+});
+
+// Output schema for REINDEX operations
+export const ReindexOutputSchema = z.object({
+  success: z.boolean().describe("Whether the reindex operation succeeded"),
+  message: z.string().describe("Human-readable result message"),
+  target: z
+    .string()
+    .optional()
+    .describe("What was reindexed (table/index/schema/database)"),
+  name: z.string().optional().describe("Name of the reindexed object"),
+  concurrently: z
+    .boolean()
+    .optional()
+    .describe("Whether concurrent reindex was used"),
+  hint: z.string().optional().describe("Additional information"),
+});
+
+// Output schema for CLUSTER operations
+export const ClusterOutputSchema = z.object({
+  success: z.boolean().describe("Whether the cluster operation succeeded"),
+  message: z.string().describe("Human-readable result message"),
+  table: z.string().optional().describe("Table that was clustered"),
+  index: z.string().optional().describe("Index used for clustering"),
+  hint: z.string().optional().describe("Additional information"),
+});
+
+// Output schema for backend operations (terminate/cancel)
+export const BackendOutputSchema = z.object({
+  success: z.boolean().describe("Whether the operation succeeded"),
+  message: z.string().describe("Human-readable result message"),
+  pid: z.number().optional().describe("Process ID that was affected"),
+  hint: z.string().optional().describe("Additional information"),
+});
+
+// Output schema for configuration operations (reload_conf, set_config, reset_stats)
+export const ConfigOutputSchema = z.object({
+  success: z.boolean().describe("Whether the operation succeeded"),
+  message: z.string().describe("Human-readable result message"),
+  hint: z.string().optional().describe("Additional information"),
+});

@@ -17,6 +17,9 @@ import {
   ListObjectsSchema,
   ObjectDetailsSchema,
   ObjectDetailsSchemaBase,
+  ObjectListOutputSchema,
+  ObjectDetailsOutputSchema,
+  ExtensionListOutputSchema,
 } from "./schemas.js";
 
 /**
@@ -33,6 +36,7 @@ export function createListObjectsTool(
     annotations: readOnly("List Objects"),
     icons: getToolIcons("core", readOnly("List Objects")),
     inputSchema: ListObjectsSchemaBase,
+    outputSchema: ObjectListOutputSchema,
     handler: async (params: unknown, _context: RequestContext) => {
       const { schema, types, limit } = ListObjectsSchema.parse(params);
 
@@ -197,6 +201,7 @@ export function createObjectDetailsTool(
       "Get detailed metadata for a specific database object (table, view, function, sequence, index).",
     group: "core",
     inputSchema: ObjectDetailsSchemaBase,
+    outputSchema: ObjectDetailsOutputSchema,
     annotations: readOnly("Object Details"),
     icons: getToolIcons("core", readOnly("Object Details")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -389,6 +394,7 @@ export function createListExtensionsTool(
     description: "List installed PostgreSQL extensions with versions.",
     group: "core",
     inputSchema: z.object({}),
+    outputSchema: ExtensionListOutputSchema,
     annotations: readOnly("List Extensions"),
     icons: getToolIcons("core", readOnly("List Extensions")),
     handler: async (_params: unknown, _context: RequestContext) => {

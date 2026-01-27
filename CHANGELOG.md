@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_reindex` — REINDEX operations
   - `pg_cluster` — CLUSTER operations
 - **Backup Tool Progress Notifications** — `pg_copy_export` now emits progress for large exports
+- **Structured Content (outputSchema) for Core Tools** — All 20 core tools now include `outputSchema` for MCP 2025-11-25 compliance:
+  - Query tools: `pg_read_query`, `pg_write_query`
+  - Table tools: `pg_list_tables`, `pg_describe_table`, `pg_create_table`, `pg_drop_table`
+  - Index tools: `pg_get_indexes`, `pg_create_index`, `pg_drop_index`
+  - Object tools: `pg_list_objects`, `pg_object_details`, `pg_list_extensions`
+  - Health tools: `pg_analyze_db_health`, `pg_analyze_workload_indexes`, `pg_analyze_query_indexes`
+  - Convenience tools: `pg_upsert`, `pg_batch_insert`, `pg_count`, `pg_exists`, `pg_truncate`
+  - Added 15 reusable output schemas in `core/schemas.ts`
 
 ### Security
 

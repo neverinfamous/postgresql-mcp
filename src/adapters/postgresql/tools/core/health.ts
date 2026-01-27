@@ -16,6 +16,9 @@ import {
   AnalyzeWorkloadIndexesSchema,
   AnalyzeQueryIndexesSchema,
   AnalyzeQueryIndexesSchemaBase,
+  HealthAnalysisOutputSchema,
+  IndexRecommendationsOutputSchema,
+  QueryIndexAnalysisOutputSchema,
 } from "./schemas.js";
 
 /**
@@ -30,6 +33,7 @@ export function createAnalyzeDbHealthTool(
       "Comprehensive database health analysis including cache hit ratio, bloat, replication, and connection stats.",
     group: "core",
     inputSchema: AnalyzeDbHealthSchema,
+    outputSchema: HealthAnalysisOutputSchema,
     annotations: readOnly("Analyze Database Health"),
     icons: getToolIcons("core", readOnly("Analyze Database Health")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -235,6 +239,7 @@ export function createAnalyzeWorkloadIndexesTool(
       "Analyze database workload using pg_stat_statements to recommend missing indexes.",
     group: "core",
     inputSchema: AnalyzeWorkloadIndexesSchema,
+    outputSchema: IndexRecommendationsOutputSchema,
     annotations: readOnly("Analyze Workload Indexes"),
     icons: getToolIcons("core", readOnly("Analyze Workload Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -352,6 +357,7 @@ export function createAnalyzeQueryIndexesTool(
       "Analyze a specific query for index recommendations using EXPLAIN ANALYZE.",
     group: "core",
     inputSchema: AnalyzeQueryIndexesSchemaBase,
+    outputSchema: QueryIndexAnalysisOutputSchema,
     annotations: readOnly("Analyze Query Indexes"),
     icons: getToolIcons("core", readOnly("Analyze Query Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {

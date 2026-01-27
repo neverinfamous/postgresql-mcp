@@ -20,6 +20,11 @@ import {
   DropTableSchemaBase,
   DropTableSchema,
 } from "../../schemas/index.js";
+import {
+  TableListOutputSchema,
+  TableDescribeOutputSchema,
+  TableOperationOutputSchema,
+} from "./schemas.js";
 
 /**
  * List all tables in the database
@@ -31,6 +36,7 @@ export function createListTablesTool(adapter: PostgresAdapter): ToolDefinition {
       "List all tables, views, and materialized views with metadata. Use limit to restrict results.",
     group: "core",
     inputSchema: ListTablesSchema,
+    outputSchema: TableListOutputSchema,
     annotations: readOnly("List Tables"),
     icons: getToolIcons("core", readOnly("List Tables")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -74,6 +80,7 @@ export function createDescribeTableTool(
       "Get detailed table structure including columns, types, and constraints. For tables/views only, not sequences.",
     group: "core",
     inputSchema: DescribeTableSchemaBase, // Base schema for MCP visibility (table required)
+    outputSchema: TableDescribeOutputSchema,
     annotations: readOnly("Describe Table"),
     icons: getToolIcons("core", readOnly("Describe Table")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -139,6 +146,7 @@ export function createCreateTableTool(
       "Create a new table with specified columns and constraints. Supports composite primary keys and table-level constraints.",
     group: "core",
     inputSchema: CreateTableSchemaBase,
+    outputSchema: TableOperationOutputSchema,
     annotations: write("Create Table"),
     icons: getToolIcons("core", write("Create Table")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -252,6 +260,7 @@ export function createDropTableTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Drop a table from the database.",
     group: "core",
     inputSchema: DropTableSchemaBase,
+    outputSchema: TableOperationOutputSchema,
     annotations: destructive("Drop Table"),
     icons: getToolIcons("core", destructive("Drop Table")),
     handler: async (params: unknown, _context: RequestContext) => {

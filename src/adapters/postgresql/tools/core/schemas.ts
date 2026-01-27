@@ -350,7 +350,10 @@ export const TruncateOutputSchema = z.object({
 // Index info schema
 const IndexInfoSchema = z.object({
   name: z.string().describe("Index name"),
-  table: z.string().describe("Table name"),
+  table: z.string().optional().describe("Table name"),
+  tableName: z.string().optional().describe("Alias for table"),
+  indexName: z.string().optional().describe("Alias for name"),
+  schemaName: z.string().optional().describe("Schema name (alias)"),
   schema: z.string().optional().describe("Schema name"),
   type: z.string().optional().describe("Index type (btree, hash, gin, etc)"),
   unique: z.boolean().optional().describe("Whether index is unique"),
@@ -419,27 +422,26 @@ export const ExtensionListOutputSchema = z.object({
   count: z.number().describe("Number of extensions"),
 });
 
+// Cache hit ratio schema for health analysis
+const CacheHitRatioSchema = z.object({
+  ratio: z.number().nullable().optional().describe("Primary numeric value"),
+  heap: z.number().nullable().optional().describe("Heap hit ratio"),
+  index: z.number().nullable().optional().describe("Index hit ratio"),
+  status: z.string().optional().describe("Status (good/fair/poor)"),
+});
+
 // Output schema for pg_analyze_db_health
 export const HealthAnalysisOutputSchema = z.object({
-  status: z.string().describe("Overall health status"),
-  version: z.string().optional().describe("PostgreSQL version"),
-  cacheHitRatio: z.number().optional().describe("Buffer cache hit ratio"),
-  connections: z
-    .record(z.string(), z.unknown())
-    .optional()
-    .describe("Connection statistics"),
-  unusedIndexes: z
-    .array(z.record(z.string(), z.unknown()))
-    .optional()
-    .describe("Unused indexes"),
-  tablesNeedingVacuum: z
-    .array(z.record(z.string(), z.unknown()))
-    .optional()
-    .describe("Tables needing vacuum"),
-  recommendations: z
-    .array(z.string())
-    .optional()
-    .describe("Health recommendations"),
+  cacheHitRatio: CacheHitRatioSchema.optional().describe("Buffer cache hit ratio details"),
+  databaseSize: z.string().optional().describe("Database size"),
+  tableStats: z.record(z.string(), z.unknown()).optional().describe("Table statistics"),
+  unusedIndexes: z.union([z.number(), z.string()]).optional().describe("Count of unused indexes"),
+  tablesNeedingVacuum: z.union([z.number(), z.string()]).optional().describe("Count of tables needing vacuum"),
+  connections: z.record(z.string(), z.unknown()).optional().describe("Connection statistics"),
+  isReplica: z.boolean().optional().describe("Whether database is a replica"),
+  bloat: z.record(z.string(), z.unknown()).optional().describe("Bloat estimation"),
+  overallScore: z.number().optional().describe("Overall health score (0-100)"),
+  overallStatus: z.string().optional().describe("Overall status (healthy/needs_attention/critical)"),
 });
 
 // Output schema for pg_analyze_workload_indexes

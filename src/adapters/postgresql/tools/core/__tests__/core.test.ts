@@ -158,10 +158,12 @@ describe("Handler Execution", () => {
 
     it("should execute query in transaction when transactionId is provided", async () => {
       const mockClient = { query: vi.fn() };
-      (mockAdapter.getTransactionConnection as ReturnType<typeof vi.fn>).mockReturnValue(mockClient);
-      (mockAdapter.executeOnConnection as ReturnType<typeof vi.fn>).mockResolvedValue(
-        createMockQueryResult([{ id: 1 }]),
-      );
+      (
+        mockAdapter.getTransactionConnection as ReturnType<typeof vi.fn>
+      ).mockReturnValue(mockClient);
+      (
+        mockAdapter.executeOnConnection as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(createMockQueryResult([{ id: 1 }]));
 
       const tool = tools.find((t) => t.name === "pg_read_query")!;
       const result = (await tool.handler(
@@ -169,7 +171,9 @@ describe("Handler Execution", () => {
         mockContext,
       )) as { rows: unknown[] };
 
-      expect(mockAdapter.getTransactionConnection).toHaveBeenCalledWith("tx-123");
+      expect(mockAdapter.getTransactionConnection).toHaveBeenCalledWith(
+        "tx-123",
+      );
       expect(mockAdapter.executeOnConnection).toHaveBeenCalledWith(
         mockClient,
         "SELECT * FROM users",
@@ -179,12 +183,17 @@ describe("Handler Execution", () => {
     });
 
     it("should throw error for invalid transactionId", async () => {
-      (mockAdapter.getTransactionConnection as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+      (
+        mockAdapter.getTransactionConnection as ReturnType<typeof vi.fn>
+      ).mockReturnValue(undefined);
 
       const tool = tools.find((t) => t.name === "pg_read_query")!;
 
       await expect(
-        tool.handler({ sql: "SELECT 1", transactionId: "invalid-tx" }, mockContext),
+        tool.handler(
+          { sql: "SELECT 1", transactionId: "invalid-tx" },
+          mockContext,
+        ),
       ).rejects.toThrow(/Invalid or expired transactionId/);
     });
 
@@ -245,8 +254,12 @@ describe("Handler Execution", () => {
 
     it("should execute query in transaction when transactionId is provided", async () => {
       const mockClient = { query: vi.fn() };
-      (mockAdapter.getTransactionConnection as ReturnType<typeof vi.fn>).mockReturnValue(mockClient);
-      (mockAdapter.executeOnConnection as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (
+        mockAdapter.getTransactionConnection as ReturnType<typeof vi.fn>
+      ).mockReturnValue(mockClient);
+      (
+        mockAdapter.executeOnConnection as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({
         rows: [],
         rowsAffected: 3,
         command: "UPDATE",
@@ -259,13 +272,17 @@ describe("Handler Execution", () => {
         mockContext,
       )) as { rowsAffected: number };
 
-      expect(mockAdapter.getTransactionConnection).toHaveBeenCalledWith("tx-456");
+      expect(mockAdapter.getTransactionConnection).toHaveBeenCalledWith(
+        "tx-456",
+      );
       expect(mockAdapter.executeOnConnection).toHaveBeenCalled();
       expect(result.rowsAffected).toBe(3);
     });
 
     it("should throw error for invalid transactionId in write", async () => {
-      (mockAdapter.getTransactionConnection as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+      (
+        mockAdapter.getTransactionConnection as ReturnType<typeof vi.fn>
+      ).mockReturnValue(undefined);
 
       const tool = tools.find((t) => t.name === "pg_write_query")!;
 
@@ -2354,10 +2371,9 @@ describe("pg_count", () => {
     });
 
     const tool = tools.find((t) => t.name === "pg_count")!;
-    const result = (await tool.handler(
-      { table: "users" },
-      mockContext,
-    )) as { count: number };
+    const result = (await tool.handler({ table: "users" }, mockContext)) as {
+      count: number;
+    };
 
     expect(result.count).toBe(42);
 
@@ -2447,10 +2463,9 @@ describe("pg_count", () => {
     });
 
     const tool = tools.find((t) => t.name === "pg_count")!;
-    const result = (await tool.handler(
-      { table: "logs" },
-      mockContext,
-    )) as { count: number };
+    const result = (await tool.handler({ table: "logs" }, mockContext)) as {
+      count: number;
+    };
 
     expect(result.count).toBe(1000000000);
   });
@@ -2488,10 +2503,10 @@ describe("pg_truncate", () => {
     mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_truncate")!;
-    const result = (await tool.handler(
-      { table: "logs" },
-      mockContext,
-    )) as { success: boolean; table: string };
+    const result = (await tool.handler({ table: "logs" }, mockContext)) as {
+      success: boolean;
+      table: string;
+    };
 
     expect(result.success).toBe(true);
     expect(result.table).toBe("public.logs");
@@ -2756,10 +2771,10 @@ describe("pg_get_indexes - additional coverage", () => {
     ]);
 
     const tool = tools.find((t) => t.name === "pg_get_indexes")!;
-    const result = (await tool.handler(
-      { schema: "archive" },
-      mockContext,
-    )) as { indexes: unknown[]; count: number };
+    const result = (await tool.handler({ schema: "archive" }, mockContext)) as {
+      indexes: unknown[];
+      count: number;
+    };
 
     expect(result.count).toBe(1);
   });
@@ -2796,10 +2811,10 @@ describe("pg_get_indexes - additional coverage", () => {
     ]);
 
     const tool = tools.find((t) => t.name === "pg_get_indexes")!;
-    const result = (await tool.handler(
-      { limit: 2 },
-      mockContext,
-    )) as { indexes: unknown[]; count: number };
+    const result = (await tool.handler({ limit: 2 }, mockContext)) as {
+      indexes: unknown[];
+      count: number;
+    };
 
     expect(result.count).toBe(2);
   });

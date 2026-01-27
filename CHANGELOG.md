@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Enhanced Log Sanitization** — Upgraded logger to match db-mcp security standards
+  - Added `sanitizeStack()` function to replace newlines with safe arrow delimiters (`→`) in stack traces
+  - Added taint-breaking `writeToStderr()` method to satisfy CodeQL static analysis
+  - Expanded sensitive key list with 8 additional OAuth 2.1 fields: `authorizationserverurl`, `authorization_server_url`, `bearerformat`, `bearer_format`, `oauthconfig`, `oauth_config`, `oauth`, `scopes_supported`, `scopessupported`
+  - Stricter control character removal (now removes all 0x00-0x1F + 0x7F including tabs and newlines)
+
 ## [1.0.0] - 2026-01-24
 
 ### Highlights

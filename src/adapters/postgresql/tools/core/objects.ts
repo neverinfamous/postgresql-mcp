@@ -79,15 +79,15 @@ export function createListObjectsTool(
                     FROM pg_class c
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE c.relkind IN (${selectedTypes
-            .map((t) => {
-              if (t === "table") return `'r'`;
-              if (t === "view") return `'v'`;
-              if (t === "materialized_view") return `'m'`;
-              if (t === "sequence") return `'S'`;
-              return null;
-            })
-            .filter(Boolean)
-            .join(", ")})
+                      .map((t) => {
+                        if (t === "table") return `'r'`;
+                        if (t === "view") return `'v'`;
+                        if (t === "materialized_view") return `'m'`;
+                        if (t === "sequence") return `'S'`;
+                        return null;
+                      })
+                      .filter(Boolean)
+                      .join(", ")})
                     ${schemaFilter}
                     ORDER BY n.nspname, c.relname
                 `;
@@ -113,10 +113,11 @@ export function createListObjectsTool(
                     FROM pg_proc p
                     JOIN pg_namespace n ON n.oid = p.pronamespace
                     WHERE p.prokind IN (${kindFilter.join(", ")})
-                    ${schema
-            ? `AND n.nspname = '${schema}'`
-            : `AND n.nspname NOT IN ('pg_catalog', 'information_schema')`
-          }
+                    ${
+                      schema
+                        ? `AND n.nspname = '${schema}'`
+                        : `AND n.nspname NOT IN ('pg_catalog', 'information_schema')`
+                    }
                     ORDER BY n.nspname, p.proname
                 `;
         const result = await adapter.executeQuery(sql);
@@ -234,7 +235,7 @@ export function createObjectDetailsTool(
       if (type && detectedType && type !== detectedType) {
         throw new Error(
           `Object '${schemaName}.${name}' is a ${detectedType}, not a ${type}. ` +
-          `Use type: '${detectedType}' or omit type to auto-detect.`,
+            `Use type: '${detectedType}' or omit type to auto-detect.`,
         );
       }
 

@@ -174,7 +174,6 @@ export function createMockPostgresAdapter(): Partial<PostgresAdapter> & {
       .fn()
       .mockResolvedValue([createMockIndexInfo("users", "users_pkey")]),
 
-
     // Capabilities
     getCapabilities: vi.fn().mockReturnValue({
       json: true,

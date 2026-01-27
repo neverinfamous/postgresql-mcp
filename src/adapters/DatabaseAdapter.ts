@@ -179,83 +179,76 @@ export abstract class DatabaseAdapter {
 
   /**
    * Register a single tool with the MCP server
+   * Uses modern registerTool() API for MCP 2025-11-25 compliance
    */
   protected registerTool(server: McpServer, tool: ToolDefinition): void {
-    // MCP SDK server.tool() registration
-    // Extract the Zod shape from inputSchema for MCP SDK compatibility
-    // Handle complex chains: z.preprocess().transform().refine() etc.
-    const zodShape = this.extractZodShape(tool.inputSchema);
-
-    // Build metadata object with annotations and icons
-    const metadata: Record<string, unknown> = {
-      ...(tool.annotations ?? {}),
+    // Build tool options for registerTool()
+    const toolOptions: Record<string, unknown> = {
+      description: tool.description,
     };
-    if (tool.icons && tool.icons.length > 0) {
-      metadata["icons"] = tool.icons;
+
+    // Pass full inputSchema (not just .shape) for proper validation
+    if (tool.inputSchema !== undefined) {
+      toolOptions["inputSchema"] = tool.inputSchema;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    server.tool(
+    // MCP 2025-11-25: Pass annotations for behavioral hints
+    if (tool.annotations) {
+      toolOptions["annotations"] = tool.annotations;
+    }
+
+    // Pass icons if defined (SDK 1.25+)
+    if (tool.icons && tool.icons.length > 0) {
+      toolOptions["icons"] = tool.icons;
+    }
+
+    server.registerTool(
       tool.name,
-      tool.description,
-      // eslint-disable-next-line @typescript-eslint/no-deprecated
-      zodShape as Parameters<typeof server.tool>[2],
-      // Pass annotations and icons (SDK 1.25+)
-      metadata,
-      async (params: unknown) => {
-        const context = this.createContext();
-        const result = await tool.handler(params, context);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                typeof result === "string"
-                  ? result
-                  : JSON.stringify(result, null, 2),
-            },
-          ],
-        };
+      toolOptions as {
+        description?: string;
+        inputSchema?: z.ZodType;
+      },
+      async (args: unknown, extra: unknown) => {
+        try {
+          // Extract progressToken from extra._meta (SDK passes RequestHandlerExtra)
+          const extraMeta = extra as {
+            _meta?: { progressToken?: string | number };
+          };
+          const progressToken = extraMeta?._meta?.progressToken;
+
+          // Create context with progress support
+          const context = this.createContext(
+            undefined,
+            server.server,
+            progressToken,
+          );
+          const result = await tool.handler(args, context);
+
+          // Standard text content response
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  typeof result === "string"
+                    ? result
+                    : JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+              },
+            ],
+            isError: true,
+          };
+        }
       },
     );
-  }
-
-  /**
-   * Extract the Zod shape from a schema, handling complex pipelines
-   * Traverses through: preprocess, transform, effects, refine, pipe
-   */
-  private extractZodShape(schema: unknown): Record<string, unknown> {
-    if (schema === null || schema === undefined) {
-      return {};
-    }
-
-    const s = schema as {
-      shape?: Record<string, unknown>;
-      _def?: {
-        schema?: unknown;
-        innerType?: unknown;
-        typeName?: string;
-      };
-    };
-
-    // Direct ZodObject - has shape directly
-    if (s.shape !== undefined && typeof s.shape === "object") {
-      return s.shape;
-    }
-
-    // Check _def for wrapped types
-    if (s._def !== undefined) {
-      // ZodEffects (preprocess, transform, refine) - dive into innerType
-      if (s._def.innerType !== undefined) {
-        return this.extractZodShape(s._def.innerType);
-      }
-      // ZodPipeline or other wrapped - dive into schema
-      if (s._def.schema !== undefined) {
-        return this.extractZodShape(s._def.schema);
-      }
-    }
-
-    return {};
   }
 
   /**
@@ -423,12 +416,26 @@ export abstract class DatabaseAdapter {
 
   /**
    * Create a request context for tool execution
+   * @param requestId Optional request ID for tracing
+   * @param server Optional MCP Server instance for progress notifications
+   * @param progressToken Optional progress token from client request _meta
    */
-  createContext(requestId?: string): RequestContext {
-    return {
+  createContext(
+    requestId?: string,
+    server?: unknown,
+    progressToken?: string | number,
+  ): RequestContext {
+    const context: RequestContext = {
       timestamp: new Date(),
       requestId: requestId ?? crypto.randomUUID(),
     };
+    if (server !== undefined) {
+      context.server = server;
+    }
+    if (progressToken !== undefined) {
+      context.progressToken = progressToken;
+    }
+    return context;
   }
 
   /**

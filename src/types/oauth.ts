@@ -88,4 +88,10 @@ export interface RequestContext {
 
   /** Request ID for tracing */
   requestId: string;
+
+  /** MCP Server instance for sending notifications */
+  server?: unknown;
+
+  /** Progress token from client request _meta */
+  progressToken?: string | number;
 }

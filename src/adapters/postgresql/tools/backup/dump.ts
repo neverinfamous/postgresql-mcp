@@ -13,6 +13,10 @@ import { z } from "zod";
 import { readOnly, write } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
 import {
+  buildProgressContext,
+  sendProgress,
+} from "../../../../utils/progress-utils.js";
+import {
   CopyExportSchema,
   CopyExportSchemaBase,
   DumpSchemaSchema,
@@ -397,7 +401,10 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: CopyExportSchemaBase, // Use base schema for MCP visibility
     annotations: readOnly("Copy Export"),
     icons: getToolIcons("backup", readOnly("Copy Export")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 3, "Preparing COPY export...");
+
       const {
         query,
         format,
@@ -415,6 +422,7 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
       const copyCommand = `COPY (${query}) TO STDOUT WITH (${options.join(", ")})`;
       void copyCommand;
 
+      await sendProgress(progress, 2, 3, "Executing query...");
       const result = await adapter.executeQuery(query);
 
       // Handle CSV format (default)
@@ -476,6 +484,8 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
         // This indicates there are likely more rows available
         const isTruncated =
           effectiveLimit !== undefined && result.rows.length === effectiveLimit;
+
+        await sendProgress(progress, 3, 3, "Export complete");
 
         return {
           data: lines.join("\n"),
@@ -544,6 +554,8 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
         // This indicates there are likely more rows available
         const isTruncated =
           effectiveLimit !== undefined && result.rows.length === effectiveLimit;
+
+        await sendProgress(progress, 3, 3, "Export complete");
 
         return {
           data: lines.join("\n"),

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Modern Tool Registration** — Migrated from deprecated `server.tool()` to `server.registerTool()` API for MCP 2025-11-25 compliance
+  - Updated `DatabaseAdapter.registerTool()` to use modern registration API
+  - Enhanced `createContext()` with optional `server` and `progressToken` parameters
+  - Removed unused `extractZodShape()` helper method
+
+### Added
+
+- **Progress Notification Infrastructure** — Added `src/utils/progress-utils.ts` with MCP 2025-11-25 compliant progress utilities
+  - `buildProgressContext()` — Extracts server/token from RequestContext
+  - `sendProgress()` — Sends progress notifications to client
+  - `createBatchProgressReporter()` — Throttled progress for batch operations
+- **Admin Tool Progress Notifications** — Long-running operations now emit progress:
+  - `pg_vacuum` — VACUUM operations
+  - `pg_vacuum_analyze` — VACUUM ANALYZE operations
+  - `pg_analyze` — ANALYZE operations
+  - `pg_reindex` — REINDEX operations
+  - `pg_cluster` — CLUSTER operations
+- **Backup Tool Progress Notifications** — `pg_copy_export` now emits progress for large exports
+
 ### Security
 
 - **Enhanced Log Sanitization** — Upgraded logger to match db-mcp security standards
@@ -14,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added taint-breaking `writeToStderr()` method to satisfy CodeQL static analysis
   - Expanded sensitive key list with 8 additional OAuth 2.1 fields: `authorizationserverurl`, `authorization_server_url`, `bearerformat`, `bearer_format`, `oauthconfig`, `oauth_config`, `oauth`, `scopes_supported`, `scopessupported`
   - Stricter control character removal (now removes all 0x00-0x1F + 0x7F including tabs and newlines)
+
+### Dependencies
+
+- Bump `hono` from 4.11.5 to 4.11.7
 
 ## [1.0.0] - 2026-01-24
 

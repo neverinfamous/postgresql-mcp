@@ -11,6 +11,10 @@ import { z } from "zod";
 import { admin, destructive } from "../../../utils/annotations.js";
 import { getToolIcons } from "../../../utils/icons.js";
 import {
+  buildProgressContext,
+  sendProgress,
+} from "../../../utils/progress-utils.js";
+import {
   VacuumSchema,
   VacuumSchemaBase,
   AnalyzeSchema,
@@ -50,7 +54,10 @@ function createVacuumTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: VacuumSchemaBase,
     annotations: admin("Vacuum"),
     icons: getToolIcons("admin", admin("Vacuum")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 2, "Starting VACUUM...");
+
       const { table, schema, full, verbose, analyze } =
         VacuumSchema.parse(params);
       const fullClause = full === true ? "FULL " : "";
@@ -65,6 +72,8 @@ function createVacuumTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `VACUUM ${fullClause}${verboseClause}${analyzeClause}${target}`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 2, 2, "VACUUM complete");
 
       // Build accurate message reflecting all options used
       const parts: string[] = ["VACUUM"];
@@ -94,7 +103,10 @@ function createVacuumAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: VacuumSchemaBase,
     annotations: admin("Vacuum Analyze"),
     icons: getToolIcons("admin", admin("Vacuum Analyze")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 2, "Starting VACUUM ANALYZE...");
+
       const { table, schema, verbose, full } = VacuumSchema.parse(params);
       const fullClause = full === true ? "FULL " : "";
       const verboseClause = verbose === true ? "VERBOSE " : "";
@@ -107,6 +119,8 @@ function createVacuumAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `VACUUM ${fullClause}${verboseClause}ANALYZE ${target}`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 2, 2, "VACUUM ANALYZE complete");
 
       // Build accurate message
       const message =
@@ -135,7 +149,10 @@ function createAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: AnalyzeSchemaBase,
     annotations: admin("Analyze"),
     icons: getToolIcons("admin", admin("Analyze")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 2, "Starting ANALYZE...");
+
       const { table, schema, columns } = AnalyzeSchema.parse(params);
 
       // Validate: columns requires table
@@ -156,6 +173,9 @@ function createAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `ANALYZE ${target}${columnClause}`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 2, 2, "ANALYZE complete");
+
       return {
         success: true,
         message: "ANALYZE completed",
@@ -176,7 +196,10 @@ function createReindexTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: ReindexSchemaBase,
     annotations: admin("Reindex"),
     icons: getToolIcons("admin", admin("Reindex")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 3, "Starting REINDEX...");
+
       const parsed = ReindexSchema.parse(params) as {
         target: string;
         name?: string;
@@ -195,6 +218,8 @@ function createReindexTool(adapter: PostgresAdapter): ToolDefinition {
         effectiveName = typeof dbName === "string" ? dbName : "";
       }
 
+      await sendProgress(progress, 2, 3, `Reindexing ${parsed.target}...`);
+
       // name should always be defined at this point (refine ensures it for non-database targets)
       if (effectiveName === undefined) {
         throw new Error("name is required");
@@ -202,6 +227,9 @@ function createReindexTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `REINDEX ${parsed.target.toUpperCase()} ${concurrentlyClause}"${effectiveName}"`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 3, 3, "REINDEX complete");
+
       return {
         success: true,
         message: `Reindexed ${parsed.target}: ${effectiveName}`,
@@ -458,7 +486,10 @@ function createClusterTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: ClusterSchemaBase,
     annotations: admin("Cluster Table"),
     icons: getToolIcons("admin", admin("Cluster Table")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 2, "Starting CLUSTER...");
+
       const parsed = ClusterSchema.parse(params) as {
         table?: string;
         index?: string;
@@ -468,6 +499,7 @@ function createClusterTool(adapter: PostgresAdapter): ToolDefinition {
       // Database-wide CLUSTER (all previously clustered tables)
       if (parsed.table === undefined) {
         await adapter.executeQuery("CLUSTER");
+        await sendProgress(progress, 2, 2, "CLUSTER complete");
         return {
           success: true,
           message: "Re-clustered all previously-clustered tables",
@@ -485,6 +517,9 @@ function createClusterTool(adapter: PostgresAdapter): ToolDefinition {
           : `"${parsed.table}"`;
       const sql = `CLUSTER ${tableName} USING "${parsed.index}"`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 2, 2, "CLUSTER complete");
+
       return {
         success: true,
         message: `Clustered ${parsed.table} using index ${parsed.index}`,

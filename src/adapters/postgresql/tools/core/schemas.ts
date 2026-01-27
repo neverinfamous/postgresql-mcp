@@ -432,16 +432,36 @@ const CacheHitRatioSchema = z.object({
 
 // Output schema for pg_analyze_db_health
 export const HealthAnalysisOutputSchema = z.object({
-  cacheHitRatio: CacheHitRatioSchema.optional().describe("Buffer cache hit ratio details"),
+  cacheHitRatio: CacheHitRatioSchema.optional().describe(
+    "Buffer cache hit ratio details",
+  ),
   databaseSize: z.string().optional().describe("Database size"),
-  tableStats: z.record(z.string(), z.unknown()).optional().describe("Table statistics"),
-  unusedIndexes: z.union([z.number(), z.string()]).optional().describe("Count of unused indexes"),
-  tablesNeedingVacuum: z.union([z.number(), z.string()]).optional().describe("Count of tables needing vacuum"),
-  connections: z.record(z.string(), z.unknown()).optional().describe("Connection statistics"),
+  tableStats: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Table statistics"),
+  unusedIndexes: z
+    .union([z.number(), z.string()])
+    .optional()
+    .describe("Count of unused indexes"),
+  tablesNeedingVacuum: z
+    .union([z.number(), z.string()])
+    .optional()
+    .describe("Count of tables needing vacuum"),
+  connections: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Connection statistics"),
   isReplica: z.boolean().optional().describe("Whether database is a replica"),
-  bloat: z.record(z.string(), z.unknown()).optional().describe("Bloat estimation"),
+  bloat: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Bloat estimation"),
   overallScore: z.number().optional().describe("Overall health score (0-100)"),
-  overallStatus: z.string().optional().describe("Overall status (healthy/needs_attention/critical)"),
+  overallStatus: z
+    .string()
+    .optional()
+    .describe("Overall status (healthy/needs_attention/critical)"),
 });
 
 // Output schema for pg_analyze_workload_indexes

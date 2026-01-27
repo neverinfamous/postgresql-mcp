@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Health tools: `pg_analyze_db_health`, `pg_analyze_workload_indexes`, `pg_analyze_query_indexes`
   - Convenience tools: `pg_upsert`, `pg_batch_insert`, `pg_count`, `pg_exists`, `pg_truncate`
   - Added 15 reusable output schemas in `core/schemas.ts`
+- **Structured Content (outputSchema) for Transaction Tools** — All 8 transaction/codemode tools now include `outputSchema`:
+  - Transaction tools: `pg_transaction_begin`, `pg_transaction_commit`, `pg_transaction_rollback`, `pg_transaction_savepoint`, `pg_transaction_release`, `pg_transaction_rollback_to`, `pg_transaction_execute`
+  - Codemode tool: `pg_execute_code`
+  - Added 4 reusable transaction output schemas in `core.ts` and 1 codemode output schema
 
 ### Security
 

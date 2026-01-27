@@ -29,6 +29,11 @@ export {
   ExecuteInTransactionSchema,
   TransactionExecuteSchema,
   TransactionExecuteSchemaBase,
+  // Transaction output schemas
+  TransactionBeginOutputSchema,
+  TransactionResultOutputSchema,
+  SavepointResultOutputSchema,
+  TransactionExecuteOutputSchema,
 } from "./core.js";
 
 // JSONB operation schemas

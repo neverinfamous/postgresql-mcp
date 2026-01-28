@@ -157,6 +157,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg.listExtensions()` now works in Code Mode (was previously only accessible via `pg.core.listExtensions()`)
   - Updated `ServerInstructions.ts` documentation to include the alias
 
+### Documentation
+
+- **pg_describe_table rowCount -1 clarification** — Documented that `rowCount: -1` in `pg_describe_table` response indicates PostgreSQL has no statistics for the table (run `ANALYZE` to populate)
+- **Code Mode memoryUsedMb metrics clarification** — Documented that `memoryUsedMb` measures heap delta (end - start) and negative values indicate memory was freed during execution (e.g., GC ran)
+
 ### Dependencies
 
 - Bump `hono` from 4.11.5 to 4.11.7

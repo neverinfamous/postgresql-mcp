@@ -187,6 +187,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_transaction_rollback_to behavior clarification** — Enhanced documentation to clarify that `rollbackTo` restores the database state to when the savepoint was created, undoing ALL work (data changes AND savepoints) created after the target savepoint—not just savepoints. This is standard PostgreSQL behavior where rolling back to a savepoint reverts both data modifications and nested savepoint definitions
 - **pg_jsonb_strip_nulls WHERE requirement** — Updated `ServerInstructions.ts` to clarify that `pg_jsonb_strip_nulls` requires a `where`/`filter` clause—write operations must be targeted for safety. Added `preview: true` suggestion for pre-modification inspection
 - **pg_jsonb_insert path format clarification** — Updated `ServerInstructions.ts` to recommend using array format `[-1]` instead of string format `"[-1]"` for negative array indices, as the string format can cause PostgreSQL parsing errors in some contexts
+- **soundex/metaphone Code Mode clarification** — Updated `ServerInstructions.ts` to clarify that `soundex` and `metaphone` are Code Mode convenience wrappers (`pg.text.soundex()`, `pg.text.metaphone()`) that call `pg_fuzzy_match` internally, not direct MCP tools. For direct MCP access, use `pg_fuzzy_match` with `method: 'soundex'|'metaphone'`
 
 ### Dependencies
 

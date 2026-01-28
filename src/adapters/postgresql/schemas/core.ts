@@ -475,12 +475,32 @@ export const GetIndexesSchema = z
 
 /**
  * Preprocess create index params:
+ * - Alias: tableName → table
+ * - Parse schema.table format (e.g., 'public.users' → schema: 'public', table: 'users')
  * - Parse JSON-encoded columns array
  * - Handle single column string → array
  */
 function preprocessCreateIndexParams(input: unknown): unknown {
   if (typeof input !== "object" || input === null) return input;
   const result = { ...(input as Record<string, unknown>) };
+
+  // Alias: tableName → table
+  if (result["table"] === undefined && result["tableName"] !== undefined) {
+    result["table"] = result["tableName"];
+  }
+
+  // Parse schema.table format
+  if (
+    typeof result["table"] === "string" &&
+    result["table"].includes(".") &&
+    result["schema"] === undefined
+  ) {
+    const parts = result["table"].split(".");
+    if (parts.length === 2) {
+      result["schema"] = parts[0];
+      result["table"] = parts[1];
+    }
+  }
 
   // Parse JSON-encoded columns array
   if (typeof result["columns"] === "string") {

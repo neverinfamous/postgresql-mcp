@@ -149,6 +149,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **pg_create_index `schema.table` format parsing** — Fixed `pg_create_index` not correctly parsing `schema.table` format in the `table` parameter. The tool now correctly auto-parses table names like `"public.users"` into separate schema and table components, matching the behavior of other tools (`pg_count`, `pg_describe_table`, `pg_get_indexes`, `pg_truncate`, `pg_drop_table`). Previously, using `table: "public.users"` caused `relation "public.users" does not exist` errors and required the workaround of using separate `schema` and `table` parameters
 - **pg_analyze_query_indexes output schema error** — Fixed MCP output validation error for direct tool calls
   - Handler now includes required `sql` field in all response paths (success, error, and no-plan cases)
   - Updated `QueryIndexAnalysisOutputSchema` to match actual response structure (issues, recommendations as string arrays, timing fields)

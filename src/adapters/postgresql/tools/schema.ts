@@ -24,6 +24,19 @@ import {
   DropViewSchema,
   ListFunctionsSchemaBase,
   ListFunctionsSchema,
+  // Output schemas
+  ListSchemasOutputSchema,
+  CreateSchemaOutputSchema,
+  DropSchemaOutputSchema,
+  ListSequencesOutputSchema,
+  CreateSequenceOutputSchema,
+  DropSequenceOutputSchema,
+  ListViewsOutputSchema,
+  CreateViewOutputSchema,
+  DropViewOutputSchema,
+  ListFunctionsOutputSchema,
+  ListTriggersOutputSchema,
+  ListConstraintsOutputSchema,
 } from "../schemas/index.js";
 
 /**
@@ -52,6 +65,7 @@ function createListSchemasTool(adapter: PostgresAdapter): ToolDefinition {
     description: "List all schemas in the database.",
     group: "schema",
     inputSchema: z.object({}),
+    outputSchema: ListSchemasOutputSchema,
     annotations: readOnly("List Schemas"),
     icons: getToolIcons("schema", readOnly("List Schemas")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -67,6 +81,7 @@ function createCreateSchemaTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Create a new schema.",
     group: "schema",
     inputSchema: CreateSchemaSchema,
+    outputSchema: CreateSchemaOutputSchema,
     annotations: write("Create Schema"),
     icons: getToolIcons("schema", write("Create Schema")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -106,6 +121,7 @@ function createDropSchemaTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Drop a schema (optionally with all objects).",
     group: "schema",
     inputSchema: DropSchemaSchema,
+    outputSchema: DropSchemaOutputSchema,
     annotations: destructive("Drop Schema"),
     icons: getToolIcons("schema", destructive("Drop Schema")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -145,6 +161,7 @@ function createListSequencesTool(adapter: PostgresAdapter): ToolDefinition {
         schema: z.string().optional(),
       })
       .default({}),
+    outputSchema: ListSequencesOutputSchema,
     annotations: readOnly("List Sequences"),
     icons: getToolIcons("schema", readOnly("List Sequences")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -181,6 +198,7 @@ function createCreateSequenceTool(adapter: PostgresAdapter): ToolDefinition {
       "Create a new sequence with optional START, INCREMENT, MIN/MAX, CACHE, CYCLE, and OWNED BY.",
     group: "schema",
     inputSchema: CreateSequenceSchemaBase,
+    outputSchema: CreateSequenceOutputSchema,
     annotations: write("Create Sequence"),
     icons: getToolIcons("schema", write("Create Sequence")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -247,6 +265,7 @@ function createDropSequenceTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Drop a sequence. Supports IF EXISTS and CASCADE options.",
     group: "schema",
     inputSchema: DropSequenceSchemaBase,
+    outputSchema: DropSequenceOutputSchema,
     annotations: destructive("Drop Sequence"),
     icons: getToolIcons("schema", destructive("Drop Sequence")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -292,6 +311,7 @@ function createListViewsTool(adapter: PostgresAdapter): ToolDefinition {
           "Maximum number of views to return (default: 50). Use 0 for all views.",
         ),
     }),
+    outputSchema: ListViewsOutputSchema,
     annotations: readOnly("List Views"),
     icons: getToolIcons("schema", readOnly("List Views")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -380,6 +400,7 @@ function createCreateViewTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Create a view or materialized view.",
     group: "schema",
     inputSchema: CreateViewSchemaBase,
+    outputSchema: CreateViewOutputSchema,
     annotations: write("Create View"),
     icons: getToolIcons("schema", write("Create View")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -434,6 +455,7 @@ function createDropViewTool(adapter: PostgresAdapter): ToolDefinition {
       "Drop a view or materialized view. Supports IF EXISTS and CASCADE options.",
     group: "schema",
     inputSchema: DropViewSchemaBase,
+    outputSchema: DropViewOutputSchema,
     annotations: destructive("Drop View"),
     icons: getToolIcons("schema", destructive("Drop View")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -473,6 +495,7 @@ function createListFunctionsTool(adapter: PostgresAdapter): ToolDefinition {
     group: "schema",
     // Use base schema for MCP visibility - ensures parameters are visible in Direct Tool Calls
     inputSchema: ListFunctionsSchemaBase,
+    outputSchema: ListFunctionsOutputSchema,
     annotations: readOnly("List Functions"),
     icons: getToolIcons("schema", readOnly("List Functions")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -541,6 +564,7 @@ function createListTriggersTool(adapter: PostgresAdapter): ToolDefinition {
       schema: z.string().optional(),
       table: z.string().optional(),
     }),
+    outputSchema: ListTriggersOutputSchema,
     annotations: readOnly("List Triggers"),
     icons: getToolIcons("schema", readOnly("List Triggers")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -586,6 +610,7 @@ function createListConstraintsTool(adapter: PostgresAdapter): ToolDefinition {
         .enum(["primary_key", "foreign_key", "unique", "check"])
         .optional(),
     }),
+    outputSchema: ListConstraintsOutputSchema,
     annotations: readOnly("List Constraints"),
     icons: getToolIcons("schema", readOnly("List Constraints")),
     handler: async (params: unknown, _context: RequestContext) => {

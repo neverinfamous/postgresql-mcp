@@ -193,6 +193,19 @@ export {
   // List functions schemas - Split Schema pattern for MCP visibility
   ListFunctionsSchemaBase,
   ListFunctionsSchema,
+  // Output schemas
+  ListSchemasOutputSchema,
+  CreateSchemaOutputSchema,
+  DropSchemaOutputSchema,
+  ListSequencesOutputSchema,
+  CreateSequenceOutputSchema,
+  DropSequenceOutputSchema,
+  ListViewsOutputSchema,
+  CreateViewOutputSchema,
+  DropViewOutputSchema,
+  ListFunctionsOutputSchema,
+  ListTriggersOutputSchema,
+  ListConstraintsOutputSchema,
 } from "./schema-mgmt.js";
 
 // pgvector schemas

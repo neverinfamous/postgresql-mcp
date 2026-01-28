@@ -64,6 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dump tools: `pg_dump_table`, `pg_dump_schema`, `pg_copy_export`, `pg_copy_import`
   - Planning tools: `pg_create_backup_plan`, `pg_restore_command`, `pg_backup_physical`, `pg_restore_validate`, `pg_backup_schedule_optimize`
   - Added 9 reusable output schemas in `schemas/backup.ts`
+- **Structured Content (outputSchema) for Schema Tools** — All 12 schema tools now include `outputSchema`:
+  - Schema management: `pg_list_schemas`, `pg_create_schema`, `pg_drop_schema`
+  - Sequence tools: `pg_list_sequences`, `pg_create_sequence`, `pg_drop_sequence`
+  - View tools: `pg_list_views`, `pg_create_view`, `pg_drop_view`
+  - Metadata tools: `pg_list_functions`, `pg_list_triggers`, `pg_list_constraints`
+  - Added 12 reusable output schemas in `schemas/schema-mgmt.ts`
 
 ### Security
 

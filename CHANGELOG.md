@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Basic tools: `pg_jsonb_extract`, `pg_jsonb_set`, `pg_jsonb_insert`, `pg_jsonb_delete`, `pg_jsonb_contains`, `pg_jsonb_path_query`, `pg_jsonb_agg`, `pg_jsonb_object`, `pg_jsonb_array`, `pg_jsonb_keys`, `pg_jsonb_strip_nulls`, `pg_jsonb_typeof`
   - Advanced tools: `pg_jsonb_validate_path`, `pg_jsonb_merge`, `pg_jsonb_normalize`, `pg_jsonb_diff`, `pg_jsonb_index_suggest`, `pg_jsonb_security_scan`, `pg_jsonb_stats`
   - Added 19 reusable output schemas in `schemas/jsonb.ts`
+- **Structured Content (outputSchema) for Text Tools** — All 13 text tools now include `outputSchema`:
+  - Search tools: `pg_text_search`, `pg_text_rank`, `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, `pg_like_search`, `pg_text_headline`
+  - Utility tools: `pg_create_fts_index`, `pg_text_normalize`, `pg_text_sentiment`, `pg_text_to_vector`, `pg_text_to_query`, `pg_text_search_config`
+  - Added 7 reusable output schemas in `schemas/text-search.ts` (shared TextRowsOutputSchema for search tools)
 
 ### Security
 

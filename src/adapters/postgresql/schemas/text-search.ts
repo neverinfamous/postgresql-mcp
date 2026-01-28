@@ -155,3 +155,75 @@ export const RegexpMatchSchema = z.preprocess(
   preprocessTextParams,
   RegexpMatchSchemaBase,
 );
+
+// =============================================================================
+// OUTPUT SCHEMAS (MCP 2025-11-25 structuredContent)
+// =============================================================================
+
+// Common output schema for text tools that return rows with count
+export const TextRowsOutputSchema = z.object({
+  rows: z.array(z.record(z.string(), z.unknown())).describe("Matching rows"),
+  count: z.number().describe("Number of rows returned"),
+});
+
+// Output schema for pg_create_fts_index
+export const FtsIndexOutputSchema = z.object({
+  success: z.boolean().describe("Whether index creation succeeded"),
+  index: z.string().describe("Index name"),
+  config: z.string().describe("Text search configuration used"),
+  skipped: z
+    .boolean()
+    .describe("Whether index already existed (IF NOT EXISTS)"),
+});
+
+// Output schema for pg_text_normalize
+export const TextNormalizeOutputSchema = z.object({
+  normalized: z.string().describe("Text with accent marks removed"),
+});
+
+// Output schema for pg_text_sentiment
+export const TextSentimentOutputSchema = z.object({
+  sentiment: z
+    .enum(["very_positive", "positive", "neutral", "negative", "very_negative"])
+    .describe("Overall sentiment classification"),
+  score: z.number().describe("Net sentiment score (positive - negative)"),
+  positiveCount: z.number().describe("Number of positive words found"),
+  negativeCount: z.number().describe("Number of negative words found"),
+  confidence: z.enum(["low", "medium", "high"]).describe("Confidence level"),
+  matchedPositive: z
+    .array(z.string())
+    .optional()
+    .describe("Matched positive words (if returnWords=true)"),
+  matchedNegative: z
+    .array(z.string())
+    .optional()
+    .describe("Matched negative words (if returnWords=true)"),
+});
+
+// Output schema for pg_text_to_vector
+export const TextToVectorOutputSchema = z.object({
+  vector: z.string().describe("tsvector representation"),
+});
+
+// Output schema for pg_text_to_query
+export const TextToQueryOutputSchema = z.object({
+  query: z.string().describe("tsquery representation"),
+  mode: z.string().describe("Query parsing mode used"),
+});
+
+// Output schema for pg_text_search_config
+export const TextSearchConfigOutputSchema = z.object({
+  configs: z
+    .array(
+      z.object({
+        name: z.string().describe("Configuration name"),
+        schema: z.string().describe("Schema containing the configuration"),
+        description: z
+          .string()
+          .nullable()
+          .describe("Configuration description"),
+      }),
+    )
+    .describe("Available text search configurations"),
+  count: z.number().describe("Number of configurations"),
+});

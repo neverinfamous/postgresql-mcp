@@ -22,6 +22,14 @@ import {
   RegexpMatchSchema,
   RegexpMatchSchemaBase,
   preprocessTextParams,
+  // Output schemas
+  TextRowsOutputSchema,
+  FtsIndexOutputSchema,
+  TextNormalizeOutputSchema,
+  TextSentimentOutputSchema,
+  TextToVectorOutputSchema,
+  TextToQueryOutputSchema,
+  TextSearchConfigOutputSchema,
 } from "../schemas/index.js";
 
 // Note: preprocessTextParams is imported from schemas/index.js
@@ -57,6 +65,7 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Full-text search using tsvector and tsquery.",
     group: "text",
     inputSchema: TextSearchSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Full-Text Search"),
     icons: getToolIcons("text", readOnly("Full-Text Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -142,6 +151,7 @@ function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
       "Get relevance ranking for full-text search results. Returns matching rows only with rank score.",
     group: "text",
     inputSchema: TextRankSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Text Rank"),
     icons: getToolIcons("text", readOnly("Text Rank")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -197,6 +207,7 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
       "Find similar strings using pg_trgm trigram matching. Returns similarity score (0-1). Default threshold 0.3; use lower (e.g., 0.1) for partial matches.",
     group: "text",
     inputSchema: TrigramSimilaritySchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Trigram Similarity"),
     icons: getToolIcons("text", readOnly("Trigram Similarity")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -273,6 +284,7 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
       "Fuzzy string matching using fuzzystrmatch extension. Levenshtein (default): returns distance; use maxDistance=5+ for longer strings. Soundex/metaphone: returns phonetic code for exact matches only.",
     group: "text",
     inputSchema: FuzzyMatchSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Fuzzy Match"),
     icons: getToolIcons("text", readOnly("Fuzzy Match")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -321,6 +333,7 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Match text using POSIX regular expressions.",
     group: "text",
     inputSchema: RegexpMatchSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Regexp Match"),
     icons: getToolIcons("text", readOnly("Regexp Match")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -386,6 +399,7 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
       "Search text using LIKE patterns. Case-insensitive (ILIKE) by default.",
     group: "text",
     inputSchema: LikeSearchSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("LIKE Search"),
     icons: getToolIcons("text", readOnly("LIKE Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -465,6 +479,7 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
       "Generate highlighted snippets from full-text search matches. Use select param for stable row identification (e.g., primary key).",
     group: "text",
     inputSchema: HeadlineSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Text Headline"),
     icons: getToolIcons("text", readOnly("Text Headline")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -542,6 +557,7 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Create a GIN index for full-text search on a column.",
     group: "text",
     inputSchema: FtsIndexSchemaBase, // Base schema for MCP visibility
+    outputSchema: FtsIndexOutputSchema,
     annotations: write("Create FTS Index"),
     icons: getToolIcons("text", write("Create FTS Index")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -598,6 +614,7 @@ function createTextNormalizeTool(adapter: PostgresAdapter): ToolDefinition {
       "Remove accent marks (diacritics) from text using PostgreSQL unaccent extension. Note: Does NOT lowercase or trim—use LOWER()/TRIM() in a query for those operations.",
     group: "text",
     inputSchema: NormalizeSchema,
+    outputSchema: TextNormalizeOutputSchema,
     annotations: readOnly("Text Normalize"),
     icons: getToolIcons("text", readOnly("Text Normalize")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -633,6 +650,7 @@ function createTextSentimentTool(_adapter: PostgresAdapter): ToolDefinition {
       "Perform basic sentiment analysis on text using keyword matching.",
     group: "text",
     inputSchema: SentimentSchema,
+    outputSchema: TextSentimentOutputSchema,
     annotations: readOnly("Text Sentiment"),
     icons: getToolIcons("text", readOnly("Text Sentiment")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -760,6 +778,7 @@ function createTextToVectorTool(adapter: PostgresAdapter): ToolDefinition {
       "Convert text to tsvector representation for full-text search operations.",
     group: "text",
     inputSchema: ToVectorSchema,
+    outputSchema: TextToVectorOutputSchema,
     annotations: readOnly("Text to Vector"),
     icons: getToolIcons("text", readOnly("Text to Vector")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -799,6 +818,7 @@ function createTextToQueryTool(adapter: PostgresAdapter): ToolDefinition {
       "Convert text to tsquery for full-text search. Modes: plain (default), phrase (proximity matching), websearch (Google-like syntax with AND/OR/-).",
     group: "text",
     inputSchema: ToQuerySchema,
+    outputSchema: TextToQueryOutputSchema,
     annotations: readOnly("Text to Query"),
     icons: getToolIcons("text", readOnly("Text to Query")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -837,6 +857,7 @@ function createTextSearchConfigTool(adapter: PostgresAdapter): ToolDefinition {
       "List available full-text search configurations (e.g., english, german, simple).",
     group: "text",
     inputSchema: z.object({}).default({}),
+    outputSchema: TextSearchConfigOutputSchema,
     annotations: readOnly("Search Configurations"),
     icons: getToolIcons("text", readOnly("Search Configurations")),
     handler: async (_params: unknown, _context: RequestContext) => {

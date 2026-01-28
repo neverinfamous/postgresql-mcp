@@ -82,6 +82,14 @@ export {
   RegexpMatchSchema,
   RegexpMatchSchemaBase,
   preprocessTextParams,
+  // Text output schemas
+  TextRowsOutputSchema,
+  FtsIndexOutputSchema,
+  TextNormalizeOutputSchema,
+  TextSentimentOutputSchema,
+  TextToVectorOutputSchema,
+  TextToQueryOutputSchema,
+  TextSearchConfigOutputSchema,
 } from "./text-search.js";
 
 // Performance and explain schemas

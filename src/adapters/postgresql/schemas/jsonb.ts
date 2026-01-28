@@ -340,7 +340,10 @@ export const JsonbValidatePathOutputSchema = z.object({
 export const JsonbMergeOutputSchema = z.object({
   merged: z.unknown().describe("Merged JSONB document"),
   deep: z.boolean().describe("Whether deep merge was used"),
-  mergeArrays: z.boolean().optional().describe("Whether arrays were concatenated"),
+  mergeArrays: z
+    .boolean()
+    .optional()
+    .describe("Whether arrays were concatenated"),
 });
 
 // Output schema for pg_jsonb_normalize

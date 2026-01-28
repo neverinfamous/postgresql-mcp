@@ -60,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Server info: `pg_server_version`, `pg_show_settings`, `pg_uptime`
   - Analysis tools: `pg_capacity_planning`, `pg_resource_usage_analyze`, `pg_alert_threshold_set`
   - Added 11 reusable output schemas in `schemas/monitoring.ts`
+- **Structured Content (outputSchema) for Backup Tools** — All 9 backup tools now include `outputSchema`:
+  - Dump tools: `pg_dump_table`, `pg_dump_schema`, `pg_copy_export`, `pg_copy_import`
+  - Planning tools: `pg_create_backup_plan`, `pg_restore_command`, `pg_backup_physical`, `pg_restore_validate`, `pg_backup_schedule_optimize`
+  - Added 9 reusable output schemas in `schemas/backup.ts`
 
 ### Security
 

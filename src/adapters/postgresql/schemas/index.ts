@@ -164,6 +164,16 @@ export {
   CopyExportSchema,
   CopyExportSchemaBase,
   DumpSchemaSchema,
+  // Output schemas
+  DumpTableOutputSchema,
+  DumpSchemaOutputSchema,
+  CopyExportOutputSchema,
+  CopyImportOutputSchema,
+  CreateBackupPlanOutputSchema,
+  RestoreCommandOutputSchema,
+  PhysicalBackupOutputSchema,
+  RestoreValidateOutputSchema,
+  BackupScheduleOptimizeOutputSchema,
 } from "./backup.js";
 
 // Schema management schemas

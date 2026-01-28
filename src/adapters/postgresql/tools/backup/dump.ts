@@ -20,6 +20,11 @@ import {
   CopyExportSchema,
   CopyExportSchemaBase,
   DumpSchemaSchema,
+  // Output schemas
+  DumpTableOutputSchema,
+  DumpSchemaOutputSchema,
+  CopyExportOutputSchema,
+  CopyImportOutputSchema,
 } from "../../schemas/index.js";
 
 export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
@@ -44,6 +49,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
           "Maximum rows to include when includeData is true (default: 500, use 0 for all rows)",
         ),
     }),
+    outputSchema: DumpTableOutputSchema,
     annotations: readOnly("Dump Table"),
     icons: getToolIcons("backup", readOnly("Dump Table")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -347,6 +353,7 @@ export function createDumpSchemaTool(
     description: "Get the pg_dump command for a schema or database.",
     group: "backup",
     inputSchema: DumpSchemaSchema,
+    outputSchema: DumpSchemaOutputSchema,
     annotations: readOnly("Dump Schema"),
     icons: getToolIcons("backup", readOnly("Dump Schema")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -399,6 +406,7 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
       "Export query results using COPY TO. Use query/sql for custom query or table for SELECT *.",
     group: "backup",
     inputSchema: CopyExportSchemaBase, // Use base schema for MCP visibility
+    outputSchema: CopyExportOutputSchema,
     annotations: readOnly("Copy Export"),
     icons: getToolIcons("backup", readOnly("Copy Export")),
     handler: async (params: unknown, context: RequestContext) => {
@@ -595,6 +603,7 @@ export function createCopyImportTool(
       delimiter: z.string().optional(),
       columns: z.array(z.string()).optional(),
     }),
+    outputSchema: CopyImportOutputSchema,
     annotations: write("Copy Import"),
     icons: getToolIcons("backup", write("Copy Import")),
     // eslint-disable-next-line @typescript-eslint/require-await

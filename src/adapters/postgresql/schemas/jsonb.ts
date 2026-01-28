@@ -219,11 +219,11 @@ export const JsonbSetSchemaBase = z
     value: z
       .unknown()
       .describe("New value to set at the path (will be converted to JSONB)"),
-    where: z.string().describe("WHERE clause to identify rows to update"),
-    filter: z
+    where: z
       .string()
       .optional()
-      .describe("WHERE clause (alias for where, only for read operations)"),
+      .describe("WHERE clause to identify rows to update"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
     createMissing: z
       .boolean()
       .optional()
@@ -237,6 +237,9 @@ export const JsonbSetSchemaBase = z
   })
   .refine((data) => data.column !== undefined || data.col !== undefined, {
     message: "Either 'column' or 'col' is required",
+  })
+  .refine((data) => data.where !== undefined || data.filter !== undefined, {
+    message: "Either 'where' or 'filter' is required",
   });
 
 // Full schema with preprocess (for handler parsing)
@@ -333,7 +336,7 @@ export const JsonbInsertSchemaBase = z
         "Path to insert at (for arrays). Accepts both string and array formats.",
       ),
     value: z.unknown().describe("Value to insert"),
-    where: z.string().describe("WHERE clause"),
+    where: z.string().optional().describe("WHERE clause"),
     filter: z.string().optional().describe("WHERE clause (alias for where)"),
     insertAfter: z
       .boolean()
@@ -346,6 +349,9 @@ export const JsonbInsertSchemaBase = z
   })
   .refine((data) => data.column !== undefined || data.col !== undefined, {
     message: "Either 'column' or 'col' is required",
+  })
+  .refine((data) => data.where !== undefined || data.filter !== undefined, {
+    message: "Either 'where' or 'filter' is required",
   });
 
 // Full schema with preprocess (for handler parsing)
@@ -371,9 +377,40 @@ export const JsonbDeleteSchemaBase = z
           .describe('Path as array (e.g., ["nested", 0])'),
       ])
       .describe("Key or path to delete. Supports numeric indices for arrays."),
-    where: z.string().describe("WHERE clause"),
+    where: z.string().optional().describe("WHERE clause"),
     filter: z.string().optional().describe("WHERE clause (alias for where)"),
     schema: z.string().optional().describe("Schema name (default: public)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  })
+  .refine((data) => data.where !== undefined || data.filter !== undefined, {
+    message: "Either 'where' or 'filter' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbDeleteSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbDeleteSchemaBase,
+);
+
+// ============== TYPEOF SCHEMA ==============
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbTypeofSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    path: z
+      .union([z.string(), z.array(z.union([z.string(), z.number()]))])
+      .optional()
+      .describe("Path to check type of nested value (string or array format)"),
+    where: z.string().optional().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
   })
   .refine((data) => data.table !== undefined || data.tableName !== undefined, {
     message: "Either 'table' or 'tableName' is required",
@@ -383,9 +420,223 @@ export const JsonbDeleteSchemaBase = z
   });
 
 // Full schema with preprocess (for handler parsing)
-export const JsonbDeleteSchema = z.preprocess(
+export const JsonbTypeofSchema = z.preprocess(
   preprocessJsonbParams,
-  JsonbDeleteSchemaBase,
+  JsonbTypeofSchemaBase,
+);
+
+// ============== KEYS SCHEMA ==============
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbKeysSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    where: z.string().optional().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbKeysSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbKeysSchemaBase,
+);
+
+// ============== STRIP NULLS SCHEMA ==============
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbStripNullsSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    where: z.string().optional().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+    preview: z
+      .boolean()
+      .optional()
+      .describe("Preview what would be stripped without modifying data"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  })
+  .refine((data) => data.where !== undefined || data.filter !== undefined, {
+    message: "Either 'where' or 'filter' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbStripNullsSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbStripNullsSchemaBase,
+);
+
+// ============== AGG SCHEMA ==============
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbAggSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    select: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Columns or expressions to include. Supports AS aliases: ["id", "metadata->\'name\' AS name"]',
+      ),
+    where: z.string().optional().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+    groupBy: z
+      .string()
+      .optional()
+      .describe(
+        "Column or expression to group by. Returns {result: [{group_key, items}], count, grouped: true}",
+      ),
+    orderBy: z
+      .string()
+      .optional()
+      .describe('ORDER BY clause (e.g., "id DESC", "name ASC")'),
+    limit: z
+      .number()
+      .optional()
+      .describe("Maximum number of rows to aggregate"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbAggSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbAggSchemaBase,
+);
+
+// ============== NORMALIZE SCHEMA ==============
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbNormalizeSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column"),
+    col: z.string().optional().describe("JSONB column (alias for column)"),
+    mode: z
+      .enum(["keys", "array", "pairs", "flatten"])
+      .optional()
+      .describe(
+        "keys: text values (all converted to string). pairs: JSONB types preserved. array: for arrays. flatten: recursive.",
+      ),
+    where: z.string().optional().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+    idColumn: z
+      .string()
+      .optional()
+      .describe(
+        'Column to use for row identification (e.g., "id"). If omitted, defaults to "id" if it exists, else uses ctid.',
+      ),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbNormalizeSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbNormalizeSchemaBase,
+);
+
+// ============== STATS SCHEMA ==============
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbStatsSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column"),
+    col: z.string().optional().describe("JSONB column (alias for column)"),
+    sampleSize: z.number().optional().describe("Sample rows to analyze"),
+    where: z.string().optional().describe("WHERE clause to filter rows"),
+    filter: z
+      .string()
+      .optional()
+      .describe("WHERE clause to filter rows (alias for where)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbStatsSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbStatsSchemaBase,
+);
+
+// ============== INDEX SUGGEST SCHEMA ==============
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbIndexSuggestSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column"),
+    col: z.string().optional().describe("JSONB column (alias for column)"),
+    sampleSize: z.number().optional().describe("Sample rows to analyze"),
+    where: z.string().optional().describe("WHERE clause to filter rows"),
+    filter: z
+      .string()
+      .optional()
+      .describe("WHERE clause to filter rows (alias for where)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbIndexSuggestSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbIndexSuggestSchemaBase,
+);
+
+// ============== SECURITY SCAN SCHEMA ==============
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbSecurityScanSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column"),
+    col: z.string().optional().describe("JSONB column (alias for column)"),
+    sampleSize: z.number().optional().describe("Sample rows to scan"),
+    where: z.string().optional().describe("WHERE clause to filter rows"),
+    filter: z
+      .string()
+      .optional()
+      .describe("WHERE clause to filter rows (alias for where)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbSecurityScanSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbSecurityScanSchemaBase,
 );
 
 // ============== OUTPUT SCHEMAS (MCP 2025-11-25 structuredContent) ==============

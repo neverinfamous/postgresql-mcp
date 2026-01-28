@@ -20,6 +20,10 @@ import {
   JsonbPathQuerySchemaBase,
   JsonbInsertSchemaBase,
   JsonbDeleteSchemaBase,
+  JsonbTypeofSchemaBase,
+  JsonbKeysSchemaBase,
+  JsonbStripNullsSchemaBase,
+  JsonbAggSchemaBase,
   // Full schemas (for handler parsing - with preprocess)
   JsonbExtractSchema,
   JsonbSetSchema,
@@ -27,6 +31,10 @@ import {
   JsonbPathQuerySchema,
   JsonbInsertSchema,
   JsonbDeleteSchema,
+  JsonbTypeofSchema,
+  JsonbKeysSchema,
+  JsonbStripNullsSchema,
+  JsonbAggSchema,
   // Path utilities
   normalizePathToArray,
   normalizePathForInsert,
@@ -534,42 +542,17 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Aggregate rows into a JSONB array. With groupBy, returns all groups with their aggregated items.",
     group: "jsonb",
-    inputSchema: z.object({
-      table: z.string(),
-      select: z
-        .array(z.string())
-        .optional()
-        .describe(
-          'Columns or expressions to include. Supports AS aliases: ["id", "metadata->\'name\' AS name"]',
-        ),
-      where: z.string().optional(),
-      groupBy: z
-        .string()
-        .optional()
-        .describe(
-          "Column or expression to group by. Returns {result: [{group_key, items}], count, grouped: true}",
-        ),
-      orderBy: z
-        .string()
-        .optional()
-        .describe('ORDER BY clause (e.g., "id DESC", "name ASC")'),
-      limit: z
-        .number()
-        .optional()
-        .describe("Maximum number of rows to aggregate"),
-    }),
+    inputSchema: JsonbAggSchemaBase,
     outputSchema: JsonbAggOutputSchema,
     annotations: readOnly("JSONB Aggregate"),
     icons: getToolIcons("jsonb", readOnly("JSONB Aggregate")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        select?: string[];
-        where?: string;
-        groupBy?: string;
-        orderBy?: string;
-        limit?: number;
-      };
+      // Parse with preprocess schema to resolve aliases (tableName→table, filter→where)
+      const parsed = JsonbAggSchema.parse(params);
+      const table = parsed.table;
+      if (!table) {
+        throw new Error("table is required");
+      }
 
       // Build select expression with proper alias handling
       let selectExpr: string;
@@ -607,7 +590,7 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         const groupClause = ` GROUP BY ${groupExpr}`;
         // Apply ordering within each group using ORDER BY inside jsonb_agg
         const aggOrderBy = parsed.orderBy ? ` ORDER BY ${parsed.orderBy}` : "";
-        const sql = `SELECT ${groupExpr} as group_key, jsonb_agg(${selectExpr}${aggOrderBy}) as items FROM "${parsed.table}" t${whereClause}${groupClause}${limitClause}`;
+        const sql = `SELECT ${groupExpr} as group_key, jsonb_agg(${selectExpr}${aggOrderBy}) as items FROM "${table}" t${whereClause}${groupClause}${limitClause}`;
         const result = await adapter.executeQuery(sql);
         // Return grouped result with group_key and items per group
         return {
@@ -617,7 +600,7 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         };
       } else {
         // For non-grouped, use subquery to apply limit/order before aggregation
-        const innerSql = `SELECT * FROM "${parsed.table}" t${whereClause}${orderByClause}${limitClause}`;
+        const innerSql = `SELECT * FROM "${table}" t${whereClause}${orderByClause}${limitClause}`;
         const sql = `SELECT jsonb_agg(${selectExpr.replace(/\bt\./g, "sub.")}) as result FROM (${innerSql}) sub`;
         const result = await adapter.executeQuery(sql);
         const arr = result.rows?.[0]?.["result"] ?? [];
@@ -748,22 +731,20 @@ export function createJsonbKeysTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Get all unique keys from a JSONB object column (deduplicated across rows).",
     group: "jsonb",
-    inputSchema: z.object({
-      table: z.string(),
-      column: z.string(),
-      where: z.string().optional(),
-    }),
+    inputSchema: JsonbKeysSchemaBase,
     outputSchema: JsonbKeysOutputSchema,
     annotations: readOnly("JSONB Keys"),
     icons: getToolIcons("jsonb", readOnly("JSONB Keys")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        column: string;
-        where?: string;
-      };
+      // Parse with preprocess schema to resolve aliases (tableName→table, col→column, filter→where)
+      const parsed = JsonbKeysSchema.parse(params);
+      const table = parsed.table;
+      const column = parsed.column;
+      if (!table || !column) {
+        throw new Error("table and column are required");
+      }
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
-      const sql = `SELECT DISTINCT jsonb_object_keys("${parsed.column}") as key FROM "${parsed.table}"${whereClause}`;
+      const sql = `SELECT DISTINCT jsonb_object_keys("${column}") as key FROM "${table}"${whereClause}`;
       try {
         const result = await adapter.executeQuery(sql);
         const keys = result.rows?.map((r) => r["key"]) as string[];
@@ -796,27 +777,21 @@ export function createJsonbStripNullsTool(
     description:
       "Remove null values from a JSONB column. Use preview=true to see changes without modifying data.",
     group: "jsonb",
-    inputSchema: z.object({
-      table: z.string(),
-      column: z.string(),
-      where: z.string(),
-      preview: z
-        .boolean()
-        .optional()
-        .describe("Preview what would be stripped without modifying data"),
-    }),
+    inputSchema: JsonbStripNullsSchemaBase,
     outputSchema: JsonbStripNullsOutputSchema,
     annotations: write("JSONB Strip Nulls"),
     icons: getToolIcons("jsonb", write("JSONB Strip Nulls")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        column: string;
-        where: string;
-        preview?: boolean;
-      };
+      // Parse with preprocess schema to resolve aliases (tableName→table, col→column, filter→where)
+      const parsed = JsonbStripNullsSchema.parse(params);
+      const table = parsed.table;
+      const column = parsed.column;
+      const whereClause = parsed.where;
+      if (!table || !column) {
+        throw new Error("table and column are required");
+      }
       // Validate required 'where' parameter before SQL execution
-      if (!parsed.where || parsed.where.trim() === "") {
+      if (!whereClause || whereClause.trim() === "") {
         throw new Error(
           'pg_jsonb_strip_nulls requires a WHERE clause to identify rows to update. Example: where: "id = 1"',
         );
@@ -824,7 +799,7 @@ export function createJsonbStripNullsTool(
 
       if (parsed.preview === true) {
         // Preview mode - show before/after without modifying
-        const previewSql = `SELECT "${parsed.column}" as before, jsonb_strip_nulls("${parsed.column}") as after FROM "${parsed.table}" WHERE ${parsed.where}`;
+        const previewSql = `SELECT "${column}" as before, jsonb_strip_nulls("${column}") as after FROM "${table}" WHERE ${whereClause}`;
         const result = await adapter.executeQuery(previewSql);
         return {
           preview: true,
@@ -834,7 +809,7 @@ export function createJsonbStripNullsTool(
         };
       }
 
-      const sql = `UPDATE "${parsed.table}" SET "${parsed.column}" = jsonb_strip_nulls("${parsed.column}") WHERE ${parsed.where}`;
+      const sql = `UPDATE "${table}" SET "${column}" = jsonb_strip_nulls("${column}") WHERE ${whereClause}`;
       const result = await adapter.executeQuery(sql);
       return { rowsAffected: result.rowsAffected };
     },
@@ -849,27 +824,18 @@ export function createJsonbTypeofTool(
     description:
       "Get JSONB type at path. Uses dot-notation (a.b.c), not JSONPath ($). Response includes columnNull to distinguish NULL columns.",
     group: "jsonb",
-    inputSchema: z.object({
-      table: z.string(),
-      column: z.string(),
-      path: z
-        .union([z.string(), z.array(z.union([z.string(), z.number()]))])
-        .optional()
-        .describe(
-          "Path to check type of nested value (string or array format)",
-        ),
-      where: z.string().optional(),
-    }),
+    inputSchema: JsonbTypeofSchemaBase,
     outputSchema: JsonbTypeofOutputSchema,
     annotations: readOnly("JSONB Typeof"),
     icons: getToolIcons("jsonb", readOnly("JSONB Typeof")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        column: string;
-        path?: string | (string | number)[];
-        where?: string;
-      };
+      // Parse with preprocess schema to resolve aliases (tableName→table, col→column, filter→where)
+      const parsed = JsonbTypeofSchema.parse(params);
+      const table = parsed.table;
+      const column = parsed.column;
+      if (!table || !column) {
+        throw new Error("table and column are required");
+      }
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
       // Normalize path to array format (accepts both string and array)
       const pathArray =
@@ -878,7 +844,7 @@ export function createJsonbTypeofTool(
           : undefined;
       const pathExpr = pathArray !== undefined ? ` #> $1` : "";
       // Include column IS NULL check to disambiguate NULL column vs null path result
-      const sql = `SELECT jsonb_typeof("${parsed.column}"${pathExpr}) as type, ("${parsed.column}" IS NULL) as column_null FROM "${parsed.table}"${whereClause}`;
+      const sql = `SELECT jsonb_typeof("${column}"${pathExpr}) as type, ("${column}" IS NULL) as column_null FROM "${table}"${whereClause}`;
       const queryParams = pathArray ? [pathArray] : [];
       const result = await adapter.executeQuery(sql, queryParams);
       const types = result.rows?.map((r) => r["type"]) as (string | null)[];

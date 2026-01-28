@@ -75,6 +75,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Create: `pg_create_partitioned_table`, `pg_create_partition`
   - Attach/detach: `pg_attach_partition`, `pg_detach_partition`
   - Added 6 reusable output schemas in `schemas/partitioning.ts`
+- **Structured Content (outputSchema) for Stats Tools** — All 8 stats tools now include `outputSchema`:
+  - Basic: `pg_stats_descriptive`, `pg_stats_percentiles`, `pg_stats_correlation`, `pg_stats_regression`
+  - Advanced: `pg_stats_time_series`, `pg_stats_distribution`, `pg_stats_hypothesis`, `pg_stats_sampling`
+  - Added 8 reusable output schemas in `schemas/stats.ts`
+- **Structured Content (outputSchema) for Vector Tools** — All 14 vector tools now include `outputSchema`:
+  - Extension: `pg_vector_create_extension`
+  - Column: `pg_vector_add_column`
+  - Data: `pg_vector_insert`, `pg_vector_batch_insert`, `pg_vector_validate`
+  - Search: `pg_vector_search`, `pg_hybrid_search`
+  - Index: `pg_vector_create_index`, `pg_vector_index_optimize`
+  - Analysis: `pg_vector_distance`, `pg_vector_normalize`, `pg_vector_aggregate`, `pg_vector_cluster`
+  - Performance: `pg_vector_performance`, `pg_vector_dimension_reduce`, `pg_vector_embed`
+  - Added 14 reusable output schemas in `schemas/vector.ts`
+- **Structured Content (outputSchema) for PostGIS Tools** — All 15 PostGIS tools now include `outputSchema`:
+  - Extension: `pg_postgis_create_extension`
+  - Column: `pg_geometry_column`
+  - Query tools: `pg_point_in_polygon`, `pg_distance`, `pg_buffer`, `pg_intersection`, `pg_bounding_box`
+  - Index: `pg_spatial_index`
+  - Advanced: `pg_geocode`, `pg_geo_transform`, `pg_geo_index_optimize`, `pg_geo_cluster`
+  - Standalone: `pg_geometry_buffer`, `pg_geometry_intersection`, `pg_geometry_transform`
+  - Added 15 reusable output schemas in `schemas/postgis.ts`
+- **Structured Content (outputSchema) for Cron Tools** — All 8 pg_cron tools now include `outputSchema`:
+  - Extension: `pg_cron_create_extension`
+  - Scheduling: `pg_cron_schedule`, `pg_cron_schedule_in_database`
+  - Job management: `pg_cron_unschedule`, `pg_cron_alter_job`, `pg_cron_list_jobs`
+  - Monitoring: `pg_cron_job_run_details`, `pg_cron_cleanup_history`
+  - Added 8 reusable output schemas in `schemas/cron.ts`
+- **Structured Content (outputSchema) for Partman Tools** — All 10 pg_partman tools now include `outputSchema`:
+  - Extension: `pg_partman_create_extension`
+  - Setup: `pg_partman_create_parent`, `pg_partman_show_config`
+  - Maintenance: `pg_partman_run_maintenance`, `pg_partman_show_partitions`
+  - Operations: `pg_partman_check_default`, `pg_partman_partition_data`, `pg_partman_set_retention`
+  - Advanced: `pg_partman_undo_partition`, `pg_partman_analyze_partition_health`
+  - Added 10 reusable output schemas in `schemas/partman.ts`
+- **Structured Content (outputSchema) for Kcache Tools** — All 7 pg_stat_kcache tools now include `outputSchema`:
+  - Extension: `pg_kcache_create_extension`
+  - Query analysis: `pg_kcache_query_stats`, `pg_kcache_top_cpu`, `pg_kcache_top_io`
+  - Database: `pg_kcache_database_stats`, `pg_kcache_resource_analysis`
+  - Management: `pg_kcache_reset`
+  - Added 7 reusable output schemas in `schemas/extensions.ts`
+- **Structured Content (outputSchema) for Citext Tools** — All 6 citext tools now include `outputSchema`:
+  - Extension: `pg_citext_create_extension`
+  - Column: `pg_citext_convert_column`, `pg_citext_list_columns`
+  - Analysis: `pg_citext_analyze_candidates`, `pg_citext_compare`, `pg_citext_schema_advisor`
+  - Added 6 reusable output schemas in `schemas/extensions.ts`
+- **Structured Content (outputSchema) for Ltree Tools** — All 8 ltree tools now include `outputSchema`:
+  - Extension: `pg_ltree_create_extension`
+  - Query: `pg_ltree_query`, `pg_ltree_subpath`, `pg_ltree_lca`, `pg_ltree_match`
+  - Management: `pg_ltree_list_columns`, `pg_ltree_convert_column`, `pg_ltree_create_index`
+  - Added 8 reusable output schemas in `schemas/extensions.ts`
+- **Structured Content (outputSchema) for Pgcrypto Tools** — All 9 pgcrypto tools now include `outputSchema`:
+  - Extension: `pg_pgcrypto_create_extension`
+  - Hashing: `pg_pgcrypto_hash`, `pg_pgcrypto_hmac`, `pg_pgcrypto_crypt`
+  - Encryption: `pg_pgcrypto_encrypt`, `pg_pgcrypto_decrypt`
+  - Random: `pg_pgcrypto_gen_random_uuid`, `pg_pgcrypto_gen_random_bytes`, `pg_pgcrypto_gen_salt`
+  - Added 9 reusable output schemas in `schemas/extensions.ts`
 
 ### Security
 

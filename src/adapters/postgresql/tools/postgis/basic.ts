@@ -31,6 +31,15 @@ import {
   IntersectionSchema,
   BoundingBoxSchemaBase,
   BoundingBoxSchema,
+  // Output schemas
+  PostgisCreateExtensionOutputSchema,
+  GeometryColumnOutputSchema,
+  PointInPolygonOutputSchema,
+  DistanceOutputSchema,
+  BufferOutputSchema,
+  IntersectionOutputSchema,
+  BoundingBoxOutputSchema,
+  SpatialIndexOutputSchema,
 } from "../../schemas/index.js";
 
 export function createPostgisExtensionTool(
@@ -41,6 +50,7 @@ export function createPostgisExtensionTool(
     description: "Enable the PostGIS extension for geospatial operations.",
     group: "postgis",
     inputSchema: z.object({}),
+    outputSchema: PostgisCreateExtensionOutputSchema,
     annotations: write("Create PostGIS Extension"),
     icons: getToolIcons("postgis", write("Create PostGIS Extension")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -59,6 +69,7 @@ export function createGeometryColumnTool(
       "Add a geometry column to a table. Returns alreadyExists: true if column exists.",
     group: "postgis",
     inputSchema: GeometryColumnSchemaBase, // Base schema for MCP visibility
+    outputSchema: GeometryColumnOutputSchema,
     annotations: write("Add Geometry Column"),
     icons: getToolIcons("postgis", write("Add Geometry Column")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -137,6 +148,7 @@ export function createPointInPolygonTool(
       "Check if a point is within any polygon in a table. The geometry column should contain POLYGON or MULTIPOLYGON geometries.",
     group: "postgis",
     inputSchema: PointInPolygonSchemaBase, // Base schema for MCP visibility
+    outputSchema: PointInPolygonOutputSchema,
     annotations: readOnly("Point in Polygon"),
     icons: getToolIcons("postgis", readOnly("Point in Polygon")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -209,6 +221,7 @@ export function createDistanceTool(adapter: PostgresAdapter): ToolDefinition {
       "Find nearby geometries within a distance from a point. Output distance_meters is always in meters; unit parameter only affects the filter threshold.",
     group: "postgis",
     inputSchema: GeometryDistanceSchemaBase, // Base schema for MCP visibility
+    outputSchema: DistanceOutputSchema,
     annotations: readOnly("Distance Search"),
     icons: getToolIcons("postgis", readOnly("Distance Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -270,6 +283,7 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
       "Create a buffer zone around geometries. Default limit: 50 rows, default simplify: 10m (set simplify: 0 to disable). Simplification reduces polygon point count for LLM-friendly payloads.",
     group: "postgis",
     inputSchema: BufferSchemaBase, // Base schema for MCP visibility
+    outputSchema: BufferOutputSchema,
     annotations: readOnly("Buffer Zone"),
     icons: getToolIcons("postgis", readOnly("Buffer Zone")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -361,6 +375,7 @@ export function createIntersectionTool(
       "Find geometries that intersect with a given geometry. Auto-detects SRID from target column if not specified.",
     group: "postgis",
     inputSchema: IntersectionSchemaBase, // Base schema for MCP visibility
+    outputSchema: IntersectionOutputSchema,
     annotations: readOnly("Intersection Search"),
     icons: getToolIcons("postgis", readOnly("Intersection Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -455,6 +470,7 @@ export function createBoundingBoxTool(
       "Find geometries within a bounding box. Swapped min/max values are auto-corrected.",
     group: "postgis",
     inputSchema: BoundingBoxSchemaBase, // Base schema for MCP visibility
+    outputSchema: BoundingBoxOutputSchema,
     annotations: readOnly("Bounding Box Search"),
     icons: getToolIcons("postgis", readOnly("Bounding Box Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -540,6 +556,7 @@ export function createSpatialIndexTool(
       "Create a GiST spatial index for geometry column. Uses IF NOT EXISTS to avoid errors on duplicate names.",
     group: "postgis",
     inputSchema: SpatialIndexSchemaBase, // Base schema for MCP visibility
+    outputSchema: SpatialIndexOutputSchema,
     annotations: write("Create Spatial Index"),
     icons: getToolIcons("postgis", write("Create Spatial Index")),
     handler: async (params: unknown, _context: RequestContext) => {

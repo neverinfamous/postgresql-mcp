@@ -218,7 +218,23 @@ export {
   VectorCreateIndexSchema,
   // Utilities
   FiniteNumberArray,
+  // Output schemas
+  VectorCreateExtensionOutputSchema,
+  VectorAddColumnOutputSchema,
+  VectorInsertOutputSchema,
+  VectorSearchOutputSchema,
+  VectorCreateIndexOutputSchema,
+  VectorDistanceOutputSchema,
+  VectorNormalizeOutputSchema,
+  VectorAggregateOutputSchema,
+  VectorClusterOutputSchema,
+  VectorIndexOptimizeOutputSchema,
+  HybridSearchOutputSchema,
+  VectorPerformanceOutputSchema,
+  VectorDimensionReduceOutputSchema,
+  VectorEmbedOutputSchema,
 } from "./vector.js";
+
 
 // PostGIS schemas
 export {
@@ -254,6 +270,22 @@ export {
   preprocessPostgisParams,
   preprocessPoint,
   convertToMeters,
+  // Output schemas
+  PostgisCreateExtensionOutputSchema,
+  GeometryColumnOutputSchema,
+  PointInPolygonOutputSchema,
+  DistanceOutputSchema,
+  BufferOutputSchema,
+  IntersectionOutputSchema,
+  BoundingBoxOutputSchema,
+  SpatialIndexOutputSchema,
+  GeocodeOutputSchema,
+  GeoTransformOutputSchema,
+  GeoIndexOptimizeOutputSchema,
+  GeoClusterOutputSchema,
+  GeometryBufferOutputSchema,
+  GeometryIntersectionOutputSchema,
+  GeometryTransformOutputSchema,
 } from "./postgis.js";
 
 // Partitioning schemas
@@ -292,6 +324,15 @@ export {
   CronJobRunDetailsSchema,
   CronCleanupHistorySchema,
   CronCleanupHistorySchemaBase,
+  // Output schemas
+  CronCreateExtensionOutputSchema,
+  CronScheduleOutputSchema,
+  CronScheduleInDatabaseOutputSchema,
+  CronUnscheduleOutputSchema,
+  CronAlterJobOutputSchema,
+  CronListJobsOutputSchema,
+  CronJobRunDetailsOutputSchema,
+  CronCleanupHistoryOutputSchema,
 } from "./cron.js";
 
 // pg_partman schemas
@@ -304,6 +345,17 @@ export {
   PartmanRetentionSchema,
   PartmanUndoPartitionSchema,
   PartmanUpdateConfigSchema,
+  // Output schemas
+  PartmanCreateExtensionOutputSchema,
+  PartmanCreateParentOutputSchema,
+  PartmanRunMaintenanceOutputSchema,
+  PartmanShowPartitionsOutputSchema,
+  PartmanShowConfigOutputSchema,
+  PartmanCheckDefaultOutputSchema,
+  PartmanPartitionDataOutputSchema,
+  PartmanSetRetentionOutputSchema,
+  PartmanUndoPartitionOutputSchema,
+  PartmanAnalyzeHealthOutputSchema,
 } from "./partman.js";
 
 // Extension schemas (kcache, citext, ltree, pgcrypto)
@@ -313,6 +365,14 @@ export {
   KcacheTopConsumersSchema,
   KcacheDatabaseStatsSchema,
   KcacheResourceAnalysisSchema,
+  // Kcache output schemas
+  KcacheCreateExtensionOutputSchema,
+  KcacheQueryStatsOutputSchema,
+  KcacheTopCpuOutputSchema,
+  KcacheTopIoOutputSchema,
+  KcacheDatabaseStatsOutputSchema,
+  KcacheResourceAnalysisOutputSchema,
+  KcacheResetOutputSchema,
   // citext
   CitextConvertColumnSchema,
   CitextConvertColumnSchemaBase,
@@ -322,6 +382,13 @@ export {
   CitextAnalyzeCandidatesSchemaBase,
   CitextSchemaAdvisorSchema,
   CitextSchemaAdvisorSchemaBase,
+  // Citext output schemas
+  CitextCreateExtensionOutputSchema,
+  CitextConvertColumnOutputSchema,
+  CitextListColumnsOutputSchema,
+  CitextAnalyzeCandidatesOutputSchema,
+  CitextCompareOutputSchema,
+  CitextSchemaAdvisorOutputSchema,
   // ltree
   LtreeQuerySchema,
   LtreeQuerySchemaBase,
@@ -335,6 +402,15 @@ export {
   LtreeConvertColumnSchemaBase,
   LtreeIndexSchema,
   LtreeIndexSchemaBase,
+  // Ltree output schemas
+  LtreeCreateExtensionOutputSchema,
+  LtreeQueryOutputSchema,
+  LtreeSubpathOutputSchema,
+  LtreeLcaOutputSchema,
+  LtreeMatchOutputSchema,
+  LtreeListColumnsOutputSchema,
+  LtreeConvertColumnOutputSchema,
+  LtreeCreateIndexOutputSchema,
   // pgcrypto
   PgcryptoHashSchema,
   PgcryptoHmacSchema,
@@ -345,6 +421,16 @@ export {
   PgcryptoRandomBytesSchema,
   PgcryptoGenSaltSchema,
   PgcryptoCryptSchema,
+  // Pgcrypto output schemas
+  PgcryptoCreateExtensionOutputSchema,
+  PgcryptoHashOutputSchema,
+  PgcryptoHmacOutputSchema,
+  PgcryptoEncryptOutputSchema,
+  PgcryptoDecryptOutputSchema,
+  PgcryptoGenRandomUuidOutputSchema,
+  PgcryptoGenRandomBytesOutputSchema,
+  PgcryptoGenSaltOutputSchema,
+  PgcryptoCryptOutputSchema,
 } from "./extensions.js";
 
 // Stats schemas
@@ -367,4 +453,13 @@ export {
   StatsDistributionSchema,
   StatsHypothesisSchema,
   StatsSamplingSchema,
+  // Output schemas for MCP structured content
+  DescriptiveOutputSchema,
+  PercentilesOutputSchema,
+  CorrelationOutputSchema,
+  RegressionOutputSchema,
+  TimeSeriesOutputSchema,
+  DistributionOutputSchema,
+  HypothesisOutputSchema,
+  SamplingOutputSchema,
 } from "./stats.js";

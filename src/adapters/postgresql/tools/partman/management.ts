@@ -16,6 +16,12 @@ import {
   PartmanCreateParentSchema,
   PartmanRunMaintenanceSchema,
   PartmanShowPartitionsSchema,
+  // Output schemas
+  PartmanCreateExtensionOutputSchema,
+  PartmanCreateParentOutputSchema,
+  PartmanRunMaintenanceOutputSchema,
+  PartmanShowPartitionsOutputSchema,
+  PartmanShowConfigOutputSchema,
 } from "../../schemas/index.js";
 
 /**
@@ -44,6 +50,7 @@ export function createPartmanExtensionTool(
       "Enable the pg_partman extension for automated partition management. Requires superuser privileges.",
     group: "partman",
     inputSchema: z.object({}),
+    outputSchema: PartmanCreateExtensionOutputSchema,
     annotations: write("Create Partman Extension"),
     icons: getToolIcons("partman", write("Create Partman Extension")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -77,6 +84,7 @@ WARNING: startPartition creates ALL partitions from that date to current date + 
 A startPartition far in the past (e.g., '2024-01-01' with daily intervals) creates many partitions.`,
     group: "partman",
     inputSchema: PartmanCreateParentSchema,
+    outputSchema: PartmanCreateParentOutputSchema,
     annotations: write("Create Partition Parent"),
     icons: getToolIcons("partman", write("Create Partition Parent")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -241,10 +249,10 @@ A startPartition far in the past (e.g., '2024-01-01' with daily intervals) creat
         message: maintenanceRan
           ? `Partition set created for ${validatedParentTable} on column ${validatedControlColumn}. Initial partitions created.`
           : `Partition set registered for ${validatedParentTable} on column ${validatedControlColumn}. ` +
-            `No child partitions created yet - pg_partman needs data or a startPartition that matches the control column type.`,
+          `No child partitions created yet - pg_partman needs data or a startPartition that matches the control column type.`,
         hint: !maintenanceRan
           ? 'For DATE columns, use a date like "2024-01-01". For TIMESTAMP columns, "now" works. ' +
-            "Otherwise, insert data first and run pg_partman_run_maintenance."
+          "Otherwise, insert data first and run pg_partman_run_maintenance."
           : undefined,
       };
     },
@@ -264,6 +272,7 @@ Should be executed regularly (e.g., via pg_cron) to keep partitions current.
 Maintains all partition sets if no specific parent table is specified.`,
     group: "partman",
     inputSchema: PartmanRunMaintenanceSchema,
+    outputSchema: PartmanRunMaintenanceOutputSchema,
     annotations: write("Run Partition Maintenance"),
     icons: getToolIcons("partman", write("Run Partition Maintenance")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -415,10 +424,10 @@ Maintains all partition sets if no specific parent table is specified.`,
         orphaned:
           orphanedTables.length > 0
             ? {
-                count: orphanedTables.length,
-                tables: orphanedTables,
-                hint: `Remove orphaned configs: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`,
-              }
+              count: orphanedTables.length,
+              tables: orphanedTables,
+              hint: `Remove orphaned configs: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`,
+            }
             : undefined,
         errors: errors.length > 0 ? errors : undefined,
         message: allFailed
@@ -446,6 +455,7 @@ export function createPartmanShowPartitionsTool(
       "List all child partitions for a partition set managed by pg_partman.",
     group: "partman",
     inputSchema: PartmanShowPartitionsSchema,
+    outputSchema: PartmanShowPartitionsOutputSchema,
     annotations: readOnly("Show Partman Partitions"),
     icons: getToolIcons("partman", readOnly("Show Partman Partitions")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -587,6 +597,7 @@ export function createPartmanShowConfigTool(
       "View the configuration for a partition set from partman.part_config table.",
     group: "partman",
     inputSchema,
+    outputSchema: PartmanShowConfigOutputSchema,
     annotations: readOnly("Show Partman Config"),
     icons: getToolIcons("partman", readOnly("Show Partman Config")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -699,7 +710,7 @@ export function createPartmanShowConfigTool(
           notFoundHint ??
           (orphanedCount > 0
             ? `${String(orphanedCount)} orphaned config(s) found - parent table no longer exists. ` +
-              `To clean up, use raw SQL: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`
+            `To clean up, use raw SQL: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`
             : undefined),
       };
     },

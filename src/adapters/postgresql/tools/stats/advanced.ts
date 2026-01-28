@@ -22,6 +22,11 @@ import {
   StatsDistributionSchema,
   StatsHypothesisSchema,
   StatsSamplingSchema,
+  // Output schemas for MCP structured content
+  TimeSeriesOutputSchema,
+  DistributionOutputSchema,
+  HypothesisOutputSchema,
+  SamplingOutputSchema,
 } from "../../schemas/index.js";
 
 // =============================================================================
@@ -284,6 +289,7 @@ export function createStatsTimeSeriesTool(
       "Aggregate data into time buckets for time series analysis. Use groupBy to get separate time series per category.",
     group: "stats",
     inputSchema: StatsTimeSeriesSchemaBase, // Base schema for MCP visibility
+    outputSchema: TimeSeriesOutputSchema,
     annotations: readOnly("Time Series Analysis"),
     icons: getToolIcons("stats", readOnly("Time Series Analysis")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -403,14 +409,27 @@ export function createStatsTimeSeriesTool(
         );
       }
 
-      // Helper to map bucket row
+      // Helper to map bucket row - convert Date to ISO string for JSON Schema
+      // Handles both Date objects (from real DB) and strings (from mocks)
       const mapBucket = (
         row: Record<string, unknown>,
-      ): { timeBucket: Date; value: number; count: number } => ({
-        timeBucket: row["time_bucket"] as Date,
-        value: Number(row["value"]),
-        count: Number(row["count"]),
-      });
+      ): { timeBucket: string; value: number; count: number } => {
+        const timeBucketValue = row["time_bucket"];
+        let timeBucket: string;
+        if (timeBucketValue instanceof Date) {
+          timeBucket = timeBucketValue.toISOString();
+        } else if (typeof timeBucketValue === "string") {
+          timeBucket = timeBucketValue;
+        } else {
+          // Fallback: null, undefined, or unexpected type
+          timeBucket = "";
+        }
+        return {
+          timeBucket,
+          value: Number(row["value"]),
+          count: Number(row["count"]),
+        };
+      };
 
       if (groupBy !== undefined) {
         // Handle groupLimit: undefined uses default (20), 0 means no limit
@@ -450,7 +469,7 @@ export function createStatsTimeSeriesTool(
         // Group results by group_key
         const groupsMap = new Map<
           unknown,
-          { timeBucket: Date; value: number; count: number }[]
+          { timeBucket: string; value: number; count: number }[]
         >();
         const groupsTotalCount = new Map<unknown, number>();
         let groupsProcessed = 0;
@@ -582,6 +601,7 @@ export function createStatsDistributionTool(
       "Analyze data distribution with histogram buckets, skewness, and kurtosis. Use groupBy to get distribution per category.",
     group: "stats",
     inputSchema: StatsDistributionSchemaBase, // Base schema for MCP visibility
+    outputSchema: DistributionOutputSchema,
     annotations: readOnly("Distribution Analysis"),
     icons: getToolIcons("stats", readOnly("Distribution Analysis")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -832,6 +852,7 @@ export function createStatsHypothesisTool(
       "Perform one-sample t-test or z-test against a hypothesized mean. For z-test, provide populationStdDev (sigma) for accurate results. Use groupBy to test each group separately.",
     group: "stats",
     inputSchema: StatsHypothesisSchemaBase, // Base schema for MCP visibility
+    outputSchema: HypothesisOutputSchema,
     annotations: readOnly("Hypothesis Testing"),
     icons: getToolIcons("stats", readOnly("Hypothesis Testing")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -869,17 +890,17 @@ export function createStatsHypothesisTool(
         sampleStdDev: number,
       ):
         | {
-            sampleSize: number;
-            sampleMean: number;
-            sampleStdDev: number;
-            populationStdDev: number | null;
-            standardError: number;
-            testStatistic: number;
-            pValue: number;
-            degreesOfFreedom: number | null;
-            interpretation: string;
-            note: string;
-          }
+          sampleSize: number;
+          sampleMean: number;
+          sampleStdDev: number;
+          populationStdDev: number | null;
+          standardError: number;
+          testStatistic: number;
+          pValue: number;
+          degreesOfFreedom: number | null;
+          interpretation: string;
+          note: string;
+        }
         | { error: string; sampleSize: number } => {
         if (n < 2 || isNaN(sampleStdDev) || sampleStdDev === 0) {
           return { error: "Insufficient data or zero variance", sampleSize: n };
@@ -1045,6 +1066,7 @@ export function createStatsSamplingTool(
       "Get a random sample of rows. Use sampleSize for exact row count (any method), or percentage for approximate sampling with bernoulli/system methods.",
     group: "stats",
     inputSchema: StatsSamplingSchemaBase, // Base schema for MCP visibility
+    outputSchema: SamplingOutputSchema,
     annotations: readOnly("Random Sampling"),
     icons: getToolIcons("stats", readOnly("Random Sampling")),
     handler: async (params: unknown, _context: RequestContext) => {

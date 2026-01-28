@@ -22,6 +22,11 @@ import {
   StatsPercentilesSchema,
   StatsCorrelationSchema,
   StatsRegressionSchema,
+  // Output schemas for MCP structured content
+  DescriptiveOutputSchema,
+  PercentilesOutputSchema,
+  CorrelationOutputSchema,
+  RegressionOutputSchema,
 } from "../../schemas/index.js";
 
 // =============================================================================
@@ -40,6 +45,7 @@ export function createStatsDescriptiveTool(
       "Calculate descriptive statistics (count, min, max, avg, stddev, variance, sum) for a numeric column. Use groupBy to get statistics per category.",
     group: "stats",
     inputSchema: StatsDescriptiveSchemaBase, // Base schema for MCP visibility
+    outputSchema: DescriptiveOutputSchema,
     annotations: readOnly("Descriptive Statistics"),
     icons: getToolIcons("stats", readOnly("Descriptive Statistics")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -247,6 +253,7 @@ export function createStatsPercentilesTool(
       "Calculate percentiles (quartiles, custom percentiles) for a numeric column. Use groupBy to get percentiles per category.",
     group: "stats",
     inputSchema: StatsPercentilesSchemaBase, // Base schema for MCP visibility
+    outputSchema: PercentilesOutputSchema,
     annotations: readOnly("Percentiles"),
     icons: getToolIcons("stats", readOnly("Percentiles")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -376,6 +383,7 @@ export function createStatsCorrelationTool(
       "Calculate Pearson correlation coefficient between two numeric columns. Use groupBy to get correlation per category.",
     group: "stats",
     inputSchema: StatsCorrelationSchemaBase, // Base schema for MCP visibility
+    outputSchema: CorrelationOutputSchema,
     annotations: readOnly("Correlation Analysis"),
     icons: getToolIcons("stats", readOnly("Correlation Analysis")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -546,6 +554,7 @@ export function createStatsRegressionTool(
       "Perform linear regression analysis (y = mx + b) between two columns. Use groupBy to get regression per category.",
     group: "stats",
     inputSchema: StatsRegressionSchemaBase, // Base schema for MCP visibility
+    outputSchema: RegressionOutputSchema,
     annotations: readOnly("Linear Regression"),
     icons: getToolIcons("stats", readOnly("Linear Regression")),
     handler: async (params: unknown, _context: RequestContext) => {

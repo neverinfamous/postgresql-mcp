@@ -21,6 +21,15 @@ import {
   // Transformed schemas for handler validation
   VectorSearchSchema,
   VectorCreateIndexSchema,
+  // Output schemas
+  VectorCreateExtensionOutputSchema,
+  VectorAddColumnOutputSchema,
+  VectorInsertOutputSchema,
+  VectorSearchOutputSchema,
+  VectorCreateIndexOutputSchema,
+  VectorDistanceOutputSchema,
+  VectorNormalizeOutputSchema,
+  VectorAggregateOutputSchema,
 } from "../../schemas/index.js";
 
 /**
@@ -69,6 +78,7 @@ export function createVectorExtensionTool(
     description: "Enable the pgvector extension for vector similarity search.",
     group: "vector",
     inputSchema: z.object({}),
+    outputSchema: VectorCreateExtensionOutputSchema,
     annotations: write("Create Vector Extension"),
     icons: getToolIcons("vector", write("Create Vector Extension")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -113,6 +123,7 @@ export function createVectorAddColumnTool(
     group: "vector",
     // Use base schema for MCP visibility
     inputSchema: AddColumnSchemaBase,
+    outputSchema: VectorAddColumnOutputSchema,
     annotations: write("Add Vector Column"),
     icons: getToolIcons("vector", write("Add Vector Column")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -204,6 +215,7 @@ export function createVectorInsertTool(
         .optional()
         .describe("Value of conflictColumn to match (e.g., 123)"),
     }),
+    outputSchema: VectorInsertOutputSchema,
     annotations: write("Insert Vector"),
     icons: getToolIcons("vector", write("Insert Vector")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -385,6 +397,7 @@ export function createVectorSearchTool(
     group: "vector",
     // Use base schema for MCP visibility (Split Schema pattern)
     inputSchema: VectorSearchSchemaBase,
+    outputSchema: VectorSearchOutputSchema,
     annotations: readOnly("Vector Search"),
     icons: getToolIcons("vector", readOnly("Vector Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -530,6 +543,7 @@ export function createVectorCreateIndexTool(
     group: "vector",
     // Use base schema for MCP visibility (Split Schema pattern)
     inputSchema: VectorCreateIndexSchemaBase,
+    outputSchema: VectorCreateIndexOutputSchema,
     annotations: write("Create Vector Index"),
     icons: getToolIcons("vector", write("Create Vector Index")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -671,6 +685,7 @@ export function createVectorDistanceTool(
       "Calculate distance between two vectors. Valid metrics: l2 (default), cosine, inner_product.",
     group: "vector",
     inputSchema: DistanceSchema,
+    outputSchema: VectorDistanceOutputSchema,
     annotations: readOnly("Vector Distance"),
     icons: getToolIcons("vector", readOnly("Vector Distance")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -718,6 +733,7 @@ export function createVectorNormalizeTool(): ToolDefinition {
     description: "Normalize a vector to unit length.",
     group: "vector",
     inputSchema: NormalizeSchema,
+    outputSchema: VectorNormalizeOutputSchema,
     annotations: readOnly("Normalize Vector"),
     icons: getToolIcons("vector", readOnly("Normalize Vector")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -784,6 +800,7 @@ export function createVectorAggregateTool(
       "Calculate average vector. Requires: table, column. Optional: groupBy, where.",
     group: "vector",
     inputSchema: AggregateSchemaBase,
+    outputSchema: VectorAggregateOutputSchema,
     annotations: readOnly("Vector Aggregate"),
     icons: getToolIcons("vector", readOnly("Vector Aggregate")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -1193,16 +1210,16 @@ export function createVectorValidateTool(
         columnDimensions,
         expectedDimensions,
         ...(parsed.vector !== undefined &&
-        expectedDimensions !== undefined &&
-        vectorDimensions !== undefined &&
-        vectorDimensions !== expectedDimensions
+          expectedDimensions !== undefined &&
+          vectorDimensions !== undefined &&
+          vectorDimensions !== expectedDimensions
           ? {
-              error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
-              suggestion:
-                vectorDimensions > expectedDimensions
-                  ? "Use pg_vector_dimension_reduce to reduce dimensions"
-                  : "Ensure your embedding model outputs the correct dimensions",
-            }
+            error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
+            suggestion:
+              vectorDimensions > expectedDimensions
+                ? "Use pg_vector_dimension_reduce to reduce dimensions"
+                : "Ensure your embedding model outputs the correct dimensions",
+          }
           : {}),
       };
     },

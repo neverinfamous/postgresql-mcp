@@ -283,3 +283,161 @@ export const CronCleanupHistorySchema = z.preprocess(
     jobId: data.jobId,
   })),
 );
+
+// ============================================================================
+// OUTPUT SCHEMAS - For MCP 2025-11-25 structured content compliance
+// ============================================================================
+
+/**
+ * Output schema for pg_cron_create_extension
+ */
+export const CronCreateExtensionOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether extension was enabled"),
+    message: z.string().describe("Status message"),
+  })
+  .describe("pg_cron extension creation result");
+
+/**
+ * Output schema for pg_cron_schedule
+ */
+export const CronScheduleOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether job was scheduled"),
+    jobId: z.number().nullable().describe("Assigned job ID"),
+    jobName: z.string().nullable().describe("Job name if provided"),
+    schedule: z.string().describe("Cron schedule expression"),
+    command: z.string().describe("SQL command to execute"),
+    message: z.string().describe("Status message"),
+    hint: z.string().optional().describe("Usage hint"),
+  })
+  .describe("Cron job scheduling result");
+
+/**
+ * Output schema for pg_cron_schedule_in_database
+ */
+export const CronScheduleInDatabaseOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether job was scheduled"),
+    jobId: z.number().nullable().describe("Assigned job ID"),
+    jobName: z.string().describe("Job name"),
+    schedule: z.string().describe("Cron schedule expression"),
+    command: z.string().describe("SQL command to execute"),
+    database: z.string().describe("Target database"),
+    username: z.string().nullable().describe("Username to run as"),
+    active: z.boolean().describe("Whether job is active"),
+    message: z.string().describe("Status message"),
+  })
+  .describe("Cross-database cron job scheduling result");
+
+/**
+ * Output schema for pg_cron_unschedule
+ */
+export const CronUnscheduleOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether job was removed"),
+    jobId: z.number().nullable().describe("Job ID that was removed"),
+    jobName: z.string().nullable().describe("Job name that was removed"),
+    usedIdentifier: z
+      .enum(["jobId", "jobName"])
+      .describe("Which identifier was used"),
+    warning: z.string().optional().describe("Warning if both identifiers given"),
+    message: z.string().describe("Status message"),
+  })
+  .describe("Cron job removal result");
+
+/**
+ * Output schema for pg_cron_alter_job
+ */
+export const CronAlterJobOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether job was updated"),
+    jobId: z.number().describe("Job ID that was modified"),
+    changes: z
+      .object({
+        schedule: z.string().optional().describe("New schedule if changed"),
+        command: z.string().optional().describe("New command if changed"),
+        database: z.string().optional().describe("New database if changed"),
+        username: z.string().optional().describe("New username if changed"),
+        active: z.boolean().optional().describe("New active status if changed"),
+      })
+      .describe("Changes applied"),
+    message: z.string().describe("Status message"),
+  })
+  .describe("Cron job modification result");
+
+/**
+ * Output schema for pg_cron_list_jobs
+ */
+export const CronListJobsOutputSchema = z
+  .object({
+    jobs: z
+      .array(
+        z.object({
+          jobid: z.number().nullable().describe("Job ID"),
+          jobname: z.string().nullable().describe("Job name"),
+          schedule: z.string().describe("Cron schedule"),
+          command: z.string().describe("SQL command"),
+          nodename: z.string().nullable().describe("Node name"),
+          nodeport: z.number().nullable().describe("Node port"),
+          database: z.string().describe("Target database"),
+          username: z.string().describe("Run as username"),
+          active: z.boolean().describe("Whether active"),
+        }),
+      )
+      .describe("Scheduled jobs"),
+    count: z.number().describe("Number of jobs returned"),
+    truncated: z.boolean().optional().describe("Results were truncated"),
+    totalCount: z.number().optional().describe("Total available count"),
+    hint: z.string().optional().describe("Hint about unnamed jobs"),
+  })
+  .describe("Cron job list result");
+
+/**
+ * Output schema for pg_cron_job_run_details
+ */
+export const CronJobRunDetailsOutputSchema = z
+  .object({
+    runs: z
+      .array(
+        z.object({
+          runid: z.number().nullable().describe("Run ID"),
+          jobid: z.number().nullable().describe("Job ID"),
+          job_pid: z.number().nullable().describe("Process ID"),
+          database: z.string().describe("Database"),
+          username: z.string().describe("Username"),
+          command: z.string().describe("Command executed"),
+          status: z.string().describe("Execution status"),
+          return_message: z.string().nullable().describe("Return message"),
+          // Use coercion to handle PostgreSQL Date objects → string
+          start_time: z.coerce.string().nullable().describe("Start time"),
+          end_time: z.coerce.string().nullable().describe("End time"),
+        }),
+      )
+      .describe("Job execution history"),
+    count: z.number().describe("Number of records returned"),
+    truncated: z.boolean().optional().describe("Results were truncated"),
+    totalCount: z.number().optional().describe("Total available count"),
+    summary: z
+      .object({
+        succeeded: z.number().describe("Successful runs"),
+        failed: z.number().describe("Failed runs"),
+        running: z.number().describe("Currently running"),
+      })
+      .describe("Execution summary"),
+  })
+  .describe("Cron job execution history result");
+
+/**
+ * Output schema for pg_cron_cleanup_history
+ */
+export const CronCleanupHistoryOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether cleanup succeeded"),
+    deletedCount: z.number().describe("Number of records deleted"),
+    olderThanDays: z.number().describe("Age threshold in days"),
+    jobId: z.number().nullable().describe("Job ID if filtered"),
+    message: z.string().describe("Status message"),
+  })
+  .describe("Cron history cleanup result");
+

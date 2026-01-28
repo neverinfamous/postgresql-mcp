@@ -15,6 +15,14 @@ import {
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
 import { truncateVector } from "./basic.js";
+import {
+  VectorClusterOutputSchema,
+  VectorIndexOptimizeOutputSchema,
+  HybridSearchOutputSchema,
+  VectorPerformanceOutputSchema,
+  VectorDimensionReduceOutputSchema,
+  VectorEmbedOutputSchema,
+} from "../../schemas/index.js";
 
 /**
  * Parse a PostgreSQL vector string to a number array.
@@ -65,6 +73,7 @@ export function createVectorClusterTool(
       "Perform K-means clustering on vectors. Returns cluster centroids only (not row assignments). To assign rows to clusters, compare row vectors to centroids using pg_vector_distance.",
     group: "vector",
     inputSchema: ClusterSchemaBase,
+    outputSchema: VectorClusterOutputSchema,
     annotations: readOnly("Vector Cluster"),
     icons: getToolIcons("vector", readOnly("Vector Cluster")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -196,6 +205,7 @@ export function createVectorIndexOptimizeTool(
       "Analyze vector column and recommend optimal index parameters for IVFFlat/HNSW.",
     group: "vector",
     inputSchema: IndexOptimizeSchemaBase,
+    outputSchema: VectorIndexOptimizeOutputSchema,
     annotations: readOnly("Vector Index Optimize"),
     icons: getToolIcons("vector", readOnly("Vector Index Optimize")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -350,6 +360,7 @@ export function createHybridSearchTool(
       "Combined vector similarity and full-text search with weighted scoring.",
     group: "vector",
     inputSchema: HybridSearchSchemaBase,
+    outputSchema: HybridSearchOutputSchema,
     annotations: readOnly("Hybrid Search"),
     icons: getToolIcons("vector", readOnly("Hybrid Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -600,6 +611,7 @@ export function createVectorPerformanceTool(
       "Analyze vector search performance and index effectiveness. Provide testVector for benchmarking (recommended).",
     group: "vector",
     inputSchema: PerformanceSchemaBase,
+    outputSchema: VectorPerformanceOutputSchema,
     annotations: readOnly("Vector Performance"),
     icons: getToolIcons("vector", readOnly("Vector Performance")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -745,8 +757,8 @@ export function createVectorPerformanceTool(
         recommendations:
           (indexResult.rows?.length ?? 0) === 0
             ? [
-                "No vector index found - consider creating one for better performance",
-              ]
+              "No vector index found - consider creating one for better performance",
+            ]
             : [],
       };
 
@@ -850,6 +862,7 @@ export function createVectorDimensionReduceTool(
     group: "vector",
     // Use base schema for MCP so properties are properly exposed in tool schema
     inputSchema: VectorDimensionReduceSchemaBase,
+    outputSchema: VectorDimensionReduceOutputSchema,
     annotations: readOnly("Vector Dimension Reduce"),
     icons: getToolIcons("vector", readOnly("Vector Dimension Reduce")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -915,12 +928,12 @@ export function createVectorDimensionReduceTool(
           id: unknown;
           original_dimensions: number;
           reduced:
-            | number[]
-            | {
-                preview: number[] | null;
-                dimensions: number;
-                truncated: boolean;
-              };
+          | number[]
+          | {
+            preview: number[] | null;
+            dimensions: number;
+            truncated: boolean;
+          };
         }[] = [];
         let originalDim = 0;
 
@@ -1003,6 +1016,7 @@ export function createVectorEmbedTool(): ToolDefinition {
       "Generate text embeddings. Returns a simple hash-based embedding for demos (use external APIs for production).",
     group: "vector",
     inputSchema: EmbedSchema,
+    outputSchema: VectorEmbedOutputSchema,
     annotations: readOnly("Vector Embed"),
     icons: getToolIcons("vector", readOnly("Vector Embed")),
     // eslint-disable-next-line @typescript-eslint/require-await

@@ -23,6 +23,15 @@ import {
   CronJobRunDetailsSchema,
   CronCleanupHistorySchema,
   CronCleanupHistorySchemaBase,
+  // Output schemas
+  CronCreateExtensionOutputSchema,
+  CronScheduleOutputSchema,
+  CronScheduleInDatabaseOutputSchema,
+  CronUnscheduleOutputSchema,
+  CronAlterJobOutputSchema,
+  CronListJobsOutputSchema,
+  CronJobRunDetailsOutputSchema,
+  CronCleanupHistoryOutputSchema,
 } from "../schemas/index.js";
 
 /**
@@ -51,6 +60,7 @@ function createCronExtensionTool(adapter: PostgresAdapter): ToolDefinition {
       "Enable the pg_cron extension for job scheduling. Requires superuser privileges.",
     group: "cron",
     inputSchema: z.object({}),
+    outputSchema: CronCreateExtensionOutputSchema,
     annotations: write("Create Cron Extension"),
     icons: getToolIcons("cron", write("Create Cron Extension")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -71,6 +81,7 @@ or interval syntax (e.g., "30 seconds"). Note: pg_cron allows duplicate job name
     group: "cron",
     // Use base schema for MCP so properties are properly exposed
     inputSchema: CronScheduleSchemaBase,
+    outputSchema: CronScheduleOutputSchema,
     annotations: write("Schedule Cron Job"),
     icons: getToolIcons("cron", write("Schedule Cron Job")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -119,6 +130,7 @@ maintenance tasks. Returns the job ID.`,
     group: "cron",
     // Use base schema for MCP so properties are properly exposed
     inputSchema: CronScheduleInDatabaseSchemaBase,
+    outputSchema: CronScheduleInDatabaseOutputSchema,
     annotations: write("Schedule Cron in Database"),
     icons: getToolIcons("cron", write("Schedule Cron in Database")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -165,6 +177,7 @@ function createCronUnscheduleTool(adapter: PostgresAdapter): ToolDefinition {
       "Remove a scheduled cron job by its ID or name. If both are provided, jobName takes precedence. Job ID accepts numbers or numeric strings. Works for both active and inactive jobs.",
     group: "cron",
     inputSchema: CronUnscheduleSchema,
+    outputSchema: CronUnscheduleOutputSchema,
     annotations: destructive("Unschedule Cron Job"),
     icons: getToolIcons("cron", destructive("Unschedule Cron Job")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -244,6 +257,7 @@ function createCronAlterJobTool(adapter: PostgresAdapter): ToolDefinition {
 or active status. Only specify the parameters you want to change.`,
     group: "cron",
     inputSchema: CronAlterJobSchema,
+    outputSchema: CronAlterJobOutputSchema,
     annotations: write("Alter Cron Job"),
     icons: getToolIcons("cron", write("Alter Cron Job")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -296,6 +310,7 @@ function createCronListJobsTool(adapter: PostgresAdapter): ToolDefinition {
       "List all scheduled cron jobs. Shows job ID, name, schedule, command, and status. Jobs without names (jobname: null) must be referenced by jobId. Default limit: 50 rows.",
     group: "cron",
     inputSchema: ListJobsSchema,
+    outputSchema: CronListJobsOutputSchema,
     annotations: readOnly("List Cron Jobs"),
     icons: getToolIcons("cron", readOnly("List Cron Jobs")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -387,6 +402,7 @@ function createCronJobRunDetailsTool(adapter: PostgresAdapter): ToolDefinition {
 Useful for monitoring and debugging scheduled jobs.`,
     group: "cron",
     inputSchema: CronJobRunDetailsSchema,
+    outputSchema: CronJobRunDetailsOutputSchema,
     annotations: readOnly("Cron Job Run Details"),
     icons: getToolIcons("cron", readOnly("Cron Job Run Details")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -497,6 +513,7 @@ from growing too large. By default, removes records older than 7 days.`,
     group: "cron",
     // Use base schema for MCP visibility
     inputSchema: CronCleanupHistorySchemaBase,
+    outputSchema: CronCleanupHistoryOutputSchema,
     annotations: destructive("Cleanup Cron History"),
     icons: getToolIcons("cron", destructive("Cleanup Cron History")),
     handler: async (params: unknown, _context: RequestContext) => {

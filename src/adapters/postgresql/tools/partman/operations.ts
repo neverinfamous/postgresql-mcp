@@ -17,6 +17,12 @@ import {
   PartmanPartitionDataSchema,
   PartmanRetentionSchema,
   PartmanUndoPartitionSchema,
+  // Output schemas
+  PartmanCheckDefaultOutputSchema,
+  PartmanPartitionDataOutputSchema,
+  PartmanSetRetentionOutputSchema,
+  PartmanUndoPartitionOutputSchema,
+  PartmanAnalyzeHealthOutputSchema,
 } from "../../schemas/index.js";
 
 /**
@@ -45,6 +51,7 @@ export function createPartmanCheckDefaultTool(
 Data in default indicates partitions may be missing for certain time/value ranges.`,
     group: "partman",
     inputSchema: PartmanCheckDefaultSchema,
+    outputSchema: PartmanCheckDefaultOutputSchema,
     annotations: readOnly("Check Partman Default"),
     icons: getToolIcons("partman", readOnly("Check Partman Default")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -201,6 +208,7 @@ export function createPartmanPartitionDataTool(
 Creates new partitions if needed for the data being moved.`,
     group: "partman",
     inputSchema: PartmanPartitionDataSchema,
+    outputSchema: PartmanPartitionDataOutputSchema,
     annotations: write("Partition Data"),
     icons: getToolIcons("partman", write("Partition Data")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -247,9 +255,9 @@ Creates new partitions if needed for the data being moved.`,
       // Get row count in default partition before moving data
       const [partSchema, partTableName] = parentTable.includes(".")
         ? [
-            parentTable.split(".")[0] ?? "public",
-            parentTable.split(".")[1] ?? parentTable,
-          ]
+          parentTable.split(".")[0] ?? "public",
+          parentTable.split(".")[1] ?? parentTable,
+        ]
         : ["public", parentTable];
       const defaultPartitionName = `${partSchema}.${partTableName}_default`;
 
@@ -306,6 +314,7 @@ export function createPartmanSetRetentionTool(
 Partitions older than the retention period will be dropped or detached during maintenance.`,
     group: "partman",
     inputSchema: PartmanRetentionSchema,
+    outputSchema: PartmanSetRetentionOutputSchema,
     annotations: write("Set Partition Retention"),
     icons: getToolIcons("partman", write("Set Partition Retention")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -373,8 +382,8 @@ Partitions older than the retention period will be dropped or detached during ma
       ) {
         throw new Error(
           `Invalid retention format '${validatedRetention}'. ` +
-            `Use PostgreSQL interval syntax (e.g., '30 days', '6 months', '1 year') ` +
-            `or integer value for integer-based partitions.`,
+          `Use PostgreSQL interval syntax (e.g., '30 days', '6 months', '1 year') ` +
+          `or integer value for integer-based partitions.`,
         );
       }
 
@@ -442,6 +451,7 @@ You must first create an empty table with the same structure as the parent, then
 Example: undoPartition({ parentTable: "public.events", targetTable: "public.events_consolidated" })`,
     group: "partman",
     inputSchema: PartmanUndoPartitionSchema,
+    outputSchema: PartmanUndoPartitionOutputSchema,
     annotations: destructive("Undo Partitioning"),
     icons: getToolIcons("partman", destructive("Undo Partitioning")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -490,8 +500,8 @@ Example: undoPartition({ parentTable: "public.events", targetTable: "public.even
       if ((tableExistsResult.rows?.length ?? 0) === 0) {
         throw new Error(
           `Target table '${validatedTargetTable}' does not exist. ` +
-            `pg_partman's undo_partition requires the target table to exist before consolidating data. ` +
-            `Create the target table first with the same structure as the parent table.`,
+          `pg_partman's undo_partition requires the target table to exist before consolidating data. ` +
+          `Create the target table first with the same structure as the parent table.`,
         );
       }
 
@@ -522,7 +532,7 @@ Example: undoPartition({ parentTable: "public.events", targetTable: "public.even
         message: `Partition set removed for ${validatedParentTable}. Data consolidated to ${validatedTargetTable}.`,
         note: keepTableValue
           ? "Child partitions were detached and now exist as standalone tables. " +
-            "To clean up, drop them manually: DROP TABLE <partition_name>;"
+          "To clean up, drop them manually: DROP TABLE <partition_name>;"
           : undefined,
       };
     },
@@ -578,6 +588,7 @@ stale maintenance, and retention configuration.`,
         }),
       )
       .default({}),
+    outputSchema: PartmanAnalyzeHealthOutputSchema,
     annotations: readOnly("Analyze Partition Health"),
     icons: getToolIcons("partman", readOnly("Analyze Partition Health")),
     handler: async (params: unknown, _context: RequestContext) => {

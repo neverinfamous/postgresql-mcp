@@ -24,6 +24,13 @@ import {
   CitextAnalyzeCandidatesSchemaBase,
   CitextSchemaAdvisorSchema,
   CitextSchemaAdvisorSchemaBase,
+  // Output schemas
+  CitextCreateExtensionOutputSchema,
+  CitextConvertColumnOutputSchema,
+  CitextListColumnsOutputSchema,
+  CitextAnalyzeCandidatesOutputSchema,
+  CitextCompareOutputSchema,
+  CitextSchemaAdvisorOutputSchema,
 } from "../schemas/index.js";
 
 /**
@@ -50,6 +57,7 @@ function createCitextExtensionTool(adapter: PostgresAdapter): ToolDefinition {
 citext is ideal for emails, usernames, and other identifiers where case shouldn't matter.`,
     group: "citext",
     inputSchema: z.object({}),
+    outputSchema: CitextCreateExtensionOutputSchema,
     annotations: write("Create Citext Extension"),
     icons: getToolIcons("citext", write("Create Citext Extension")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -77,6 +85,7 @@ This is useful for retrofitting case-insensitivity to existing columns like emai
 Note: If views depend on this column, you must drop and recreate them manually before conversion.`,
     group: "citext",
     inputSchema: CitextConvertColumnSchemaBase,
+    outputSchema: CitextConvertColumnOutputSchema,
     annotations: write("Convert to Citext"),
     icons: getToolIcons("citext", write("Convert to Citext")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -196,9 +205,9 @@ Note: If views depend on this column, you must drop and recreate them manually b
           affectedViews:
             dependentViews.length > 0
               ? dependentViews.map(
-                  (v) =>
-                    `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
-                )
+                (v) =>
+                  `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
+              )
               : undefined,
         };
       } catch (error) {
@@ -211,9 +220,9 @@ Note: If views depend on this column, you must drop and recreate them manually b
           dependentViews:
             dependentViews.length > 0
               ? dependentViews.map(
-                  (v) =>
-                    `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
-                )
+                (v) =>
+                  `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
+              )
               : undefined,
         };
       }
@@ -231,6 +240,7 @@ function createCitextListColumnsTool(adapter: PostgresAdapter): ToolDefinition {
 Useful for auditing case-insensitive columns.`,
     group: "citext",
     inputSchema: CitextListColumnsSchemaBase,
+    outputSchema: CitextListColumnsOutputSchema,
     annotations: readOnly("List Citext Columns"),
     icons: getToolIcons("citext", readOnly("List Citext Columns")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -316,6 +326,7 @@ function createCitextAnalyzeCandidatesTool(
 Looks for common patterns like email, username, name, slug, etc.`,
     group: "citext",
     inputSchema: CitextAnalyzeCandidatesSchemaBase,
+    outputSchema: CitextAnalyzeCandidatesOutputSchema,
     annotations: readOnly("Analyze Citext Candidates"),
     icons: getToolIcons("citext", readOnly("Analyze Citext Candidates")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -477,8 +488,8 @@ Looks for common patterns like email, username, name, slug, etc.`,
         ...(excludeSystemSchemas &&
           schema === undefined &&
           table === undefined && {
-            excludedSchemas: systemSchemas,
-          }),
+          excludedSchemas: systemSchemas,
+        }),
         // Include patterns used for transparency
         patternsUsed: searchPatterns,
       };
@@ -499,6 +510,7 @@ Useful for testing citext behavior before converting columns.`,
       value1: z.string().describe("First value to compare"),
       value2: z.string().describe("Second value to compare"),
     }),
+    outputSchema: CitextCompareOutputSchema,
     annotations: readOnly("Compare Citext Values"),
     icons: getToolIcons("citext", readOnly("Compare Citext Values")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -574,6 +586,7 @@ Provides schema design recommendations based on column names and existing data p
 Requires the 'table' parameter to specify which table to analyze.`,
     group: "citext",
     inputSchema: CitextSchemaAdvisorSchemaBase,
+    outputSchema: CitextSchemaAdvisorOutputSchema,
     annotations: readOnly("Citext Schema Advisor"),
     icons: getToolIcons("citext", readOnly("Citext Schema Advisor")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -711,10 +724,10 @@ Requires the 'table' parameter to specify which table to analyze.`,
         nextSteps:
           convertCount > 0
             ? [
-                "Review recommendations above",
-                `Use pg_citext_convert_column to convert recommended columns`,
-                "Update application queries if they rely on case-sensitive comparisons",
-              ]
+              "Review recommendations above",
+              `Use pg_citext_convert_column to convert recommended columns`,
+              "Update application queries if they rely on case-sensitive comparisons",
+            ]
             : ["No columns require conversion"],
       };
     },

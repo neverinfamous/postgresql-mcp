@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `preprocessJsonbParams()` function for alias normalization and `schema.table` parsing
   - Created Base schemas for MCP visibility and full schemas with preprocessing for handler parsing
   - Updated tools: `pg_jsonb_extract`, `pg_jsonb_set`, `pg_jsonb_insert`, `pg_jsonb_delete`, `pg_jsonb_contains`, `pg_jsonb_path_query`
-
+- **JSONB path parsing negative index support** — Fixed `stringPathToArray()` to parse negative array indices like `[-1]` in string paths. Previously, the regex `/\[(\d+)\]/g` only matched positive indices, causing paths like `'tags[-1]'` to fail parsing. Now supports both `[0]` and `[-1]` bracket notation
 
 ### Changed
 
@@ -183,6 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_describe_table rowCount -1 clarification** — Documented that `rowCount: -1` in `pg_describe_table` response indicates PostgreSQL has no statistics for the table (run `ANALYZE` to populate)
 - **Code Mode memoryUsedMb metrics clarification** — Documented that `memoryUsedMb` measures heap delta (end - start) and negative values indicate memory was freed during execution (e.g., GC ran)
 - **pg_transaction_rollback_to behavior clarification** — Enhanced documentation to clarify that `rollbackTo` restores the database state to when the savepoint was created, undoing ALL work (data changes AND savepoints) created after the target savepoint—not just savepoints. This is standard PostgreSQL behavior where rolling back to a savepoint reverts both data modifications and nested savepoint definitions
+- **pg_jsonb_strip_nulls WHERE requirement** — Updated `ServerInstructions.ts` to clarify that `pg_jsonb_strip_nulls` requires a `where`/`filter` clause—write operations must be targeted for safety. Added `preview: true` suggestion for pre-modification inspection
+- **pg_jsonb_insert path format clarification** — Updated `ServerInstructions.ts` to recommend using array format `[-1]` instead of string format `"[-1]"` for negative array indices, as the string format can cause PostgreSQL parsing errors in some contexts
 
 ### Dependencies
 

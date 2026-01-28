@@ -20,6 +20,7 @@ import { z } from "zod";
  * Convert a string path to array format
  * 'a.b[0].c' → ['a', 'b', '0', 'c']
  * 'a.b.0' → ['a', 'b', '0']
+ * '[-1]' → ['-1'] (supports negative indices)
  */
 export function stringPathToArray(path: string): string[] {
   // Handle JSONPath format ($.a.b) - strip leading $. if present
@@ -28,8 +29,8 @@ export function stringPathToArray(path: string): string[] {
   if (normalized.startsWith("$")) normalized = normalized.slice(1);
   if (normalized.startsWith(".")) normalized = normalized.slice(1);
 
-  // Replace array notation [0] with .0
-  normalized = normalized.replace(/\[(\d+)\]/g, ".$1");
+  // Replace array notation [0] or [-1] with .0 or .-1 (supports negative indices)
+  normalized = normalized.replace(/\[(-?\d+)\]/g, ".$1");
 
   // Split by dot and filter empty strings
   return normalized.split(".").filter((p) => p !== "");

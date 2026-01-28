@@ -147,6 +147,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added 31 comprehensive security injection tests in `security-injection.test.ts`
   - **Breaking change**: Tools now reject inputs containing SQL injection patterns (previously passed through)
 
+### Fixed
+
+- **pg_analyze_query_indexes output schema error** — Fixed MCP output validation error for direct tool calls
+  - Handler now includes required `sql` field in all response paths (success, error, and no-plan cases)
+  - Updated `QueryIndexAnalysisOutputSchema` to match actual response structure (issues, recommendations as string arrays, timing fields)
+- **pg.listExtensions() top-level alias missing** — Added missing Code Mode top-level alias for consistency
+  - `pg.listExtensions()` now works in Code Mode (was previously only accessible via `pg.core.listExtensions()`)
+  - Updated `ServerInstructions.ts` documentation to include the alias
+
 ### Dependencies
 
 - Bump `hono` from 4.11.5 to 4.11.7

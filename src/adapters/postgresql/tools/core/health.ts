@@ -380,6 +380,7 @@ export function createAnalyzeQueryIndexesTool(
 
       if (isWriteQuery) {
         return {
+          sql,
           error:
             "Write queries not allowed - EXPLAIN ANALYZE executes the query",
           hint: "Use pg_explain for write queries (no ANALYZE option) or wrap in a transaction and rollback",
@@ -391,7 +392,7 @@ export function createAnalyzeQueryIndexesTool(
       const result = await adapter.executeQuery(explainSql, queryParams);
 
       if (!result.rows || result.rows.length === 0) {
-        return { error: "No query plan returned" };
+        return { sql, error: "No query plan returned" };
       }
 
       const plan = (result.rows[0] as { "QUERY PLAN": unknown[] })[
@@ -488,6 +489,7 @@ export function createAnalyzeQueryIndexesTool(
 
       // Return based on verbosity
       const baseResult = {
+        sql,
         executionTime: plan["Execution Time"] as number,
         planningTime: plan["Planning Time"] as number,
         issues,

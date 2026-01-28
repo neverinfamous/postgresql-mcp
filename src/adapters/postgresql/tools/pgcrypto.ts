@@ -268,9 +268,9 @@ function createPgcryptoGenSaltTool(adapter: PostgresAdapter): ToolDefinition {
       const result =
         iterations !== undefined && (type === "bf" || type === "xdes")
           ? await adapter.executeQuery(`SELECT gen_salt($1, $2) as salt`, [
-            type,
-            iterations,
-          ])
+              type,
+              iterations,
+            ])
           : await adapter.executeQuery(`SELECT gen_salt($1) as salt`, [type]);
       return {
         success: true,

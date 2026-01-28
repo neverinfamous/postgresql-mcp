@@ -255,9 +255,9 @@ Creates new partitions if needed for the data being moved.`,
       // Get row count in default partition before moving data
       const [partSchema, partTableName] = parentTable.includes(".")
         ? [
-          parentTable.split(".")[0] ?? "public",
-          parentTable.split(".")[1] ?? parentTable,
-        ]
+            parentTable.split(".")[0] ?? "public",
+            parentTable.split(".")[1] ?? parentTable,
+          ]
         : ["public", parentTable];
       const defaultPartitionName = `${partSchema}.${partTableName}_default`;
 
@@ -382,8 +382,8 @@ Partitions older than the retention period will be dropped or detached during ma
       ) {
         throw new Error(
           `Invalid retention format '${validatedRetention}'. ` +
-          `Use PostgreSQL interval syntax (e.g., '30 days', '6 months', '1 year') ` +
-          `or integer value for integer-based partitions.`,
+            `Use PostgreSQL interval syntax (e.g., '30 days', '6 months', '1 year') ` +
+            `or integer value for integer-based partitions.`,
         );
       }
 
@@ -500,8 +500,8 @@ Example: undoPartition({ parentTable: "public.events", targetTable: "public.even
       if ((tableExistsResult.rows?.length ?? 0) === 0) {
         throw new Error(
           `Target table '${validatedTargetTable}' does not exist. ` +
-          `pg_partman's undo_partition requires the target table to exist before consolidating data. ` +
-          `Create the target table first with the same structure as the parent table.`,
+            `pg_partman's undo_partition requires the target table to exist before consolidating data. ` +
+            `Create the target table first with the same structure as the parent table.`,
         );
       }
 
@@ -532,7 +532,7 @@ Example: undoPartition({ parentTable: "public.events", targetTable: "public.even
         message: `Partition set removed for ${validatedParentTable}. Data consolidated to ${validatedTargetTable}.`,
         note: keepTableValue
           ? "Child partitions were detached and now exist as standalone tables. " +
-          "To clean up, drop them manually: DROP TABLE <partition_name>;"
+            "To clean up, drop them manually: DROP TABLE <partition_name>;"
           : undefined,
       };
     },

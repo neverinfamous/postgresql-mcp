@@ -990,9 +990,16 @@ export const GeoClusterOutputSchema = z
  */
 export const GeometryBufferOutputSchema = z
   .object({
-    buffer_geojson: z.string().nullable().optional().describe("Buffer as GeoJSON"),
+    buffer_geojson: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Buffer as GeoJSON"),
     buffer_wkt: z.string().nullable().optional().describe("Buffer as WKT"),
-    distance_meters: z.number().optional().describe("Buffer distance in meters"),
+    distance_meters: z
+      .number()
+      .optional()
+      .describe("Buffer distance in meters"),
     srid: z.number().optional().describe("SRID used"),
     inputFormat: z.string().optional().describe("Input format (GeoJSON/WKT)"),
     simplified: z.boolean().optional().describe("Simplification applied"),

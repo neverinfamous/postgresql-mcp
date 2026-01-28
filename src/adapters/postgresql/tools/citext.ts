@@ -205,9 +205,9 @@ Note: If views depend on this column, you must drop and recreate them manually b
           affectedViews:
             dependentViews.length > 0
               ? dependentViews.map(
-                (v) =>
-                  `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
-              )
+                  (v) =>
+                    `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
+                )
               : undefined,
         };
       } catch (error) {
@@ -220,9 +220,9 @@ Note: If views depend on this column, you must drop and recreate them manually b
           dependentViews:
             dependentViews.length > 0
               ? dependentViews.map(
-                (v) =>
-                  `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
-              )
+                  (v) =>
+                    `${v["view_schema"] as string}.${v["dependent_view"] as string}`,
+                )
               : undefined,
         };
       }
@@ -488,8 +488,8 @@ Looks for common patterns like email, username, name, slug, etc.`,
         ...(excludeSystemSchemas &&
           schema === undefined &&
           table === undefined && {
-          excludedSchemas: systemSchemas,
-        }),
+            excludedSchemas: systemSchemas,
+          }),
         // Include patterns used for transparency
         patternsUsed: searchPatterns,
       };
@@ -724,10 +724,10 @@ Requires the 'table' parameter to specify which table to analyze.`,
         nextSteps:
           convertCount > 0
             ? [
-              "Review recommendations above",
-              `Use pg_citext_convert_column to convert recommended columns`,
-              "Update application queries if they rely on case-sensitive comparisons",
-            ]
+                "Review recommendations above",
+                `Use pg_citext_convert_column to convert recommended columns`,
+                "Update application queries if they rely on case-sensitive comparisons",
+              ]
             : ["No columns require conversion"],
       };
     },

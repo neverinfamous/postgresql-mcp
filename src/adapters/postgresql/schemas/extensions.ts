@@ -983,7 +983,10 @@ export const LtreeSubpathOutputSchema = z
   .object({
     originalPath: z.string().describe("Original path"),
     offset: z.number().optional().describe("Offset used"),
-    length: z.union([z.number(), z.string()]).optional().describe("Length used"),
+    length: z
+      .union([z.number(), z.string()])
+      .optional()
+      .describe("Length used"),
     subpath: z.string().optional().describe("Extracted subpath"),
     originalDepth: z.number().optional().describe("Original path depth"),
     pathDepth: z.number().optional().describe("Path depth for error"),

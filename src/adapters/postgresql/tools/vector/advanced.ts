@@ -757,8 +757,8 @@ export function createVectorPerformanceTool(
         recommendations:
           (indexResult.rows?.length ?? 0) === 0
             ? [
-              "No vector index found - consider creating one for better performance",
-            ]
+                "No vector index found - consider creating one for better performance",
+              ]
             : [],
       };
 
@@ -928,12 +928,12 @@ export function createVectorDimensionReduceTool(
           id: unknown;
           original_dimensions: number;
           reduced:
-          | number[]
-          | {
-            preview: number[] | null;
-            dimensions: number;
-            truncated: boolean;
-          };
+            | number[]
+            | {
+                preview: number[] | null;
+                dimensions: number;
+                truncated: boolean;
+              };
         }[] = [];
         let originalDim = 0;
 

@@ -279,8 +279,8 @@ export function createGeoIndexOptimizeTool(
             ? recommendations
             : (indexes.rows?.length ?? 0) === 0
               ? [
-                "No spatial indexes found in this schema. Consider adding GiST indexes for spatial columns.",
-              ]
+                  "No spatial indexes found in this schema. Consider adding GiST indexes for spatial columns.",
+                ]
               : ["All spatial indexes appear optimized"],
         tips: [
           "Use GiST indexes for general spatial queries",

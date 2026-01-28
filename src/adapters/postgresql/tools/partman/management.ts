@@ -249,10 +249,10 @@ A startPartition far in the past (e.g., '2024-01-01' with daily intervals) creat
         message: maintenanceRan
           ? `Partition set created for ${validatedParentTable} on column ${validatedControlColumn}. Initial partitions created.`
           : `Partition set registered for ${validatedParentTable} on column ${validatedControlColumn}. ` +
-          `No child partitions created yet - pg_partman needs data or a startPartition that matches the control column type.`,
+            `No child partitions created yet - pg_partman needs data or a startPartition that matches the control column type.`,
         hint: !maintenanceRan
           ? 'For DATE columns, use a date like "2024-01-01". For TIMESTAMP columns, "now" works. ' +
-          "Otherwise, insert data first and run pg_partman_run_maintenance."
+            "Otherwise, insert data first and run pg_partman_run_maintenance."
           : undefined,
       };
     },
@@ -424,10 +424,10 @@ Maintains all partition sets if no specific parent table is specified.`,
         orphaned:
           orphanedTables.length > 0
             ? {
-              count: orphanedTables.length,
-              tables: orphanedTables,
-              hint: `Remove orphaned configs: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`,
-            }
+                count: orphanedTables.length,
+                tables: orphanedTables,
+                hint: `Remove orphaned configs: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`,
+              }
             : undefined,
         errors: errors.length > 0 ? errors : undefined,
         message: allFailed
@@ -710,7 +710,7 @@ export function createPartmanShowConfigTool(
           notFoundHint ??
           (orphanedCount > 0
             ? `${String(orphanedCount)} orphaned config(s) found - parent table no longer exists. ` +
-            `To clean up, use raw SQL: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`
+              `To clean up, use raw SQL: DELETE FROM ${partmanSchema}.part_config WHERE parent_table = '<table_name>';`
             : undefined),
       };
     },

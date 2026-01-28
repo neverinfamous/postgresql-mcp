@@ -475,20 +475,24 @@ export const IndexRecommendationsOutputSchema = z.object({
 
 // Output schema for pg_analyze_query_indexes
 export const QueryIndexAnalysisOutputSchema = z.object({
-  sql: z.string().describe("Analyzed query"),
+  sql: z.string().optional().describe("Analyzed query"),
   plan: z
     .record(z.string(), z.unknown())
     .optional()
     .describe("Query execution plan"),
   recommendations: z
-    .array(z.record(z.string(), z.unknown()))
-    .optional()
-    .describe("Index recommendations"),
-  currentIndexes: z
     .array(z.string())
     .optional()
-    .describe("Indexes currently used"),
-  estimatedCost: z.number().optional().describe("Query cost estimate"),
+    .describe("Index recommendations"),
+  issues: z
+    .array(z.string())
+    .optional()
+    .describe("Issues detected in query plan"),
+  executionTime: z.number().optional().describe("Query execution time in ms"),
+  planningTime: z.number().optional().describe("Planning time in ms"),
+  verbosity: z.string().optional().describe("Response verbosity level"),
+  hint: z.string().optional().describe("Additional information"),
+  error: z.string().optional().describe("Error message if analysis failed"),
 });
 
 // Output schema for pg_count

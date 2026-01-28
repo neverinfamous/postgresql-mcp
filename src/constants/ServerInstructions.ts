@@ -53,7 +53,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 \`pg_group_action\` → \`pg.group.action()\` (group prefixes dropped: \`pg_jsonb_extract\` → \`pg.jsonb.extract()\`)
 
-**Top-Level Core Aliases**: All starter tools available directly: \`pg.readQuery()\`, \`pg.writeQuery()\`, \`pg.listTables()\`, \`pg.describeTable()\`, \`pg.createTable()\`, \`pg.dropTable()\`, \`pg.count()\`, \`pg.exists()\`, \`pg.upsert()\`, \`pg.batchInsert()\`, \`pg.truncate()\`, \`pg.createIndex()\`, \`pg.dropIndex()\`, \`pg.getIndexes()\`, \`pg.listObjects()\`, \`pg.objectDetails()\`, \`pg.analyzeDbHealth()\`, \`pg.analyzeQueryIndexes()\`, \`pg.analyzeWorkloadIndexes()\`
+**Top-Level Core Aliases**: All starter tools available directly: \`pg.readQuery()\`, \`pg.writeQuery()\`, \`pg.listTables()\`, \`pg.describeTable()\`, \`pg.createTable()\`, \`pg.dropTable()\`, \`pg.count()\`, \`pg.exists()\`, \`pg.upsert()\`, \`pg.batchInsert()\`, \`pg.truncate()\`, \`pg.createIndex()\`, \`pg.dropIndex()\`, \`pg.getIndexes()\`, \`pg.listObjects()\`, \`pg.objectDetails()\`, \`pg.listExtensions()\`, \`pg.analyzeDbHealth()\`, \`pg.analyzeQueryIndexes()\`, \`pg.analyzeWorkloadIndexes()\`
 
 **Positional args work**: \`readQuery("SELECT...")\`, \`exists("users", "id=1")\`, \`createIndex("users", ["email"])\`
 

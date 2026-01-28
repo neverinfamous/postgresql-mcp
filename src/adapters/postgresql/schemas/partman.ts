@@ -448,13 +448,11 @@ export const PartmanShowConfigOutputSchema = z
   .object({
     configs: z
       .array(
-        z
-          .record(z.string(), z.unknown())
-          .and(
-            z.object({
-              orphaned: z.boolean().optional().describe("Config is orphaned"),
-            }),
-          ),
+        z.record(z.string(), z.unknown()).and(
+          z.object({
+            orphaned: z.boolean().optional().describe("Config is orphaned"),
+          }),
+        ),
       )
       .describe("Partition configurations"),
     count: z.number().describe("Number of configs returned"),
@@ -574,4 +572,3 @@ export const PartmanAnalyzeHealthOutputSchema = z
     message: z.string().optional().describe("Status message"),
   })
   .describe("Partition health analysis result");
-

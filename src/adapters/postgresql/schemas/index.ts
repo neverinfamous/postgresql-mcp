@@ -235,7 +235,6 @@ export {
   VectorEmbedOutputSchema,
 } from "./vector.js";
 
-
 // PostGIS schemas
 export {
   // Base schemas for MCP visibility

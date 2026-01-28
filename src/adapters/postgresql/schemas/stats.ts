@@ -816,9 +816,15 @@ export const CorrelationOutputSchema = z
       .array(
         z.object({
           groupKey: z.unknown().describe("Group key value"),
-          correlation: z.number().nullable().describe("Pearson correlation coefficient"),
+          correlation: z
+            .number()
+            .nullable()
+            .describe("Pearson correlation coefficient"),
           interpretation: z.string().describe("Human-readable interpretation"),
-          covariancePopulation: z.number().nullable().describe("Population covariance"),
+          covariancePopulation: z
+            .number()
+            .nullable()
+            .describe("Population covariance"),
           covarianceSample: z.number().nullable().describe("Sample covariance"),
           sampleSize: z.number().describe("Number of data points"),
         }),
@@ -828,10 +834,25 @@ export const CorrelationOutputSchema = z
     count: z.number().optional().describe("Number of groups (if grouped)"),
     note: z.string().optional().describe("Additional notes"),
     // Flattened correlation result fields for ungrouped results
-    correlation: z.number().nullable().optional().describe("Pearson correlation coefficient"),
-    interpretation: z.string().optional().describe("Human-readable interpretation"),
-    covariancePopulation: z.number().nullable().optional().describe("Population covariance"),
-    covarianceSample: z.number().nullable().optional().describe("Sample covariance"),
+    correlation: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Pearson correlation coefficient"),
+    interpretation: z
+      .string()
+      .optional()
+      .describe("Human-readable interpretation"),
+    covariancePopulation: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Population covariance"),
+    covarianceSample: z
+      .number()
+      .nullable()
+      .optional()
+      .describe("Sample covariance"),
     sampleSize: z.number().optional().describe("Number of data points"),
   })
   .describe("Correlation analysis output");

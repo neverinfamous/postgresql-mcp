@@ -890,17 +890,17 @@ export function createStatsHypothesisTool(
         sampleStdDev: number,
       ):
         | {
-          sampleSize: number;
-          sampleMean: number;
-          sampleStdDev: number;
-          populationStdDev: number | null;
-          standardError: number;
-          testStatistic: number;
-          pValue: number;
-          degreesOfFreedom: number | null;
-          interpretation: string;
-          note: string;
-        }
+            sampleSize: number;
+            sampleMean: number;
+            sampleStdDev: number;
+            populationStdDev: number | null;
+            standardError: number;
+            testStatistic: number;
+            pValue: number;
+            degreesOfFreedom: number | null;
+            interpretation: string;
+            note: string;
+          }
         | { error: string; sampleSize: number } => {
         if (n < 2 || isNaN(sampleStdDev) || sampleStdDev === 0) {
           return { error: "Insufficient data or zero variance", sampleSize: n };

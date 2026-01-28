@@ -341,7 +341,10 @@ export const CronUnscheduleOutputSchema = z
     usedIdentifier: z
       .enum(["jobId", "jobName"])
       .describe("Which identifier was used"),
-    warning: z.string().optional().describe("Warning if both identifiers given"),
+    warning: z
+      .string()
+      .optional()
+      .describe("Warning if both identifiers given"),
     message: z.string().describe("Status message"),
   })
   .describe("Cron job removal result");
@@ -440,4 +443,3 @@ export const CronCleanupHistoryOutputSchema = z
     message: z.string().describe("Status message"),
   })
   .describe("Cron history cleanup result");
-

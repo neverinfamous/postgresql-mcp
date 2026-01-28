@@ -109,124 +109,284 @@ export function parseJsonbValue(value: unknown): unknown {
   return value;
 }
 
+/**
+ * Preprocess JSONB tool parameters to normalize common input patterns.
+ * Handles aliases and schema.table format parsing.
+ * Exported so tools can apply it in their handlers.
+ *
+ * SPLIT SCHEMA PATTERN:
+ * - Base schemas use optional table/tableName with .refine() for MCP visibility
+ * - Handlers use z.preprocess(preprocessJsonbParams, BaseSchema) for alias resolution
+ */
+export function preprocessJsonbParams(input: unknown): unknown {
+  if (typeof input !== "object" || input === null) {
+    return input;
+  }
+  const result = { ...(input as Record<string, unknown>) };
+
+  // Alias: tableName → table
+  if (result["tableName"] !== undefined && result["table"] === undefined) {
+    result["table"] = result["tableName"];
+  }
+  // Alias: name → table (for consistency with other tool groups)
+  if (result["name"] !== undefined && result["table"] === undefined) {
+    result["table"] = result["name"];
+  }
+  // Alias: col → column
+  if (result["col"] !== undefined && result["column"] === undefined) {
+    result["column"] = result["col"];
+  }
+  // Alias: filter → where
+  if (result["filter"] !== undefined && result["where"] === undefined) {
+    result["where"] = result["filter"];
+  }
+
+  // Parse schema.table format (embedded schema takes priority)
+  if (typeof result["table"] === "string" && result["table"].includes(".")) {
+    const parts = result["table"].split(".");
+    if (parts.length === 2 && parts[0] && parts[1]) {
+      // Only override schema if not already explicitly set
+      if (result["schema"] === undefined) {
+        result["schema"] = parts[0];
+      }
+      result["table"] = parts[1];
+    }
+  }
+
+  return result;
+}
+
 // ============== EXTRACT SCHEMA ==============
-export const JsonbExtractSchema = z.object({
-  table: z.string().describe("Table name"),
-  column: z.string().describe("JSONB column name"),
-  path: z
-    .union([
-      z.string().describe('Path as string (e.g., "a.b.c" or "a[0].b")'),
-      z
-        .array(z.union([z.string(), z.number()]))
-        .describe('Path as array (e.g., ["a", 0, "b"])'),
-    ])
-    .describe(
-      "Path to extract. Accepts both string and array formats with numeric indices.",
-    ),
-  select: z
-    .array(z.string())
-    .optional()
-    .describe(
-      'Additional columns to include in result for row identification (e.g., ["id"])',
-    ),
-  where: z.string().optional().describe("WHERE clause"),
-  limit: z.number().optional().describe("Maximum number of rows to return"),
-});
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbExtractSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    path: z
+      .union([
+        z.string().describe('Path as string (e.g., "a.b.c" or "a[0].b")'),
+        z
+          .array(z.union([z.string(), z.number()]))
+          .describe('Path as array (e.g., ["a", 0, "b"])'),
+      ])
+      .describe(
+        "Path to extract. Accepts both string and array formats with numeric indices.",
+      ),
+    select: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Additional columns to include in result for row identification (e.g., ["id"])',
+      ),
+    where: z.string().optional().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+    limit: z.number().optional().describe("Maximum number of rows to return"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbExtractSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbExtractSchemaBase,
+);
 
 // ============== SET SCHEMA ==============
-export const JsonbSetSchema = z.object({
-  table: z.string().describe("Table name"),
-  column: z.string().describe("JSONB column name"),
-  path: z
-    .union([
-      z.string().describe('Path as string (e.g., "a.b.c" or "a[0].b")'),
-      z
-        .array(z.union([z.string(), z.number()]))
-        .describe('Path as array (e.g., ["a", 0, "b"])'),
-    ])
-    .describe(
-      "Path to the value. Accepts both string and array formats with numeric indices.",
-    ),
-  value: z
-    .unknown()
-    .describe("New value to set at the path (will be converted to JSONB)"),
-  where: z.string().describe("WHERE clause to identify rows to update"),
-  createMissing: z
-    .boolean()
-    .optional()
-    .describe(
-      "Create intermediate keys if path does not exist (default: true)",
-    ),
-});
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbSetSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    path: z
+      .union([
+        z.string().describe('Path as string (e.g., "a.b.c" or "a[0].b")'),
+        z
+          .array(z.union([z.string(), z.number()]))
+          .describe('Path as array (e.g., ["a", 0, "b"])'),
+      ])
+      .describe(
+        "Path to the value. Accepts both string and array formats with numeric indices.",
+      ),
+    value: z
+      .unknown()
+      .describe("New value to set at the path (will be converted to JSONB)"),
+    where: z.string().describe("WHERE clause to identify rows to update"),
+    filter: z
+      .string()
+      .optional()
+      .describe("WHERE clause (alias for where, only for read operations)"),
+    createMissing: z
+      .boolean()
+      .optional()
+      .describe(
+        "Create intermediate keys if path does not exist (default: true)",
+      ),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbSetSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbSetSchemaBase,
+);
 
 // ============== CONTAINS SCHEMA ==============
-export const JsonbContainsSchema = z.object({
-  table: z.string().describe("Table name"),
-  column: z.string().describe("JSONB column name"),
-  value: z
-    .unknown()
-    .describe('JSON value to check if contained (e.g., {"status": "active"})'),
-  select: z
-    .array(z.string())
-    .optional()
-    .describe("Columns to select in result"),
-  where: z.string().optional().describe("Additional WHERE clause filter"),
-});
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbContainsSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    value: z
+      .unknown()
+      .describe(
+        'JSON value to check if contained (e.g., {"status": "active"})',
+      ),
+    select: z
+      .array(z.string())
+      .optional()
+      .describe("Columns to select in result"),
+    where: z.string().optional().describe("Additional WHERE clause filter"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbContainsSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbContainsSchemaBase,
+);
 
 // ============== PATH QUERY SCHEMA ==============
-export const JsonbPathQuerySchema = z.object({
-  table: z.string().describe("Table name"),
-  column: z.string().describe("JSONB column name"),
-  path: z
-    .string()
-    .describe(
-      'JSONPath expression (e.g., "$.items[*].name" or "$.* ? (@.price > 10)")',
-    ),
-  vars: z
-    .record(z.string(), z.unknown())
-    .optional()
-    .describe("Variables for JSONPath (access with $var_name)"),
-  where: z.string().optional().describe("WHERE clause"),
-});
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbPathQuerySchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    path: z
+      .string()
+      .describe(
+        'JSONPath expression (e.g., "$.items[*].name" or "$.* ? (@.price > 10)")',
+      ),
+    vars: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Variables for JSONPath (access with $var_name)"),
+    where: z.string().optional().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbPathQuerySchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbPathQuerySchemaBase,
+);
 
 // ============== INSERT SCHEMA ==============
-export const JsonbInsertSchema = z.object({
-  table: z.string().describe("Table name"),
-  column: z.string().describe("JSONB column name"),
-  path: z
-    .union([
-      z.string().describe('Path as string (e.g., "tags.0")'),
-      z.number().describe("Array index position (e.g., 0, -1)"),
-      z
-        .array(z.union([z.string(), z.number()]))
-        .describe('Path as array (e.g., ["tags", 0])'),
-    ])
-    .describe(
-      "Path to insert at (for arrays). Accepts both string and array formats.",
-    ),
-  value: z.unknown().describe("Value to insert"),
-  where: z.string().describe("WHERE clause"),
-  insertAfter: z
-    .boolean()
-    .optional()
-    .describe("Insert after the specified position (default: false)"),
-});
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbInsertSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    path: z
+      .union([
+        z.string().describe('Path as string (e.g., "tags.0")'),
+        z.number().describe("Array index position (e.g., 0, -1)"),
+        z
+          .array(z.union([z.string(), z.number()]))
+          .describe('Path as array (e.g., ["tags", 0])'),
+      ])
+      .describe(
+        "Path to insert at (for arrays). Accepts both string and array formats.",
+      ),
+    value: z.unknown().describe("Value to insert"),
+    where: z.string().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+    insertAfter: z
+      .boolean()
+      .optional()
+      .describe("Insert after the specified position (default: false)"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbInsertSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbInsertSchemaBase,
+);
 
 // ============== DELETE SCHEMA ==============
-export const JsonbDeleteSchema = z.object({
-  table: z.string().describe("Table name"),
-  column: z.string().describe("JSONB column name"),
-  path: z
-    .union([
-      z.string().describe("Key to delete (single key) or dot-notation path"),
-      z.number().describe("Array index to delete (e.g., 0, 1, 2)"),
-      z
-        .array(z.union([z.string(), z.number()]))
-        .describe('Path as array (e.g., ["nested", 0])'),
-    ])
-    .describe("Key or path to delete. Supports numeric indices for arrays."),
-  where: z.string().describe("WHERE clause"),
-});
+// Base schema (for MCP inputSchema visibility - no preprocess)
+export const JsonbDeleteSchemaBase = z
+  .object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Table name (alias for table)"),
+    column: z.string().optional().describe("JSONB column name"),
+    col: z.string().optional().describe("JSONB column name (alias for column)"),
+    path: z
+      .union([
+        z.string().describe("Key to delete (single key) or dot-notation path"),
+        z.number().describe("Array index to delete (e.g., 0, 1, 2)"),
+        z
+          .array(z.union([z.string(), z.number()]))
+          .describe('Path as array (e.g., ["nested", 0])'),
+      ])
+      .describe("Key or path to delete. Supports numeric indices for arrays."),
+    where: z.string().describe("WHERE clause"),
+    filter: z.string().optional().describe("WHERE clause (alias for where)"),
+    schema: z.string().optional().describe("Schema name (default: public)"),
+  })
+  .refine((data) => data.table !== undefined || data.tableName !== undefined, {
+    message: "Either 'table' or 'tableName' is required",
+  })
+  .refine((data) => data.column !== undefined || data.col !== undefined, {
+    message: "Either 'column' or 'col' is required",
+  });
+
+// Full schema with preprocess (for handler parsing)
+export const JsonbDeleteSchema = z.preprocess(
+  preprocessJsonbParams,
+  JsonbDeleteSchemaBase,
+);
 
 // ============== OUTPUT SCHEMAS (MCP 2025-11-25 structuredContent) ==============
 
@@ -298,28 +458,29 @@ export const JsonbKeysOutputSchema = z.object({
 });
 
 // Output schema for pg_jsonb_strip_nulls (two modes: update or preview)
-export const JsonbStripNullsOutputSchema = z.union([
-  z.object({
-    rowsAffected: z.number().describe("Number of rows updated"),
-  }),
-  z.object({
-    preview: z.literal(true).describe("Preview mode indicator"),
-    rows: z
-      .array(z.object({ before: z.unknown(), after: z.unknown() }))
-      .describe("Before/after comparison"),
-    count: z.number().describe("Number of rows"),
-    hint: z.string().describe("Preview mode note"),
-  }),
-]);
+// Uses combined schema with optional fields instead of union with z.literal() to avoid Zod validation issues
+export const JsonbStripNullsOutputSchema = z.object({
+  // Update mode fields
+  rowsAffected: z.number().optional().describe("Number of rows updated"),
+  // Preview mode fields
+  preview: z.boolean().optional().describe("Preview mode indicator"),
+  rows: z
+    .array(z.record(z.string(), z.unknown()))
+    .optional()
+    .describe("Before/after comparison"),
+  count: z.number().optional().describe("Number of rows"),
+  hint: z.string().optional().describe("Preview mode note"),
+});
 
 // Output schema for pg_jsonb_typeof
 export const JsonbTypeofOutputSchema = z.object({
-  types: z.array(z.string()).describe("JSONB types for each row"),
+  types: z
+    .array(z.string().nullable())
+    .describe("JSONB types for each row (null if path doesn't exist)"),
   count: z.number().describe("Number of rows"),
   columnNull: z
-    .array(z.boolean())
-    .optional()
-    .describe("Whether column is NULL per row"),
+    .boolean()
+    .describe("Whether any column was NULL (uses .some() aggregation)"),
   hint: z.string().optional().describe("Additional information"),
 });
 

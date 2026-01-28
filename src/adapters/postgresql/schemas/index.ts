@@ -38,12 +38,22 @@ export {
 
 // JSONB operation schemas
 export {
+  // Base schemas for MCP visibility (Split Schema pattern)
+  JsonbExtractSchemaBase,
+  JsonbSetSchemaBase,
+  JsonbContainsSchemaBase,
+  JsonbPathQuerySchemaBase,
+  JsonbInsertSchemaBase,
+  JsonbDeleteSchemaBase,
+  // Full schemas (with preprocess - for handler parsing)
   JsonbExtractSchema,
   JsonbSetSchema,
   JsonbContainsSchema,
   JsonbPathQuerySchema,
   JsonbInsertSchema,
   JsonbDeleteSchema,
+  // Preprocess function for handlers
+  preprocessJsonbParams,
   // Path normalization functions (for handler use)
   normalizePathToArray,
   normalizePathForInsert,

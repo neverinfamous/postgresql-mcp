@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **JSONB Output Schema Validation Bugs**
+  - `pg_jsonb_typeof` — Fixed `columnNull` field type from array to boolean to match actual handler output
+  - `pg_jsonb_strip_nulls` — Refactored output schema from union to combined object with optional fields to resolve Zod validation errors
+- **JSONB Split Schema Pattern** — Implemented Split Schema pattern for 6 JSONB tools to support parameter aliases in direct MCP tool calls:
+  - Added `tableName` (alias for `table`), `col` (alias for `column`), and `filter` (alias for `where`) support
+  - Added `preprocessJsonbParams()` function for alias normalization and `schema.table` parsing
+  - Created Base schemas for MCP visibility and full schemas with preprocessing for handler parsing
+  - Updated tools: `pg_jsonb_extract`, `pg_jsonb_set`, `pg_jsonb_insert`, `pg_jsonb_delete`, `pg_jsonb_contains`, `pg_jsonb_path_query`
+
+
 ### Changed
 
 - **Modern Tool Registration** — Migrated from deprecated `server.tool()` to `server.registerTool()` API for MCP 2025-11-25 compliance

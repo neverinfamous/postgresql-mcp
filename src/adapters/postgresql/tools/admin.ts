@@ -375,10 +375,12 @@ function createSetConfigTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.value,
         local,
       ]);
+      const actualValue = result.rows?.[0]?.["set_config"] as string;
       return {
         success: true,
+        message: `Set ${parsed.name} = ${actualValue}`,
         parameter: parsed.name,
-        value: result.rows?.[0]?.["set_config"],
+        value: actualValue,
       };
     },
   };

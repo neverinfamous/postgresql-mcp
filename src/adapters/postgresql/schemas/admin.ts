@@ -274,5 +274,13 @@ export const BackendOutputSchema = z.object({
 export const ConfigOutputSchema = z.object({
   success: z.boolean().describe("Whether the operation succeeded"),
   message: z.string().describe("Human-readable result message"),
+  parameter: z
+    .string()
+    .optional()
+    .describe("Configuration parameter name (set_config)"),
+  value: z
+    .string()
+    .optional()
+    .describe("Configuration parameter value (set_config)"),
   hint: z.string().optional().describe("Additional information"),
 });

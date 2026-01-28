@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **pg_set_config Zod output schema error** — Fixed direct MCP tool call failing with output validation error. The handler was returning `{success, parameter, value}` without a `message` field, which is required by `ConfigOutputSchema`. Handler now returns a `message` field (e.g., "Set work_mem = 256MB") and the schema now includes optional `parameter` and `value` fields for set_config operations
 - **pg_cache_hit_ratio Zod output schema error** — Fixed direct MCP tool call failing with `Cannot read properties of undefined (reading '_zod')` error. The root cause was the `CacheHitRatioOutputSchema` using `.nullable()` at the top level, which broke MCP's Zod-to-JSON Schema conversion. Changed schema to always return an object with nullable fields, and updated handler to never return `null` (fields are set to `null` individually when no data exists)
 - **JSONB Output Schema Validation Bugs**
 

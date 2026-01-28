@@ -70,6 +70,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - View tools: `pg_list_views`, `pg_create_view`, `pg_drop_view`
   - Metadata tools: `pg_list_functions`, `pg_list_triggers`, `pg_list_constraints`
   - Added 12 reusable output schemas in `schemas/schema-mgmt.ts`
+- **Structured Content (outputSchema) for Partitioning Tools** — All 6 partitioning tools now include `outputSchema`:
+  - List/info: `pg_list_partitions`, `pg_partition_info`
+  - Create: `pg_create_partitioned_table`, `pg_create_partition`
+  - Attach/detach: `pg_attach_partition`, `pg_detach_partition`
+  - Added 6 reusable output schemas in `schemas/partitioning.ts`
 
 ### Security
 

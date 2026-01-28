@@ -28,6 +28,13 @@ import {
   DetachPartitionSchema,
   ListPartitionsSchema,
   PartitionInfoSchema,
+  // Output schemas
+  ListPartitionsOutputSchema,
+  CreatePartitionedTableOutputSchema,
+  CreatePartitionOutputSchema,
+  AttachPartitionOutputSchema,
+  DetachPartitionOutputSchema,
+  PartitionInfoOutputSchema,
 } from "../schemas/index.js";
 
 /**
@@ -106,6 +113,7 @@ function createListPartitionsTool(adapter: PostgresAdapter): ToolDefinition {
       "List all partitions of a partitioned table. Returns warning if table is not partitioned.",
     group: "partitioning",
     inputSchema: ListPartitionsSchemaBase, // Base schema for MCP visibility with alias support
+    outputSchema: ListPartitionsOutputSchema,
     annotations: readOnly("List Partitions"),
     icons: getToolIcons("partitioning", readOnly("List Partitions")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -218,6 +226,7 @@ function createPartitionedTableTool(adapter: PostgresAdapter): ToolDefinition {
       "Create a partitioned table. Columns: notNull, primaryKey, unique, default. Note: primaryKey/unique must include the partition key column.",
     group: "partitioning",
     inputSchema: CreatePartitionedTableSchemaBase, // Base schema for MCP visibility
+    outputSchema: CreatePartitionedTableOutputSchema,
     annotations: write("Create Partitioned Table"),
     icons: getToolIcons("partitioning", write("Create Partitioned Table")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -362,6 +371,7 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
       "Create a partition. Use subpartitionBy/subpartitionKey to make it sub-partitionable for multi-level partitioning.",
     group: "partitioning",
     inputSchema: CreatePartitionSchemaBase, // Base schema for MCP visibility
+    outputSchema: CreatePartitionOutputSchema,
     annotations: write("Create Partition"),
     icons: getToolIcons("partitioning", write("Create Partition")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -451,6 +461,7 @@ function createAttachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Attach an existing table as a partition.",
     group: "partitioning",
     inputSchema: AttachPartitionSchemaBase, // Base schema for MCP visibility
+    outputSchema: AttachPartitionOutputSchema,
     annotations: write("Attach Partition"),
     icons: getToolIcons("partitioning", write("Attach Partition")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -516,6 +527,7 @@ function createDetachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
       "Detach a partition. Use concurrently: true for non-blocking. Use finalize: true only after an interrupted CONCURRENTLY detach.",
     group: "partitioning",
     inputSchema: DetachPartitionSchemaBase, // Base schema for MCP visibility
+    outputSchema: DetachPartitionOutputSchema,
     annotations: destructive("Detach Partition"),
     icons: getToolIcons("partitioning", destructive("Detach Partition")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -574,6 +586,7 @@ function createPartitionInfoTool(adapter: PostgresAdapter): ToolDefinition {
       "Get detailed information about a partitioned table. Returns warning if table is not partitioned.",
     group: "partitioning",
     inputSchema: PartitionInfoSchemaBase, // Base schema for MCP visibility with alias support
+    outputSchema: PartitionInfoOutputSchema,
     annotations: readOnly("Partition Info"),
     icons: getToolIcons("partitioning", readOnly("Partition Info")),
     handler: async (params: unknown, _context: RequestContext) => {

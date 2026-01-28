@@ -272,6 +272,13 @@ export {
   DetachPartitionSchema,
   ListPartitionsSchema,
   PartitionInfoSchema,
+  // Output schemas
+  ListPartitionsOutputSchema,
+  CreatePartitionedTableOutputSchema,
+  CreatePartitionOutputSchema,
+  AttachPartitionOutputSchema,
+  DetachPartitionOutputSchema,
+  PartitionInfoOutputSchema,
 } from "./partitioning.js";
 
 // pg_cron schemas

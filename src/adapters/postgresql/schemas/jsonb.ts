@@ -340,6 +340,7 @@ export const JsonbValidatePathOutputSchema = z.object({
 export const JsonbMergeOutputSchema = z.object({
   merged: z.unknown().describe("Merged JSONB document"),
   deep: z.boolean().describe("Whether deep merge was used"),
+  mergeArrays: z.boolean().optional().describe("Whether arrays were concatenated"),
 });
 
 // Output schema for pg_jsonb_normalize
@@ -365,13 +366,8 @@ export const JsonbDiffOutputSchema = z.object({
     )
     .describe("List of differences"),
   hasDifferences: z.boolean().describe("Whether any differences exist"),
-  summary: z
-    .object({
-      added: z.number().describe("Keys added in doc2"),
-      removed: z.number().describe("Keys removed from doc1"),
-      modified: z.number().describe("Keys with different values"),
-    })
-    .describe("Summary counts"),
+  comparison: z.string().describe("Comparison type performed"),
+  hint: z.string().describe("Explanation of comparison scope"),
 });
 
 // Output schema for pg_jsonb_index_suggest

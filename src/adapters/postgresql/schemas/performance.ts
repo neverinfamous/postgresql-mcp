@@ -143,16 +143,11 @@ export const BloatCheckOutputSchema = z.object({
 });
 
 // pg_cache_hit_ratio
-export const CacheHitRatioOutputSchema = z
-  .object({
-    heap_read: z.number().nullable().describe("Heap blocks read from disk"),
-    heap_hit: z.number().nullable().describe("Heap blocks hit in cache"),
-    cache_hit_ratio: z
-      .number()
-      .nullable()
-      .describe("Cache hit ratio percentage"),
-  })
-  .nullable();
+export const CacheHitRatioOutputSchema = z.object({
+  heap_read: z.number().nullable().describe("Heap blocks read from disk"),
+  heap_hit: z.number().nullable().describe("Heap blocks hit in cache"),
+  cache_hit_ratio: z.number().nullable().describe("Cache hit ratio percentage"),
+});
 
 // pg_seq_scan_tables
 export const SeqScanTablesOutputSchema = z.object({

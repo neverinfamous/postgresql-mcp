@@ -140,14 +140,12 @@ export function createCacheHitRatioTool(
 
       const result = await adapter.executeQuery(sql);
       const row = result.rows?.[0];
-      // Coerce numeric fields to JavaScript numbers
-      return row
-        ? {
-            heap_read: toNum(row["heap_read"]),
-            heap_hit: toNum(row["heap_hit"]),
-            cache_hit_ratio: toNum(row["cache_hit_ratio"]),
-          }
-        : null;
+      // Always return an object with nullable fields (never return null)
+      return {
+        heap_read: row ? toNum(row["heap_read"]) : null,
+        heap_hit: row ? toNum(row["heap_hit"]) : null,
+        cache_hit_ratio: row ? toNum(row["cache_hit_ratio"]) : null,
+      };
     },
   };
 }

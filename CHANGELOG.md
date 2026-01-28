@@ -166,11 +166,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Code mode handler now captures active transactions before execution and cleans up any new transactions created if the code fails
   - Prevents dangling database connections from uncommitted transactions after code errors or timeouts
 
-
 ### Documentation
 
 - **pg_describe_table rowCount -1 clarification** — Documented that `rowCount: -1` in `pg_describe_table` response indicates PostgreSQL has no statistics for the table (run `ANALYZE` to populate)
 - **Code Mode memoryUsedMb metrics clarification** — Documented that `memoryUsedMb` measures heap delta (end - start) and negative values indicate memory was freed during execution (e.g., GC ran)
+- **pg_transaction_rollback_to behavior clarification** — Enhanced documentation to clarify that `rollbackTo` restores the database state to when the savepoint was created, undoing ALL work (data changes AND savepoints) created after the target savepoint—not just savepoints. This is standard PostgreSQL behavior where rolling back to a savepoint reverts both data modifications and nested savepoint definitions
 
 ### Dependencies
 

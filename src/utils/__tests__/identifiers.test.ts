@@ -10,6 +10,7 @@ import {
   sanitizeColumnRef,
   sanitizeIdentifiers,
   generateIndexName,
+  quoteIdentifier,
   InvalidIdentifierError,
 } from "../../utils/identifiers.js";
 
@@ -289,6 +290,72 @@ describe("Identifier Sanitization", () => {
 
     it("should throw for invalid index names", () => {
       expect(() => sanitizeIndexName("bad;index")).toThrow(
+        InvalidIdentifierError,
+      );
+    });
+  });
+
+  describe("quoteIdentifier", () => {
+    it("should quote simple identifiers", () => {
+      expect(quoteIdentifier("my_savepoint")).toBe('"my_savepoint"');
+      expect(quoteIdentifier("sp1")).toBe('"sp1"');
+      expect(quoteIdentifier("nested_sp")).toBe('"nested_sp"');
+    });
+
+    it("should allow reserved keywords (critical for savepoint names)", () => {
+      // This is the key difference from sanitizeIdentifier -
+      // reserved keywords are perfectly valid when quoted
+      expect(quoteIdentifier("outer")).toBe('"outer"');
+      expect(quoteIdentifier("inner")).toBe('"inner"');
+      expect(quoteIdentifier("select")).toBe('"select"');
+      expect(quoteIdentifier("table")).toBe('"table"');
+      expect(quoteIdentifier("from")).toBe('"from"');
+      expect(quoteIdentifier("order")).toBe('"order"');
+    });
+
+    it("should allow mixed case identifiers", () => {
+      expect(quoteIdentifier("MySavepoint")).toBe('"MySavepoint"');
+      expect(quoteIdentifier("CamelCase")).toBe('"CamelCase"');
+    });
+
+    it("should allow underscore-prefixed identifiers", () => {
+      expect(quoteIdentifier("_internal")).toBe('"_internal"');
+      expect(quoteIdentifier("_sp")).toBe('"_sp"');
+    });
+
+    it("should allow dollar sign in identifiers", () => {
+      expect(quoteIdentifier("sp$1")).toBe('"sp$1"');
+      expect(quoteIdentifier("tx$main")).toBe('"tx$main"');
+    });
+
+    it("should reject empty identifiers", () => {
+      expect(() => quoteIdentifier("")).toThrow(InvalidIdentifierError);
+    });
+
+    it("should reject oversized identifiers (>63 chars)", () => {
+      const longName = "a".repeat(64);
+      expect(() => quoteIdentifier(longName)).toThrow(InvalidIdentifierError);
+      expect(() => quoteIdentifier("a".repeat(63))).not.toThrow();
+    });
+
+    it("should reject identifiers with invalid characters", () => {
+      expect(() => quoteIdentifier("bad;name")).toThrow(InvalidIdentifierError);
+      expect(() => quoteIdentifier("bad-name")).toThrow(InvalidIdentifierError);
+      expect(() => quoteIdentifier("bad name")).toThrow(InvalidIdentifierError);
+      expect(() => quoteIdentifier("bad'name")).toThrow(InvalidIdentifierError);
+    });
+
+    it("should reject SQL injection attempts", () => {
+      expect(() => quoteIdentifier('sp"; DROP TABLE users;--')).toThrow(
+        InvalidIdentifierError,
+      );
+      expect(() => quoteIdentifier("1starting_with_number")).toThrow(
+        InvalidIdentifierError,
+      );
+    });
+
+    it("should reject schema.table format (not applicable for savepoints)", () => {
+      expect(() => quoteIdentifier("schema.savepoint")).toThrow(
         InvalidIdentifierError,
       );
     });

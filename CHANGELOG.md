@@ -156,6 +156,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg.listExtensions() top-level alias missing** — Added missing Code Mode top-level alias for consistency
   - `pg.listExtensions()` now works in Code Mode (was previously only accessible via `pg.core.listExtensions()`)
   - Updated `ServerInstructions.ts` documentation to include the alias
+- **Transaction savepoint reserved keyword syntax errors** — Fixed savepoint operations failing with SQL syntax errors when using reserved keywords (e.g., `outer`, `inner`, `select`, `table`) as savepoint names
+  - Added new `quoteIdentifier()` utility in `src/utils/identifiers.ts` that safely quotes identifiers without rejecting reserved keywords (unlike `sanitizeIdentifier()` which is stricter for schema/table/column names)
+  - Updated `createSavepoint()`, `releaseSavepoint()`, and `rollbackToSavepoint()` in `PostgresAdapter.ts` to use `quoteIdentifier()` for savepoint names
+  - Expanded `RESERVED_KEYWORDS` set with 8 additional keywords: `cross`, `full`, `inner`, `join`, `left`, `natural`, `right`, `outer`
+  - Example: `pg.transactions.savepoint({ tx: txId, name: 'outer' })` now works correctly instead of producing `syntax error at or near "outer"`
+- **Code Mode orphaned transaction cleanup** — Implemented automatic transaction cleanup when code mode execution fails
+  - Added `getActiveTransactionIds()` and `cleanupTransaction()` methods to `PostgresAdapter` for tracking and rolling back orphaned transactions
+  - Code mode handler now captures active transactions before execution and cleans up any new transactions created if the code fails
+  - Prevents dangling database connections from uncommitted transactions after code errors or timeouts
+
 
 ### Documentation
 

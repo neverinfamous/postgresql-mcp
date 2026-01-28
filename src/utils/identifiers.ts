@@ -44,6 +44,7 @@ const RESERVED_KEYWORDS = new Set([
   "column",
   "constraint",
   "create",
+  "cross",
   "current_catalog",
   "current_date",
   "current_role",
@@ -64,18 +65,23 @@ const RESERVED_KEYWORDS = new Set([
   "for",
   "foreign",
   "from",
+  "full",
   "grant",
   "group",
   "having",
   "in",
   "initially",
+  "inner",
   "intersect",
   "into",
+  "join",
   "lateral",
   "leading",
+  "left",
   "limit",
   "localtime",
   "localtimestamp",
+  "natural",
   "not",
   "null",
   "offset",
@@ -83,10 +89,12 @@ const RESERVED_KEYWORDS = new Set([
   "only",
   "or",
   "order",
+  "outer",
   "placing",
   "primary",
   "references",
   "returning",
+  "right",
   "select",
   "session_user",
   "some",
@@ -310,4 +318,61 @@ export function generateIndexName(
   validateIdentifier(truncated);
 
   return sanitizeIdentifier(truncated);
+}
+
+/**
+ * Quote an identifier for safe use in SQL without strict validation.
+ *
+ * Unlike sanitizeIdentifier(), this function:
+ * - Allows reserved keywords (they become valid when quoted)
+ * - Allows any valid PostgreSQL identifier characters
+ * - Only validates basic safety (length, no dangerous characters)
+ *
+ * Use this for user-provided names like savepoints where reserved keywords
+ * are perfectly valid PostgreSQL identifiers when properly quoted.
+ *
+ * @param name - The identifier to quote
+ * @returns The double-quoted identifier safe for SQL interpolation
+ * @throws InvalidIdentifierError if the identifier is genuinely invalid
+ *
+ * @example
+ * quoteIdentifier('outer') // Returns: "outer" (reserved keyword, but valid)
+ * quoteIdentifier('my_savepoint') // Returns: "my_savepoint"
+ * quoteIdentifier('sp1') // Returns: "sp1"
+ */
+export function quoteIdentifier(name: string): string {
+  if (!name || typeof name !== "string") {
+    throw new InvalidIdentifierError(
+      name,
+      "Identifier must be a non-empty string",
+    );
+  }
+
+  if (name.length > MAX_IDENTIFIER_LENGTH) {
+    throw new InvalidIdentifierError(
+      name,
+      `Identifier exceeds maximum length of ${String(MAX_IDENTIFIER_LENGTH)} characters`,
+    );
+  }
+
+  // Basic pattern validation - allows letters, digits, underscores, dollar signs
+  // This is less strict than validateIdentifier() - allows reserved keywords
+  if (!IDENTIFIER_PATTERN.test(name)) {
+    // Check if user is trying to use schema.table format
+    if (name.includes(".")) {
+      throw new InvalidIdentifierError(
+        name,
+        'Schema-qualified names (schema.table) are not supported in this parameter. Use the separate "schema" parameter instead.',
+      );
+    }
+    throw new InvalidIdentifierError(
+      name,
+      "Identifier contains invalid characters. Must start with a letter or underscore and contain only letters, digits, underscores, or dollar signs",
+    );
+  }
+
+  // Escape any embedded double quotes (defensive - pattern should prevent this)
+  const escaped = name.replace(/"/g, '""');
+
+  return `"${escaped}"`;
 }

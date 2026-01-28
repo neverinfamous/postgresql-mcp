@@ -28,6 +28,7 @@ import {
   TransactionError,
 } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { quoteIdentifier } from "../../utils/identifiers.js";
 
 // Import tool modules (will be created next)
 import { getCoreTools } from "./tools/core/index.js";
@@ -342,7 +343,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       throw new TransactionError(`Transaction not found: ${transactionId}`);
     }
 
-    await client.query(`SAVEPOINT ${savepointName}`);
+    await client.query(`SAVEPOINT ${quoteIdentifier(savepointName)}`);
   }
 
   /**
@@ -357,7 +358,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       throw new TransactionError(`Transaction not found: ${transactionId}`);
     }
 
-    await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+    await client.query(`RELEASE SAVEPOINT ${quoteIdentifier(savepointName)}`);
   }
 
   /**
@@ -372,7 +373,9 @@ export class PostgresAdapter extends DatabaseAdapter {
       throw new TransactionError(`Transaction not found: ${transactionId}`);
     }
 
-    await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+    await client.query(
+      `ROLLBACK TO SAVEPOINT ${quoteIdentifier(savepointName)}`,
+    );
   }
 
   /**
@@ -380,6 +383,54 @@ export class PostgresAdapter extends DatabaseAdapter {
    */
   getTransactionConnection(transactionId: string): PoolClient | undefined {
     return this.activeTransactions.get(transactionId);
+  }
+
+  /**
+   * Get all active transaction IDs
+   * Used by code mode to track transactions started during execution
+   */
+  getActiveTransactionIds(): string[] {
+    return Array.from(this.activeTransactions.keys());
+  }
+
+  /**
+   * Rollback and cleanup a specific transaction by ID
+   * Used for cleaning up orphaned transactions after code mode errors
+   *
+   * @param transactionId - The transaction ID to cleanup
+   * @returns true if transaction was found and cleaned up, false if not found
+   */
+  async cleanupTransaction(transactionId: string): Promise<boolean> {
+    const client = this.activeTransactions.get(transactionId);
+    if (!client) {
+      return false;
+    }
+
+    try {
+      await client.query("ROLLBACK");
+      client.release();
+      this.activeTransactions.delete(transactionId);
+      logger.warn(
+        `Cleaned up orphaned transaction during code mode error recovery: ${transactionId}`,
+        { module: "CODEMODE" as const },
+      );
+      return true;
+    } catch (error) {
+      // Best effort cleanup - log and continue
+      logger.error("Failed to cleanup orphaned transaction", {
+        module: "CODEMODE" as const,
+        error: error instanceof Error ? error.message : String(error),
+        transactionId,
+      });
+      // Still try to release the client
+      try {
+        client.release(true); // Force release with error
+        this.activeTransactions.delete(transactionId);
+      } catch {
+        // Ignore - connection may be broken
+      }
+      return false;
+    }
   }
 
   // =========================================================================

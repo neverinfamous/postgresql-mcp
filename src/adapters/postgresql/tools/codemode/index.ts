@@ -185,8 +185,25 @@ return results;
         };
       }
 
+      // Capture active transactions before execution for cleanup on error
+      const transactionsBefore = new Set(adapter.getActiveTransactionIds());
+
       // Execute in sandbox
       const result = await pool.execute(code, bindings);
+
+      // Cleanup orphaned transactions on failure
+      // Any transaction started during execution but not committed/rolled back is orphaned
+      if (!result.success) {
+        const transactionsAfter = adapter.getActiveTransactionIds();
+        const orphanedTransactions = transactionsAfter.filter(
+          (txId) => !transactionsBefore.has(txId),
+        );
+
+        // Best-effort cleanup of orphaned transactions
+        for (const txId of orphanedTransactions) {
+          await adapter.cleanupTransaction(txId);
+        }
+      }
 
       // Sanitize result
       if (result.success && result.result !== undefined) {

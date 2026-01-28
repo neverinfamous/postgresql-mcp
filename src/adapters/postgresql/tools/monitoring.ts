@@ -14,6 +14,18 @@ import {
   DatabaseSizeSchema,
   TableSizesSchema,
   ShowSettingsSchema,
+  // Output schemas
+  DatabaseSizeOutputSchema,
+  TableSizesOutputSchema,
+  ConnectionStatsOutputSchema,
+  ReplicationStatusOutputSchema,
+  ServerVersionOutputSchema,
+  ShowSettingsOutputSchema,
+  UptimeOutputSchema,
+  RecoveryStatusOutputSchema,
+  CapacityPlanningOutputSchema,
+  ResourceUsageAnalyzeOutputSchema,
+  AlertThresholdOutputSchema,
 } from "../schemas/index.js";
 
 /**
@@ -41,6 +53,7 @@ function createDatabaseSizeTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Get the size of a database.",
     group: "monitoring",
     inputSchema: DatabaseSizeSchema,
+    outputSchema: DatabaseSizeOutputSchema,
     annotations: readOnly("Database Size"),
     icons: getToolIcons("monitoring", readOnly("Database Size")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -70,6 +83,7 @@ function createTableSizesTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Get sizes of all tables with indexes and total.",
     group: "monitoring",
     inputSchema: TableSizesSchema,
+    outputSchema: TableSizesOutputSchema,
     annotations: readOnly("Table Sizes"),
     icons: getToolIcons("monitoring", readOnly("Table Sizes")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -136,6 +150,7 @@ function createConnectionStatsTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Get connection statistics by database and state.",
     group: "monitoring",
     inputSchema: z.object({}),
+    outputSchema: ConnectionStatsOutputSchema,
     annotations: readOnly("Connection Stats"),
     icons: getToolIcons("monitoring", readOnly("Connection Stats")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -198,6 +213,7 @@ function createReplicationStatusTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Check replication status and lag.",
     group: "monitoring",
     inputSchema: z.object({}),
+    outputSchema: ReplicationStatusOutputSchema,
     annotations: readOnly("Replication Status"),
     icons: getToolIcons("monitoring", readOnly("Replication Status")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -230,6 +246,7 @@ function createServerVersionTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Get PostgreSQL server version information.",
     group: "monitoring",
     inputSchema: z.object({}),
+    outputSchema: ServerVersionOutputSchema,
     annotations: readOnly("Server Version"),
     icons: getToolIcons("monitoring", readOnly("Server Version")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -256,6 +273,7 @@ function createShowSettingsTool(adapter: PostgresAdapter): ToolDefinition {
       "Show current PostgreSQL configuration settings. Filter by name pattern or exact setting name. Accepts: pattern, setting, or name parameter.",
     group: "monitoring",
     inputSchema: ShowSettingsSchema,
+    outputSchema: ShowSettingsOutputSchema,
     annotations: readOnly("Show Settings"),
     icons: getToolIcons("monitoring", readOnly("Show Settings")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -318,6 +336,7 @@ function createUptimeTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Get server uptime and startup time.",
     group: "monitoring",
     inputSchema: z.object({}),
+    outputSchema: UptimeOutputSchema,
     annotations: readOnly("Server Uptime"),
     icons: getToolIcons("monitoring", readOnly("Server Uptime")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -358,6 +377,7 @@ function createRecoveryStatusTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Check if server is in recovery mode (replica).",
     group: "monitoring",
     inputSchema: z.object({}),
+    outputSchema: RecoveryStatusOutputSchema,
     annotations: readOnly("Recovery Status"),
     icons: getToolIcons("monitoring", readOnly("Recovery Status")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -411,6 +431,7 @@ function createCapacityPlanningTool(adapter: PostgresAdapter): ToolDefinition {
         .describe("Days to project growth (default: 90)"),
       days: z.number().optional().describe("Alias for projectionDays"),
     }),
+    outputSchema: CapacityPlanningOutputSchema,
     annotations: readOnly("Capacity Planning"),
     icons: getToolIcons("monitoring", readOnly("Capacity Planning")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -583,6 +604,7 @@ function createResourceUsageAnalyzeTool(
       "Analyze current resource usage including CPU, memory, and I/O patterns.",
     group: "monitoring",
     inputSchema: z.object({}),
+    outputSchema: ResourceUsageAnalyzeOutputSchema,
     annotations: readOnly("Resource Usage Analysis"),
     icons: getToolIcons("monitoring", readOnly("Resource Usage Analysis")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -806,6 +828,7 @@ function createAlertThresholdSetTool(
           "Specific metric to get thresholds for, or all if not specified",
         ),
     }),
+    outputSchema: AlertThresholdOutputSchema,
     annotations: readOnly("Get Alert Thresholds"),
     icons: getToolIcons("monitoring", readOnly("Get Alert Thresholds")),
     // eslint-disable-next-line @typescript-eslint/require-await

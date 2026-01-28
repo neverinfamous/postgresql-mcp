@@ -54,6 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Analysis tools: `pg_seq_scan_tables`, `pg_index_recommendations`, `pg_query_plan_compare`
   - Optimization tools: `pg_performance_baseline`, `pg_connection_pool_optimize`, `pg_partition_strategy_suggest`
   - Added 17 reusable output schemas in `schemas/performance.ts`
+- **Structured Content (outputSchema) for Monitoring Tools** — All 11 monitoring tools now include `outputSchema`:
+  - Size tools: `pg_database_size`, `pg_table_sizes`
+  - Connection/replication: `pg_connection_stats`, `pg_replication_status`, `pg_recovery_status`
+  - Server info: `pg_server_version`, `pg_show_settings`, `pg_uptime`
+  - Analysis tools: `pg_capacity_planning`, `pg_resource_usage_analyze`, `pg_alert_threshold_set`
+  - Added 11 reusable output schemas in `schemas/monitoring.ts`
 
 ### Security
 

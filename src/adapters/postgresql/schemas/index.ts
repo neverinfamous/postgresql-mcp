@@ -145,6 +145,18 @@ export {
   DatabaseSizeSchema,
   TableSizesSchema,
   ShowSettingsSchema,
+  // Output schemas
+  DatabaseSizeOutputSchema,
+  TableSizesOutputSchema,
+  ConnectionStatsOutputSchema,
+  ReplicationStatusOutputSchema,
+  ServerVersionOutputSchema,
+  ShowSettingsOutputSchema,
+  UptimeOutputSchema,
+  RecoveryStatusOutputSchema,
+  CapacityPlanningOutputSchema,
+  ResourceUsageAnalyzeOutputSchema,
+  AlertThresholdOutputSchema,
 } from "./monitoring.js";
 
 // Backup and export schemas

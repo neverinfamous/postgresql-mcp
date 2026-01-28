@@ -227,3 +227,207 @@ export const JsonbDeleteSchema = z.object({
     .describe("Key or path to delete. Supports numeric indices for arrays."),
   where: z.string().describe("WHERE clause"),
 });
+
+// ============== OUTPUT SCHEMAS (MCP 2025-11-25 structuredContent) ==============
+
+// Output schema for pg_jsonb_extract
+export const JsonbExtractOutputSchema = z.object({
+  rows: z
+    .array(z.record(z.string(), z.unknown()))
+    .describe("Extracted values with optional identifying columns"),
+  count: z.number().describe("Number of rows returned"),
+  hint: z.string().optional().describe("Hint when all values are null"),
+});
+
+// Output schema for pg_jsonb_set
+export const JsonbSetOutputSchema = z.object({
+  rowsAffected: z.number().describe("Number of rows updated"),
+  hint: z.string().optional().describe("Additional information"),
+});
+
+// Output schema for pg_jsonb_insert
+export const JsonbInsertOutputSchema = z.object({
+  rowsAffected: z.number().describe("Number of rows updated"),
+});
+
+// Output schema for pg_jsonb_delete
+export const JsonbDeleteOutputSchema = z.object({
+  rowsAffected: z.number().describe("Number of rows updated"),
+  hint: z.string().describe("Note about rowsAffected semantics"),
+});
+
+// Output schema for pg_jsonb_contains
+export const JsonbContainsOutputSchema = z.object({
+  rows: z.array(z.record(z.string(), z.unknown())).describe("Matching rows"),
+  count: z.number().describe("Number of matching rows"),
+  warning: z
+    .string()
+    .optional()
+    .describe("Warning for empty object containment"),
+});
+
+// Output schema for pg_jsonb_path_query
+export const JsonbPathQueryOutputSchema = z.object({
+  results: z.array(z.unknown()).describe("Query results"),
+  count: z.number().describe("Number of results"),
+});
+
+// Output schema for pg_jsonb_agg
+export const JsonbAggOutputSchema = z.object({
+  result: z.unknown().describe("Aggregated JSONB array or grouped results"),
+  count: z.number().describe("Number of items or groups"),
+  grouped: z.boolean().describe("Whether results are grouped"),
+  hint: z.string().optional().describe("Empty result hint"),
+});
+
+// Output schema for pg_jsonb_object
+export const JsonbObjectOutputSchema = z.object({
+  object: z.record(z.string(), z.unknown()).describe("Built JSONB object"),
+});
+
+// Output schema for pg_jsonb_array
+export const JsonbArrayOutputSchema = z.object({
+  array: z.array(z.unknown()).describe("Built JSONB array"),
+});
+
+// Output schema for pg_jsonb_keys
+export const JsonbKeysOutputSchema = z.object({
+  keys: z.array(z.string()).describe("Unique keys from JSONB column"),
+  count: z.number().describe("Number of unique keys"),
+  hint: z.string().describe("Deduplication note"),
+});
+
+// Output schema for pg_jsonb_strip_nulls (two modes: update or preview)
+export const JsonbStripNullsOutputSchema = z.union([
+  z.object({
+    rowsAffected: z.number().describe("Number of rows updated"),
+  }),
+  z.object({
+    preview: z.literal(true).describe("Preview mode indicator"),
+    rows: z
+      .array(z.object({ before: z.unknown(), after: z.unknown() }))
+      .describe("Before/after comparison"),
+    count: z.number().describe("Number of rows"),
+    hint: z.string().describe("Preview mode note"),
+  }),
+]);
+
+// Output schema for pg_jsonb_typeof
+export const JsonbTypeofOutputSchema = z.object({
+  types: z.array(z.string()).describe("JSONB types for each row"),
+  count: z.number().describe("Number of rows"),
+  columnNull: z
+    .array(z.boolean())
+    .optional()
+    .describe("Whether column is NULL per row"),
+  hint: z.string().optional().describe("Additional information"),
+});
+
+// ============== ADVANCED JSONB OUTPUT SCHEMAS ==============
+
+// Output schema for pg_jsonb_validate_path
+export const JsonbValidatePathOutputSchema = z.object({
+  valid: z.boolean().describe("Whether path is valid"),
+  error: z.string().optional().describe("Error message if invalid"),
+  results: z
+    .array(z.unknown())
+    .optional()
+    .describe("Test results if testValue provided"),
+  count: z.number().optional().describe("Number of results"),
+});
+
+// Output schema for pg_jsonb_merge
+export const JsonbMergeOutputSchema = z.object({
+  merged: z.unknown().describe("Merged JSONB document"),
+  deep: z.boolean().describe("Whether deep merge was used"),
+});
+
+// Output schema for pg_jsonb_normalize
+export const JsonbNormalizeOutputSchema = z.object({
+  rows: z.array(z.record(z.string(), z.unknown())).describe("Normalized rows"),
+  count: z.number().describe("Number of rows"),
+  mode: z.string().optional().describe("Normalization mode used"),
+  hint: z.string().optional().describe("Additional information"),
+});
+
+// Output schema for pg_jsonb_diff
+export const JsonbDiffOutputSchema = z.object({
+  differences: z
+    .array(
+      z.object({
+        key: z.string().describe("Key that differs"),
+        status: z
+          .enum(["added", "removed", "modified"])
+          .describe("Type of difference"),
+        value1: z.unknown().optional().describe("Value in doc1"),
+        value2: z.unknown().optional().describe("Value in doc2"),
+      }),
+    )
+    .describe("List of differences"),
+  hasDifferences: z.boolean().describe("Whether any differences exist"),
+  summary: z
+    .object({
+      added: z.number().describe("Keys added in doc2"),
+      removed: z.number().describe("Keys removed from doc1"),
+      modified: z.number().describe("Keys with different values"),
+    })
+    .describe("Summary counts"),
+});
+
+// Output schema for pg_jsonb_index_suggest
+export const JsonbIndexSuggestOutputSchema = z.object({
+  recommendations: z
+    .array(z.string())
+    .describe("Index creation SQL recommendations"),
+  analyzed: z
+    .object({
+      topKeys: z.number().optional().describe("Number of top keys analyzed"),
+      existingIndexes: z.number().optional().describe("Existing indexes found"),
+    })
+    .optional()
+    .describe("Analysis details"),
+});
+
+// Output schema for pg_jsonb_security_scan
+export const JsonbSecurityScanOutputSchema = z.object({
+  issues: z
+    .array(
+      z.object({
+        type: z.string().describe("Issue type"),
+        key: z.string().optional().describe("Affected key"),
+        count: z.number().optional().describe("Occurrence count"),
+        severity: z.string().optional().describe("Issue severity"),
+      }),
+    )
+    .describe("Security issues found"),
+  riskLevel: z.enum(["low", "medium", "high"]).describe("Overall risk level"),
+  scannedRows: z.number().describe("Number of rows scanned"),
+});
+
+// Output schema for pg_jsonb_stats
+export const JsonbStatsOutputSchema = z.object({
+  basics: z
+    .object({
+      total_rows: z.number().describe("Total rows"),
+      non_null_count: z.number().optional().describe("Non-null values"),
+      avg_size_bytes: z.number().optional().describe("Average size"),
+      max_size_bytes: z.number().optional().describe("Maximum size"),
+    })
+    .describe("Basic statistics"),
+  topKeys: z
+    .array(
+      z.object({
+        key: z.string().describe("Key name"),
+        frequency: z.number().describe("Occurrence count"),
+      }),
+    )
+    .describe("Most common keys"),
+  typeDistribution: z
+    .array(
+      z.object({
+        type: z.string().describe("JSONB type"),
+        count: z.number().describe("Count"),
+      }),
+    )
+    .describe("Type distribution"),
+});

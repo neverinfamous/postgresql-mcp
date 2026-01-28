@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Transaction tools: `pg_transaction_begin`, `pg_transaction_commit`, `pg_transaction_rollback`, `pg_transaction_savepoint`, `pg_transaction_release`, `pg_transaction_rollback_to`, `pg_transaction_execute`
   - Codemode tool: `pg_execute_code`
   - Added 4 reusable transaction output schemas in `core.ts` and 1 codemode output schema
+- **Structured Content (outputSchema) for JSONB Tools** — All 19 JSONB tools now include `outputSchema`:
+  - Basic tools: `pg_jsonb_extract`, `pg_jsonb_set`, `pg_jsonb_insert`, `pg_jsonb_delete`, `pg_jsonb_contains`, `pg_jsonb_path_query`, `pg_jsonb_agg`, `pg_jsonb_object`, `pg_jsonb_array`, `pg_jsonb_keys`, `pg_jsonb_strip_nulls`, `pg_jsonb_typeof`
+  - Advanced tools: `pg_jsonb_validate_path`, `pg_jsonb_merge`, `pg_jsonb_normalize`, `pg_jsonb_diff`, `pg_jsonb_index_suggest`, `pg_jsonb_security_scan`, `pg_jsonb_stats`
+  - Added 19 reusable output schemas in `schemas/jsonb.ts`
 
 ### Security
 

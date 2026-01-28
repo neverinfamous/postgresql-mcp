@@ -16,6 +16,15 @@ import {
   sanitizeIdentifier,
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
+import {
+  JsonbValidatePathOutputSchema,
+  JsonbMergeOutputSchema,
+  JsonbNormalizeOutputSchema,
+  JsonbDiffOutputSchema,
+  JsonbIndexSuggestOutputSchema,
+  JsonbSecurityScanOutputSchema,
+  JsonbStatsOutputSchema,
+} from "../../schemas/index.js";
 
 /**
  * Convert value to a valid JSON string for PostgreSQL's ::jsonb cast
@@ -47,6 +56,7 @@ export function createJsonbValidatePathTool(
         .optional()
         .describe("Variables for parameterized paths (e.g., {x: 5})"),
     }),
+    outputSchema: JsonbValidatePathOutputSchema,
     annotations: readOnly("JSONB Validate Path"),
     icons: getToolIcons("jsonb", readOnly("JSONB Validate Path")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -215,6 +225,7 @@ export function createJsonbMergeTool(adapter: PostgresAdapter): ToolDefinition {
       "Merge two JSONB objects. deep=true (default) recursively merges. mergeArrays=true concatenates arrays.",
     group: "jsonb",
     inputSchema: JsonbMergeSchema,
+    outputSchema: JsonbMergeOutputSchema,
     annotations: readOnly("JSONB Merge"),
     icons: getToolIcons("jsonb", readOnly("JSONB Merge")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -272,6 +283,7 @@ export function createJsonbNormalizeTool(
           'Column to use for row identification (e.g., "id"). If omitted, defaults to "id" if it exists, else uses ctid.',
         ),
     }),
+    outputSchema: JsonbNormalizeOutputSchema,
     annotations: readOnly("JSONB Normalize"),
     icons: getToolIcons("jsonb", readOnly("JSONB Normalize")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -423,6 +435,7 @@ export function createJsonbDiffTool(adapter: PostgresAdapter): ToolDefinition {
       "Compare two JSONB objects. Returns top-level key differences only (shallow comparison, not recursive).",
     group: "jsonb",
     inputSchema: JsonbDiffSchema,
+    outputSchema: JsonbDiffOutputSchema,
     annotations: readOnly("JSONB Diff"),
     icons: getToolIcons("jsonb", readOnly("JSONB Diff")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -486,6 +499,7 @@ export function createJsonbIndexSuggestTool(
       sampleSize: z.number().optional().describe("Sample rows to analyze"),
       where: z.string().optional().describe("WHERE clause to filter rows"),
     }),
+    outputSchema: JsonbIndexSuggestOutputSchema,
     annotations: readOnly("JSONB Index Suggest"),
     icons: getToolIcons("jsonb", readOnly("JSONB Index Suggest")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -612,6 +626,7 @@ export function createJsonbSecurityScanTool(
       sampleSize: z.number().optional().describe("Sample rows to scan"),
       where: z.string().optional().describe("WHERE clause to filter rows"),
     }),
+    outputSchema: JsonbSecurityScanOutputSchema,
     annotations: readOnly("JSONB Security Scan"),
     icons: getToolIcons("jsonb", readOnly("JSONB Security Scan")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -734,6 +749,7 @@ export function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
       sampleSize: z.number().optional().describe("Sample rows to analyze"),
       where: z.string().optional().describe("WHERE clause to filter rows"),
     }),
+    outputSchema: JsonbStatsOutputSchema,
     annotations: readOnly("JSONB Stats"),
     icons: getToolIcons("jsonb", readOnly("JSONB Stats")),
     handler: async (params: unknown, _context: RequestContext) => {

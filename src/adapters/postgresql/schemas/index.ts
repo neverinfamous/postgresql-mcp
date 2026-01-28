@@ -51,6 +51,26 @@ export {
   parseJsonbValue,
   stringPathToArray,
   arrayPathToString,
+  // JSONB output schemas
+  JsonbExtractOutputSchema,
+  JsonbSetOutputSchema,
+  JsonbInsertOutputSchema,
+  JsonbDeleteOutputSchema,
+  JsonbContainsOutputSchema,
+  JsonbPathQueryOutputSchema,
+  JsonbAggOutputSchema,
+  JsonbObjectOutputSchema,
+  JsonbArrayOutputSchema,
+  JsonbKeysOutputSchema,
+  JsonbStripNullsOutputSchema,
+  JsonbTypeofOutputSchema,
+  JsonbValidatePathOutputSchema,
+  JsonbMergeOutputSchema,
+  JsonbNormalizeOutputSchema,
+  JsonbDiffOutputSchema,
+  JsonbIndexSuggestOutputSchema,
+  JsonbSecurityScanOutputSchema,
+  JsonbStatsOutputSchema,
 } from "./jsonb.js";
 
 // Text search schemas

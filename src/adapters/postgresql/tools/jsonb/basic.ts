@@ -22,6 +22,19 @@ import {
   normalizePathToArray,
   normalizePathForInsert,
   parseJsonbValue,
+  // Output schemas
+  JsonbExtractOutputSchema,
+  JsonbSetOutputSchema,
+  JsonbInsertOutputSchema,
+  JsonbDeleteOutputSchema,
+  JsonbContainsOutputSchema,
+  JsonbPathQueryOutputSchema,
+  JsonbAggOutputSchema,
+  JsonbObjectOutputSchema,
+  JsonbArrayOutputSchema,
+  JsonbKeysOutputSchema,
+  JsonbStripNullsOutputSchema,
+  JsonbTypeofOutputSchema,
 } from "../../schemas/index.js";
 
 /**
@@ -41,6 +54,7 @@ export function createJsonbExtractTool(
       "Extract value from JSONB at specified path. Returns null if path does not exist in data structure. Use select param to include identifying columns.",
     group: "jsonb",
     inputSchema: JsonbExtractSchema,
+    outputSchema: JsonbExtractOutputSchema,
     annotations: readOnly("JSONB Extract"),
     icons: getToolIcons("jsonb", readOnly("JSONB Extract")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -126,6 +140,7 @@ export function createJsonbSetTool(adapter: PostgresAdapter): ToolDefinition {
       "Set value in JSONB at path. Uses dot-notation by default; for literal dots in keys use array format [\"key.with.dots\"]. Use empty path ('' or []) to replace entire column value.",
     group: "jsonb",
     inputSchema: JsonbSetSchema,
+    outputSchema: JsonbSetOutputSchema,
     annotations: write("JSONB Set"),
     icons: getToolIcons("jsonb", write("JSONB Set")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -212,6 +227,7 @@ export function createJsonbInsertTool(
       "Insert value into JSONB array. Index -1 inserts BEFORE last element; use insertAfter:true with -1 to append at end.",
     group: "jsonb",
     inputSchema: JsonbInsertSchema,
+    outputSchema: JsonbInsertOutputSchema,
     annotations: write("JSONB Insert"),
     icons: getToolIcons("jsonb", write("JSONB Insert")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -306,6 +322,7 @@ export function createJsonbDeleteTool(
       "Delete a key or array element from a JSONB column. Accepts path as string or array. Note: rowsAffected reflects matched rows, not whether key existed.",
     group: "jsonb",
     inputSchema: JsonbDeleteSchema,
+    outputSchema: JsonbDeleteOutputSchema,
     annotations: write("JSONB Delete"),
     icons: getToolIcons("jsonb", write("JSONB Delete")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -379,6 +396,7 @@ export function createJsonbContainsTool(
       "Find rows where JSONB column contains the specified value. Note: Empty object {} matches all rows.",
     group: "jsonb",
     inputSchema: JsonbContainsSchema,
+    outputSchema: JsonbContainsOutputSchema,
     annotations: readOnly("JSONB Contains"),
     icons: getToolIcons("jsonb", readOnly("JSONB Contains")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -424,6 +442,7 @@ export function createJsonbPathQueryTool(
       "Query JSONB using SQL/JSON path expressions (PostgreSQL 12+). Note: Recursive descent (..) syntax is not supported by PostgreSQL.",
     group: "jsonb",
     inputSchema: JsonbPathQuerySchema,
+    outputSchema: JsonbPathQueryOutputSchema,
     annotations: readOnly("JSONB Path Query"),
     icons: getToolIcons("jsonb", readOnly("JSONB Path Query")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -493,6 +512,7 @@ export function createJsonbAggTool(adapter: PostgresAdapter): ToolDefinition {
         .optional()
         .describe("Maximum number of rows to aggregate"),
     }),
+    outputSchema: JsonbAggOutputSchema,
     annotations: readOnly("JSONB Aggregate"),
     icons: getToolIcons("jsonb", readOnly("JSONB Aggregate")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -602,6 +622,7 @@ export function createJsonbObjectTool(
       'Build a JSONB object. Use data: {name: "John", age: 30} or object: {name: "John"}. Returns {object: {...}}.',
     group: "jsonb",
     inputSchema: JsonbObjectSchema,
+    outputSchema: JsonbObjectOutputSchema,
     annotations: readOnly("JSONB Object"),
     icons: getToolIcons("jsonb", readOnly("JSONB Object")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -652,6 +673,7 @@ export function createJsonbArrayTool(adapter: PostgresAdapter): ToolDefinition {
       "Build a JSONB array from values. Accepts {values: [...]} or {elements: [...]}. Returns {array: [...]}.",
     group: "jsonb",
     inputSchema: JsonbArraySchema,
+    outputSchema: JsonbArrayOutputSchema,
     annotations: readOnly("JSONB Array"),
     icons: getToolIcons("jsonb", readOnly("JSONB Array")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -685,6 +707,7 @@ export function createJsonbKeysTool(adapter: PostgresAdapter): ToolDefinition {
       column: z.string(),
       where: z.string().optional(),
     }),
+    outputSchema: JsonbKeysOutputSchema,
     annotations: readOnly("JSONB Keys"),
     icons: getToolIcons("jsonb", readOnly("JSONB Keys")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -736,6 +759,7 @@ export function createJsonbStripNullsTool(
         .optional()
         .describe("Preview what would be stripped without modifying data"),
     }),
+    outputSchema: JsonbStripNullsOutputSchema,
     annotations: write("JSONB Strip Nulls"),
     icons: getToolIcons("jsonb", write("JSONB Strip Nulls")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -790,6 +814,7 @@ export function createJsonbTypeofTool(
         ),
       where: z.string().optional(),
     }),
+    outputSchema: JsonbTypeofOutputSchema,
     annotations: readOnly("JSONB Typeof"),
     icons: getToolIcons("jsonb", readOnly("JSONB Typeof")),
     handler: async (params: unknown, _context: RequestContext) => {

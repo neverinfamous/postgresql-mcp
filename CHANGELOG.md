@@ -139,6 +139,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added taint-breaking `writeToStderr()` method to satisfy CodeQL static analysis
   - Expanded sensitive key list with 8 additional OAuth 2.1 fields: `authorizationserverurl`, `authorization_server_url`, `bearerformat`, `bearer_format`, `oauthconfig`, `oauth_config`, `oauth`, `scopes_supported`, `scopessupported`
   - Stricter control character removal (now removes all 0x00-0x1F + 0x7F including tabs and newlines)
+- **SQL Injection Remediation** — Comprehensive fixes for WHERE clause, FTS config, and table name injection vectors
+  - Created `src/utils/fts-config.ts` — Validates FTS configurations using PostgreSQL identifier pattern (63 chars max, alphanumeric + underscore only)
+  - Created `src/utils/where-clause.ts` — Pattern-based blocklist for dangerous SQL patterns (`;DROP`, `UNION SELECT`, `--`, `/*`, `pg_sleep`, stacked queries)
+  - Updated 8 text tools with sanitization: `pg_text_search`, `pg_text_rank`, `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, `pg_like_search`, `pg_text_headline`, `pg_create_fts_index`
+  - Updated 2 vector tools with WHERE clause sanitization: `pg_vector_search`, `pg_vector_aggregate`
+  - Added 31 comprehensive security injection tests in `security-injection.test.ts`
+  - **Breaking change**: Tools now reject inputs containing SQL injection patterns (previously passed through)
 
 ### Dependencies
 

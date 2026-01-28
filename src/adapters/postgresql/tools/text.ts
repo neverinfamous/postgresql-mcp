@@ -13,7 +13,10 @@ import { getToolIcons } from "../../../utils/icons.js";
 import {
   sanitizeIdentifier,
   sanitizeIdentifiers,
+  sanitizeTableName,
 } from "../../../utils/identifiers.js";
+import { sanitizeFtsConfig } from "../../../utils/fts-config.js";
+import { sanitizeWhereClause } from "../../../utils/where-clause.js";
 import {
   TextSearchSchema,
   TextSearchSchemaBase,
@@ -70,7 +73,7 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
     icons: getToolIcons("text", readOnly("Full-Text Search")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = TextSearchSchema.parse(params);
-      const cfg = parsed.config ?? "english";
+      const cfg = sanitizeFtsConfig(parsed.config ?? "english");
 
       // Handle both column (string) and columns (array) parameters
       // The preprocessor converts column → columns, but we handle both for safety
@@ -87,12 +90,11 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
 
       // Build qualified table name with schema support
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const sanitizedCols = sanitizeIdentifiers(cols);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -156,7 +158,7 @@ function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
     icons: getToolIcons("text", readOnly("Text Rank")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = TextRankSchema.parse(params);
-      const cfg = parsed.config ?? "english";
+      const cfg = sanitizeFtsConfig(parsed.config ?? "english");
       const norm = parsed.normalization ?? 0;
 
       // Handle both column (string) and columns (array) parameters
@@ -170,12 +172,11 @@ function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const sanitizedCols = sanitizeIdentifiers(cols);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -218,18 +219,19 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
-      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
+      const additionalWhere = parsed.where
+        ? ` AND (${sanitizeWhereClause(parsed.where)})`
+        : "";
 
       const sql = `SELECT ${selectCols}, similarity(${columnName}, $1) as similarity
                         FROM ${tableName}
@@ -299,18 +301,19 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
-      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
+      const additionalWhere = parsed.where
+        ? ` AND (${sanitizeWhereClause(parsed.where)})`
+        : "";
 
       let sql: string;
       if (method === "soundex") {
@@ -340,19 +343,20 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
       const parsed = RegexpMatchSchema.parse(params);
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
       const op = parsed.flags?.includes("i") ? "~*" : "~";
-      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
+      const additionalWhere = parsed.where
+        ? ` AND (${sanitizeWhereClause(parsed.where)})`
+        : "";
       const limitClause =
         parsed.limit !== undefined ? ` LIMIT ${String(parsed.limit)}` : "";
 
@@ -406,19 +410,20 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
       const parsed = LikeSearchSchema.parse(params);
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
       const op = parsed.caseSensitive === true ? "LIKE" : "ILIKE";
-      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
+      const additionalWhere = parsed.where
+        ? ` AND (${sanitizeWhereClause(parsed.where)})`
+        : "";
       const limitClause =
         parsed.limit !== undefined && parsed.limit > 0
           ? ` LIMIT ${String(parsed.limit)}`
@@ -484,7 +489,7 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
     icons: getToolIcons("text", readOnly("Text Headline")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = HeadlineSchema.parse(params);
-      const cfg = parsed.config ?? "english";
+      const cfg = sanitizeFtsConfig(parsed.config ?? "english");
 
       // Build options string from individual params or use provided options
       let opts: string;
@@ -500,12 +505,11 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       // Use provided select columns, or default to * (user should specify PK for stable identification)
       const selectCols =
@@ -562,7 +566,7 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
     icons: getToolIcons("text", write("Create FTS Index")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = FtsIndexSchema.parse(params);
-      const cfg = parsed.config ?? "english";
+      const cfg = sanitizeFtsConfig(parsed.config ?? "english");
       // The preprocessor guarantees table is set (converts tableName → table)
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
@@ -576,8 +580,7 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
       const ifNotExists = useIfNotExists ? "IF NOT EXISTS " : "";
 
       // Build qualified table name with schema support
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
 
       // Check if index exists before creation (to accurately report 'skipped')

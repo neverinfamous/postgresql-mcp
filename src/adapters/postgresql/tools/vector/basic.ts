@@ -14,6 +14,7 @@ import {
   sanitizeIdentifier,
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
+import { sanitizeWhereClause } from "../../../../utils/where-clause.js";
 import {
   // Base schemas for MCP visibility (Split Schema pattern)
   VectorSearchSchemaBase,
@@ -458,7 +459,7 @@ export function createVectorSearchTool(
         select !== undefined && select.length > 0
           ? select.map((c) => sanitizeIdentifier(c)).join(", ") + ", "
           : "";
-      const whereClause = where ? ` AND ${where}` : "";
+      const whereClause = where ? ` AND ${sanitizeWhereClause(where)}` : "";
       const { excludeNull } = VectorSearchSchema.parse(params);
       const nullFilter =
         excludeNull === true ? ` AND ${columnName} IS NOT NULL` : "";
@@ -861,7 +862,9 @@ export function createVectorAggregateTool(
       }
 
       const whereClause =
-        parsed.where !== undefined ? ` WHERE ${parsed.where} ` : "";
+        parsed.where !== undefined
+          ? ` WHERE ${sanitizeWhereClause(parsed.where)} `
+          : "";
 
       const tableName = sanitizeTableName(resolvedTable, resolvedSchema);
       const columnName = sanitizeIdentifier(parsed.column);
@@ -1210,16 +1213,16 @@ export function createVectorValidateTool(
         columnDimensions,
         expectedDimensions,
         ...(parsed.vector !== undefined &&
-          expectedDimensions !== undefined &&
-          vectorDimensions !== undefined &&
-          vectorDimensions !== expectedDimensions
+        expectedDimensions !== undefined &&
+        vectorDimensions !== undefined &&
+        vectorDimensions !== expectedDimensions
           ? {
-            error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
-            suggestion:
-              vectorDimensions > expectedDimensions
-                ? "Use pg_vector_dimension_reduce to reduce dimensions"
-                : "Ensure your embedding model outputs the correct dimensions",
-          }
+              error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
+              suggestion:
+                vectorDimensions > expectedDimensions
+                  ? "Use pg_vector_dimension_reduce to reduce dimensions"
+                  : "Ensure your embedding model outputs the correct dimensions",
+            }
           : {}),
       };
     },

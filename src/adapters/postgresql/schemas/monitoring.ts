@@ -112,20 +112,28 @@ export const ConnectionStatsOutputSchema = z.object({
 /**
  * pg_replication_status output (primary or replica)
  */
-export const ReplicationStatusOutputSchema = z.union([
-  z.object({
-    role: z.literal("replica").describe("Server role"),
-    replay_lag: z.unknown().describe("Replication lag interval"),
-    receive_lsn: z.string().nullable().describe("Last received WAL LSN"),
-    replay_lsn: z.string().nullable().describe("Last replayed WAL LSN"),
-  }),
-  z.object({
-    role: z.literal("primary").describe("Server role"),
+export const ReplicationStatusOutputSchema = z
+  .object({
+    role: z.string().describe("Server role: primary or replica"),
+    // Replica-specific fields
+    replay_lag: z.unknown().optional().describe("Replication lag interval"),
+    receive_lsn: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Last received WAL LSN"),
+    replay_lsn: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Last replayed WAL LSN"),
+    // Primary-specific fields
     replicas: z
       .array(z.record(z.string(), z.unknown()))
+      .optional()
       .describe("Connected replicas"),
-  }),
-]);
+  })
+  .loose();
 
 /**
  * pg_server_version output
@@ -160,7 +168,7 @@ export const ShowSettingsOutputSchema = z.object({
  * pg_uptime output
  */
 export const UptimeOutputSchema = z.object({
-  start_time: z.string().describe("Server start timestamp"),
+  start_time: z.unknown().describe("Server start timestamp"),
   uptime: z.object({
     days: z.number().describe("Days since start"),
     hours: z.number().describe("Hours component"),
@@ -298,15 +306,16 @@ const ThresholdSchema = z.object({
   description: z.string().describe("Metric description"),
 });
 
-export const AlertThresholdOutputSchema = z.union([
-  z.object({
-    metric: z.string().describe("Metric name"),
-    threshold: ThresholdSchema.describe("Threshold values"),
-  }),
-  z.object({
+export const AlertThresholdOutputSchema = z
+  .object({
+    // Single metric response
+    metric: z.string().optional().describe("Metric name"),
+    threshold: ThresholdSchema.optional().describe("Threshold values"),
+    // All thresholds response
     thresholds: z
       .record(z.string(), ThresholdSchema)
+      .optional()
       .describe("All metric thresholds"),
-    note: z.string().describe("Usage guidance"),
-  }),
-]);
+    note: z.string().optional().describe("Usage guidance"),
+  })
+  .loose();

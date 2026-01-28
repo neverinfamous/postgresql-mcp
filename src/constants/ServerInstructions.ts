@@ -93,7 +93,8 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 - \`pg_jsonb_agg\`: Supports AS aliases in select: \`["id", "metadata->>'name' AS name"]\`. ⚠️ \`->>\` returns text—use \`->\` to preserve JSON types
 - \`pg_jsonb_object\`: Use \`data\`, \`object\`, or \`pairs\` parameter: \`{data: {name: "John", age: 30}}\`. Returns \`{object: {...}}\`
 - \`pg_jsonb_normalize\`: \`flatten\` doesn't descend into arrays; \`keys\` returns text (use \`pairs\` for JSON types)
-- ⛔ **Object-only tools**: \`diff\`, \`merge\`, \`keys\`, \`indexSuggest\`, \`securityScan\`—require JSONB objects, throw descriptive errors for arrays
+- \`pg_jsonb_stats\`: Returns column-level statistics. \`topKeysLimit\` controls key count (default: 20). ⚠️ \`typeDistribution\` null type = SQL NULL columns (entire column NULL, not JSON \`null\` literal). Use \`sqlNullCount\` for explicit count
+- ⛔ **Object-only tools**: \`diff\`, \`merge\`, \`keys\`, \`indexSuggest\`, \`securityScan\`, \`stats\`—topKeys require JSONB objects, throw descriptive errors for arrays
 - ⛔ **Array-only tools**: \`insert\`—requires JSONB arrays, throws errors for objects
 - 📝 \`normalize\` modes: \`pairs\`/\`keys\`/\`flatten\` for objects; \`array\` for arrays
 

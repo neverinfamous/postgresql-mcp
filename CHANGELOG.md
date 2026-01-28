@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **JSONB Output Schema Validation Bugs**
   - `pg_jsonb_typeof` — Fixed `columnNull` field type from array to boolean to match actual handler output
   - `pg_jsonb_strip_nulls` — Refactored output schema from union to combined object with optional fields to resolve Zod validation errors
+  - `pg_jsonb_stats` — Fixed `typeDistribution[].type` to accept null for SQL NULL columns; added missing `sqlNullCount` and `hint` output fields
 - **JSONB Split Schema Pattern** — Implemented Split Schema pattern for 6 JSONB tools to support parameter aliases in direct MCP tool calls:
   - Added `tableName` (alias for `table`), `col` (alias for `column`), and `filter` (alias for `where`) support
   - Added `preprocessJsonbParams()` function for alias normalization and `schema.table` parsing
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_reindex` — REINDEX operations
   - `pg_cluster` — CLUSTER operations
 - **Backup Tool Progress Notifications** — `pg_copy_export` now emits progress for large exports
+- **JSONB Stats Payload Control** — Added `topKeysLimit` parameter to `pg_jsonb_stats` to control number of top keys returned (default: 20)
 - **Structured Content (outputSchema) for Core Tools** — All 20 core tools now include `outputSchema` for MCP 2025-11-25 compliance:
   - Query tools: `pg_read_query`, `pg_write_query`
   - Table tools: `pg_list_tables`, `pg_describe_table`, `pg_create_table`, `pg_drop_table`

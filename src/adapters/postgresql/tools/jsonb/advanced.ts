@@ -768,13 +768,14 @@ export function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
           }
         : undefined;
 
+      const keyLimit = parsed.topKeysLimit ?? 20;
       const keySql = `
                 SELECT key, COUNT(*) as frequency
                 FROM (SELECT * FROM ${tableName}${whereClause} LIMIT ${String(sample)}) t,
                      jsonb_object_keys(${columnName}) key
                 GROUP BY key
                 ORDER BY frequency DESC
-                LIMIT 20
+                LIMIT ${String(keyLimit)}
             `;
 
       let topKeys: { key: string; frequency: number }[] = [];

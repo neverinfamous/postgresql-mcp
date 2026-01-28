@@ -570,6 +570,10 @@ export const JsonbStatsSchemaBase = z
       .string()
       .optional()
       .describe("WHERE clause to filter rows (alias for where)"),
+    topKeysLimit: z
+      .number()
+      .optional()
+      .describe("Maximum number of top keys to return (default: 20)"),
   })
   .refine((data) => data.table !== undefined || data.tableName !== undefined, {
     message: "Either 'table' or 'tableName' is required",
@@ -837,9 +841,17 @@ export const JsonbStatsOutputSchema = z.object({
   typeDistribution: z
     .array(
       z.object({
-        type: z.string().describe("JSONB type"),
+        type: z
+          .string()
+          .nullable()
+          .describe("JSONB type (null = SQL NULL column)"),
         count: z.number().describe("Count"),
       }),
     )
     .describe("Type distribution"),
+  sqlNullCount: z
+    .number()
+    .optional()
+    .describe("Count of rows with SQL NULL in the JSONB column"),
+  hint: z.string().optional().describe("Usage hints or notes"),
 });

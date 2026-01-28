@@ -47,6 +47,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Search tools: `pg_text_search`, `pg_text_rank`, `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, `pg_like_search`, `pg_text_headline`
   - Utility tools: `pg_create_fts_index`, `pg_text_normalize`, `pg_text_sentiment`, `pg_text_to_vector`, `pg_text_to_query`, `pg_text_search_config`
   - Added 7 reusable output schemas in `schemas/text-search.ts` (shared TextRowsOutputSchema for search tools)
+- **Structured Content (outputSchema) for Performance Tools** — All 20 performance tools now include `outputSchema`:
+  - Explain tools: `pg_explain`, `pg_explain_analyze`, `pg_explain_buffers`
+  - Stats tools: `pg_index_stats`, `pg_table_stats`, `pg_stat_statements`, `pg_stat_activity`, `pg_unused_indexes`, `pg_duplicate_indexes`, `pg_vacuum_stats`, `pg_query_plan_stats`
+  - Monitoring tools: `pg_locks`, `pg_bloat_check`, `pg_cache_hit_ratio`
+  - Analysis tools: `pg_seq_scan_tables`, `pg_index_recommendations`, `pg_query_plan_compare`
+  - Optimization tools: `pg_performance_baseline`, `pg_connection_pool_optimize`, `pg_partition_strategy_suggest`
+  - Added 17 reusable output schemas in `schemas/performance.ts`
 
 ### Security
 

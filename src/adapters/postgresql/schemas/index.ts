@@ -99,6 +99,25 @@ export {
   preprocessExplainParams,
   IndexStatsSchema,
   TableStatsSchema,
+  // Output schemas
+  ExplainOutputSchema,
+  IndexStatsOutputSchema,
+  TableStatsOutputSchema,
+  StatStatementsOutputSchema,
+  StatActivityOutputSchema,
+  LocksOutputSchema,
+  BloatCheckOutputSchema,
+  CacheHitRatioOutputSchema,
+  SeqScanTablesOutputSchema,
+  IndexRecommendationsOutputSchema,
+  QueryPlanCompareOutputSchema,
+  PerformanceBaselineOutputSchema,
+  ConnectionPoolOptimizeOutputSchema,
+  PartitionStrategySuggestOutputSchema,
+  UnusedIndexesOutputSchema,
+  DuplicateIndexesOutputSchema,
+  VacuumStatsOutputSchema,
+  QueryPlanStatsOutputSchema,
 } from "./performance.js";
 
 // Admin operation schemas

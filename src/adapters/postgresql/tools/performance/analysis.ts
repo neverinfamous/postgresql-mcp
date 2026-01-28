@@ -10,6 +10,11 @@ import type {
 import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
+import {
+  SeqScanTablesOutputSchema,
+  IndexRecommendationsOutputSchema,
+  QueryPlanCompareOutputSchema,
+} from "../../schemas/index.js";
 
 // Helper to coerce string numbers to JavaScript numbers (PostgreSQL returns BIGINT as strings)
 const toNum = (val: unknown): number | null =>
@@ -39,6 +44,7 @@ export function createSeqScanTablesTool(
       "Find tables with high sequential scan counts (potential missing indexes). Default minScans=10; use higher values (e.g., 100+) for production databases.",
     group: "performance",
     inputSchema: SeqScanTablesSchema,
+    outputSchema: SeqScanTablesOutputSchema,
     annotations: readOnly("Sequential Scan Tables"),
     icons: getToolIcons("performance", readOnly("Sequential Scan Tables")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -197,6 +203,7 @@ export function createIndexRecommendationsTool(
       "Suggest missing indexes based on table statistics or query analysis. When sql is provided and HypoPG is installed, creates hypothetical indexes to measure potential performance improvement.",
     group: "performance",
     inputSchema: IndexRecommendationsSchemaBase, // Base schema for MCP visibility
+    outputSchema: IndexRecommendationsOutputSchema,
     annotations: readOnly("Index Recommendations"),
     icons: getToolIcons("performance", readOnly("Index Recommendations")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -419,6 +426,7 @@ export function createQueryPlanCompareTool(
       "Compare execution plans of two SQL queries to identify performance differences.",
     group: "performance",
     inputSchema: QueryPlanCompareSchemaBase, // Base schema for MCP visibility
+    outputSchema: QueryPlanCompareOutputSchema,
     annotations: readOnly("Query Plan Compare"),
     icons: getToolIcons("performance", readOnly("Query Plan Compare")),
     handler: async (params: unknown, _context: RequestContext) => {

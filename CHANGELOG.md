@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_vector_index_optimize` — Fixed `estimatedRows` returned as string from PostgreSQL bigint; now explicitly cast to number before output schema validation
   - `pg_vector_performance` — Fixed `estimatedRows`, `idx_scan`, and `idx_tup_read` returned as strings from PostgreSQL bigint; now explicitly cast to numbers
 - **pg_vector_insert Split Schema Violation** — Fixed direct MCP tool calls not accepting `tableName` and `col` aliases. Implemented Split Schema pattern with `VectorInsertSchemaBase` for MCP visibility and transformed schema for handler alias resolution. Error messages now mention aliases (e.g., "table (or tableName) parameter is required")
+- **pg_vector_validate user-friendly error** — Fixed raw Zod validation error being returned when invalid input types are provided (e.g., string instead of number array for `vector` parameter). Now returns `{valid: false, error: \"Invalid vector: ...\", suggestion: \"Ensure vector is an array of numbers, e.g., [0.1, 0.2, 0.3]\"}` for type validation failures
 
 - **JSONB Split Schema Pattern** — Implemented Split Schema pattern for 6 JSONB tools to support parameter aliases in direct MCP tool calls:
   - Added `tableName` (alias for `table`), `col` (alias for `column`), and `filter` (alias for `where`) support

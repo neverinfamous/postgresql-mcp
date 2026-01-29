@@ -1131,7 +1131,35 @@ export function createVectorValidateTool(
     annotations: readOnly("Validate Vector"),
     icons: getToolIcons("vector", readOnly("Validate Vector")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = ValidateSchema.parse(params);
+      // Wrap validation in try-catch for user-friendly errors
+      let parsed: {
+        table: string;
+        column: string;
+        vector: number[] | undefined;
+        dimensions: number | undefined;
+        schema: string | undefined;
+      };
+      try {
+        parsed = ValidateSchema.parse(params);
+      } catch (error: unknown) {
+        // Return user-friendly error for invalid input types
+        if (error instanceof z.ZodError) {
+          const firstIssue = error.issues[0];
+          if (firstIssue) {
+            const path = firstIssue.path.join(".");
+            const message = firstIssue.message;
+            return {
+              valid: false,
+              error: `Invalid ${path || "input"}: ${message}`,
+              suggestion:
+                path === "vector"
+                  ? "Ensure vector is an array of numbers, e.g., [0.1, 0.2, 0.3]"
+                  : "Check the parameter types and try again",
+            };
+          }
+        }
+        throw error;
+      }
 
       // Get column dimensions if table/column specified
       let columnDimensions: number | undefined;

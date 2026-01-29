@@ -6,7 +6,7 @@
 
 **PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
-**203 specialized tools** · **20 resources** · **19 AI-powered prompts**
+**204 specialized tools** · **20 resources** · **19 AI-powered prompts**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgresql-mcp)
 ![GitHub Release](https://img.shields.io/github/v/release/neverinfamous/postgresql-mcp)
@@ -180,7 +180,7 @@ The `vm` mode is fully functional and is the default. No configuration needed.
 ## 🛠️ Tool Filtering
 
 > [!IMPORTANT]
-> AI IDEs like Cursor have tool limits. With 203 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (58 tools) as a starting point. Code Mode is included in all presets by default for 70-90% token savings on multi-step operations.
+> AI IDEs like Cursor have tool limits. With 204 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (58 tools) as a starting point. Code Mode is included in all presets by default for 70-90% token savings on multi-step operations.
 
 ### What Can You Filter?
 
@@ -196,6 +196,8 @@ The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names*
 All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by default for token-efficient operations. To exclude it, add `-codemode` to your filter: `--tool-filter cron,pgcrypto,-codemode`
 
 ### Shortcuts (Predefined Bundles)
+
+> Tool counts include Code Mode (`pg_execute_code`) which is included in all presets by default.
 
 | Shortcut       | Tools  | Use Case                 | What's Included                                          |
 | -------------- | ------ | ------------------------ | -------------------------------------------------------- |
@@ -217,6 +219,8 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 
 ### Tool Groups (20 Available)
 
+> Tool counts include Code Mode (`pg_execute_code`) which is added to all groups by default.
+
 | Group          | Tools | Description                                                 |
 | -------------- | ----- | ----------------------------------------------------------- |
 | `core`         | 21    | Read/write queries, tables, indexes, convenience/drop tools |
@@ -230,7 +234,7 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 | `schema`       | 13    | Schemas, views, sequences, functions, triggers              |
 | `partitioning` | 7     | Native partition management                                 |
 | `stats`        | 9     | Statistical analysis                                        |
-| `vector`       | 15    | pgvector (AI/ML similarity search)                          |
+| `vector`       | 16    | pgvector (AI/ML similarity search)                          |
 | `postgis`      | 16    | PostGIS (geospatial)                                        |
 | `cron`         | 9     | pg_cron (job scheduling)                                    |
 | `partman`      | 11    | pg_partman (auto-partitioning)                              |
@@ -504,7 +508,7 @@ This server provides **20 resources** for structured data access:
 ## 🏆 Why Choose postgres-mcp?
 
 ✅ **TypeScript Native** - Full type safety with strict mode  
-✅ **203 Specialized Tools** - Comprehensive PostgreSQL coverage  
+✅ **204 Specialized Tools** - Comprehensive PostgreSQL coverage  
 ✅ **Tool Annotations** - UX hints for read-only, destructive, and idempotent operations  
 ✅ **Connection Pooling** - Efficient PostgreSQL connection management  
 ✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements, pg_cron  

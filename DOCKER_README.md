@@ -22,7 +22,7 @@
 
 ### Key Benefits
 
-- 🔧 **203 specialized tools** — Comprehensive PostgreSQL coverage
+- 🔧 **204 specialized tools** — Comprehensive PostgreSQL coverage
 - 📊 **20 resources** — Instant database state snapshots
 - 🤖 **19 AI-powered prompts** — Guided workflows for complex tasks
 - ⚡ **Code Mode** — 70-90% token reduction for multi-step operations

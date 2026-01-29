@@ -167,6 +167,7 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
     "pg_vector_performance",
     "pg_vector_dimension_reduce",
     "pg_vector_embed",
+    "pg_vector_validate",
   ],
   postgis: [
     "pg_postgis_create_extension",
@@ -274,7 +275,7 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
  *
  * Group sizes:
  *   core:19, transactions:7, jsonb:19, text:13, performance:20
- *   admin:10, monitoring:11, backup:9, schema:12, vector:14
+ *   admin:10, monitoring:11, backup:9, schema:12, vector:15
  *   postgis:15, partitioning:6, stats:8, cron:8, partman:10
  *   kcache:7, citext:6, ltree:8, pgcrypto:9, codemode:1
  *

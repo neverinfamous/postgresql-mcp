@@ -1,6 +1,10 @@
 # postgres-mcp
 
-**Last Updated January 25, 2026**
+**Last Updated January 28, 2026**
+
+**PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
+
+**204 specialized tools** · **20 resources** · **19 AI-powered prompts**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgresql-mcp)
 ![GitHub Release](https://img.shields.io/github/v/release/neverinfamous/postgresql-mcp)
@@ -11,10 +15,8 @@
 [![npm](https://img.shields.io/npm/v/@neverinfamous/postgres-mcp)](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/postgresql-mcp/blob/master/SECURITY.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/postgresql-mcp)
-[![Tests](https://img.shields.io/badge/Tests-2063_passed-success.svg)](https://github.com/neverinfamous/postgresql-mcp)
+[![Tests](https://img.shields.io/badge/Tests-2108_passed-success.svg)](https://github.com/neverinfamous/postgresql-mcp)
 [![Coverage](https://img.shields.io/badge/Coverage-84.38%25-green.svg)](https://github.com/neverinfamous/postgresql-mcp)
-
-**PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
 **[GitHub](https://github.com/neverinfamous/postgresql-mcp)** • **[npm Package](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)** • **[MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.neverinfamous/postgres-mcp)**
 
@@ -182,29 +184,72 @@ Click the button below to install directly into Cursor:
 | `METADATA_CACHE_TTL_MS` | `30000` | Schema cache TTL (ms)       |
 | `LOG_LEVEL`             | `info`  | debug, info, warning, error |
 
-### Tool Filtering
+## 🛠️ Tool Filtering
 
-Control which tools are exposed using `--tool-filter`:
+> [!IMPORTANT]
+> AI IDEs like Cursor have tool limits. With 204 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (58 tools) as a starting point. Code Mode is included in all presets by default for 70-90% token savings on multi-step operations.
 
-```json
-{
-  "args": ["...", "--tool-filter", "starter"]
-}
-```
+### What Can You Filter?
 
-**Available Shortcuts:**
+The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names** — mix and match freely:
 
-| Shortcut      | Tools  | Use Case             |
-| ------------- | ------ | -------------------- |
-| `starter`     | **58** | 🌟 **Recommended**   |
-| `essential`   | 46     | Minimal footprint    |
-| `dev-power`   | 53     | Power Developer      |
-| `ai-data`     | 59     | AI Data Analyst      |
-| `ai-vector`   | 47     | AI/ML with pgvector  |
-| `dba-monitor` | 58     | DBA Monitoring       |
-| `geo`         | 42     | Geospatial Workloads |
+| Filter Pattern   | Example                   | Tools | Description               |
+| ---------------- | ------------------------- | ----- | ------------------------- |
+| Shortcut only    | `starter`                 | 58    | Use a predefined bundle   |
+| Groups only      | `core,jsonb,transactions` | 45    | Combine individual groups |
+| Shortcut + Group | `starter,+text`           | 69    | Extend a shortcut         |
+| Shortcut - Tool  | `starter,-pg_drop_table`  | 57    | Remove specific tools     |
 
-**[Complete tool filtering guide →](https://github.com/neverinfamous/postgresql-mcp#-tool-filtering)**
+All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by default for token-efficient operations. To exclude it, add `-codemode` to your filter: `--tool-filter cron,pgcrypto,-codemode`
+
+### Shortcuts (Predefined Bundles)
+
+> Tool counts include Code Mode (`pg_execute_code`) which is included in all presets by default.
+
+| Shortcut       | Tools  | Use Case                 | What's Included                                          |
+| -------------- | ------ | ------------------------ | -------------------------------------------------------- |
+| `starter`      | **58** | 🌟 **Recommended**       | Core, trans, JSONB, schema, codemode                     |
+| `essential`    | 46     | Minimal footprint        | Core, trans, JSONB, codemode                             |
+| `dev-power`    | 53     | Power Developer          | Core, trans, schema, stats, part, codemode               |
+| `ai-data`      | 59     | AI Data Analyst          | Core, JSONB, text, trans, codemode                       |
+| `ai-vector`    | 48     | AI/ML with pgvector      | Core, vector, trans, part, codemode                      |
+| `dba-monitor`  | 58     | DBA Monitoring           | Core, monitoring, perf, trans, codemode                  |
+| `dba-manage`   | 57     | DBA Management           | Core, admin, backup, part, schema, codemode              |
+| `dba-stats`    | 56     | DBA Stats/Security       | Core, admin, monitoring, trans, stats, codemode          |
+| `geo`          | 42     | Geospatial Workloads     | Core, PostGIS, trans, codemode                           |
+| `base-core`    | 58     | Base Building Block      | Core, JSONB, trans, schema, codemode                     |
+| `base-ops`     | 51     | Operations Block         | Admin, monitoring, backup, part, stats, citext, codemode |
+| `ext-ai`       | 25     | Extension: AI/Security   | pgvector, pgcrypto, codemode                             |
+| `ext-geo`      | 24     | Extension: Spatial       | PostGIS, ltree, codemode                                 |
+| `ext-schedule` | 19     | Extension: Scheduling    | pg_cron, pg_partman, codemode                            |
+| `ext-perf`     | 28     | Extension: Perf/Analysis | pg_stat_kcache, performance, codemode                    |
+
+### Tool Groups (20 Available)
+
+> Tool counts include Code Mode (`pg_execute_code`) which is added to all groups by default.
+
+| Group          | Tools | Description                                                 |
+| -------------- | ----- | ----------------------------------------------------------- |
+| `core`         | 21    | Read/write queries, tables, indexes, convenience/drop tools |
+| `transactions` | 8     | BEGIN, COMMIT, ROLLBACK, savepoints                         |
+| `jsonb`        | 20    | JSONB manipulation and queries                              |
+| `text`         | 14    | Full-text search, fuzzy matching                            |
+| `performance`  | 21    | EXPLAIN, query analysis, optimization                       |
+| `admin`        | 11    | VACUUM, ANALYZE, REINDEX                                    |
+| `monitoring`   | 12    | Database sizes, connections, status                         |
+| `backup`       | 10    | pg_dump, COPY, restore                                      |
+| `schema`       | 13    | Schemas, views, sequences, functions, triggers              |
+| `partitioning` | 7     | Native partition management                                 |
+| `stats`        | 9     | Statistical analysis                                        |
+| `vector`       | 16    | pgvector (AI/ML similarity search)                          |
+| `postgis`      | 16    | PostGIS (geospatial)                                        |
+| `cron`         | 9     | pg_cron (job scheduling)                                    |
+| `partman`      | 11    | pg_partman (auto-partitioning)                              |
+| `kcache`       | 8     | pg_stat_kcache (OS-level stats)                             |
+| `citext`       | 7     | citext (case-insensitive text)                              |
+| `ltree`        | 9     | ltree (hierarchical data)                                   |
+| `pgcrypto`     | 10    | pgcrypto (encryption, UUIDs)                                |
+| `codemode`     | 1     | Code Mode (sandboxed code execution)                        |
 
 ---
 

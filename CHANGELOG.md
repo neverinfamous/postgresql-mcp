@@ -12,10 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_set_config Zod output schema error** — Fixed direct MCP tool call failing with output validation error. The handler was returning `{success, parameter, value}` without a `message` field, which is required by `ConfigOutputSchema`. Handler now returns a `message` field (e.g., "Set work_mem = 256MB") and the schema now includes optional `parameter` and `value` fields for set_config operations
 - **pg_cache_hit_ratio Zod output schema error** — Fixed direct MCP tool call failing with `Cannot read properties of undefined (reading '_zod')` error. The root cause was the `CacheHitRatioOutputSchema` using `.nullable()` at the top level, which broke MCP's Zod-to-JSON Schema conversion. Changed schema to always return an object with nullable fields, and updated handler to never return `null` (fields are set to `null` individually when no data exists)
 - **JSONB Output Schema Validation Bugs**
-
   - `pg_jsonb_typeof` — Fixed `columnNull` field type from array to boolean to match actual handler output
   - `pg_jsonb_strip_nulls` — Refactored output schema from union to combined object with optional fields to resolve Zod validation errors
   - `pg_jsonb_stats` — Fixed `typeDistribution[].type` to accept null for SQL NULL columns; added missing `sqlNullCount` and `hint` output fields
+
 - **JSONB Split Schema Pattern** — Implemented Split Schema pattern for 6 JSONB tools to support parameter aliases in direct MCP tool calls:
   - Added `tableName` (alias for `table`), `col` (alias for `column`), and `filter` (alias for `where`) support
   - Added `preprocessJsonbParams()` function for alias normalization and `schema.table` parsing
@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_reindex` — REINDEX operations
   - `pg_cluster` — CLUSTER operations
 - **Backup Tool Progress Notifications** — `pg_copy_export` now emits progress for large exports
+- **Stats tools `params` support** — All 8 stats tools now accept an optional `params` array for parameterized `where` clauses (e.g., `where: "value > $1", params: [100]`). Consistent with core tools like `pg_read_query` and `pg_count`. Affected tools: `pg_stats_descriptive`, `pg_stats_percentiles`, `pg_stats_correlation`, `pg_stats_regression`, `pg_stats_time_series`, `pg_stats_distribution`, `pg_stats_hypothesis`, `pg_stats_sampling`
 - **JSONB Stats Payload Control** — Added `topKeysLimit` parameter to `pg_jsonb_stats` to control number of top keys returned (default: 20)
 - **Structured Content (outputSchema) for Core Tools** — All 20 core tools now include `outputSchema` for MCP 2025-11-25 compliance:
   - Query tools: `pg_read_query`, `pg_write_query`

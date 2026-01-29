@@ -49,8 +49,21 @@ export function createStatsDescriptiveTool(
     annotations: readOnly("Descriptive Statistics"),
     icons: getToolIcons("stats", readOnly("Descriptive Statistics")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { table, column, schema, where, groupBy } =
-        StatsDescriptiveSchema.parse(params);
+      const {
+        table,
+        column,
+        schema,
+        where,
+        params: queryParams,
+        groupBy,
+      } = StatsDescriptiveSchema.parse(params) as {
+        table: string;
+        column: string;
+        schema?: string;
+        where?: string;
+        params?: unknown[];
+        groupBy?: string;
+      };
 
       const schemaPrefix = schema ? `"${schema}".` : "";
       const whereClause = where ? `WHERE ${where}` : "";
@@ -142,7 +155,12 @@ export function createStatsDescriptiveTool(
                     ORDER BY "${groupBy}"
                 `;
 
-        const result = await adapter.executeQuery(sql);
+        const result = await adapter.executeQuery(
+          sql,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const rows = result.rows ?? [];
 
         const groups = rows.map((row) => ({
@@ -174,7 +192,12 @@ export function createStatsDescriptiveTool(
                 ${whereClause}
             `;
 
-      const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(
+        sql,
+        ...(queryParams !== undefined && queryParams.length > 0
+          ? [queryParams]
+          : []),
+      );
       const stats = result.rows?.[0];
 
       if (!stats) throw new Error("No stats found");
@@ -263,6 +286,7 @@ export function createStatsPercentilesTool(
         percentiles?: number[];
         schema?: string;
         where?: string;
+        params?: unknown[];
         groupBy?: string;
         _percentileScaleWarning?: string;
       };
@@ -272,6 +296,7 @@ export function createStatsPercentilesTool(
         percentiles,
         schema,
         where,
+        params: queryParams,
         groupBy,
         _percentileScaleWarning,
       } = parsed;
@@ -320,7 +345,12 @@ export function createStatsPercentilesTool(
                     ORDER BY "${groupBy}"
                 `;
 
-        const result = await adapter.executeQuery(sql);
+        const result = await adapter.executeQuery(
+          sql,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const rows = result.rows ?? [];
 
         const groups = rows.map((row) => ({
@@ -352,7 +382,12 @@ export function createStatsPercentilesTool(
                 ${whereClause}
             `;
 
-      const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(
+        sql,
+        ...(queryParams !== undefined && queryParams.length > 0
+          ? [queryParams]
+          : []),
+      );
       const row = result.rows?.[0] ?? {};
 
       const response: Record<string, unknown> = {
@@ -393,9 +428,18 @@ export function createStatsCorrelationTool(
         column2: string;
         schema?: string;
         where?: string;
+        params?: unknown[];
         groupBy?: string;
       };
-      const { table, column1, column2, schema, where, groupBy } = parsed;
+      const {
+        table,
+        column1,
+        column2,
+        schema,
+        where,
+        params: queryParams,
+        groupBy,
+      } = parsed;
 
       const schemaPrefix = schema ? `"${schema}".` : "";
       const whereClause = where ? `WHERE ${where}` : "";
@@ -493,7 +537,12 @@ export function createStatsCorrelationTool(
                     ORDER BY "${groupBy}"
                 `;
 
-        const result = await adapter.executeQuery(sql);
+        const result = await adapter.executeQuery(
+          sql,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const rows = result.rows ?? [];
 
         const groups = rows.map((row) => ({
@@ -521,7 +570,12 @@ export function createStatsCorrelationTool(
                 ${whereClause}
             `;
 
-      const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(
+        sql,
+        ...(queryParams !== undefined && queryParams.length > 0
+          ? [queryParams]
+          : []),
+      );
       const row = result.rows?.[0];
 
       if (!row) throw new Error("No correlation data found");
@@ -564,9 +618,18 @@ export function createStatsRegressionTool(
         yColumn: string;
         schema?: string;
         where?: string;
+        params?: unknown[];
         groupBy?: string;
       };
-      const { table, xColumn, yColumn, schema, where, groupBy } = parsed;
+      const {
+        table,
+        xColumn,
+        yColumn,
+        schema,
+        where,
+        params: queryParams,
+        groupBy,
+      } = parsed;
 
       const schemaName = schema ?? "public";
       const schemaPrefix = schema ? `"${schema}".` : "";
@@ -628,7 +691,12 @@ export function createStatsRegressionTool(
                     ORDER BY "${groupBy}"
                 `;
 
-        const result = await adapter.executeQuery(sql);
+        const result = await adapter.executeQuery(
+          sql,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const rows = result.rows ?? [];
 
         const groups = rows.map((row) => ({
@@ -662,7 +730,12 @@ export function createStatsRegressionTool(
                 ${whereClause}
             `;
 
-      const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(
+        sql,
+        ...(queryParams !== undefined && queryParams.length > 0
+          ? [queryParams]
+          : []),
+      );
       const row = result.rows?.[0];
 
       if (!row) return { error: "No regression data found" };

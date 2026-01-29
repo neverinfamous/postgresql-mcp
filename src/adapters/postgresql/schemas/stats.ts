@@ -462,6 +462,10 @@ export const StatsDescriptiveSchemaBase = z.object({
   column: z.string().describe("Numeric column to analyze"),
   schema: z.string().optional().describe("Schema name (default: public)"),
   where: z.string().optional().describe("Filter condition"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for $1, $2 placeholders in where clause"),
   groupBy: z.string().optional().describe("Column to group statistics by"),
 });
 
@@ -476,6 +480,10 @@ export const StatsPercentilesSchemaBase = z.object({
     ),
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for $1, $2 placeholders in where clause"),
   groupBy: z.string().optional().describe("Column to group percentiles by"),
 });
 
@@ -487,6 +495,10 @@ export const StatsCorrelationSchemaBase = z.object({
   y: z.string().optional().describe("Alias for column2"),
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for $1, $2 placeholders in where clause"),
   groupBy: z.string().optional().describe("Column to group correlation by"),
 });
 
@@ -506,6 +518,10 @@ export const StatsRegressionSchemaBase = z.object({
     .describe("Alias for yColumn (consistency with correlation)"),
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for $1, $2 placeholders in where clause"),
   groupBy: z.string().optional().describe("Column to group regression by"),
 });
 
@@ -525,6 +541,10 @@ export const StatsTimeSeriesSchemaBase = z.object({
     .describe("Aggregation function (default: avg)"),
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for $1, $2 placeholders in where clause"),
   limit: z
     .number()
     .optional()
@@ -547,6 +567,10 @@ export const StatsDistributionSchemaBase = z.object({
     .describe("Number of histogram buckets (default: 10)"),
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for $1, $2 placeholders in where clause"),
   groupBy: z.string().optional().describe("Column to group distribution by"),
   groupLimit: z
     .number()
@@ -571,6 +595,10 @@ export const StatsHypothesisSchemaBase = z.object({
     ),
   schema: z.string().optional().describe("Schema name"),
   where: z.string().optional().describe("Filter condition"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for $1, $2 placeholders in where clause"),
   groupBy: z.string().optional().describe("Column to group hypothesis test by"),
 });
 
@@ -593,6 +621,10 @@ export const StatsSamplingSchemaBase = z.object({
   schema: z.string().optional().describe("Schema name"),
   select: z.array(z.string()).optional().describe("Columns to select"),
   where: z.string().optional().describe("Filter condition"),
+  params: z
+    .array(z.unknown())
+    .optional()
+    .describe("Parameters for $1, $2 placeholders in where clause"),
 });
 
 // =============================================================================

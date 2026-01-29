@@ -301,6 +301,7 @@ export function createStatsTimeSeriesTool(
         aggregation,
         schema,
         where,
+        params: queryParams,
         limit,
         groupBy,
         groupLimit,
@@ -312,6 +313,7 @@ export function createStatsTimeSeriesTool(
         aggregation?: string;
         schema?: string;
         where?: string;
+        params?: unknown[];
         limit?: number;
         groupBy?: string;
         groupLimit?: number;
@@ -463,7 +465,12 @@ export function createStatsTimeSeriesTool(
                     ORDER BY "${groupBy}", time_bucket DESC
                 `;
 
-        const result = await adapter.executeQuery(sql);
+        const result = await adapter.executeQuery(
+          sql,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const rows = result.rows ?? [];
 
         // Group results by group_key
@@ -545,7 +552,12 @@ export function createStatsTimeSeriesTool(
           FROM ${schemaPrefix}"${table}"
           ${whereClause}
         `;
-        const countResult = await adapter.executeQuery(countSql);
+        const countResult = await adapter.executeQuery(
+          countSql,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const countRow = countResult.rows?.[0] as
           | { total_buckets: string | number }
           | undefined;
@@ -564,7 +576,12 @@ export function createStatsTimeSeriesTool(
                 ${limitClause}
             `;
 
-      const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(
+        sql,
+        ...(queryParams !== undefined && queryParams.length > 0
+          ? [queryParams]
+          : []),
+      );
 
       const buckets = (result.rows ?? []).map((row) => mapBucket(row));
 
@@ -611,11 +628,20 @@ export function createStatsDistributionTool(
         buckets?: number;
         schema?: string;
         where?: string;
+        params?: unknown[];
         groupBy?: string;
         groupLimit?: number;
       };
-      const { table, column, buckets, schema, where, groupBy, groupLimit } =
-        parsed;
+      const {
+        table,
+        column,
+        buckets,
+        schema,
+        where,
+        params: queryParams,
+        groupBy,
+        groupLimit,
+      } = parsed;
 
       const schemaName = schema ?? "public";
       const schemaPrefix = schema ? `"${schema}".` : "";
@@ -671,7 +697,12 @@ export function createStatsDistributionTool(
                     SELECT * FROM moments
                 `;
 
-        const result = await adapter.executeQuery(statsQuery);
+        const result = await adapter.executeQuery(
+          statsQuery,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const row = result.rows?.[0];
 
         if (row?.["min_val"] == null || row["max_val"] == null) {
@@ -717,7 +748,12 @@ export function createStatsDistributionTool(
                     ORDER BY bucket
                 `;
 
-        const result = await adapter.executeQuery(histogramQuery);
+        const result = await adapter.executeQuery(
+          histogramQuery,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         return (result.rows ?? []).map((row) => ({
           bucket: Number(row["bucket"]),
           frequency: Number(row["frequency"]),
@@ -740,7 +776,12 @@ export function createStatsDistributionTool(
                     ${whereClause}
                     ORDER BY "${groupBy}"
                 `;
-        const groupsResult = await adapter.executeQuery(groupsQuery);
+        const groupsResult = await adapter.executeQuery(
+          groupsQuery,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const allGroupKeys = (groupsResult.rows ?? []).map(
           (r) => r["group_key"],
         );
@@ -864,6 +905,7 @@ export function createStatsHypothesisTool(
         populationStdDev,
         schema,
         where,
+        params: queryParams,
         groupBy,
       } = StatsHypothesisSchema.parse(params) as {
         table: string;
@@ -874,6 +916,7 @@ export function createStatsHypothesisTool(
         groupBy?: string;
         schema?: string;
         where?: string;
+        params?: unknown[];
       };
 
       const schemaName = schema ?? "public";
@@ -992,7 +1035,12 @@ export function createStatsHypothesisTool(
                     ORDER BY "${groupBy}"
                 `;
 
-        const result = await adapter.executeQuery(sql);
+        const result = await adapter.executeQuery(
+          sql,
+          ...(queryParams !== undefined && queryParams.length > 0
+            ? [queryParams]
+            : []),
+        );
         const rows = result.rows ?? [];
 
         const groups = rows.map((row) => {
@@ -1026,7 +1074,12 @@ export function createStatsHypothesisTool(
                 ${whereClause}
             `;
 
-      const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(
+        sql,
+        ...(queryParams !== undefined && queryParams.length > 0
+          ? [queryParams]
+          : []),
+      );
       const row = result.rows?.[0] as
         | { n: string | number; mean: string | number; stddev: string | number }
         | undefined;
@@ -1070,8 +1123,25 @@ export function createStatsSamplingTool(
     annotations: readOnly("Random Sampling"),
     icons: getToolIcons("stats", readOnly("Random Sampling")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { table, method, sampleSize, percentage, schema, select, where } =
-        StatsSamplingSchema.parse(params);
+      const {
+        table,
+        method,
+        sampleSize,
+        percentage,
+        schema,
+        select,
+        where,
+        params: queryParams,
+      } = StatsSamplingSchema.parse(params) as {
+        table: string;
+        method?: "random" | "bernoulli" | "system";
+        sampleSize?: number;
+        percentage?: number;
+        schema?: string;
+        select?: string[];
+        where?: string;
+        params?: unknown[];
+      };
 
       const schemaName = schema ?? "public";
 
@@ -1138,7 +1208,12 @@ export function createStatsSamplingTool(
         note = `TABLESAMPLE ${samplingMethod.toUpperCase()}(${String(pct)}%) returns approximately ${String(pct)}% of rows. Actual count varies based on table size and sampling algorithm.${methodHint}`;
       }
 
-      const result = await adapter.executeQuery(sql);
+      const result = await adapter.executeQuery(
+        sql,
+        ...(queryParams !== undefined && queryParams.length > 0
+          ? [queryParams]
+          : []),
+      );
       let rows = result.rows ?? [];
 
       // Check if we need to truncate due to default limit for TABLESAMPLE methods

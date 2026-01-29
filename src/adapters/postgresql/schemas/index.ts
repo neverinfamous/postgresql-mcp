@@ -259,6 +259,7 @@ export {
   VectorPerformanceOutputSchema,
   VectorDimensionReduceOutputSchema,
   VectorEmbedOutputSchema,
+  VectorValidateOutputSchema,
 } from "./vector.js";
 
 // PostGIS schemas

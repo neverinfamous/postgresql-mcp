@@ -31,6 +31,7 @@ import {
   VectorDistanceOutputSchema,
   VectorNormalizeOutputSchema,
   VectorAggregateOutputSchema,
+  VectorValidateOutputSchema,
 } from "../../schemas/index.js";
 
 /**
@@ -1128,6 +1129,7 @@ export function createVectorValidateTool(
       "Returns `{valid: bool, vectorDimensions}`. Validate vector dimensions against a column or check a vector before operations. Empty vector `[]` returns `{valid: true, vectorDimensions: 0}`.",
     group: "vector",
     inputSchema: ValidateSchemaBase,
+    outputSchema: VectorValidateOutputSchema,
     annotations: readOnly("Validate Vector"),
     icons: getToolIcons("vector", readOnly("Validate Vector")),
     handler: async (params: unknown, _context: RequestContext) => {

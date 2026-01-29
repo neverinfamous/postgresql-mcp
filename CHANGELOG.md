@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `pg_vector_embed` — Fixed output schema validation error when `summarize: false`; handler now always returns embedding in object format `{preview, dimensions, truncated}` to comply with `VectorEmbedOutputSchema`
 - **pg_vector_insert Split Schema Violation** — Fixed direct MCP tool calls not accepting `tableName` and `col` aliases. Implemented Split Schema pattern with `VectorInsertSchemaBase` for MCP visibility and transformed schema for handler alias resolution. Error messages now mention aliases (e.g., "table (or tableName) parameter is required")
 - **pg_vector_validate user-friendly error** — Fixed raw Zod validation error being returned when invalid input types are provided (e.g., string instead of number array for `vector` parameter). Now returns `{valid: false, error: \"Invalid vector: ...\", suggestion: \"Ensure vector is an array of numbers, e.g., [0.1, 0.2, 0.3]\"}` for type validation failures
+- **pg_vector_validate direct MCP tool exposure** — Fixed `pg_vector_validate` not appearing as a direct MCP tool. The tool was missing an `outputSchema` property, which is required for MCP tool visibility. Added `VectorValidateOutputSchema` to `schemas/vector.ts` and updated tool definition in `basic.ts`
 
 - **JSONB Split Schema Pattern** — Implemented Split Schema pattern for 6 JSONB tools to support parameter aliases in direct MCP tool calls:
   - Added `tableName` (alias for `table`), `col` (alias for `column`), and `filter` (alias for `where`) support

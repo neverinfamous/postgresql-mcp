@@ -508,3 +508,26 @@ export const VectorEmbedOutputSchema = z
     error: z.string().optional().describe("Error message"),
   })
   .describe("Vector embedding result");
+
+/**
+ * Output schema for pg_vector_validate
+ */
+export const VectorValidateOutputSchema = z
+  .object({
+    valid: z.boolean().describe("Whether validation passed"),
+    vectorDimensions: z
+      .number()
+      .optional()
+      .describe("Dimensions of provided vector"),
+    columnDimensions: z
+      .number()
+      .optional()
+      .describe("Dimensions expected by column"),
+    expectedDimensions: z
+      .number()
+      .optional()
+      .describe("Expected dimensions (from column or param)"),
+    error: z.string().optional().describe("Error message"),
+    suggestion: z.string().optional().describe("Helpful suggestion"),
+  })
+  .describe("Vector validation result");

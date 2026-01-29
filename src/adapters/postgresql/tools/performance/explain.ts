@@ -13,7 +13,11 @@ import type {
 } from "../../../../types/index.js";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
-import { ExplainSchema, ExplainSchemaBase } from "../../schemas/index.js";
+import {
+  ExplainSchema,
+  ExplainSchemaBase,
+  ExplainOutputSchema,
+} from "../../schemas/index.js";
 
 export function createExplainTool(adapter: PostgresAdapter): ToolDefinition {
   return {
@@ -21,6 +25,7 @@ export function createExplainTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Show query execution plan without running the query.",
     group: "performance",
     inputSchema: ExplainSchemaBase, // Base schema for MCP visibility
+    outputSchema: ExplainOutputSchema,
     annotations: readOnly("Explain Query"),
     icons: getToolIcons("performance", readOnly("Explain Query")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -45,6 +50,7 @@ export function createExplainAnalyzeTool(
     description: "Run query and show actual execution plan with timing.",
     group: "performance",
     inputSchema: ExplainSchemaBase, // Base schema for MCP visibility
+    outputSchema: ExplainOutputSchema,
     annotations: readOnly("Explain Analyze"),
     icons: getToolIcons("performance", readOnly("Explain Analyze")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -69,6 +75,7 @@ export function createExplainBuffersTool(
     description: "Show query plan with buffer usage statistics.",
     group: "performance",
     inputSchema: ExplainSchemaBase, // Base schema for MCP visibility
+    outputSchema: ExplainOutputSchema,
     annotations: readOnly("Explain Buffers"),
     icons: getToolIcons("performance", readOnly("Explain Buffers")),
     handler: async (params: unknown, _context: RequestContext) => {

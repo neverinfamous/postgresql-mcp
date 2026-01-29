@@ -475,12 +475,32 @@ export const GetIndexesSchema = z
 
 /**
  * Preprocess create index params:
+ * - Alias: tableName → table
+ * - Parse schema.table format (e.g., 'public.users' → schema: 'public', table: 'users')
  * - Parse JSON-encoded columns array
  * - Handle single column string → array
  */
 function preprocessCreateIndexParams(input: unknown): unknown {
   if (typeof input !== "object" || input === null) return input;
   const result = { ...(input as Record<string, unknown>) };
+
+  // Alias: tableName → table
+  if (result["table"] === undefined && result["tableName"] !== undefined) {
+    result["table"] = result["tableName"];
+  }
+
+  // Parse schema.table format
+  if (
+    typeof result["table"] === "string" &&
+    result["table"].includes(".") &&
+    result["schema"] === undefined
+  ) {
+    const parts = result["table"].split(".");
+    if (parts.length === 2) {
+      result["schema"] = parts[0];
+      result["table"] = parts[1];
+    }
+  }
 
   // Parse JSON-encoded columns array
   if (typeof result["columns"] === "string") {
@@ -736,3 +756,55 @@ export const TransactionExecuteSchema = z
     message:
       'statements is required. Format: {statements: [{sql: "INSERT INTO..."}, {sql: "UPDATE..."}]}. Each statement must be an object with "sql" property, not a raw string.',
   });
+
+// =============================================================================
+// Transaction Output Schemas
+// =============================================================================
+
+// Output schema for pg_transaction_begin
+export const TransactionBeginOutputSchema = z.object({
+  transactionId: z
+    .string()
+    .describe("Unique transaction ID for subsequent operations"),
+  isolationLevel: z.string().describe("Transaction isolation level"),
+  message: z.string().describe("Confirmation message"),
+});
+
+// Output schema for pg_transaction_commit, pg_transaction_rollback
+export const TransactionResultOutputSchema = z.object({
+  success: z.boolean().describe("Whether the operation succeeded"),
+  transactionId: z.string().describe("Transaction ID that was operated on"),
+  message: z.string().describe("Result message"),
+});
+
+// Output schema for pg_transaction_savepoint, pg_transaction_release, pg_transaction_rollback_to
+export const SavepointResultOutputSchema = z.object({
+  success: z.boolean().describe("Whether the operation succeeded"),
+  transactionId: z.string().describe("Transaction ID"),
+  savepoint: z.string().describe("Savepoint name"),
+  message: z.string().describe("Result message"),
+});
+
+// Statement result schema for transaction execute
+const StatementResultSchema = z.object({
+  sql: z.string().describe("Executed SQL statement"),
+  rowsAffected: z.number().describe("Number of rows affected"),
+  rowCount: z.number().describe("Number of rows returned"),
+  rows: z
+    .array(z.record(z.string(), z.unknown()))
+    .optional()
+    .describe("Returned rows (when using RETURNING)"),
+});
+
+// Output schema for pg_transaction_execute
+export const TransactionExecuteOutputSchema = z.object({
+  success: z.boolean().describe("Whether all statements executed successfully"),
+  statementsExecuted: z.number().describe("Number of statements executed"),
+  results: z
+    .array(StatementResultSchema)
+    .describe("Results from each statement"),
+  transactionId: z
+    .string()
+    .optional()
+    .describe("Transaction ID (when joining existing transaction)"),
+});

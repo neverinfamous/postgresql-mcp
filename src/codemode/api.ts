@@ -1372,6 +1372,10 @@ export class PgApi {
       if (coreApi["analyzeWorkloadIndexes"] !== undefined) {
         bindings["analyzeWorkloadIndexes"] = coreApi["analyzeWorkloadIndexes"];
       }
+      // Extensions
+      if (coreApi["listExtensions"] !== undefined) {
+        bindings["listExtensions"] = coreApi["listExtensions"];
+      }
     }
 
     // Add top-level transaction aliases for consistency: pg.transactionXxx() → pg.transactions.xxx()

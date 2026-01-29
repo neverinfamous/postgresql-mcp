@@ -17,6 +17,11 @@ import {
   SavepointSchemaBase,
   TransactionExecuteSchema,
   TransactionExecuteSchemaBase,
+  // Output schemas
+  TransactionBeginOutputSchema,
+  TransactionResultOutputSchema,
+  SavepointResultOutputSchema,
+  TransactionExecuteOutputSchema,
 } from "../schemas/index.js";
 
 /**
@@ -43,6 +48,7 @@ function createBeginTransactionTool(adapter: PostgresAdapter): ToolDefinition {
       "Begin a new transaction. Returns a transaction ID for subsequent operations.",
     group: "transactions",
     inputSchema: BeginTransactionSchema,
+    outputSchema: TransactionBeginOutputSchema,
     annotations: write("Begin Transaction"),
     icons: getToolIcons("transactions", write("Begin Transaction")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -63,6 +69,7 @@ function createCommitTransactionTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Commit a transaction, making all changes permanent.",
     group: "transactions",
     inputSchema: TransactionIdSchemaBase, // Use base schema for MCP visibility
+    outputSchema: TransactionResultOutputSchema,
     annotations: write("Commit Transaction"),
     icons: getToolIcons("transactions", write("Commit Transaction")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -85,6 +92,7 @@ function createRollbackTransactionTool(
     description: "Rollback a transaction, undoing all changes.",
     group: "transactions",
     inputSchema: TransactionIdSchemaBase, // Use base schema for MCP visibility
+    outputSchema: TransactionResultOutputSchema,
     annotations: write("Rollback Transaction"),
     icons: getToolIcons("transactions", write("Rollback Transaction")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -106,6 +114,7 @@ function createSavepointTool(adapter: PostgresAdapter): ToolDefinition {
       "Create a savepoint within a transaction for partial rollback.",
     group: "transactions",
     inputSchema: SavepointSchemaBase, // Use base schema for MCP visibility
+    outputSchema: SavepointResultOutputSchema,
     annotations: write("Create Savepoint"),
     icons: getToolIcons("transactions", write("Create Savepoint")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -128,6 +137,7 @@ function createReleaseSavepointTool(adapter: PostgresAdapter): ToolDefinition {
       "Release a savepoint, keeping all changes since it was created.",
     group: "transactions",
     inputSchema: SavepointSchemaBase, // Use base schema for MCP visibility
+    outputSchema: SavepointResultOutputSchema,
     annotations: write("Release Savepoint"),
     icons: getToolIcons("transactions", write("Release Savepoint")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -151,6 +161,7 @@ function createRollbackToSavepointTool(
     description: "Rollback to a savepoint, undoing changes made after it.",
     group: "transactions",
     inputSchema: SavepointSchemaBase, // Use base schema for MCP visibility
+    outputSchema: SavepointResultOutputSchema,
     annotations: write("Rollback to Savepoint"),
     icons: getToolIcons("transactions", write("Rollback to Savepoint")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -175,6 +186,7 @@ function createTransactionExecuteTool(
       "Execute multiple statements atomically in a single transaction.",
     group: "transactions",
     inputSchema: TransactionExecuteSchemaBase, // Use base schema for MCP visibility
+    outputSchema: TransactionExecuteOutputSchema,
     annotations: write("Transaction Execute"),
     icons: getToolIcons("transactions", write("Transaction Execute")),
     handler: async (params: unknown, _context: RequestContext) => {

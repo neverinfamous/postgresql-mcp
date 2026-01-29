@@ -129,3 +129,188 @@ export const DumpSchemaSchema = z.object({
     .optional()
     .describe("Output filename (default: backup.dump)"),
 });
+
+// ============================================================================
+// Output Schemas
+// ============================================================================
+
+/**
+ * pg_dump_table output - DDL for table, sequence, or view
+ */
+export const DumpTableOutputSchema = z
+  .object({
+    ddl: z.string().describe("DDL statement (CREATE TABLE/SEQUENCE/VIEW)"),
+    type: z
+      .string()
+      .optional()
+      .describe(
+        "Object type: table, sequence, view, materialized_view, partitioned_table",
+      ),
+    note: z.string().describe("Usage notes"),
+    insertStatements: z
+      .string()
+      .optional()
+      .describe("INSERT statements when includeData=true"),
+    warning: z.string().optional().describe("Warning message"),
+  })
+  .loose();
+
+/**
+ * pg_dump_schema output - pg_dump command
+ */
+export const DumpSchemaOutputSchema = z
+  .object({
+    command: z.string().describe("pg_dump command to run"),
+    warning: z
+      .string()
+      .optional()
+      .describe("Warning about schema+table combination"),
+    formatWarning: z
+      .string()
+      .optional()
+      .describe("Warning about .sql extension with custom format"),
+    notes: z.array(z.string()).describe("Usage notes"),
+  })
+  .loose();
+
+/**
+ * pg_copy_export output - exported data
+ */
+export const CopyExportOutputSchema = z
+  .object({
+    data: z.string().describe("Exported data (CSV or text format)"),
+    rowCount: z.number().describe("Number of rows exported"),
+    truncated: z
+      .boolean()
+      .optional()
+      .describe("Whether results were truncated"),
+    limit: z.number().optional().describe("Limit that was applied"),
+    note: z.string().optional().describe("Message when no rows returned"),
+    warning: z
+      .string()
+      .optional()
+      .describe("Warning about parameter conflicts"),
+  })
+  .loose();
+
+/**
+ * pg_copy_import output - COPY FROM command
+ */
+export const CopyImportOutputSchema = z.object({
+  command: z.string().describe("COPY FROM command"),
+  stdinCommand: z.string().describe("COPY FROM STDIN command"),
+  notes: z.string().describe("Usage notes"),
+});
+
+/**
+ * pg_create_backup_plan output - backup strategy
+ */
+export const CreateBackupPlanOutputSchema = z.object({
+  strategy: z.object({
+    fullBackup: z.object({
+      command: z.string().describe("pg_dump command with timestamp"),
+      frequency: z.string().describe("Backup frequency"),
+      cronSchedule: z.string().describe("Cron schedule expression"),
+      retention: z.string().describe("Retention policy"),
+    }),
+    walArchiving: z.object({
+      note: z.string().describe("WAL archiving recommendation"),
+      configChanges: z.array(z.string()).describe("PostgreSQL config changes"),
+    }),
+  }),
+  estimates: z
+    .object({
+      databaseSize: z.string().describe("Current database size"),
+      backupSizeEach: z.string().describe("Estimated size per backup"),
+      backupsPerDay: z
+        .number()
+        .optional()
+        .describe("Backups per day (for hourly/daily)"),
+      backupsPerWeek: z
+        .number()
+        .optional()
+        .describe("Backups per week (for weekly)"),
+      totalStorageNeeded: z.string().describe("Total storage needed"),
+    })
+    .loose(),
+});
+
+/**
+ * pg_restore_command output - pg_restore command
+ */
+export const RestoreCommandOutputSchema = z.object({
+  command: z.string().describe("pg_restore command"),
+  warnings: z
+    .array(z.string())
+    .optional()
+    .describe("Warnings about missing parameters"),
+  notes: z.array(z.string()).describe("Usage notes"),
+});
+
+/**
+ * pg_backup_physical output - pg_basebackup command
+ */
+export const PhysicalBackupOutputSchema = z.object({
+  command: z.string().describe("pg_basebackup command"),
+  notes: z.array(z.string()).describe("Usage notes"),
+  requirements: z.array(z.string()).describe("PostgreSQL requirements"),
+});
+
+/**
+ * pg_restore_validate output - validation steps
+ */
+export const RestoreValidateOutputSchema = z
+  .object({
+    note: z.string().optional().describe("Default type note"),
+    validationSteps: z.array(
+      z
+        .object({
+          step: z.number().describe("Step number"),
+          name: z.string().describe("Step name"),
+          command: z.string().optional().describe("Command to run"),
+          commands: z
+            .array(z.string())
+            .optional()
+            .describe("Multiple commands"),
+          note: z.string().optional().describe("Step note"),
+        })
+        .loose(),
+    ),
+    recommendations: z
+      .array(z.string())
+      .describe("Best practice recommendations"),
+  })
+  .loose();
+
+/**
+ * pg_backup_schedule_optimize output - schedule analysis
+ */
+export const BackupScheduleOptimizeOutputSchema = z.object({
+  analysis: z.object({
+    databaseSize: z.unknown().describe("Database size"),
+    totalChanges: z.number().describe("Total DML changes since stats reset"),
+    changeVelocity: z.number().describe("Change velocity ratio"),
+    changeVelocityRatio: z.string().describe("Change velocity as percentage"),
+    activityByHour: z
+      .array(
+        z.object({
+          hour: z.number().describe("Hour of day"),
+          connection_count: z.number().describe("Connection count"),
+        }),
+      )
+      .optional()
+      .describe("Connection activity by hour"),
+    activityNote: z.string().describe("Activity data caveat"),
+  }),
+  recommendation: z.object({
+    strategy: z.string().describe("Recommended strategy"),
+    fullBackupFrequency: z.string().describe("Full backup frequency"),
+    incrementalFrequency: z.string().describe("Incremental/WAL frequency"),
+    bestTimeForBackup: z.string().describe("Recommended backup time"),
+    retentionPolicy: z.string().describe("Retention policy"),
+  }),
+  commands: z.object({
+    cronSchedule: z.string().describe("Sample cron schedule"),
+    walArchive: z.string().describe("WAL archive command"),
+  }),
+});

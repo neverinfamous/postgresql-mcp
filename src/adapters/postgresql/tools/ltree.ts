@@ -21,6 +21,15 @@ import {
   LtreeConvertColumnSchemaBase,
   LtreeIndexSchema,
   LtreeIndexSchemaBase,
+  // Output schemas
+  LtreeCreateExtensionOutputSchema,
+  LtreeQueryOutputSchema,
+  LtreeSubpathOutputSchema,
+  LtreeLcaOutputSchema,
+  LtreeMatchOutputSchema,
+  LtreeListColumnsOutputSchema,
+  LtreeConvertColumnOutputSchema,
+  LtreeCreateIndexOutputSchema,
 } from "../schemas/index.js";
 
 export function getLtreeTools(adapter: PostgresAdapter): ToolDefinition[] {
@@ -43,6 +52,7 @@ function createLtreeExtensionTool(adapter: PostgresAdapter): ToolDefinition {
       "Enable the ltree extension for hierarchical tree-structured labels.",
     group: "ltree",
     inputSchema: z.object({}),
+    outputSchema: LtreeCreateExtensionOutputSchema,
     annotations: write("Create Ltree Extension"),
     icons: getToolIcons("ltree", write("Create Ltree Extension")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -59,6 +69,7 @@ function createLtreeQueryTool(adapter: PostgresAdapter): ToolDefinition {
       "Query hierarchical relationships in ltree columns. Supports exact paths (descendants/ancestors) and lquery patterns with wildcards.",
     group: "ltree",
     inputSchema: LtreeQuerySchemaBase, // Base schema for MCP visibility
+    outputSchema: LtreeQueryOutputSchema,
     annotations: readOnly("Query Ltree"),
     icons: getToolIcons("ltree", readOnly("Query Ltree")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -166,6 +177,7 @@ function createLtreeSubpathTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Extract a portion of an ltree path.",
     group: "ltree",
     inputSchema: LtreeSubpathSchemaBase, // Base schema for MCP visibility
+    outputSchema: LtreeSubpathOutputSchema,
     annotations: readOnly("Ltree Subpath"),
     icons: getToolIcons("ltree", readOnly("Ltree Subpath")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -214,6 +226,7 @@ function createLtreeLcaTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Find the longest common ancestor of multiple ltree paths.",
     group: "ltree",
     inputSchema: LtreeLcaSchema,
+    outputSchema: LtreeLcaOutputSchema,
     annotations: readOnly("Ltree LCA"),
     icons: getToolIcons("ltree", readOnly("Ltree LCA")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -239,6 +252,7 @@ function createLtreeMatchTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Match ltree paths using lquery pattern syntax.",
     group: "ltree",
     inputSchema: LtreeMatchSchemaBase, // Base schema for MCP visibility
+    outputSchema: LtreeMatchOutputSchema,
     annotations: readOnly("Ltree Match"),
     icons: getToolIcons("ltree", readOnly("Ltree Match")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -282,6 +296,7 @@ function createLtreeListColumnsTool(adapter: PostgresAdapter): ToolDefinition {
     description: "List all columns using the ltree type in the database.",
     group: "ltree",
     inputSchema: LtreeListColumnsSchema,
+    outputSchema: LtreeListColumnsOutputSchema,
     annotations: readOnly("List Ltree Columns"),
     icons: getToolIcons("ltree", readOnly("List Ltree Columns")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -311,6 +326,7 @@ function createLtreeConvertColumnTool(
       "Convert an existing TEXT column to LTREE type. Note: If views depend on this column, you must drop and recreate them manually before conversion.",
     group: "ltree",
     inputSchema: LtreeConvertColumnSchemaBase, // Base schema for MCP visibility
+    outputSchema: LtreeConvertColumnOutputSchema,
     annotations: write("Convert to Ltree"),
     icons: getToolIcons("ltree", write("Convert to Ltree")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -436,6 +452,7 @@ function createLtreeCreateIndexTool(adapter: PostgresAdapter): ToolDefinition {
       "Create a GiST index on an ltree column for efficient tree queries.",
     group: "ltree",
     inputSchema: LtreeIndexSchemaBase, // Base schema for MCP visibility
+    outputSchema: LtreeCreateIndexOutputSchema,
     annotations: write("Create Ltree Index"),
     icons: getToolIcons("ltree", write("Create Ltree Index")),
     handler: async (params: unknown, _context: RequestContext) => {

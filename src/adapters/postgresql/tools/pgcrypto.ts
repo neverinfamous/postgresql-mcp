@@ -18,6 +18,16 @@ import {
   PgcryptoRandomBytesSchema,
   PgcryptoGenSaltSchema,
   PgcryptoCryptSchema,
+  // Output schemas
+  PgcryptoCreateExtensionOutputSchema,
+  PgcryptoHashOutputSchema,
+  PgcryptoHmacOutputSchema,
+  PgcryptoEncryptOutputSchema,
+  PgcryptoDecryptOutputSchema,
+  PgcryptoGenRandomUuidOutputSchema,
+  PgcryptoGenRandomBytesOutputSchema,
+  PgcryptoGenSaltOutputSchema,
+  PgcryptoCryptOutputSchema,
 } from "../schemas/index.js";
 
 export function getPgcryptoTools(adapter: PostgresAdapter): ToolDefinition[] {
@@ -40,6 +50,7 @@ function createPgcryptoExtensionTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Enable the pgcrypto extension for cryptographic functions.",
     group: "pgcrypto",
     inputSchema: z.object({}),
+    outputSchema: PgcryptoCreateExtensionOutputSchema,
     annotations: write("Create Pgcrypto Extension"),
     icons: getToolIcons("pgcrypto", write("Create Pgcrypto Extension")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -56,6 +67,7 @@ function createPgcryptoHashTool(adapter: PostgresAdapter): ToolDefinition {
       "Hash data using various algorithms (SHA-256, SHA-512, MD5, etc.).",
     group: "pgcrypto",
     inputSchema: PgcryptoHashSchema,
+    outputSchema: PgcryptoHashOutputSchema,
     annotations: readOnly("Hash Data"),
     icons: getToolIcons("pgcrypto", readOnly("Hash Data")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -86,6 +98,7 @@ function createPgcryptoHmacTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Compute HMAC for data with a secret key.",
     group: "pgcrypto",
     inputSchema: PgcryptoHmacSchema,
+    outputSchema: PgcryptoHmacOutputSchema,
     annotations: readOnly("HMAC"),
     icons: getToolIcons("pgcrypto", readOnly("HMAC")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -115,8 +128,8 @@ function createPgcryptoEncryptTool(adapter: PostgresAdapter): ToolDefinition {
     name: "pg_pgcrypto_encrypt",
     description: "Encrypt data using PGP symmetric encryption.",
     group: "pgcrypto",
-    // Use base schema for MCP so properties are properly exposed
     inputSchema: PgcryptoEncryptSchemaBase,
+    outputSchema: PgcryptoEncryptOutputSchema,
     annotations: readOnly("Encrypt Data"),
     icons: getToolIcons("pgcrypto", readOnly("Encrypt Data")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -143,8 +156,8 @@ function createPgcryptoDecryptTool(adapter: PostgresAdapter): ToolDefinition {
     name: "pg_pgcrypto_decrypt",
     description: "Decrypt data that was encrypted with pg_pgcrypto_encrypt.",
     group: "pgcrypto",
-    // Use base schema for MCP so properties are properly exposed
     inputSchema: PgcryptoDecryptSchemaBase,
+    outputSchema: PgcryptoDecryptOutputSchema,
     annotations: readOnly("Decrypt Data"),
     icons: getToolIcons("pgcrypto", readOnly("Decrypt Data")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -186,6 +199,7 @@ function createPgcryptoGenRandomUuidTool(
     description: "Generate a cryptographically secure UUID v4.",
     group: "pgcrypto",
     inputSchema: GenUuidSchema,
+    outputSchema: PgcryptoGenRandomUuidOutputSchema,
     annotations: readOnly("Generate UUID"),
     icons: getToolIcons("pgcrypto", readOnly("Generate UUID")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -219,6 +233,7 @@ function createPgcryptoGenRandomBytesTool(
     description: "Generate cryptographically secure random bytes.",
     group: "pgcrypto",
     inputSchema: PgcryptoRandomBytesSchema,
+    outputSchema: PgcryptoGenRandomBytesOutputSchema,
     annotations: readOnly("Generate Random Bytes"),
     icons: getToolIcons("pgcrypto", readOnly("Generate Random Bytes")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -245,6 +260,7 @@ function createPgcryptoGenSaltTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Generate a salt for use with crypt() password hashing.",
     group: "pgcrypto",
     inputSchema: PgcryptoGenSaltSchema,
+    outputSchema: PgcryptoGenSaltOutputSchema,
     annotations: readOnly("Generate Salt"),
     icons: getToolIcons("pgcrypto", readOnly("Generate Salt")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -271,6 +287,7 @@ function createPgcryptoCryptTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Hash a password using crypt() with a salt from gen_salt().",
     group: "pgcrypto",
     inputSchema: PgcryptoCryptSchema,
+    outputSchema: PgcryptoCryptOutputSchema,
     annotations: readOnly("Crypt Password"),
     icons: getToolIcons("pgcrypto", readOnly("Crypt Password")),
     handler: async (params: unknown, _context: RequestContext) => {

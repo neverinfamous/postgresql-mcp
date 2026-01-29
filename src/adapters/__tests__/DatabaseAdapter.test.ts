@@ -414,7 +414,7 @@ describe("DatabaseAdapter", () => {
   describe("registerTools", () => {
     it("should register only enabled tools", () => {
       const mockServer = {
-        tool: vi.fn(),
+        registerTool: vi.fn(),
       };
 
       const tools: ToolDefinition[] = [
@@ -445,13 +445,13 @@ describe("DatabaseAdapter", () => {
       );
 
       // Should only register pg_query
-      expect(mockServer.tool).toHaveBeenCalledTimes(1);
-      expect(mockServer.tool.mock.calls[0]?.[0]).toBe("pg_query");
+      expect(mockServer.registerTool).toHaveBeenCalledTimes(1);
+      expect(mockServer.registerTool.mock.calls[0]?.[0]).toBe("pg_query");
     });
 
     it("should register no tools if none are enabled", () => {
       const mockServer = {
-        tool: vi.fn(),
+        registerTool: vi.fn(),
       };
 
       adapter.setMockTools([
@@ -470,14 +470,14 @@ describe("DatabaseAdapter", () => {
         new Set(),
       );
 
-      expect(mockServer.tool).not.toHaveBeenCalled();
+      expect(mockServer.registerTool).not.toHaveBeenCalled();
     });
   });
 
   describe("registerTool", () => {
     it("should register tool with correct name and description", () => {
       const mockServer = {
-        tool: vi.fn(),
+        registerTool: vi.fn(),
       };
 
       const tool: ToolDefinition = {
@@ -491,18 +491,18 @@ describe("DatabaseAdapter", () => {
 
       adapter.testRegisterTool(mockServer, tool);
 
-      expect(mockServer.tool).toHaveBeenCalledWith(
+      expect(mockServer.registerTool).toHaveBeenCalledWith(
         "pg_test_tool",
-        "A test tool",
-        expect.anything(),
-        expect.anything(),
+        expect.objectContaining({
+          description: "A test tool",
+        }),
         expect.any(Function),
       );
     });
 
     it("should include annotations in metadata", () => {
       const mockServer = {
-        tool: vi.fn(),
+        registerTool: vi.fn(),
       };
 
       const tool: ToolDefinition = {
@@ -520,17 +520,19 @@ describe("DatabaseAdapter", () => {
 
       adapter.testRegisterTool(mockServer, tool);
 
-      const metadata = mockServer.tool.mock.calls[0]?.[3] as Record<
+      const options = mockServer.registerTool.mock.calls[0]?.[1] as Record<
         string,
         unknown
       >;
-      expect(metadata["readOnlyHint"]).toBe(true);
-      expect(metadata["destructiveHint"]).toBe(false);
+      expect(options["annotations"]).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+      });
     });
 
     it("should include icons in metadata when present", () => {
       const mockServer = {
-        tool: vi.fn(),
+        registerTool: vi.fn(),
       };
 
       const tool: ToolDefinition = {
@@ -547,11 +549,11 @@ describe("DatabaseAdapter", () => {
 
       adapter.testRegisterTool(mockServer, tool);
 
-      const metadata = mockServer.tool.mock.calls[0]?.[3] as Record<
+      const options = mockServer.registerTool.mock.calls[0]?.[1] as Record<
         string,
         unknown
       >;
-      expect(metadata["icons"]).toEqual([
+      expect(options["icons"]).toEqual([
         { src: "data:image/svg+xml;base64,test", mimeType: "image/svg+xml" },
       ]);
     });
@@ -761,7 +763,7 @@ describe("DatabaseAdapter", () => {
   describe("handler invocation", () => {
     it("should invoke tool handler and JSON stringify object results", async () => {
       const mockServer = {
-        tool: vi.fn(),
+        registerTool: vi.fn(),
       };
 
       const mockHandler = vi
@@ -778,8 +780,8 @@ describe("DatabaseAdapter", () => {
 
       adapter.testRegisterTool(mockServer, tool);
 
-      // Get the handler that was passed to server.tool (5th argument)
-      const registeredHandler = mockServer.tool.mock.calls[0]?.[4] as (
+      // Get the handler that was passed to server.registerTool (3rd argument)
+      const registeredHandler = mockServer.registerTool.mock.calls[0]?.[2] as (
         params: unknown,
       ) => Promise<unknown>;
       const result = await registeredHandler({});
@@ -796,7 +798,7 @@ describe("DatabaseAdapter", () => {
 
     it("should invoke tool handler and return string results directly", async () => {
       const mockServer = {
-        tool: vi.fn(),
+        registerTool: vi.fn(),
       };
 
       const mockHandler = vi.fn().mockResolvedValue("plain text result");
@@ -811,7 +813,7 @@ describe("DatabaseAdapter", () => {
 
       adapter.testRegisterTool(mockServer, tool);
 
-      const registeredHandler = mockServer.tool.mock.calls[0]?.[4] as (
+      const registeredHandler = mockServer.registerTool.mock.calls[0]?.[2] as (
         params: unknown,
       ) => Promise<unknown>;
       const result = await registeredHandler({});

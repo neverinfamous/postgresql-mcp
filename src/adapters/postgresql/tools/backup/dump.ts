@@ -13,9 +13,18 @@ import { z } from "zod";
 import { readOnly, write } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
 import {
+  buildProgressContext,
+  sendProgress,
+} from "../../../../utils/progress-utils.js";
+import {
   CopyExportSchema,
   CopyExportSchemaBase,
   DumpSchemaSchema,
+  // Output schemas
+  DumpTableOutputSchema,
+  DumpSchemaOutputSchema,
+  CopyExportOutputSchema,
+  CopyImportOutputSchema,
 } from "../../schemas/index.js";
 
 export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
@@ -40,6 +49,7 @@ export function createDumpTableTool(adapter: PostgresAdapter): ToolDefinition {
           "Maximum rows to include when includeData is true (default: 500, use 0 for all rows)",
         ),
     }),
+    outputSchema: DumpTableOutputSchema,
     annotations: readOnly("Dump Table"),
     icons: getToolIcons("backup", readOnly("Dump Table")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -343,6 +353,7 @@ export function createDumpSchemaTool(
     description: "Get the pg_dump command for a schema or database.",
     group: "backup",
     inputSchema: DumpSchemaSchema,
+    outputSchema: DumpSchemaOutputSchema,
     annotations: readOnly("Dump Schema"),
     icons: getToolIcons("backup", readOnly("Dump Schema")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -395,9 +406,13 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
       "Export query results using COPY TO. Use query/sql for custom query or table for SELECT *.",
     group: "backup",
     inputSchema: CopyExportSchemaBase, // Use base schema for MCP visibility
+    outputSchema: CopyExportOutputSchema,
     annotations: readOnly("Copy Export"),
     icons: getToolIcons("backup", readOnly("Copy Export")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 3, "Preparing COPY export...");
+
       const {
         query,
         format,
@@ -415,6 +430,7 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
       const copyCommand = `COPY (${query}) TO STDOUT WITH (${options.join(", ")})`;
       void copyCommand;
 
+      await sendProgress(progress, 2, 3, "Executing query...");
       const result = await adapter.executeQuery(query);
 
       // Handle CSV format (default)
@@ -476,6 +492,8 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
         // This indicates there are likely more rows available
         const isTruncated =
           effectiveLimit !== undefined && result.rows.length === effectiveLimit;
+
+        await sendProgress(progress, 3, 3, "Export complete");
 
         return {
           data: lines.join("\n"),
@@ -545,6 +563,8 @@ export function createCopyExportTool(adapter: PostgresAdapter): ToolDefinition {
         const isTruncated =
           effectiveLimit !== undefined && result.rows.length === effectiveLimit;
 
+        await sendProgress(progress, 3, 3, "Export complete");
+
         return {
           data: lines.join("\n"),
           rowCount: result.rows.length,
@@ -583,6 +603,7 @@ export function createCopyImportTool(
       delimiter: z.string().optional(),
       columns: z.array(z.string()).optional(),
     }),
+    outputSchema: CopyImportOutputSchema,
     annotations: write("Copy Import"),
     icons: getToolIcons("backup", write("Copy Import")),
     // eslint-disable-next-line @typescript-eslint/require-await

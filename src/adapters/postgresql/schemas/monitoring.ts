@@ -58,3 +58,264 @@ export const ShowSettingsSchema = z.preprocess(
       return { pattern, limit };
     }),
 );
+
+// ============================================================================
+// Output Schemas
+// ============================================================================
+
+/**
+ * pg_database_size output
+ */
+export const DatabaseSizeOutputSchema = z.object({
+  bytes: z.number().describe("Database size in bytes"),
+  size: z.string().describe("Human-readable size"),
+});
+
+/**
+ * pg_table_sizes output
+ */
+export const TableSizesOutputSchema = z.object({
+  tables: z
+    .array(
+      z.object({
+        schema: z.string().describe("Schema name"),
+        table_name: z.string().describe("Table name"),
+        table_size: z.string().describe("Table data size"),
+        indexes_size: z.string().describe("Indexes size"),
+        total_size: z.string().describe("Total size including TOAST"),
+        total_bytes: z.number().describe("Total size in bytes"),
+      }),
+    )
+    .describe("Table size information"),
+  count: z.number().describe("Number of tables returned"),
+  totalCount: z.number().optional().describe("Total tables if truncated"),
+  truncated: z.boolean().optional().describe("Whether results were truncated"),
+});
+
+/**
+ * pg_connection_stats output
+ */
+export const ConnectionStatsOutputSchema = z.object({
+  byDatabaseAndState: z
+    .array(
+      z.object({
+        datname: z.string().nullable().describe("Database name"),
+        state: z.string().nullable().describe("Connection state"),
+        connections: z.number().describe("Number of connections"),
+      }),
+    )
+    .describe("Connections grouped by database and state"),
+  totalConnections: z.number().describe("Total active connections"),
+  maxConnections: z.number().describe("Maximum allowed connections"),
+});
+
+/**
+ * pg_replication_status output (primary or replica)
+ */
+export const ReplicationStatusOutputSchema = z
+  .object({
+    role: z.string().describe("Server role: primary or replica"),
+    // Replica-specific fields
+    replay_lag: z.unknown().optional().describe("Replication lag interval"),
+    receive_lsn: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Last received WAL LSN"),
+    replay_lsn: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Last replayed WAL LSN"),
+    // Primary-specific fields
+    replicas: z
+      .array(z.record(z.string(), z.unknown()))
+      .optional()
+      .describe("Connected replicas"),
+  })
+  .loose();
+
+/**
+ * pg_server_version output
+ */
+export const ServerVersionOutputSchema = z.object({
+  full_version: z.string().describe("Full PostgreSQL version string"),
+  version: z.string().describe("PostgreSQL version number"),
+  version_num: z.number().describe("Numeric version for comparison"),
+});
+
+/**
+ * pg_show_settings output
+ */
+export const ShowSettingsOutputSchema = z.object({
+  settings: z
+    .array(
+      z.object({
+        name: z.string().describe("Setting name"),
+        setting: z.string().describe("Current value"),
+        unit: z.string().nullable().describe("Unit of measurement"),
+        category: z.string().describe("Setting category"),
+        short_desc: z.string().describe("Description"),
+      }),
+    )
+    .describe("Configuration settings"),
+  count: z.number().describe("Number of settings returned"),
+  totalCount: z.number().optional().describe("Total settings if truncated"),
+  truncated: z.boolean().optional().describe("Whether results were truncated"),
+});
+
+/**
+ * pg_uptime output
+ */
+export const UptimeOutputSchema = z.object({
+  start_time: z.unknown().describe("Server start timestamp"),
+  uptime: z.object({
+    days: z.number().describe("Days since start"),
+    hours: z.number().describe("Hours component"),
+    minutes: z.number().describe("Minutes component"),
+    seconds: z.number().describe("Seconds component"),
+    milliseconds: z.number().describe("Milliseconds component"),
+  }),
+});
+
+/**
+ * pg_recovery_status output
+ */
+export const RecoveryStatusOutputSchema = z.object({
+  in_recovery: z.boolean().describe("Whether server is in recovery mode"),
+  last_replay_timestamp: z
+    .string()
+    .nullable()
+    .describe("Last replayed transaction timestamp (null if primary)"),
+});
+
+/**
+ * pg_capacity_planning output
+ */
+export const CapacityPlanningOutputSchema = z.object({
+  current: z.object({
+    databaseSize: z
+      .object({
+        current_size_bytes: z.number().describe("Current size in bytes"),
+        current_size: z.string().describe("Human-readable size"),
+      })
+      .optional(),
+    tableCount: z.number().describe("Number of tables"),
+    totalRows: z.number().describe("Total rows across tables"),
+    connections: z.string().describe("Current/max connections"),
+  }),
+  growth: z.object({
+    totalInserts: z.number().describe("Total inserts since stats reset"),
+    totalDeletes: z.number().describe("Total deletes since stats reset"),
+    netRowGrowth: z.number().describe("Net row growth"),
+    daysOfData: z.number().describe("Days of statistics collected"),
+    statsSince: z.unknown().describe("Statistics reset timestamp"),
+    estimatedDailyRowGrowth: z.number().describe("Estimated daily row growth"),
+    estimatedDailyGrowthBytes: z
+      .number()
+      .describe("Estimated daily byte growth"),
+    estimationQuality: z.string().describe("Confidence level of estimates"),
+  }),
+  projection: z.object({
+    days: z.number().describe("Projection period in days"),
+    projectedSizeBytes: z.number().describe("Projected database size in bytes"),
+    projectedSizePretty: z.string().describe("Human-readable projected size"),
+    growthPercentage: z.number().describe("Projected growth percentage"),
+  }),
+  recommendations: z.array(z.string()).describe("Capacity recommendations"),
+});
+
+/**
+ * pg_resource_usage_analyze output
+ */
+export const ResourceUsageAnalyzeOutputSchema = z.object({
+  backgroundWriter: z
+    .object({
+      buffers_clean: z.number().describe("Buffers written by bgwriter"),
+      maxwritten_clean: z
+        .number()
+        .describe("Times bgwriter stopped due to limit"),
+      buffers_alloc: z.number().describe("Buffers allocated"),
+      buffers_checkpoint: z
+        .number()
+        .optional()
+        .describe("Buffers written at checkpoint"),
+      buffers_backend: z
+        .number()
+        .optional()
+        .describe("Buffers written by backends"),
+    })
+    .optional(),
+  checkpoints: z
+    .object({
+      checkpoints_timed: z.number().describe("Scheduled checkpoints"),
+      checkpoints_req: z.number().describe("Requested checkpoints"),
+      checkpoint_write_time: z
+        .number()
+        .describe("Time writing checkpoint files (ms)"),
+      checkpoint_sync_time: z
+        .number()
+        .describe("Time syncing checkpoint files (ms)"),
+      buffers_checkpoint: z
+        .number()
+        .optional()
+        .describe("Buffers written at checkpoint"),
+    })
+    .optional(),
+  connectionDistribution: z
+    .array(
+      z.object({
+        state: z.string().nullable().describe("Connection state"),
+        wait_event_type: z.string().nullable().describe("Wait event type"),
+        wait_event: z.string().nullable().describe("Wait event"),
+        count: z.number().describe("Number of connections"),
+      }),
+    )
+    .describe("Connection distribution by state and wait event"),
+  bufferUsage: z.object({
+    heap_reads: z.number().describe("Heap blocks read from disk"),
+    heap_hits: z.number().describe("Heap blocks found in cache"),
+    index_reads: z.number().describe("Index blocks read from disk"),
+    index_hits: z.number().describe("Index blocks found in cache"),
+    heapHitRate: z.string().describe("Heap cache hit rate"),
+    indexHitRate: z.string().describe("Index cache hit rate"),
+  }),
+  activity: z
+    .object({
+      active_queries: z.number().describe("Currently running queries"),
+      idle_connections: z.number().describe("Idle connections"),
+      lock_waiting: z.number().describe("Queries waiting on locks"),
+      io_waiting: z.number().describe("Queries waiting on I/O"),
+    })
+    .optional(),
+  analysis: z.object({
+    heapCachePerformance: z.string().describe("Heap cache analysis"),
+    indexCachePerformance: z.string().describe("Index cache analysis"),
+    checkpointPressure: z.string().describe("Checkpoint pressure assessment"),
+    ioPattern: z.string().describe("I/O pattern analysis"),
+    lockContention: z.string().describe("Lock contention analysis"),
+  }),
+});
+
+/**
+ * pg_alert_threshold_set output (single metric or all thresholds)
+ */
+const ThresholdSchema = z.object({
+  warning: z.string().describe("Warning threshold"),
+  critical: z.string().describe("Critical threshold"),
+  description: z.string().describe("Metric description"),
+});
+
+export const AlertThresholdOutputSchema = z
+  .object({
+    // Single metric response
+    metric: z.string().optional().describe("Metric name"),
+    threshold: ThresholdSchema.optional().describe("Threshold values"),
+    // All thresholds response
+    thresholds: z
+      .record(z.string(), ThresholdSchema)
+      .optional()
+      .describe("All metric thresholds"),
+    note: z.string().optional().describe("Usage guidance"),
+  })
+  .loose();

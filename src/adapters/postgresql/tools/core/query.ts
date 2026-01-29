@@ -17,6 +17,7 @@ import {
   WriteQuerySchemaBase,
   WriteQuerySchema,
 } from "../../schemas/index.js";
+import { ReadQueryOutputSchema, WriteQueryOutputSchema } from "./schemas.js";
 
 /**
  * Execute a read-only SQL query
@@ -28,6 +29,7 @@ export function createReadQueryTool(adapter: PostgresAdapter): ToolDefinition {
       "Execute a read-only SQL query (SELECT, WITH). Returns rows as JSON. Pass transactionId to execute within a transaction.",
     group: "core",
     inputSchema: ReadQuerySchemaBase, // Base schema for MCP visibility (sql required)
+    outputSchema: ReadQueryOutputSchema,
     annotations: readOnly("Read Query"),
     icons: getToolIcons("core", readOnly("Read Query")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -74,6 +76,7 @@ export function createWriteQueryTool(adapter: PostgresAdapter): ToolDefinition {
       "Execute a write SQL query (INSERT, UPDATE, DELETE). Returns affected row count. Pass transactionId to execute within a transaction.",
     group: "core",
     inputSchema: WriteQuerySchemaBase, // Base schema for MCP visibility (sql required)
+    outputSchema: WriteQueryOutputSchema,
     annotations: write("Write Query"),
     icons: getToolIcons("core", write("Write Query")),
     handler: async (params: unknown, _context: RequestContext) => {

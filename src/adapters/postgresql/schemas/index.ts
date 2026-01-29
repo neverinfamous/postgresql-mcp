@@ -29,16 +29,47 @@ export {
   ExecuteInTransactionSchema,
   TransactionExecuteSchema,
   TransactionExecuteSchemaBase,
+  // Transaction output schemas
+  TransactionBeginOutputSchema,
+  TransactionResultOutputSchema,
+  SavepointResultOutputSchema,
+  TransactionExecuteOutputSchema,
 } from "./core.js";
 
 // JSONB operation schemas
 export {
+  // Base schemas for MCP visibility (Split Schema pattern)
+  JsonbExtractSchemaBase,
+  JsonbSetSchemaBase,
+  JsonbContainsSchemaBase,
+  JsonbPathQuerySchemaBase,
+  JsonbInsertSchemaBase,
+  JsonbDeleteSchemaBase,
+  JsonbTypeofSchemaBase,
+  JsonbKeysSchemaBase,
+  JsonbStripNullsSchemaBase,
+  JsonbAggSchemaBase,
+  JsonbNormalizeSchemaBase,
+  JsonbStatsSchemaBase,
+  JsonbIndexSuggestSchemaBase,
+  JsonbSecurityScanSchemaBase,
+  // Full schemas (with preprocess - for handler parsing)
   JsonbExtractSchema,
   JsonbSetSchema,
   JsonbContainsSchema,
   JsonbPathQuerySchema,
   JsonbInsertSchema,
   JsonbDeleteSchema,
+  JsonbTypeofSchema,
+  JsonbKeysSchema,
+  JsonbStripNullsSchema,
+  JsonbAggSchema,
+  JsonbNormalizeSchema,
+  JsonbStatsSchema,
+  JsonbIndexSuggestSchema,
+  JsonbSecurityScanSchema,
+  // Preprocess function for handlers
+  preprocessJsonbParams,
   // Path normalization functions (for handler use)
   normalizePathToArray,
   normalizePathForInsert,
@@ -46,6 +77,26 @@ export {
   parseJsonbValue,
   stringPathToArray,
   arrayPathToString,
+  // JSONB output schemas
+  JsonbExtractOutputSchema,
+  JsonbSetOutputSchema,
+  JsonbInsertOutputSchema,
+  JsonbDeleteOutputSchema,
+  JsonbContainsOutputSchema,
+  JsonbPathQueryOutputSchema,
+  JsonbAggOutputSchema,
+  JsonbObjectOutputSchema,
+  JsonbArrayOutputSchema,
+  JsonbKeysOutputSchema,
+  JsonbStripNullsOutputSchema,
+  JsonbTypeofOutputSchema,
+  JsonbValidatePathOutputSchema,
+  JsonbMergeOutputSchema,
+  JsonbNormalizeOutputSchema,
+  JsonbDiffOutputSchema,
+  JsonbIndexSuggestOutputSchema,
+  JsonbSecurityScanOutputSchema,
+  JsonbStatsOutputSchema,
 } from "./jsonb.js";
 
 // Text search schemas
@@ -57,6 +108,14 @@ export {
   RegexpMatchSchema,
   RegexpMatchSchemaBase,
   preprocessTextParams,
+  // Text output schemas
+  TextRowsOutputSchema,
+  FtsIndexOutputSchema,
+  TextNormalizeOutputSchema,
+  TextSentimentOutputSchema,
+  TextToVectorOutputSchema,
+  TextToQueryOutputSchema,
+  TextSearchConfigOutputSchema,
 } from "./text-search.js";
 
 // Performance and explain schemas
@@ -66,20 +125,45 @@ export {
   preprocessExplainParams,
   IndexStatsSchema,
   TableStatsSchema,
+  // Output schemas
+  ExplainOutputSchema,
+  IndexStatsOutputSchema,
+  TableStatsOutputSchema,
+  StatStatementsOutputSchema,
+  StatActivityOutputSchema,
+  LocksOutputSchema,
+  BloatCheckOutputSchema,
+  CacheHitRatioOutputSchema,
+  SeqScanTablesOutputSchema,
+  IndexRecommendationsOutputSchema,
+  QueryPlanCompareOutputSchema,
+  PerformanceBaselineOutputSchema,
+  ConnectionPoolOptimizeOutputSchema,
+  PartitionStrategySuggestOutputSchema,
+  UnusedIndexesOutputSchema,
+  DuplicateIndexesOutputSchema,
+  VacuumStatsOutputSchema,
+  QueryPlanStatsOutputSchema,
 } from "./performance.js";
 
 // Admin operation schemas
 export {
   VacuumSchema,
   VacuumSchemaBase,
+  VacuumOutputSchema,
   AnalyzeSchema,
   AnalyzeSchemaBase,
+  AnalyzeOutputSchema,
   ReindexSchema,
   ReindexSchemaBase,
+  ReindexOutputSchema,
+  ClusterOutputSchema,
   TerminateBackendSchema,
   TerminateBackendSchemaBase,
   CancelBackendSchema,
   CancelBackendSchemaBase,
+  BackendOutputSchema,
+  ConfigOutputSchema,
 } from "./admin.js";
 
 // Monitoring schemas
@@ -87,6 +171,18 @@ export {
   DatabaseSizeSchema,
   TableSizesSchema,
   ShowSettingsSchema,
+  // Output schemas
+  DatabaseSizeOutputSchema,
+  TableSizesOutputSchema,
+  ConnectionStatsOutputSchema,
+  ReplicationStatusOutputSchema,
+  ServerVersionOutputSchema,
+  ShowSettingsOutputSchema,
+  UptimeOutputSchema,
+  RecoveryStatusOutputSchema,
+  CapacityPlanningOutputSchema,
+  ResourceUsageAnalyzeOutputSchema,
+  AlertThresholdOutputSchema,
 } from "./monitoring.js";
 
 // Backup and export schemas
@@ -94,6 +190,16 @@ export {
   CopyExportSchema,
   CopyExportSchemaBase,
   DumpSchemaSchema,
+  // Output schemas
+  DumpTableOutputSchema,
+  DumpSchemaOutputSchema,
+  CopyExportOutputSchema,
+  CopyImportOutputSchema,
+  CreateBackupPlanOutputSchema,
+  RestoreCommandOutputSchema,
+  PhysicalBackupOutputSchema,
+  RestoreValidateOutputSchema,
+  BackupScheduleOptimizeOutputSchema,
 } from "./backup.js";
 
 // Schema management schemas
@@ -113,6 +219,19 @@ export {
   // List functions schemas - Split Schema pattern for MCP visibility
   ListFunctionsSchemaBase,
   ListFunctionsSchema,
+  // Output schemas
+  ListSchemasOutputSchema,
+  CreateSchemaOutputSchema,
+  DropSchemaOutputSchema,
+  ListSequencesOutputSchema,
+  CreateSequenceOutputSchema,
+  DropSequenceOutputSchema,
+  ListViewsOutputSchema,
+  CreateViewOutputSchema,
+  DropViewOutputSchema,
+  ListFunctionsOutputSchema,
+  ListTriggersOutputSchema,
+  ListConstraintsOutputSchema,
 } from "./schema-mgmt.js";
 
 // pgvector schemas
@@ -125,6 +244,22 @@ export {
   VectorCreateIndexSchema,
   // Utilities
   FiniteNumberArray,
+  // Output schemas
+  VectorCreateExtensionOutputSchema,
+  VectorAddColumnOutputSchema,
+  VectorInsertOutputSchema,
+  VectorSearchOutputSchema,
+  VectorCreateIndexOutputSchema,
+  VectorDistanceOutputSchema,
+  VectorNormalizeOutputSchema,
+  VectorAggregateOutputSchema,
+  VectorClusterOutputSchema,
+  VectorIndexOptimizeOutputSchema,
+  HybridSearchOutputSchema,
+  VectorPerformanceOutputSchema,
+  VectorDimensionReduceOutputSchema,
+  VectorEmbedOutputSchema,
+  VectorValidateOutputSchema,
 } from "./vector.js";
 
 // PostGIS schemas
@@ -161,6 +296,22 @@ export {
   preprocessPostgisParams,
   preprocessPoint,
   convertToMeters,
+  // Output schemas
+  PostgisCreateExtensionOutputSchema,
+  GeometryColumnOutputSchema,
+  PointInPolygonOutputSchema,
+  DistanceOutputSchema,
+  BufferOutputSchema,
+  IntersectionOutputSchema,
+  BoundingBoxOutputSchema,
+  SpatialIndexOutputSchema,
+  GeocodeOutputSchema,
+  GeoTransformOutputSchema,
+  GeoIndexOptimizeOutputSchema,
+  GeoClusterOutputSchema,
+  GeometryBufferOutputSchema,
+  GeometryIntersectionOutputSchema,
+  GeometryTransformOutputSchema,
 } from "./postgis.js";
 
 // Partitioning schemas
@@ -179,6 +330,13 @@ export {
   DetachPartitionSchema,
   ListPartitionsSchema,
   PartitionInfoSchema,
+  // Output schemas
+  ListPartitionsOutputSchema,
+  CreatePartitionedTableOutputSchema,
+  CreatePartitionOutputSchema,
+  AttachPartitionOutputSchema,
+  DetachPartitionOutputSchema,
+  PartitionInfoOutputSchema,
 } from "./partitioning.js";
 
 // pg_cron schemas
@@ -192,6 +350,15 @@ export {
   CronJobRunDetailsSchema,
   CronCleanupHistorySchema,
   CronCleanupHistorySchemaBase,
+  // Output schemas
+  CronCreateExtensionOutputSchema,
+  CronScheduleOutputSchema,
+  CronScheduleInDatabaseOutputSchema,
+  CronUnscheduleOutputSchema,
+  CronAlterJobOutputSchema,
+  CronListJobsOutputSchema,
+  CronJobRunDetailsOutputSchema,
+  CronCleanupHistoryOutputSchema,
 } from "./cron.js";
 
 // pg_partman schemas
@@ -204,6 +371,17 @@ export {
   PartmanRetentionSchema,
   PartmanUndoPartitionSchema,
   PartmanUpdateConfigSchema,
+  // Output schemas
+  PartmanCreateExtensionOutputSchema,
+  PartmanCreateParentOutputSchema,
+  PartmanRunMaintenanceOutputSchema,
+  PartmanShowPartitionsOutputSchema,
+  PartmanShowConfigOutputSchema,
+  PartmanCheckDefaultOutputSchema,
+  PartmanPartitionDataOutputSchema,
+  PartmanSetRetentionOutputSchema,
+  PartmanUndoPartitionOutputSchema,
+  PartmanAnalyzeHealthOutputSchema,
 } from "./partman.js";
 
 // Extension schemas (kcache, citext, ltree, pgcrypto)
@@ -213,6 +391,14 @@ export {
   KcacheTopConsumersSchema,
   KcacheDatabaseStatsSchema,
   KcacheResourceAnalysisSchema,
+  // Kcache output schemas
+  KcacheCreateExtensionOutputSchema,
+  KcacheQueryStatsOutputSchema,
+  KcacheTopCpuOutputSchema,
+  KcacheTopIoOutputSchema,
+  KcacheDatabaseStatsOutputSchema,
+  KcacheResourceAnalysisOutputSchema,
+  KcacheResetOutputSchema,
   // citext
   CitextConvertColumnSchema,
   CitextConvertColumnSchemaBase,
@@ -222,6 +408,13 @@ export {
   CitextAnalyzeCandidatesSchemaBase,
   CitextSchemaAdvisorSchema,
   CitextSchemaAdvisorSchemaBase,
+  // Citext output schemas
+  CitextCreateExtensionOutputSchema,
+  CitextConvertColumnOutputSchema,
+  CitextListColumnsOutputSchema,
+  CitextAnalyzeCandidatesOutputSchema,
+  CitextCompareOutputSchema,
+  CitextSchemaAdvisorOutputSchema,
   // ltree
   LtreeQuerySchema,
   LtreeQuerySchemaBase,
@@ -235,6 +428,15 @@ export {
   LtreeConvertColumnSchemaBase,
   LtreeIndexSchema,
   LtreeIndexSchemaBase,
+  // Ltree output schemas
+  LtreeCreateExtensionOutputSchema,
+  LtreeQueryOutputSchema,
+  LtreeSubpathOutputSchema,
+  LtreeLcaOutputSchema,
+  LtreeMatchOutputSchema,
+  LtreeListColumnsOutputSchema,
+  LtreeConvertColumnOutputSchema,
+  LtreeCreateIndexOutputSchema,
   // pgcrypto
   PgcryptoHashSchema,
   PgcryptoHmacSchema,
@@ -245,6 +447,16 @@ export {
   PgcryptoRandomBytesSchema,
   PgcryptoGenSaltSchema,
   PgcryptoCryptSchema,
+  // Pgcrypto output schemas
+  PgcryptoCreateExtensionOutputSchema,
+  PgcryptoHashOutputSchema,
+  PgcryptoHmacOutputSchema,
+  PgcryptoEncryptOutputSchema,
+  PgcryptoDecryptOutputSchema,
+  PgcryptoGenRandomUuidOutputSchema,
+  PgcryptoGenRandomBytesOutputSchema,
+  PgcryptoGenSaltOutputSchema,
+  PgcryptoCryptOutputSchema,
 } from "./extensions.js";
 
 // Stats schemas
@@ -267,4 +479,13 @@ export {
   StatsDistributionSchema,
   StatsHypothesisSchema,
   StatsSamplingSchema,
+  // Output schemas for MCP structured content
+  DescriptiveOutputSchema,
+  PercentilesOutputSchema,
+  CorrelationOutputSchema,
+  RegressionOutputSchema,
+  TimeSeriesOutputSchema,
+  DistributionOutputSchema,
+  HypothesisOutputSchema,
+  SamplingOutputSchema,
 } from "./stats.js";

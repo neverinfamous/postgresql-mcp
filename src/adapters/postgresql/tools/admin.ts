@@ -11,16 +11,26 @@ import { z } from "zod";
 import { admin, destructive } from "../../../utils/annotations.js";
 import { getToolIcons } from "../../../utils/icons.js";
 import {
+  buildProgressContext,
+  sendProgress,
+} from "../../../utils/progress-utils.js";
+import {
   VacuumSchema,
   VacuumSchemaBase,
+  VacuumOutputSchema,
   AnalyzeSchema,
   AnalyzeSchemaBase,
+  AnalyzeOutputSchema,
   ReindexSchema,
   ReindexSchemaBase,
+  ReindexOutputSchema,
+  ClusterOutputSchema,
   TerminateBackendSchema,
   TerminateBackendSchemaBase,
   CancelBackendSchema,
   CancelBackendSchemaBase,
+  BackendOutputSchema,
+  ConfigOutputSchema,
 } from "../schemas/index.js";
 
 /**
@@ -48,9 +58,13 @@ function createVacuumTool(adapter: PostgresAdapter): ToolDefinition {
       "Run VACUUM to reclaim storage and update visibility map. Use analyze: true to also update statistics. Verbose output goes to PostgreSQL server logs.",
     group: "admin",
     inputSchema: VacuumSchemaBase,
+    outputSchema: VacuumOutputSchema,
     annotations: admin("Vacuum"),
     icons: getToolIcons("admin", admin("Vacuum")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 2, "Starting VACUUM...");
+
       const { table, schema, full, verbose, analyze } =
         VacuumSchema.parse(params);
       const fullClause = full === true ? "FULL " : "";
@@ -65,6 +79,8 @@ function createVacuumTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `VACUUM ${fullClause}${verboseClause}${analyzeClause}${target}`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 2, 2, "VACUUM complete");
 
       // Build accurate message reflecting all options used
       const parts: string[] = ["VACUUM"];
@@ -92,9 +108,13 @@ function createVacuumAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
       "Run VACUUM and ANALYZE together for optimal performance. Verbose output goes to PostgreSQL server logs.",
     group: "admin",
     inputSchema: VacuumSchemaBase,
+    outputSchema: VacuumOutputSchema,
     annotations: admin("Vacuum Analyze"),
     icons: getToolIcons("admin", admin("Vacuum Analyze")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 2, "Starting VACUUM ANALYZE...");
+
       const { table, schema, verbose, full } = VacuumSchema.parse(params);
       const fullClause = full === true ? "FULL " : "";
       const verboseClause = verbose === true ? "VERBOSE " : "";
@@ -107,6 +127,8 @@ function createVacuumAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `VACUUM ${fullClause}${verboseClause}ANALYZE ${target}`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 2, 2, "VACUUM ANALYZE complete");
 
       // Build accurate message
       const message =
@@ -133,9 +155,13 @@ function createAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Update table statistics for the query planner.",
     group: "admin",
     inputSchema: AnalyzeSchemaBase,
+    outputSchema: AnalyzeOutputSchema,
     annotations: admin("Analyze"),
     icons: getToolIcons("admin", admin("Analyze")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 2, "Starting ANALYZE...");
+
       const { table, schema, columns } = AnalyzeSchema.parse(params);
 
       // Validate: columns requires table
@@ -156,6 +182,9 @@ function createAnalyzeTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `ANALYZE ${target}${columnClause}`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 2, 2, "ANALYZE complete");
+
       return {
         success: true,
         message: "ANALYZE completed",
@@ -174,9 +203,13 @@ function createReindexTool(adapter: PostgresAdapter): ToolDefinition {
       "Rebuild indexes to improve performance. For target: database, name defaults to the current database if omitted.",
     group: "admin",
     inputSchema: ReindexSchemaBase,
+    outputSchema: ReindexOutputSchema,
     annotations: admin("Reindex"),
     icons: getToolIcons("admin", admin("Reindex")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 3, "Starting REINDEX...");
+
       const parsed = ReindexSchema.parse(params) as {
         target: string;
         name?: string;
@@ -195,6 +228,8 @@ function createReindexTool(adapter: PostgresAdapter): ToolDefinition {
         effectiveName = typeof dbName === "string" ? dbName : "";
       }
 
+      await sendProgress(progress, 2, 3, `Reindexing ${parsed.target}...`);
+
       // name should always be defined at this point (refine ensures it for non-database targets)
       if (effectiveName === undefined) {
         throw new Error("name is required");
@@ -202,6 +237,9 @@ function createReindexTool(adapter: PostgresAdapter): ToolDefinition {
 
       const sql = `REINDEX ${parsed.target.toUpperCase()} ${concurrentlyClause}"${effectiveName}"`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 3, 3, "REINDEX complete");
+
       return {
         success: true,
         message: `Reindexed ${parsed.target}: ${effectiveName}`,
@@ -217,6 +255,7 @@ function createTerminateBackendTool(adapter: PostgresAdapter): ToolDefinition {
       "Terminate a database connection (forceful, use with caution).",
     group: "admin",
     inputSchema: TerminateBackendSchemaBase,
+    outputSchema: BackendOutputSchema,
     annotations: destructive("Terminate Backend"),
     icons: getToolIcons("admin", destructive("Terminate Backend")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -239,6 +278,7 @@ function createCancelBackendTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Cancel a running query (graceful, preferred over terminate).",
     group: "admin",
     inputSchema: CancelBackendSchemaBase,
+    outputSchema: BackendOutputSchema,
     annotations: admin("Cancel Backend"),
     icons: getToolIcons("admin", admin("Cancel Backend")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -261,6 +301,7 @@ function createReloadConfTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Reload PostgreSQL configuration without restart.",
     group: "admin",
     inputSchema: z.object({}),
+    outputSchema: ConfigOutputSchema,
     annotations: admin("Reload Configuration"),
     icons: getToolIcons("admin", admin("Reload Configuration")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -322,6 +363,7 @@ function createSetConfigTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Set a configuration parameter for the current session.",
     group: "admin",
     inputSchema: SetConfigSchemaBase,
+    outputSchema: ConfigOutputSchema,
     annotations: admin("Set Configuration"),
     icons: getToolIcons("admin", admin("Set Configuration")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -333,10 +375,12 @@ function createSetConfigTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.value,
         local,
       ]);
+      const actualValue = result.rows?.[0]?.["set_config"] as string;
       return {
         success: true,
+        message: `Set ${parsed.name} = ${actualValue}`,
         parameter: parsed.name,
-        value: result.rows?.[0]?.["set_config"],
+        value: actualValue,
       };
     },
   };
@@ -365,6 +409,7 @@ function createResetStatsTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Reset statistics counters (requires superuser).",
     group: "admin",
     inputSchema: ResetStatsSchema,
+    outputSchema: ConfigOutputSchema,
     annotations: admin("Reset Statistics"),
     icons: getToolIcons("admin", admin("Reset Statistics")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -456,9 +501,13 @@ function createClusterTool(adapter: PostgresAdapter): ToolDefinition {
       "Physically reorder table data based on an index. Call with no args to re-cluster all previously-clustered tables.",
     group: "admin",
     inputSchema: ClusterSchemaBase,
+    outputSchema: ClusterOutputSchema,
     annotations: admin("Cluster Table"),
     icons: getToolIcons("admin", admin("Cluster Table")),
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: async (params: unknown, context: RequestContext) => {
+      const progress = buildProgressContext(context);
+      await sendProgress(progress, 1, 2, "Starting CLUSTER...");
+
       const parsed = ClusterSchema.parse(params) as {
         table?: string;
         index?: string;
@@ -468,6 +517,7 @@ function createClusterTool(adapter: PostgresAdapter): ToolDefinition {
       // Database-wide CLUSTER (all previously clustered tables)
       if (parsed.table === undefined) {
         await adapter.executeQuery("CLUSTER");
+        await sendProgress(progress, 2, 2, "CLUSTER complete");
         return {
           success: true,
           message: "Re-clustered all previously-clustered tables",
@@ -485,6 +535,9 @@ function createClusterTool(adapter: PostgresAdapter): ToolDefinition {
           : `"${parsed.table}"`;
       const sql = `CLUSTER ${tableName} USING "${parsed.index}"`;
       await adapter.executeQuery(sql);
+
+      await sendProgress(progress, 2, 2, "CLUSTER complete");
+
       return {
         success: true,
         message: `Clustered ${parsed.table} using index ${parsed.index}`,

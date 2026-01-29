@@ -10,6 +10,16 @@ import type {
 import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
+import {
+  IndexStatsOutputSchema,
+  TableStatsOutputSchema,
+  StatStatementsOutputSchema,
+  StatActivityOutputSchema,
+  UnusedIndexesOutputSchema,
+  DuplicateIndexesOutputSchema,
+  VacuumStatsOutputSchema,
+  QueryPlanStatsOutputSchema,
+} from "../../schemas/index.js";
 
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
@@ -37,6 +47,7 @@ export function createIndexStatsTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Get index usage statistics.",
     group: "performance",
     inputSchema: IndexStatsSchemaLocal,
+    outputSchema: IndexStatsOutputSchema,
     annotations: readOnly("Index Stats"),
     icons: getToolIcons("performance", readOnly("Index Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -105,6 +116,7 @@ export function createTableStatsTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Get table access statistics.",
     group: "performance",
     inputSchema: TableStatsSchemaLocal,
+    outputSchema: TableStatsOutputSchema,
     annotations: readOnly("Table Stats"),
     icons: getToolIcons("performance", readOnly("Table Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -182,6 +194,7 @@ export function createStatStatementsTool(
       "Get query statistics from pg_stat_statements (requires extension).",
     group: "performance",
     inputSchema: StatStatementsSchema,
+    outputSchema: StatStatementsOutputSchema,
     annotations: readOnly("Query Statistics"),
     icons: getToolIcons("performance", readOnly("Query Statistics")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -237,6 +250,7 @@ export function createStatActivityTool(
     description: "Get currently running queries and connections.",
     group: "performance",
     inputSchema: StatActivitySchema,
+    outputSchema: StatActivityOutputSchema,
     annotations: readOnly("Activity Stats"),
     icons: getToolIcons("performance", readOnly("Activity Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -289,6 +303,7 @@ export function createUnusedIndexesTool(
       "Find indexes that have never been used (idx_scan = 0). Candidates for removal.",
     group: "performance",
     inputSchema: UnusedIndexesSchema,
+    outputSchema: UnusedIndexesOutputSchema,
     annotations: readOnly("Unused Indexes"),
     icons: getToolIcons("performance", readOnly("Unused Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -399,6 +414,7 @@ export function createDuplicateIndexesTool(
       "Find duplicate or overlapping indexes (same leading columns). Candidates for consolidation.",
     group: "performance",
     inputSchema: DuplicateIndexesSchema,
+    outputSchema: DuplicateIndexesOutputSchema,
     annotations: readOnly("Duplicate Indexes"),
     icons: getToolIcons("performance", readOnly("Duplicate Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -511,6 +527,7 @@ export function createVacuumStatsTool(
       "Get detailed vacuum statistics including dead tuples, last vacuum times, and wraparound risk.",
     group: "performance",
     inputSchema: VacuumStatsSchema,
+    outputSchema: VacuumStatsOutputSchema,
     annotations: readOnly("Vacuum Stats"),
     icons: getToolIcons("performance", readOnly("Vacuum Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -601,6 +618,7 @@ export function createQueryPlanStatsTool(
       "Get query plan statistics showing planning time vs execution time (requires pg_stat_statements).",
     group: "performance",
     inputSchema: QueryPlanStatsSchema,
+    outputSchema: QueryPlanStatsOutputSchema,
     annotations: readOnly("Query Plan Stats"),
     icons: getToolIcons("performance", readOnly("Query Plan Stats")),
     handler: async (params: unknown, _context: RequestContext) => {

@@ -19,6 +19,11 @@ import {
   GeoTransformSchema,
   GeoClusterSchemaBase,
   GeoClusterSchema,
+  // Output schemas
+  GeocodeOutputSchema,
+  GeoTransformOutputSchema,
+  GeoIndexOptimizeOutputSchema,
+  GeoClusterOutputSchema,
 } from "../../schemas/index.js";
 
 export function createGeocodeTool(adapter: PostgresAdapter): ToolDefinition {
@@ -28,6 +33,7 @@ export function createGeocodeTool(adapter: PostgresAdapter): ToolDefinition {
       "Create a point geometry from latitude/longitude coordinates. The SRID parameter sets output metadata only; input coordinates are always WGS84 lat/lng.",
     group: "postgis",
     inputSchema: GeocodeSchemaBase, // Base schema for MCP visibility
+    outputSchema: GeocodeOutputSchema,
     annotations: readOnly("Geocode"),
     icons: getToolIcons("postgis", readOnly("Geocode")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -71,6 +77,7 @@ export function createGeoTransformTool(
       "Transform geometry from one spatial reference system (SRID) to another.",
     group: "postgis",
     inputSchema: GeoTransformSchemaBase, // Base schema for MCP visibility
+    outputSchema: GeoTransformOutputSchema,
     annotations: readOnly("Transform Geometry"),
     icons: getToolIcons("postgis", readOnly("Transform Geometry")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -160,6 +167,7 @@ export function createGeoIndexOptimizeTool(
         .describe("Specific table to analyze (or all spatial tables)"),
       schema: z.string().optional().describe("Schema name"),
     }),
+    outputSchema: GeoIndexOptimizeOutputSchema,
     annotations: readOnly("Geo Index Optimize"),
     icons: getToolIcons("postgis", readOnly("Geo Index Optimize")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -295,6 +303,7 @@ export function createGeoClusterTool(adapter: PostgresAdapter): ToolDefinition {
       "Perform spatial clustering using DBSCAN or K-Means. DBSCAN defaults: eps=100m, minPoints=3. K-Means default: numClusters=5 (provide explicit value for best results).",
     group: "postgis",
     inputSchema: GeoClusterSchemaBase, // Base schema for MCP visibility
+    outputSchema: GeoClusterOutputSchema,
     annotations: readOnly("Geo Cluster"),
     icons: getToolIcons("postgis", readOnly("Geo Cluster")),
     handler: async (params: unknown, _context: RequestContext) => {

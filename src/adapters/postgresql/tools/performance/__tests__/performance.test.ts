@@ -831,7 +831,9 @@ describe("pg_index_recommendations", () => {
     // hypopg_reset
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
     // hypopg_create_index
-    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ indexrelid: 12345 }] });
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ indexrelid: 12345 }],
+    });
     // Re-run EXPLAIN with hypothetical index - improved cost
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
@@ -2016,7 +2018,11 @@ describe("pg_unused_indexes comprehensive", () => {
 
     const tool = tools.find((t) => t.name === "pg_unused_indexes")!;
     const result = (await tool.handler({}, mockContext)) as {
-      unusedIndexes: { scans: number; tuples_read: number; size_bytes: number }[];
+      unusedIndexes: {
+        scans: number;
+        tuples_read: number;
+        size_bytes: number;
+      }[];
     };
 
     expect(typeof result.unusedIndexes[0].scans).toBe("number");
@@ -2293,7 +2299,10 @@ describe("pg_vacuum_stats comprehensive", () => {
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_vacuum_stats")!;
-    await tool.handler({ schema: "analytics", table: "pageviews" }, mockContext);
+    await tool.handler(
+      { schema: "analytics", table: "pageviews" },
+      mockContext,
+    );
 
     expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
       expect.stringContaining("s.schemaname = 'analytics'"),
@@ -2470,7 +2479,8 @@ describe("pg_query_plan_stats comprehensive", () => {
   });
 
   it("should return full query when truncateQuery=0", async () => {
-    const longQuery = "SELECT " + "column_name, ".repeat(50) + "last_column FROM table";
+    const longQuery =
+      "SELECT " + "column_name, ".repeat(50) + "last_column FROM table";
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
         {
@@ -2499,7 +2509,8 @@ describe("pg_query_plan_stats comprehensive", () => {
   });
 
   it("should respect custom truncateQuery length", async () => {
-    const query = "SELECT id, name, email, created_at FROM users WHERE active = true";
+    const query =
+      "SELECT id, name, email, created_at FROM users WHERE active = true";
     mockAdapter.executeQuery.mockResolvedValueOnce({
       rows: [
         {

@@ -16,6 +16,25 @@ import {
   sanitizeIdentifier,
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
+import {
+  JsonbValidatePathOutputSchema,
+  JsonbMergeOutputSchema,
+  JsonbNormalizeOutputSchema,
+  JsonbDiffOutputSchema,
+  JsonbIndexSuggestOutputSchema,
+  JsonbSecurityScanOutputSchema,
+  JsonbStatsOutputSchema,
+  // Base schemas for MCP visibility (Split Schema pattern)
+  JsonbNormalizeSchemaBase,
+  JsonbStatsSchemaBase,
+  JsonbIndexSuggestSchemaBase,
+  JsonbSecurityScanSchemaBase,
+  // Full schemas (with preprocess - for handler parsing)
+  JsonbNormalizeSchema,
+  JsonbStatsSchema,
+  JsonbIndexSuggestSchema,
+  JsonbSecurityScanSchema,
+} from "../../schemas/index.js";
 
 /**
  * Convert value to a valid JSON string for PostgreSQL's ::jsonb cast
@@ -47,6 +66,7 @@ export function createJsonbValidatePathTool(
         .optional()
         .describe("Variables for parameterized paths (e.g., {x: 5})"),
     }),
+    outputSchema: JsonbValidatePathOutputSchema,
     annotations: readOnly("JSONB Validate Path"),
     icons: getToolIcons("jsonb", readOnly("JSONB Validate Path")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -215,6 +235,7 @@ export function createJsonbMergeTool(adapter: PostgresAdapter): ToolDefinition {
       "Merge two JSONB objects. deep=true (default) recursively merges. mergeArrays=true concatenates arrays.",
     group: "jsonb",
     inputSchema: JsonbMergeSchema,
+    outputSchema: JsonbMergeOutputSchema,
     annotations: readOnly("JSONB Merge"),
     icons: getToolIcons("jsonb", readOnly("JSONB Merge")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -255,33 +276,18 @@ export function createJsonbNormalizeTool(
     description:
       'Normalize JSONB to key-value pairs. Use idColumn to specify row identifier (default: "id" if exists, else ctid).',
     group: "jsonb",
-    inputSchema: z.object({
-      table: z.string().describe("Table name"),
-      column: z.string().describe("JSONB column"),
-      mode: z
-        .enum(["keys", "array", "pairs", "flatten"])
-        .optional()
-        .describe(
-          "keys: text values (all converted to string). pairs: JSONB types preserved. array: for arrays. flatten: recursive.",
-        ),
-      where: z.string().optional(),
-      idColumn: z
-        .string()
-        .optional()
-        .describe(
-          'Column to use for row identification (e.g., "id"). If omitted, defaults to "id" if it exists, else uses ctid.',
-        ),
-    }),
+    inputSchema: JsonbNormalizeSchemaBase,
+    outputSchema: JsonbNormalizeOutputSchema,
     annotations: readOnly("JSONB Normalize"),
     icons: getToolIcons("jsonb", readOnly("JSONB Normalize")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        column: string;
-        mode?: string;
-        where?: string;
-        idColumn?: string;
-      };
+      // Parse with preprocess schema to resolve aliases (tableName→table, col→column, filter→where)
+      const parsed = JsonbNormalizeSchema.parse(params);
+      const table = parsed.table;
+      const column = parsed.column;
+      if (!table || !column) {
+        throw new Error("table and column are required");
+      }
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
       const mode = parsed.mode ?? "keys";
 
@@ -293,8 +299,8 @@ export function createJsonbNormalizeTool(
         );
       }
 
-      const tableName = sanitizeTableName(parsed.table);
-      const columnName = sanitizeIdentifier(parsed.column);
+      const tableName = sanitizeTableName(table);
+      const columnName = sanitizeIdentifier(column);
 
       // Determine row identifier column
       let rowIdExpr: string;
@@ -423,6 +429,7 @@ export function createJsonbDiffTool(adapter: PostgresAdapter): ToolDefinition {
       "Compare two JSONB objects. Returns top-level key differences only (shallow comparison, not recursive).",
     group: "jsonb",
     inputSchema: JsonbDiffSchema,
+    outputSchema: JsonbDiffOutputSchema,
     annotations: readOnly("JSONB Diff"),
     icons: getToolIcons("jsonb", readOnly("JSONB Diff")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -480,26 +487,23 @@ export function createJsonbIndexSuggestTool(
     description:
       "Analyze JSONB column and suggest indexes. Only works on object-type JSONB (not arrays).",
     group: "jsonb",
-    inputSchema: z.object({
-      table: z.string().describe("Table name"),
-      column: z.string().describe("JSONB column"),
-      sampleSize: z.number().optional().describe("Sample rows to analyze"),
-      where: z.string().optional().describe("WHERE clause to filter rows"),
-    }),
+    inputSchema: JsonbIndexSuggestSchemaBase,
+    outputSchema: JsonbIndexSuggestOutputSchema,
     annotations: readOnly("JSONB Index Suggest"),
     icons: getToolIcons("jsonb", readOnly("JSONB Index Suggest")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        column: string;
-        sampleSize?: number;
-        where?: string;
-      };
+      // Parse with preprocess schema to resolve aliases (tableName→table, col→column, filter→where)
+      const parsed = JsonbIndexSuggestSchema.parse(params);
+      const table = parsed.table;
+      const column = parsed.column;
+      if (!table || !column) {
+        throw new Error("table and column are required");
+      }
       const sample = parsed.sampleSize ?? 1000;
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
 
-      const tableName = sanitizeTableName(parsed.table);
-      const columnName = sanitizeIdentifier(parsed.column);
+      const tableName = sanitizeTableName(table);
+      const columnName = sanitizeIdentifier(column);
 
       const keySql = `
                 SELECT key, COUNT(*) as frequency, 
@@ -521,7 +525,7 @@ export function createJsonbIndexSuggestTool(
             error.message.includes("cannot call jsonb_each"))
         ) {
           throw new Error(
-            `pg_jsonb_index_suggest requires JSONB objects (not arrays). Column '${parsed.column}' may not be JSONB type or contains arrays.`,
+            `pg_jsonb_index_suggest requires JSONB objects (not arrays). Column '${column}' may not be JSONB type or contains arrays.`,
           );
         }
         throw error;
@@ -606,28 +610,25 @@ export function createJsonbSecurityScanTool(
     description:
       "Scan JSONB for security issues. Only works on object-type JSONB (not arrays). Use larger sampleSize for thorough scans.",
     group: "jsonb",
-    inputSchema: z.object({
-      table: z.string().describe("Table name"),
-      column: z.string().describe("JSONB column"),
-      sampleSize: z.number().optional().describe("Sample rows to scan"),
-      where: z.string().optional().describe("WHERE clause to filter rows"),
-    }),
+    inputSchema: JsonbSecurityScanSchemaBase,
+    outputSchema: JsonbSecurityScanOutputSchema,
     annotations: readOnly("JSONB Security Scan"),
     icons: getToolIcons("jsonb", readOnly("JSONB Security Scan")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        column: string;
-        sampleSize?: number;
-        where?: string;
-      };
+      // Parse with preprocess schema to resolve aliases (tableName→table, col→column, filter→where)
+      const parsed = JsonbSecurityScanSchema.parse(params);
+      const table = parsed.table;
+      const column = parsed.column;
+      if (!table || !column) {
+        throw new Error("table and column are required");
+      }
       const sample = parsed.sampleSize ?? 100;
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
 
       const issues: { type: string; key: string; count: number }[] = [];
 
-      const tableName = sanitizeTableName(parsed.table);
-      const columnName = sanitizeIdentifier(parsed.column);
+      const tableName = sanitizeTableName(table);
+      const columnName = sanitizeIdentifier(column);
 
       // Count actual rows scanned (may be less than sample if table is small)
       const countSql = `SELECT COUNT(*) as count FROM (SELECT * FROM ${tableName}${whereClause} LIMIT ${String(sample)}) t`;
@@ -653,7 +654,7 @@ export function createJsonbSecurityScanTool(
             error.message.includes("cannot call jsonb_each"))
         ) {
           throw new Error(
-            `pg_jsonb_security_scan requires JSONB objects (not arrays). Column '${parsed.column}' may not be JSONB type or contains arrays.`,
+            `pg_jsonb_security_scan requires JSONB objects. Column '${column}' may contain arrays or non-JSONB data.`,
           );
         }
         throw error;
@@ -728,26 +729,23 @@ export function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
     description:
       "Get statistics about JSONB column usage. Note: topKeys only applies to object-type JSONB, not arrays.",
     group: "jsonb",
-    inputSchema: z.object({
-      table: z.string().describe("Table name"),
-      column: z.string().describe("JSONB column"),
-      sampleSize: z.number().optional().describe("Sample rows to analyze"),
-      where: z.string().optional().describe("WHERE clause to filter rows"),
-    }),
+    inputSchema: JsonbStatsSchemaBase,
+    outputSchema: JsonbStatsOutputSchema,
     annotations: readOnly("JSONB Stats"),
     icons: getToolIcons("jsonb", readOnly("JSONB Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        column: string;
-        sampleSize?: number;
-        where?: string;
-      };
+      // Parse with preprocess schema to resolve aliases (tableName→table, col→column, filter→where)
+      const parsed = JsonbStatsSchema.parse(params);
+      const table = parsed.table;
+      const column = parsed.column;
+      if (!table || !column) {
+        throw new Error("table and column are required");
+      }
       const sample = parsed.sampleSize ?? 1000;
       const whereClause = parsed.where ? ` WHERE ${parsed.where}` : "";
 
-      const tableName = sanitizeTableName(parsed.table);
-      const columnName = sanitizeIdentifier(parsed.column);
+      const tableName = sanitizeTableName(table);
+      const columnName = sanitizeIdentifier(column);
 
       const basicSql = `
                 SELECT 
@@ -770,13 +768,14 @@ export function createJsonbStatsTool(adapter: PostgresAdapter): ToolDefinition {
           }
         : undefined;
 
+      const keyLimit = parsed.topKeysLimit ?? 20;
       const keySql = `
                 SELECT key, COUNT(*) as frequency
                 FROM (SELECT * FROM ${tableName}${whereClause} LIMIT ${String(sample)}) t,
                      jsonb_object_keys(${columnName}) key
                 GROUP BY key
                 ORDER BY frequency DESC
-                LIMIT 20
+                LIMIT ${String(keyLimit)}
             `;
 
       let topKeys: { key: string; frequency: number }[] = [];

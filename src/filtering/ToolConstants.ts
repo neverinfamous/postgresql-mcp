@@ -167,6 +167,7 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
     "pg_vector_performance",
     "pg_vector_dimension_reduce",
     "pg_vector_embed",
+    "pg_vector_validate",
   ],
   postgis: [
     "pg_postgis_create_extension",
@@ -274,7 +275,7 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
  *
  * Group sizes:
  *   core:19, transactions:7, jsonb:19, text:13, performance:20
- *   admin:10, monitoring:11, backup:9, schema:12, vector:14
+ *   admin:10, monitoring:11, backup:9, schema:12, vector:15
  *   postgis:15, partitioning:6, stats:8, cron:8, partman:10
  *   kcache:7, citext:6, ltree:8, pgcrypto:9, codemode:1
  *
@@ -283,14 +284,14 @@ export const TOOL_GROUPS: Record<ToolGroup, string[]> = {
  *   essential:    46 (core:19 + transactions:7 + jsonb:19 + codemode:1)
  *   dev-power:    53 (core:19 + transactions:7 + schema:12 + stats:8 + partitioning:6 + codemode:1)
  *   ai-data:      59 (core:19 + jsonb:19 + text:13 + transactions:7 + codemode:1)
- *   ai-vector:    47 (core:19 + vector:14 + transactions:7 + partitioning:6 + codemode:1)
+ *   ai-vector:    48 (core:19 + vector:15 + transactions:7 + partitioning:6 + codemode:1)
  *   dba-monitor:  58 (core:19 + monitoring:11 + performance:20 + transactions:7 + codemode:1)
  *   dba-manage:   57 (core:19 + admin:10 + backup:9 + partitioning:6 + schema:12 + codemode:1)
  *   dba-stats:    56 (core:19 + admin:10 + monitoring:11 + transactions:7 + stats:8 + codemode:1)
  *   geo:          42 (core:19 + postgis:15 + transactions:7 + codemode:1)
  *   base-core:    58 (core:19 + jsonb:19 + transactions:7 + schema:12 + codemode:1)
  *   base-ops:     51 (admin:10 + monitoring:11 + backup:9 + partitioning:6 + stats:8 + citext:6 + codemode:1)
- *   ext-ai:       24 (vector:14 + pgcrypto:9 + codemode:1)
+ *   ext-ai:       25 (vector:15 + pgcrypto:9 + codemode:1)
  *   ext-geo:      24 (postgis:15 + ltree:8 + codemode:1)
  *   ext-schedule: 19 (cron:8 + partman:10 + codemode:1)
  *   ext-perf:     28 (kcache:7 + performance:20 + codemode:1)

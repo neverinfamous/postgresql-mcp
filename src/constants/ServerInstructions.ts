@@ -42,7 +42,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | \`pg_list_objects\` | \`{objects, count, totalCount, byType}\` | Use \`limit\` to cap results, \`type\`/\`types\` to filter |
 | \`pg_object_details\` | \`{name, schema, type, returnType?, ...}\` | Functions: \`returnType\` alias. Views/Mat. views: \`definition\` |
 | \`pg_analyze_db_health\` | \`{cacheHitRatio: {ratio, heap, index, status}}\` | \`ratio\` = primary numeric %. \`bloat\` available |
-| \`pg_describe_table\` | \`{columns, indexes, constraints, foreignKeys}\` | Columns include \`notNull\` (alias for \`!nullable\`), \`foreignKey\`. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL |
+| \`pg_describe_table\` | \`{columns, indexes, constraints, foreignKeys}\` | Columns include \`notNull\` (alias for \`!nullable\`), \`foreignKey\`. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL. ⚠️ \`rowCount: -1\` = no statistics (run ANALYZE) |
 | \`pg_analyze_query_indexes\` | \`{plan, issues, recommendations}\` | \`verbosity\`: 'summary' (default) or 'full'. Summary mode returns condensed plan |
 | \`pg_list_tables\` | \`{tables, count}\` | Use \`schema\` to filter, \`limit\` to cap results |
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |
@@ -53,7 +53,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 \`pg_group_action\` → \`pg.group.action()\` (group prefixes dropped: \`pg_jsonb_extract\` → \`pg.jsonb.extract()\`)
 
-**Top-Level Core Aliases**: All starter tools available directly: \`pg.readQuery()\`, \`pg.writeQuery()\`, \`pg.listTables()\`, \`pg.describeTable()\`, \`pg.createTable()\`, \`pg.dropTable()\`, \`pg.count()\`, \`pg.exists()\`, \`pg.upsert()\`, \`pg.batchInsert()\`, \`pg.truncate()\`, \`pg.createIndex()\`, \`pg.dropIndex()\`, \`pg.getIndexes()\`, \`pg.listObjects()\`, \`pg.objectDetails()\`, \`pg.analyzeDbHealth()\`, \`pg.analyzeQueryIndexes()\`, \`pg.analyzeWorkloadIndexes()\`
+**Top-Level Core Aliases**: All starter tools available directly: \`pg.readQuery()\`, \`pg.writeQuery()\`, \`pg.listTables()\`, \`pg.describeTable()\`, \`pg.createTable()\`, \`pg.dropTable()\`, \`pg.count()\`, \`pg.exists()\`, \`pg.upsert()\`, \`pg.batchInsert()\`, \`pg.truncate()\`, \`pg.createIndex()\`, \`pg.dropIndex()\`, \`pg.getIndexes()\`, \`pg.listObjects()\`, \`pg.objectDetails()\`, \`pg.listExtensions()\`, \`pg.analyzeDbHealth()\`, \`pg.analyzeQueryIndexes()\`, \`pg.analyzeWorkloadIndexes()\`
 
 **Positional args work**: \`readQuery("SELECT...")\`, \`exists("users", "id=1")\`, \`createIndex("users", ["email"])\`
 
@@ -68,6 +68,8 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 ---
 
 ## Vector Tools
+
+⚠️ **Large Vectors**: Direct MCP tool calls may truncate vectors >256 dimensions due to JSON-RPC message size limits. For vectors ≥256 dimensions (e.g., OpenAI 1536-dim, local 384-dim), use Code Mode: \`await pg.vector.search({table, column, vector, limit})\`
 
 - \`pg_vector_search\`: Supports \`schema.table\` format (auto-parsed). Returns \`{results: [...], count, metric}\`. Use \`select: ["id", "name"]\` to include identifying columns. Without select, only returns distance. \`filter\` = \`where\`. ⚠️ Vectors read from DB are strings—parse before passing: \`vec.replace(/^\\[|\\]$/g, '').split(',').map(Number)\`
 - \`pg_vector_insert\`: Supports \`schema.table\` format (auto-parsed). Use \`updateExisting\` + \`conflictColumn\` + \`conflictValue\` for UPDATE mode. \`additionalColumns\` is applied in both INSERT and UPDATE modes
@@ -87,12 +89,14 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 ## JSONB Tools
 
 - \`pg_jsonb_extract\`: Returns null if path doesn't exist
-- \`pg_jsonb_insert\`: Index -1 inserts BEFORE last element; use \`insertAfter: true\` to append
+- \`pg_jsonb_insert\`: Index -1 inserts BEFORE last element; use \`insertAfter: true\` to append. ⚠️ Use array format \`[-1]\` not string \`"[-1]"\` for negative indices
 - \`pg_jsonb_set\`: \`createMissing=true\` creates full nested paths; initializes NULL columns to \`{}\`. Empty path (\`''\` or \`[]\`) replaces entire column value
+- \`pg_jsonb_strip_nulls\`: ⚠️ Requires \`where\`/\`filter\` clause—write operations must be targeted. Use \`preview: true\` to see changes first
 - \`pg_jsonb_agg\`: Supports AS aliases in select: \`["id", "metadata->>'name' AS name"]\`. ⚠️ \`->>\` returns text—use \`->\` to preserve JSON types
 - \`pg_jsonb_object\`: Use \`data\`, \`object\`, or \`pairs\` parameter: \`{data: {name: "John", age: 30}}\`. Returns \`{object: {...}}\`
 - \`pg_jsonb_normalize\`: \`flatten\` doesn't descend into arrays; \`keys\` returns text (use \`pairs\` for JSON types)
-- ⛔ **Object-only tools**: \`diff\`, \`merge\`, \`keys\`, \`indexSuggest\`, \`securityScan\`—require JSONB objects, throw descriptive errors for arrays
+- \`pg_jsonb_stats\`: Returns column-level statistics. \`topKeysLimit\` controls key count (default: 20). ⚠️ \`typeDistribution\` null type = SQL NULL columns (entire column NULL, not JSON \`null\` literal). Use \`sqlNullCount\` for explicit count
+- ⛔ **Object-only tools**: \`diff\`, \`merge\`, \`keys\`, \`indexSuggest\`, \`securityScan\`, \`stats\`—topKeys require JSONB objects, throw descriptive errors for arrays
 - ⛔ **Array-only tools**: \`insert\`—requires JSONB arrays, throws errors for objects
 - 📝 \`normalize\` modes: \`pairs\`/\`keys\`/\`flatten\` for objects; \`array\` for arrays
 
@@ -218,7 +222,7 @@ Defaults: \`threshold\`=0.3 (use 0.1-0.2 for partial), \`maxDistance\`=3 (use 5+
 - \`pg_trigram_similarity\` vs \`pg_similarity_search\`: Both use pg_trgm. First filters by threshold; second uses set_limit() with %
 - \`pg_fuzzy_match\`: Levenshtein returns distance (lower=better). Soundex/metaphone return phonetic codes (exact match only). ⛔ Invalid \`method\` values throw error with valid options
 - \`pg_text_normalize\`: Removes accents only (unaccent). Does NOT lowercase/trim
-- 📍 **Table vs Standalone**: \`normalize\`, \`sentiment\`, \`toVector\`, \`toQuery\`, \`searchConfig\` are standalone (text input only). \`soundex\`, \`metaphone\` are table operations (require \`table\`, \`column\`, \`value\`)—they query database rows, not single strings
+- 📍 **Table vs Standalone**: \`normalize\`, \`sentiment\`, \`toVector\`, \`toQuery\`, \`searchConfig\` are standalone (text input only). For phonetic matching: use \`pg_fuzzy_match\` with \`method: 'soundex'|'metaphone'\` (direct MCP), or \`pg.text.soundex()\`/\`pg.text.metaphone()\` (Code Mode convenience wrappers that call fuzzyMatch internally)
 
 **Top-Level Aliases**: \`pg.textSearch()\`, \`pg.textRank()\`, \`pg.textHeadline()\`, \`pg.textNormalize()\`, \`pg.textSentiment()\`, \`pg.textToVector()\`, \`pg.textToQuery()\`, \`pg.textSearchConfig()\`, \`pg.textTrigramSimilarity()\`, \`pg.textFuzzyMatch()\`, \`pg.textLikeSearch()\`, \`pg.textRegexpMatch()\`, \`pg.textCreateFtsIndex()\`
 
@@ -344,7 +348,7 @@ Core: \`createExtension()\`, \`schedule()\`, \`scheduleInDatabase()\`, \`unsched
 - \`pg_cron_unschedule\`: Remove job by \`jobId\` or \`jobName\`. If both provided, \`jobName\` takes precedence (with warning)
 - \`pg_cron_alter_job\`: Modify existing job. Can change \`schedule\`, \`command\`, \`database\`, \`username\`, \`active\`. ⛔ Non-existent jobId throws error
 - \`pg_cron_list_jobs\`: List all jobs. Default \`limit: 50\` (use \`0\` for all). Optional \`active\` boolean filter. Returns \`truncated\` + \`totalCount\` when limited. Returns \`hint\` when jobs have no name
-- \`pg_cron_job_run_details\`: View execution history. Default \`limit: 100\`. Optional \`jobId\`, \`status\` ('running'|'succeeded'|'failed') filters. Returns \`truncated\` + \`totalCount\` when limited. Returns \`summary\` with counts
+- \`pg_cron_job_run_details\`: View execution history. Default \`limit: 50\`. Optional \`jobId\`, \`status\` ('running'|'succeeded'|'failed') filters. Returns \`truncated\` + \`totalCount\` when limited. Returns \`summary\` with counts
 - \`pg_cron_cleanup_history\`: Delete old run records. \`olderThanDays\`/\`days\` param (default: 7). Optional \`jobId\` to target specific job
 - \`pg_cron_create_extension\`: Enable pg_cron extension (idempotent). Requires superuser
 
@@ -374,6 +378,8 @@ Core: \`createExtension()\`, \`hash()\`, \`hmac()\`, \`encrypt()\`, \`decrypt()\
 
 No \`setTimeout\`, \`setInterval\`, \`fetch\`, or network access. Use \`pg.core.readQuery()\` for data access.
 
+📊 **Metrics Note**: \`memoryUsedMb\` measures heap delta (end - start). Negative values indicate memory freed during execution (e.g., GC ran).
+
 ## Transactions
 
 Core: \`begin()\`, \`commit()\`, \`rollback()\`, \`savepoint()\`, \`rollbackTo()\`, \`release()\`, \`execute()\`
@@ -385,7 +391,7 @@ Core: \`begin()\`, \`commit()\`, \`rollback()\`, \`savepoint()\`, \`rollbackTo()
 
 **Savepoints:**
 - \`pg_transaction_savepoint\`: Create savepoint within transaction. \`name\`/\`savepoint\` + \`transactionId\`/\`tx\`/\`txId\`
-- \`pg_transaction_rollback_to\`: Rollback to savepoint, undoing changes made after it. ⚠️ Destroys all savepoints created after the target savepoint
+- \`pg_transaction_rollback_to\`: Rollback to savepoint, restoring database state to when the savepoint was created. ⚠️ Undoes ALL work (data changes AND savepoints) created after the target savepoint
 - \`pg_transaction_release\`: Release savepoint, keeping all changes since it was created. \`name\`/\`savepoint\` aliases
 
 **Atomic Execution:**

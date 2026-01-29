@@ -12,6 +12,13 @@ import type {
 import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
+import {
+  CreateBackupPlanOutputSchema,
+  RestoreCommandOutputSchema,
+  PhysicalBackupOutputSchema,
+  RestoreValidateOutputSchema,
+  BackupScheduleOptimizeOutputSchema,
+} from "../../schemas/index.js";
 
 export function createBackupPlanTool(adapter: PostgresAdapter): ToolDefinition {
   return {
@@ -29,6 +36,7 @@ export function createBackupPlanTool(adapter: PostgresAdapter): ToolDefinition {
         .optional()
         .describe("Number of backups to retain (default: 7)"),
     }),
+    outputSchema: CreateBackupPlanOutputSchema,
     annotations: readOnly("Create Backup Plan"),
     icons: getToolIcons("backup", readOnly("Create Backup Plan")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -121,6 +129,7 @@ export function createRestoreCommandTool(
       dataOnly: z.boolean().optional(),
       schemaOnly: z.boolean().optional(),
     }),
+    outputSchema: RestoreCommandOutputSchema,
     annotations: readOnly("Restore Command"),
     icons: getToolIcons("backup", readOnly("Restore Command")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -198,6 +207,7 @@ export function createPhysicalBackupTool(
         .describe("Checkpoint mode"),
       compress: z.number().optional().describe("Compression level 0-9"),
     }),
+    outputSchema: PhysicalBackupOutputSchema,
     annotations: readOnly("Physical Backup"),
     icons: getToolIcons("backup", readOnly("Physical Backup")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -283,6 +293,7 @@ export function createRestoreValidateTool(
       backupFile: z.string().describe("Path to backup file"),
       backupType: z.enum(["pg_dump", "pg_basebackup"]).optional(),
     }),
+    outputSchema: RestoreValidateOutputSchema,
     annotations: readOnly("Restore Validate"),
     icons: getToolIcons("backup", readOnly("Restore Validate")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -382,6 +393,7 @@ export function createBackupScheduleOptimizeTool(
       "Analyze database activity patterns and recommend optimal backup schedule.",
     group: "backup",
     inputSchema: z.object({}),
+    outputSchema: BackupScheduleOptimizeOutputSchema,
     annotations: readOnly("Backup Schedule Optimize"),
     icons: getToolIcons("backup", readOnly("Backup Schedule Optimize")),
     handler: async (_params: unknown, _context: RequestContext) => {

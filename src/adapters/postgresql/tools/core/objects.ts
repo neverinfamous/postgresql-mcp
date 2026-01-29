@@ -17,6 +17,9 @@ import {
   ListObjectsSchema,
   ObjectDetailsSchema,
   ObjectDetailsSchemaBase,
+  ObjectListOutputSchema,
+  ObjectDetailsOutputSchema,
+  ExtensionListOutputSchema,
 } from "./schemas.js";
 
 /**
@@ -33,6 +36,7 @@ export function createListObjectsTool(
     annotations: readOnly("List Objects"),
     icons: getToolIcons("core", readOnly("List Objects")),
     inputSchema: ListObjectsSchemaBase,
+    outputSchema: ObjectListOutputSchema,
     handler: async (params: unknown, _context: RequestContext) => {
       const { schema, types, limit } = ListObjectsSchema.parse(params);
 
@@ -79,15 +83,15 @@ export function createListObjectsTool(
                     FROM pg_class c
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE c.relkind IN (${selectedTypes
-            .map((t) => {
-              if (t === "table") return `'r'`;
-              if (t === "view") return `'v'`;
-              if (t === "materialized_view") return `'m'`;
-              if (t === "sequence") return `'S'`;
-              return null;
-            })
-            .filter(Boolean)
-            .join(", ")})
+                      .map((t) => {
+                        if (t === "table") return `'r'`;
+                        if (t === "view") return `'v'`;
+                        if (t === "materialized_view") return `'m'`;
+                        if (t === "sequence") return `'S'`;
+                        return null;
+                      })
+                      .filter(Boolean)
+                      .join(", ")})
                     ${schemaFilter}
                     ORDER BY n.nspname, c.relname
                 `;
@@ -113,10 +117,11 @@ export function createListObjectsTool(
                     FROM pg_proc p
                     JOIN pg_namespace n ON n.oid = p.pronamespace
                     WHERE p.prokind IN (${kindFilter.join(", ")})
-                    ${schema
-            ? `AND n.nspname = '${schema}'`
-            : `AND n.nspname NOT IN ('pg_catalog', 'information_schema')`
-          }
+                    ${
+                      schema
+                        ? `AND n.nspname = '${schema}'`
+                        : `AND n.nspname NOT IN ('pg_catalog', 'information_schema')`
+                    }
                     ORDER BY n.nspname, p.proname
                 `;
         const result = await adapter.executeQuery(sql);
@@ -196,6 +201,7 @@ export function createObjectDetailsTool(
       "Get detailed metadata for a specific database object (table, view, function, sequence, index).",
     group: "core",
     inputSchema: ObjectDetailsSchemaBase,
+    outputSchema: ObjectDetailsOutputSchema,
     annotations: readOnly("Object Details"),
     icons: getToolIcons("core", readOnly("Object Details")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -234,7 +240,7 @@ export function createObjectDetailsTool(
       if (type && detectedType && type !== detectedType) {
         throw new Error(
           `Object '${schemaName}.${name}' is a ${detectedType}, not a ${type}. ` +
-          `Use type: '${detectedType}' or omit type to auto-detect.`,
+            `Use type: '${detectedType}' or omit type to auto-detect.`,
         );
       }
 
@@ -388,6 +394,7 @@ export function createListExtensionsTool(
     description: "List installed PostgreSQL extensions with versions.",
     group: "core",
     inputSchema: z.object({}),
+    outputSchema: ExtensionListOutputSchema,
     annotations: readOnly("List Extensions"),
     icons: getToolIcons("core", readOnly("List Extensions")),
     handler: async (_params: unknown, _context: RequestContext) => {

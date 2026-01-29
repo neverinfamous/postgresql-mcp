@@ -282,3 +282,149 @@ export const ListFunctionsSchema = z.preprocess(
   (val: unknown) => val ?? {},
   ListFunctionsSchemaBase,
 );
+
+// ============================================================================
+// Output Schemas
+// ============================================================================
+
+/**
+ * pg_list_schemas output
+ */
+export const ListSchemasOutputSchema = z.object({
+  schemas: z.array(z.string()).describe("Schema names"),
+  count: z.number().describe("Number of schemas"),
+});
+
+/**
+ * pg_create_schema output
+ */
+export const CreateSchemaOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether the operation succeeded"),
+    schema: z.string().describe("Schema name"),
+    alreadyExisted: z
+      .boolean()
+      .optional()
+      .describe("True if schema already existed"),
+  })
+  .loose();
+
+/**
+ * pg_drop_schema output
+ */
+export const DropSchemaOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether the operation succeeded"),
+    dropped: z.string().nullable().describe("Dropped schema name or null"),
+    existed: z.boolean().describe("Whether the schema existed before drop"),
+    note: z.string().optional().describe("Note when schema did not exist"),
+  })
+  .loose();
+
+/**
+ * pg_list_sequences output
+ */
+export const ListSequencesOutputSchema = z.object({
+  sequences: z
+    .array(z.record(z.string(), z.unknown()))
+    .describe("Sequence list"),
+  count: z.number().describe("Number of sequences"),
+});
+
+/**
+ * pg_create_sequence output
+ */
+export const CreateSequenceOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether the operation succeeded"),
+    sequence: z.string().describe("Sequence name (schema.name)"),
+    ifNotExists: z.boolean().describe("Whether IF NOT EXISTS was used"),
+    alreadyExisted: z
+      .boolean()
+      .optional()
+      .describe("True if sequence already existed"),
+  })
+  .loose();
+
+/**
+ * pg_drop_sequence output
+ */
+export const DropSequenceOutputSchema = z.object({
+  success: z.boolean().describe("Whether the operation succeeded"),
+  sequence: z.string().describe("Sequence name"),
+  existed: z.boolean().describe("Whether the sequence existed before drop"),
+});
+
+/**
+ * pg_list_views output
+ */
+export const ListViewsOutputSchema = z
+  .object({
+    views: z.array(z.record(z.string(), z.unknown())).describe("View list"),
+    count: z.number().describe("Number of views"),
+    hasMatViews: z.boolean().describe("Whether materialized views were found"),
+    truncatedDefinitions: z
+      .number()
+      .optional()
+      .describe("Number of truncated definitions"),
+    truncated: z.boolean().describe("Whether results were truncated"),
+    note: z.string().optional().describe("Note about truncation"),
+  })
+  .loose();
+
+/**
+ * pg_create_view output
+ */
+export const CreateViewOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether the operation succeeded"),
+    view: z.string().describe("View name (schema.name)"),
+    materialized: z.boolean().describe("Whether view is materialized"),
+    alreadyExisted: z
+      .boolean()
+      .optional()
+      .describe("True if view already existed"),
+  })
+  .loose();
+
+/**
+ * pg_drop_view output
+ */
+export const DropViewOutputSchema = z.object({
+  success: z.boolean().describe("Whether the operation succeeded"),
+  view: z.string().describe("View name"),
+  materialized: z.boolean().describe("Whether view was materialized"),
+  existed: z.boolean().describe("Whether the view existed before drop"),
+});
+
+/**
+ * pg_list_functions output
+ */
+export const ListFunctionsOutputSchema = z
+  .object({
+    functions: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Function list"),
+    count: z.number().describe("Number of functions"),
+    limit: z.number().describe("Limit used"),
+    note: z.string().optional().describe("Note about truncation"),
+  })
+  .loose();
+
+/**
+ * pg_list_triggers output
+ */
+export const ListTriggersOutputSchema = z.object({
+  triggers: z.array(z.record(z.string(), z.unknown())).describe("Trigger list"),
+  count: z.number().describe("Number of triggers"),
+});
+
+/**
+ * pg_list_constraints output
+ */
+export const ListConstraintsOutputSchema = z.object({
+  constraints: z
+    .array(z.record(z.string(), z.unknown()))
+    .describe("Constraint list"),
+  count: z.number().describe("Number of constraints"),
+});

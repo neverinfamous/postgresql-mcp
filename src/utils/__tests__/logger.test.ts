@@ -74,12 +74,12 @@ describe("Logger", () => {
   });
 
   describe("Message Sanitization (Log Injection Prevention)", () => {
-    it("should strip null bytes from messages", () => {
+    it("should replace null bytes with spaces in messages", () => {
       logger.info("message\x00with\x00nulls");
 
       const output = consoleErrorSpy.mock.calls[0]?.[0] as string;
       expect(output).not.toContain("\x00");
-      expect(output).toContain("messagewithnulls");
+      expect(output).toContain("message with nulls"); // Replaced with spaces
     });
 
     it("should strip bell and backspace characters", () => {
@@ -105,20 +105,15 @@ describe("Logger", () => {
       expect(output).not.toContain("\x7F");
     });
 
-    it("should strip C1 control characters (0x80-0x9F)", () => {
-      logger.info("message\x80\x9Fcontrol");
-
-      const output = consoleErrorSpy.mock.calls[0]?.[0] as string;
-      expect(output).not.toContain("\x80");
-      expect(output).not.toContain("\x9F");
-    });
-
-    it("should preserve tabs, newlines, and carriage returns", () => {
+    it("should replace tabs and newlines with spaces", () => {
       logger.info("line1\nline2\ttabbed\r\nwindows");
 
       const output = consoleErrorSpy.mock.calls[0]?.[0] as string;
-      expect(output).toContain("\n");
-      expect(output).toContain("\t");
+      // In stricter mode, all control characters including tab/newline are replaced with spaces
+      expect(output).not.toContain("\n");
+      expect(output).not.toContain("\t");
+      expect(output).not.toContain("\r");
+      expect(output).toContain("line1 line2 tabbed  windows"); // Replaced with spaces
     });
 
     it("should prevent log forgery via control character injection", () => {
@@ -126,12 +121,66 @@ describe("Logger", () => {
       logger.info("user input\x00\x1B[2Kwith control chars");
 
       const output = consoleErrorSpy.mock.calls[0]?.[0] as string;
-      // Null bytes and escape sequence prefix should be stripped
+      // Null bytes and escape sequence prefix should be replaced with spaces
       expect(output).toContain("[INFO]");
       expect(output).not.toContain("\x00");
-      expect(output).not.toContain("\x1B"); // ESC character stripped
+      expect(output).not.toContain("\x1B"); // ESC character replaced
       // The printable part of the message remains
       expect(output).toContain("user input");
+    });
+  });
+
+  describe("Stack Trace Sanitization", () => {
+    it("should sanitize stack traces with newlines replaced by arrows on error", () => {
+      const stackTrace = "Error: Test\n    at foo.ts:10\n    at bar.ts:20";
+      logger.error("An error occurred", { stack: stackTrace });
+
+      // Error-level logs output two lines: the main message and the stack
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+
+      const stackOutput = consoleErrorSpy.mock.calls[1]?.[0] as string;
+      expect(stackOutput).toContain("Stack:");
+      // Newlines replaced with arrow delimiters
+      expect(stackOutput).toContain("→");
+      expect(stackOutput).not.toContain("\n");
+      expect(stackOutput).toContain("foo.ts:10");
+      expect(stackOutput).toContain("bar.ts:20");
+    });
+
+    it("should remove control characters from stack traces", () => {
+      const stackTrace = "Error: Test\x07bell\n    at foo.ts:10";
+      logger.error("Error with control chars", { stack: stackTrace });
+
+      const stackOutput = consoleErrorSpy.mock.calls[1]?.[0] as string;
+      expect(stackOutput).not.toContain("\x07");
+    });
+
+    it("should output stack traces for critical, alert, and emergency levels", () => {
+      const stackTrace = "Error: Critical\n    at critical.ts:1";
+
+      logger.critical("Critical error", { stack: stackTrace });
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy.mock.calls[1]?.[0]).toContain("Stack:");
+
+      consoleErrorSpy.mockClear();
+      logger.alert("Alert error", { stack: stackTrace });
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy.mock.calls[1]?.[0]).toContain("Stack:");
+
+      consoleErrorSpy.mockClear();
+      logger.emergency("Emergency error", { stack: stackTrace });
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy.mock.calls[1]?.[0]).toContain("Stack:");
+    });
+
+    it("should not output stack traces for info/warning level logs", () => {
+      const stackTrace = "Error: Info\n    at info.ts:1";
+      logger.info("Info with stack", { stack: stackTrace });
+
+      // Only 1 call (no separate stack line)
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      // The stack should be in the context JSON, not as a separate line
+      expect(consoleErrorSpy.mock.calls[0]?.[0]).not.toContain("  Stack:");
     });
   });
 
@@ -169,6 +218,22 @@ describe("Logger", () => {
       expect(output).toContain("[REDACTED]");
       expect(output).not.toContain("https://auth.example.com");
       expect(output).not.toContain("super_secret");
+    });
+
+    it("should redact additional OAuth 2.1 fields", () => {
+      const context: LogContext = {
+        authorizationServerUrl: "https://auth.example.com/oauth2",
+        bearerFormat: "JWT",
+        oauthConfig: { issuer: "https://auth.example.com" },
+        scopes_supported: ["read", "write", "admin"],
+      };
+      logger.info("oauth 2.1 config", context);
+
+      const output = consoleErrorSpy.mock.calls[0]?.[0] as string;
+      expect(output).not.toContain("https://auth.example.com/oauth2");
+      expect(output).not.toContain("JWT");
+      // Nested oauth config should also be redacted
+      expect(output.match(/\[REDACTED\]/g)?.length).toBeGreaterThanOrEqual(3);
     });
 
     it("should redact nested sensitive fields", () => {

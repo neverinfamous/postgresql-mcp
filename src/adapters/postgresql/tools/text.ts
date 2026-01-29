@@ -13,7 +13,10 @@ import { getToolIcons } from "../../../utils/icons.js";
 import {
   sanitizeIdentifier,
   sanitizeIdentifiers,
+  sanitizeTableName,
 } from "../../../utils/identifiers.js";
+import { sanitizeFtsConfig } from "../../../utils/fts-config.js";
+import { sanitizeWhereClause } from "../../../utils/where-clause.js";
 import {
   TextSearchSchema,
   TextSearchSchemaBase,
@@ -22,6 +25,14 @@ import {
   RegexpMatchSchema,
   RegexpMatchSchemaBase,
   preprocessTextParams,
+  // Output schemas
+  TextRowsOutputSchema,
+  FtsIndexOutputSchema,
+  TextNormalizeOutputSchema,
+  TextSentimentOutputSchema,
+  TextToVectorOutputSchema,
+  TextToQueryOutputSchema,
+  TextSearchConfigOutputSchema,
 } from "../schemas/index.js";
 
 // Note: preprocessTextParams is imported from schemas/index.js
@@ -57,11 +68,12 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Full-text search using tsvector and tsquery.",
     group: "text",
     inputSchema: TextSearchSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Full-Text Search"),
     icons: getToolIcons("text", readOnly("Full-Text Search")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = TextSearchSchema.parse(params);
-      const cfg = parsed.config ?? "english";
+      const cfg = sanitizeFtsConfig(parsed.config ?? "english");
 
       // Handle both column (string) and columns (array) parameters
       // The preprocessor converts column → columns, but we handle both for safety
@@ -78,12 +90,11 @@ function createTextSearchTool(adapter: PostgresAdapter): ToolDefinition {
 
       // Build qualified table name with schema support
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const sanitizedCols = sanitizeIdentifiers(cols);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -142,11 +153,12 @@ function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
       "Get relevance ranking for full-text search results. Returns matching rows only with rank score.",
     group: "text",
     inputSchema: TextRankSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Text Rank"),
     icons: getToolIcons("text", readOnly("Text Rank")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = TextRankSchema.parse(params);
-      const cfg = parsed.config ?? "english";
+      const cfg = sanitizeFtsConfig(parsed.config ?? "english");
       const norm = parsed.normalization ?? 0;
 
       // Handle both column (string) and columns (array) parameters
@@ -160,12 +172,11 @@ function createTextRankTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const sanitizedCols = sanitizeIdentifiers(cols);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
@@ -197,6 +208,7 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
       "Find similar strings using pg_trgm trigram matching. Returns similarity score (0-1). Default threshold 0.3; use lower (e.g., 0.1) for partial matches.",
     group: "text",
     inputSchema: TrigramSimilaritySchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Trigram Similarity"),
     icons: getToolIcons("text", readOnly("Trigram Similarity")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -207,18 +219,19 @@ function createTrigramSimilarityTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
-      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
+      const additionalWhere = parsed.where
+        ? ` AND (${sanitizeWhereClause(parsed.where)})`
+        : "";
 
       const sql = `SELECT ${selectCols}, similarity(${columnName}, $1) as similarity
                         FROM ${tableName}
@@ -273,6 +286,7 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
       "Fuzzy string matching using fuzzystrmatch extension. Levenshtein (default): returns distance; use maxDistance=5+ for longer strings. Soundex/metaphone: returns phonetic code for exact matches only.",
     group: "text",
     inputSchema: FuzzyMatchSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Fuzzy Match"),
     icons: getToolIcons("text", readOnly("Fuzzy Match")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -287,18 +301,19 @@ function createFuzzyMatchTool(adapter: PostgresAdapter): ToolDefinition {
         parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
-      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
+      const additionalWhere = parsed.where
+        ? ` AND (${sanitizeWhereClause(parsed.where)})`
+        : "";
 
       let sql: string;
       if (method === "soundex") {
@@ -321,25 +336,27 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Match text using POSIX regular expressions.",
     group: "text",
     inputSchema: RegexpMatchSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Regexp Match"),
     icons: getToolIcons("text", readOnly("Regexp Match")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = RegexpMatchSchema.parse(params);
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
       const op = parsed.flags?.includes("i") ? "~*" : "~";
-      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
+      const additionalWhere = parsed.where
+        ? ` AND (${sanitizeWhereClause(parsed.where)})`
+        : "";
       const limitClause =
         parsed.limit !== undefined ? ` LIMIT ${String(parsed.limit)}` : "";
 
@@ -386,25 +403,27 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
       "Search text using LIKE patterns. Case-insensitive (ILIKE) by default.",
     group: "text",
     inputSchema: LikeSearchSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("LIKE Search"),
     icons: getToolIcons("text", readOnly("LIKE Search")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = LikeSearchSchema.parse(params);
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       const selectCols =
         parsed.select !== undefined && parsed.select.length > 0
           ? sanitizeIdentifiers(parsed.select).join(", ")
           : "*";
       const op = parsed.caseSensitive === true ? "LIKE" : "ILIKE";
-      const additionalWhere = parsed.where ? ` AND (${parsed.where})` : "";
+      const additionalWhere = parsed.where
+        ? ` AND (${sanitizeWhereClause(parsed.where)})`
+        : "";
       const limitClause =
         parsed.limit !== undefined && parsed.limit > 0
           ? ` LIMIT ${String(parsed.limit)}`
@@ -465,11 +484,12 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
       "Generate highlighted snippets from full-text search matches. Use select param for stable row identification (e.g., primary key).",
     group: "text",
     inputSchema: HeadlineSchemaBase, // Base schema for MCP visibility
+    outputSchema: TextRowsOutputSchema,
     annotations: readOnly("Text Headline"),
     icons: getToolIcons("text", readOnly("Text Headline")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = HeadlineSchema.parse(params);
-      const cfg = parsed.config ?? "english";
+      const cfg = sanitizeFtsConfig(parsed.config ?? "english");
 
       // Build options string from individual params or use provided options
       let opts: string;
@@ -485,12 +505,11 @@ function createTextHeadlineTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       // The preprocessor guarantees table is set (converts tableName → table)
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
         throw new Error("Either 'table' or 'tableName' is required");
       }
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
       // Use provided select columns, or default to * (user should specify PK for stable identification)
       const selectCols =
@@ -542,11 +561,12 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
     description: "Create a GIN index for full-text search on a column.",
     group: "text",
     inputSchema: FtsIndexSchemaBase, // Base schema for MCP visibility
+    outputSchema: FtsIndexOutputSchema,
     annotations: write("Create FTS Index"),
     icons: getToolIcons("text", write("Create FTS Index")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = FtsIndexSchema.parse(params);
-      const cfg = parsed.config ?? "english";
+      const cfg = sanitizeFtsConfig(parsed.config ?? "english");
       // The preprocessor guarantees table is set (converts tableName → table)
       const resolvedTable = parsed.table ?? parsed.tableName;
       if (!resolvedTable) {
@@ -560,8 +580,7 @@ function createFtsIndexTool(adapter: PostgresAdapter): ToolDefinition {
       const ifNotExists = useIfNotExists ? "IF NOT EXISTS " : "";
 
       // Build qualified table name with schema support
-      const schemaPrefix = parsed.schema ? `"${parsed.schema}".` : "";
-      const tableName = `${schemaPrefix}"${resolvedTable}"`;
+      const tableName = sanitizeTableName(resolvedTable, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
 
       // Check if index exists before creation (to accurately report 'skipped')
@@ -598,6 +617,7 @@ function createTextNormalizeTool(adapter: PostgresAdapter): ToolDefinition {
       "Remove accent marks (diacritics) from text using PostgreSQL unaccent extension. Note: Does NOT lowercase or trim—use LOWER()/TRIM() in a query for those operations.",
     group: "text",
     inputSchema: NormalizeSchema,
+    outputSchema: TextNormalizeOutputSchema,
     annotations: readOnly("Text Normalize"),
     icons: getToolIcons("text", readOnly("Text Normalize")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -633,6 +653,7 @@ function createTextSentimentTool(_adapter: PostgresAdapter): ToolDefinition {
       "Perform basic sentiment analysis on text using keyword matching.",
     group: "text",
     inputSchema: SentimentSchema,
+    outputSchema: TextSentimentOutputSchema,
     annotations: readOnly("Text Sentiment"),
     icons: getToolIcons("text", readOnly("Text Sentiment")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -760,6 +781,7 @@ function createTextToVectorTool(adapter: PostgresAdapter): ToolDefinition {
       "Convert text to tsvector representation for full-text search operations.",
     group: "text",
     inputSchema: ToVectorSchema,
+    outputSchema: TextToVectorOutputSchema,
     annotations: readOnly("Text to Vector"),
     icons: getToolIcons("text", readOnly("Text to Vector")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -799,6 +821,7 @@ function createTextToQueryTool(adapter: PostgresAdapter): ToolDefinition {
       "Convert text to tsquery for full-text search. Modes: plain (default), phrase (proximity matching), websearch (Google-like syntax with AND/OR/-).",
     group: "text",
     inputSchema: ToQuerySchema,
+    outputSchema: TextToQueryOutputSchema,
     annotations: readOnly("Text to Query"),
     icons: getToolIcons("text", readOnly("Text to Query")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -837,6 +860,7 @@ function createTextSearchConfigTool(adapter: PostgresAdapter): ToolDefinition {
       "List available full-text search configurations (e.g., english, german, simple).",
     group: "text",
     inputSchema: z.object({}).default({}),
+    outputSchema: TextSearchConfigOutputSchema,
     annotations: readOnly("Search Configurations"),
     icons: getToolIcons("text", readOnly("Search Configurations")),
     handler: async (_params: unknown, _context: RequestContext) => {

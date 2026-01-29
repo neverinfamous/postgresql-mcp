@@ -5,7 +5,219 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-01-29
+
+### Fixed
+
+- **pg_set_config Zod output schema error** — Fixed direct MCP tool call failing with output validation error. The handler was returning `{success, parameter, value}` without a `message` field, which is required by `ConfigOutputSchema`. Handler now returns a `message` field (e.g., "Set work_mem = 256MB") and the schema now includes optional `parameter` and `value` fields for set_config operations
+- **pg_cache_hit_ratio Zod output schema error** — Fixed direct MCP tool call failing with `Cannot read properties of undefined (reading '_zod')` error. The root cause was the `CacheHitRatioOutputSchema` using `.nullable()` at the top level, which broke MCP's Zod-to-JSON Schema conversion. Changed schema to always return an object with nullable fields, and updated handler to never return `null` (fields are set to `null` individually when no data exists)
+- **pg_stats_hypothesis params stripped by transform** — Fixed `StatsHypothesisSchema.transform()` stripping the `params` field from parsed input, causing parameterized WHERE clauses to fail with "there is no parameter $1" errors. The transform now preserves `params: data.params`
+- **JSONB Output Schema Validation Bugs**
+  - `pg_jsonb_typeof` — Fixed `columnNull` field type from array to boolean to match actual handler output
+  - `pg_jsonb_strip_nulls` — Refactored output schema from union to combined object with optional fields to resolve Zod validation errors
+  - `pg_jsonb_stats` — Fixed `typeDistribution[].type` to accept null for SQL NULL columns; added missing `sqlNullCount` and `hint` output fields
+- **Vector Tools Output Schema Validation Bugs**
+  - `pg_vector_index_optimize` — Fixed `estimatedRows` returned as string from PostgreSQL bigint; now explicitly cast to number before output schema validation
+  - `pg_vector_performance` — Fixed `estimatedRows`, `idx_scan`, and `idx_tup_read` returned as strings from PostgreSQL bigint; now explicitly cast to numbers
+  - `pg_vector_aggregate` — Fixed output schema field names: handler returns `average_vector`/`group_key` but schema expected `average`/`groupKey`; updated schema to match handler output
+  - `pg_vector_embed` — Fixed output schema validation error when `summarize: false`; handler now always returns embedding in object format `{preview, dimensions, truncated}` to comply with `VectorEmbedOutputSchema`
+- **pg_vector_insert Split Schema Violation** — Fixed direct MCP tool calls not accepting `tableName` and `col` aliases. Implemented Split Schema pattern with `VectorInsertSchemaBase` for MCP visibility and transformed schema for handler alias resolution. Error messages now mention aliases (e.g., "table (or tableName) parameter is required")
+- **pg_vector_validate user-friendly error** — Fixed raw Zod validation error being returned when invalid input types are provided (e.g., string instead of number array for `vector` parameter). Now returns `{valid: false, error: \"Invalid vector: ...\", suggestion: \"Ensure vector is an array of numbers, e.g., [0.1, 0.2, 0.3]\"}` for type validation failures
+- **pg_vector_validate direct MCP tool exposure** — Fixed `pg_vector_validate` not appearing as a direct MCP tool. The tool was missing from the `vector` tool group in `ToolConstants.ts` (registry entry). Added `pg_vector_validate` to the vector array, increasing total vector tools from 14 to 15
+- **Cron schedule output schema jobId type** — Fixed `pg_cron_schedule` and `pg_cron_schedule_in_database` direct MCP tool calls failing with output validation error. PostgreSQL BIGINT values are returned as strings due to JavaScript number precision limits, but the output schema expected `z.number()`. Changed `jobId` type to `z.string()` in both `CronScheduleOutputSchema` and `CronScheduleInDatabaseOutputSchema`
+
+### Performance
+
+- **pg_cron_job_run_details default limit reduced** — Reduced default limit from 100 to 50 rows to match AI-optimized payload patterns used by other tools (e.g., `pg_cron_list_jobs`, `pg_table_stats`). Reduces typical response payload size by ~50%. Use `limit: 100` or higher to restore previous behavior, or `limit: 0` for all records
+
+### Documentation
+
+- **Large vector limitations** — Updated `ServerInstructions.ts` Vector Tools section to document that direct MCP tool calls may truncate vectors >256 dimensions due to JSON-RPC message size limits. Recommends Code Mode (`await pg.vector.search({...})`) for vectors ≥256 dimensions (e.g., OpenAI 1536-dim, local 384-dim embeddings)
+
+- **JSONB Split Schema Pattern** — Implemented Split Schema pattern for 6 JSONB tools to support parameter aliases in direct MCP tool calls:
+  - Added `tableName` (alias for `table`), `col` (alias for `column`), and `filter` (alias for `where`) support
+  - Added `preprocessJsonbParams()` function for alias normalization and `schema.table` parsing
+  - Created Base schemas for MCP visibility and full schemas with preprocessing for handler parsing
+  - Updated tools: `pg_jsonb_extract`, `pg_jsonb_set`, `pg_jsonb_insert`, `pg_jsonb_delete`, `pg_jsonb_contains`, `pg_jsonb_path_query`
+- **JSONB path parsing negative index support** — Fixed `stringPathToArray()` to parse negative array indices like `[-1]` in string paths. Previously, the regex `/\[(\d+)\]/g` only matched positive indices, causing paths like `'tags[-1]'` to fail parsing. Now supports both `[0]` and `[-1]` bracket notation
+
+### Changed
+
+- **Modern Tool Registration** — Migrated from deprecated `server.tool()` to `server.registerTool()` API for MCP 2025-11-25 compliance
+  - Updated `DatabaseAdapter.registerTool()` to use modern registration API
+  - Enhanced `createContext()` with optional `server` and `progressToken` parameters
+  - Removed unused `extractZodShape()` helper method
+
+### Added
+
+- **Progress Notification Infrastructure** — Added `src/utils/progress-utils.ts` with MCP 2025-11-25 compliant progress utilities
+  - `buildProgressContext()` — Extracts server/token from RequestContext
+  - `sendProgress()` — Sends progress notifications to client
+  - `createBatchProgressReporter()` — Throttled progress for batch operations
+- **Admin Tool Progress Notifications** — Long-running operations now emit progress:
+  - `pg_vacuum` — VACUUM operations
+  - `pg_vacuum_analyze` — VACUUM ANALYZE operations
+  - `pg_analyze` — ANALYZE operations
+  - `pg_reindex` — REINDEX operations
+  - `pg_cluster` — CLUSTER operations
+- **Backup Tool Progress Notifications** — `pg_copy_export` now emits progress for large exports
+- **Stats tools `params` support** — All 8 stats tools now accept an optional `params` array for parameterized `where` clauses (e.g., `where: "value > $1", params: [100]`). Consistent with core tools like `pg_read_query` and `pg_count`. Affected tools: `pg_stats_descriptive`, `pg_stats_percentiles`, `pg_stats_correlation`, `pg_stats_regression`, `pg_stats_time_series`, `pg_stats_distribution`, `pg_stats_hypothesis`, `pg_stats_sampling`
+- **JSONB Stats Payload Control** — Added `topKeysLimit` parameter to `pg_jsonb_stats` to control number of top keys returned (default: 20)
+- **Structured Content (outputSchema) for Core Tools** — All 20 core tools now include `outputSchema` for MCP 2025-11-25 compliance:
+  - Query tools: `pg_read_query`, `pg_write_query`
+  - Table tools: `pg_list_tables`, `pg_describe_table`, `pg_create_table`, `pg_drop_table`
+  - Index tools: `pg_get_indexes`, `pg_create_index`, `pg_drop_index`
+  - Object tools: `pg_list_objects`, `pg_object_details`, `pg_list_extensions`
+  - Health tools: `pg_analyze_db_health`, `pg_analyze_workload_indexes`, `pg_analyze_query_indexes`
+  - Convenience tools: `pg_upsert`, `pg_batch_insert`, `pg_count`, `pg_exists`, `pg_truncate`
+  - Added 15 reusable output schemas in `core/schemas.ts`
+- **Structured Content (outputSchema) for Transaction Tools** — All 8 transaction/codemode tools now include `outputSchema`:
+  - Transaction tools: `pg_transaction_begin`, `pg_transaction_commit`, `pg_transaction_rollback`, `pg_transaction_savepoint`, `pg_transaction_release`, `pg_transaction_rollback_to`, `pg_transaction_execute`
+  - Codemode tool: `pg_execute_code`
+  - Added 4 reusable transaction output schemas in `core.ts` and 1 codemode output schema
+- **Structured Content (outputSchema) for JSONB Tools** — All 19 JSONB tools now include `outputSchema`:
+  - Basic tools: `pg_jsonb_extract`, `pg_jsonb_set`, `pg_jsonb_insert`, `pg_jsonb_delete`, `pg_jsonb_contains`, `pg_jsonb_path_query`, `pg_jsonb_agg`, `pg_jsonb_object`, `pg_jsonb_array`, `pg_jsonb_keys`, `pg_jsonb_strip_nulls`, `pg_jsonb_typeof`
+  - Advanced tools: `pg_jsonb_validate_path`, `pg_jsonb_merge`, `pg_jsonb_normalize`, `pg_jsonb_diff`, `pg_jsonb_index_suggest`, `pg_jsonb_security_scan`, `pg_jsonb_stats`
+  - Added 19 reusable output schemas in `schemas/jsonb.ts`
+- **Structured Content (outputSchema) for Text Tools** — All 13 text tools now include `outputSchema`:
+  - Search tools: `pg_text_search`, `pg_text_rank`, `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, `pg_like_search`, `pg_text_headline`
+  - Utility tools: `pg_create_fts_index`, `pg_text_normalize`, `pg_text_sentiment`, `pg_text_to_vector`, `pg_text_to_query`, `pg_text_search_config`
+  - Added 7 reusable output schemas in `schemas/text-search.ts` (shared TextRowsOutputSchema for search tools)
+- **Structured Content (outputSchema) for Performance Tools** — All 20 performance tools now include `outputSchema`:
+  - Explain tools: `pg_explain`, `pg_explain_analyze`, `pg_explain_buffers`
+  - Stats tools: `pg_index_stats`, `pg_table_stats`, `pg_stat_statements`, `pg_stat_activity`, `pg_unused_indexes`, `pg_duplicate_indexes`, `pg_vacuum_stats`, `pg_query_plan_stats`
+  - Monitoring tools: `pg_locks`, `pg_bloat_check`, `pg_cache_hit_ratio`
+  - Analysis tools: `pg_seq_scan_tables`, `pg_index_recommendations`, `pg_query_plan_compare`
+  - Optimization tools: `pg_performance_baseline`, `pg_connection_pool_optimize`, `pg_partition_strategy_suggest`
+  - Added 17 reusable output schemas in `schemas/performance.ts`
+- **Structured Content (outputSchema) for Monitoring Tools** — All 11 monitoring tools now include `outputSchema`:
+  - Size tools: `pg_database_size`, `pg_table_sizes`
+  - Connection/replication: `pg_connection_stats`, `pg_replication_status`, `pg_recovery_status`
+  - Server info: `pg_server_version`, `pg_show_settings`, `pg_uptime`
+  - Analysis tools: `pg_capacity_planning`, `pg_resource_usage_analyze`, `pg_alert_threshold_set`
+  - Added 11 reusable output schemas in `schemas/monitoring.ts`
+- **Structured Content (outputSchema) for Backup Tools** — All 9 backup tools now include `outputSchema`:
+  - Dump tools: `pg_dump_table`, `pg_dump_schema`, `pg_copy_export`, `pg_copy_import`
+  - Planning tools: `pg_create_backup_plan`, `pg_restore_command`, `pg_backup_physical`, `pg_restore_validate`, `pg_backup_schedule_optimize`
+  - Added 9 reusable output schemas in `schemas/backup.ts`
+- **Structured Content (outputSchema) for Schema Tools** — All 12 schema tools now include `outputSchema`:
+  - Schema management: `pg_list_schemas`, `pg_create_schema`, `pg_drop_schema`
+  - Sequence tools: `pg_list_sequences`, `pg_create_sequence`, `pg_drop_sequence`
+  - View tools: `pg_list_views`, `pg_create_view`, `pg_drop_view`
+  - Metadata tools: `pg_list_functions`, `pg_list_triggers`, `pg_list_constraints`
+  - Added 12 reusable output schemas in `schemas/schema-mgmt.ts`
+- **Structured Content (outputSchema) for Partitioning Tools** — All 6 partitioning tools now include `outputSchema`:
+  - List/info: `pg_list_partitions`, `pg_partition_info`
+  - Create: `pg_create_partitioned_table`, `pg_create_partition`
+  - Attach/detach: `pg_attach_partition`, `pg_detach_partition`
+  - Added 6 reusable output schemas in `schemas/partitioning.ts`
+- **Structured Content (outputSchema) for Stats Tools** — All 8 stats tools now include `outputSchema`:
+  - Basic: `pg_stats_descriptive`, `pg_stats_percentiles`, `pg_stats_correlation`, `pg_stats_regression`
+  - Advanced: `pg_stats_time_series`, `pg_stats_distribution`, `pg_stats_hypothesis`, `pg_stats_sampling`
+  - Added 8 reusable output schemas in `schemas/stats.ts`
+- **Structured Content (outputSchema) for Vector Tools** — All 14 vector tools now include `outputSchema`:
+  - Extension: `pg_vector_create_extension`
+  - Column: `pg_vector_add_column`
+  - Data: `pg_vector_insert`, `pg_vector_batch_insert`, `pg_vector_validate`
+  - Search: `pg_vector_search`, `pg_hybrid_search`
+  - Index: `pg_vector_create_index`, `pg_vector_index_optimize`
+  - Analysis: `pg_vector_distance`, `pg_vector_normalize`, `pg_vector_aggregate`, `pg_vector_cluster`
+  - Performance: `pg_vector_performance`, `pg_vector_dimension_reduce`, `pg_vector_embed`
+  - Added 14 reusable output schemas in `schemas/vector.ts`
+- **Structured Content (outputSchema) for PostGIS Tools** — All 15 PostGIS tools now include `outputSchema`:
+  - Extension: `pg_postgis_create_extension`
+  - Column: `pg_geometry_column`
+  - Query tools: `pg_point_in_polygon`, `pg_distance`, `pg_buffer`, `pg_intersection`, `pg_bounding_box`
+  - Index: `pg_spatial_index`
+  - Advanced: `pg_geocode`, `pg_geo_transform`, `pg_geo_index_optimize`, `pg_geo_cluster`
+  - Standalone: `pg_geometry_buffer`, `pg_geometry_intersection`, `pg_geometry_transform`
+  - Added 15 reusable output schemas in `schemas/postgis.ts`
+- **Structured Content (outputSchema) for Cron Tools** — All 8 pg_cron tools now include `outputSchema`:
+  - Extension: `pg_cron_create_extension`
+  - Scheduling: `pg_cron_schedule`, `pg_cron_schedule_in_database`
+  - Job management: `pg_cron_unschedule`, `pg_cron_alter_job`, `pg_cron_list_jobs`
+  - Monitoring: `pg_cron_job_run_details`, `pg_cron_cleanup_history`
+  - Added 8 reusable output schemas in `schemas/cron.ts`
+- **Structured Content (outputSchema) for Partman Tools** — All 10 pg_partman tools now include `outputSchema`:
+  - Extension: `pg_partman_create_extension`
+  - Setup: `pg_partman_create_parent`, `pg_partman_show_config`
+  - Maintenance: `pg_partman_run_maintenance`, `pg_partman_show_partitions`
+  - Operations: `pg_partman_check_default`, `pg_partman_partition_data`, `pg_partman_set_retention`
+  - Advanced: `pg_partman_undo_partition`, `pg_partman_analyze_partition_health`
+  - Added 10 reusable output schemas in `schemas/partman.ts`
+- **Structured Content (outputSchema) for Kcache Tools** — All 7 pg_stat_kcache tools now include `outputSchema`:
+  - Extension: `pg_kcache_create_extension`
+  - Query analysis: `pg_kcache_query_stats`, `pg_kcache_top_cpu`, `pg_kcache_top_io`
+  - Database: `pg_kcache_database_stats`, `pg_kcache_resource_analysis`
+  - Management: `pg_kcache_reset`
+  - Added 7 reusable output schemas in `schemas/extensions.ts`
+- **Structured Content (outputSchema) for Citext Tools** — All 6 citext tools now include `outputSchema`:
+  - Extension: `pg_citext_create_extension`
+  - Column: `pg_citext_convert_column`, `pg_citext_list_columns`
+  - Analysis: `pg_citext_analyze_candidates`, `pg_citext_compare`, `pg_citext_schema_advisor`
+  - Added 6 reusable output schemas in `schemas/extensions.ts`
+- **Structured Content (outputSchema) for Ltree Tools** — All 8 ltree tools now include `outputSchema`:
+  - Extension: `pg_ltree_create_extension`
+  - Query: `pg_ltree_query`, `pg_ltree_subpath`, `pg_ltree_lca`, `pg_ltree_match`
+  - Management: `pg_ltree_list_columns`, `pg_ltree_convert_column`, `pg_ltree_create_index`
+  - Added 8 reusable output schemas in `schemas/extensions.ts`
+- **Structured Content (outputSchema) for Pgcrypto Tools** — All 9 pgcrypto tools now include `outputSchema`:
+  - Extension: `pg_pgcrypto_create_extension`
+  - Hashing: `pg_pgcrypto_hash`, `pg_pgcrypto_hmac`, `pg_pgcrypto_crypt`
+  - Encryption: `pg_pgcrypto_encrypt`, `pg_pgcrypto_decrypt`
+  - Random: `pg_pgcrypto_gen_random_uuid`, `pg_pgcrypto_gen_random_bytes`, `pg_pgcrypto_gen_salt`
+  - Added 9 reusable output schemas in `schemas/extensions.ts`
+
+### Security
+
+- **Docker CVE-2026-24842 Remediation** — Upgraded manual `tar` patch in Dockerfile from version 7.5.4 to 7.5.7 to fix Path Traversal vulnerability (CVSS 8.2). Applied to both builder and production stages. Docker Scout scan now reports 0 fixable critical/high CVEs
+- **Enhanced Log Sanitization** — Upgraded logger to match db-mcp security standards
+  - Added `sanitizeStack()` function to replace newlines with safe arrow delimiters (`→`) in stack traces
+  - Added taint-breaking `writeToStderr()` method to satisfy CodeQL static analysis
+  - Expanded sensitive key list with 8 additional OAuth 2.1 fields: `authorizationserverurl`, `authorization_server_url`, `bearerformat`, `bearer_format`, `oauthconfig`, `oauth_config`, `oauth`, `scopes_supported`, `scopessupported`
+  - Stricter control character removal (now removes all 0x00-0x1F + 0x7F including tabs and newlines)
+- **SQL Injection Remediation** — Comprehensive fixes for WHERE clause, FTS config, and table name injection vectors
+  - Created `src/utils/fts-config.ts` — Validates FTS configurations using PostgreSQL identifier pattern (63 chars max, alphanumeric + underscore only)
+  - Created `src/utils/where-clause.ts` — Pattern-based blocklist for dangerous SQL patterns (`;DROP`, `UNION SELECT`, `--`, `/*`, `pg_sleep`, stacked queries)
+  - Updated 8 text tools with sanitization: `pg_text_search`, `pg_text_rank`, `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, `pg_like_search`, `pg_text_headline`, `pg_create_fts_index`
+  - Updated 2 vector tools with WHERE clause sanitization: `pg_vector_search`, `pg_vector_aggregate`
+  - Added 31 comprehensive security injection tests in `security-injection.test.ts`
+  - **Breaking change**: Tools now reject inputs containing SQL injection patterns (previously passed through)
+
+### Fixed
+
+- **pg_create_index `schema.table` format parsing** — Fixed `pg_create_index` not correctly parsing `schema.table` format in the `table` parameter. The tool now correctly auto-parses table names like `"public.users"` into separate schema and table components, matching the behavior of other tools (`pg_count`, `pg_describe_table`, `pg_get_indexes`, `pg_truncate`, `pg_drop_table`). Previously, using `table: "public.users"` caused `relation "public.users" does not exist` errors and required the workaround of using separate `schema` and `table` parameters
+- **pg_analyze_query_indexes output schema error** — Fixed MCP output validation error for direct tool calls
+  - Handler now includes required `sql` field in all response paths (success, error, and no-plan cases)
+  - Updated `QueryIndexAnalysisOutputSchema` to match actual response structure (issues, recommendations as string arrays, timing fields)
+- **pg.listExtensions() top-level alias missing** — Added missing Code Mode top-level alias for consistency
+  - `pg.listExtensions()` now works in Code Mode (was previously only accessible via `pg.core.listExtensions()`)
+  - Updated `ServerInstructions.ts` documentation to include the alias
+- **Transaction savepoint reserved keyword syntax errors** — Fixed savepoint operations failing with SQL syntax errors when using reserved keywords (e.g., `outer`, `inner`, `select`, `table`) as savepoint names
+  - Added new `quoteIdentifier()` utility in `src/utils/identifiers.ts` that safely quotes identifiers without rejecting reserved keywords (unlike `sanitizeIdentifier()` which is stricter for schema/table/column names)
+  - Updated `createSavepoint()`, `releaseSavepoint()`, and `rollbackToSavepoint()` in `PostgresAdapter.ts` to use `quoteIdentifier()` for savepoint names
+  - Expanded `RESERVED_KEYWORDS` set with 8 additional keywords: `cross`, `full`, `inner`, `join`, `left`, `natural`, `right`, `outer`
+  - Example: `pg.transactions.savepoint({ tx: txId, name: 'outer' })` now works correctly instead of producing `syntax error at or near "outer"`
+- **Code Mode orphaned transaction cleanup** — Implemented automatic transaction cleanup when code mode execution fails
+  - Added `getActiveTransactionIds()` and `cleanupTransaction()` methods to `PostgresAdapter` for tracking and rolling back orphaned transactions
+  - Code mode handler now captures active transactions before execution and cleans up any new transactions created if the code fails
+  - Prevents dangling database connections from uncommitted transactions after code errors or timeouts
+
+### Documentation
+
+- **pg_describe_table rowCount -1 clarification** — Documented that `rowCount: -1` in `pg_describe_table` response indicates PostgreSQL has no statistics for the table (run `ANALYZE` to populate)
+- **Code Mode memoryUsedMb metrics clarification** — Documented that `memoryUsedMb` measures heap delta (end - start) and negative values indicate memory was freed during execution (e.g., GC ran)
+- **pg_transaction_rollback_to behavior clarification** — Enhanced documentation to clarify that `rollbackTo` restores the database state to when the savepoint was created, undoing ALL work (data changes AND savepoints) created after the target savepoint—not just savepoints. This is standard PostgreSQL behavior where rolling back to a savepoint reverts both data modifications and nested savepoint definitions
+- **pg_jsonb_strip_nulls WHERE requirement** — Updated `ServerInstructions.ts` to clarify that `pg_jsonb_strip_nulls` requires a `where`/`filter` clause—write operations must be targeted for safety. Added `preview: true` suggestion for pre-modification inspection
+- **pg_jsonb_insert path format clarification** — Updated `ServerInstructions.ts` to recommend using array format `[-1]` instead of string format `"[-1]"` for negative array indices, as the string format can cause PostgreSQL parsing errors in some contexts
+- **soundex/metaphone Code Mode clarification** — Updated `ServerInstructions.ts` to clarify that `soundex` and `metaphone` are Code Mode convenience wrappers (`pg.text.soundex()`, `pg.text.metaphone()`) that call `pg_fuzzy_match` internally, not direct MCP tools. For direct MCP access, use `pg_fuzzy_match` with `method: 'soundex'|'metaphone'`
+
+### Dependencies
+
+- Bump `@types/node` from 25.0.10 to 25.1.0
+- Bump `globals` from 17.1.0 to 17.2.0
+- Bump `typescript-eslint` from 8.53.1 to 8.54.0
+- Bump `hono` from 4.11.5 to 4.11.7
 
 ## [1.0.0] - 2026-01-24
 

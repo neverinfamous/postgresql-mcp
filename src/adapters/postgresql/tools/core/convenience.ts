@@ -17,6 +17,12 @@ import type {
 import { z } from "zod";
 import { readOnly, write } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
+import {
+  WriteQueryOutputSchema,
+  CountOutputSchema,
+  ExistsOutputSchema,
+  TruncateOutputSchema,
+} from "./schemas.js";
 
 // =============================================================================
 // Schemas
@@ -379,6 +385,7 @@ export function createUpsertTool(adapter: PostgresAdapter): ToolDefinition {
       "Insert a row or update if it already exists (INSERT ... ON CONFLICT DO UPDATE). Specify conflict columns for uniqueness check. Use data or values for column-value pairs.",
     group: "core",
     inputSchema: UpsertSchemaBase, // Base schema for MCP visibility
+    outputSchema: WriteQueryOutputSchema,
     annotations: write("Upsert"),
     icons: getToolIcons("core", write("Upsert")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -483,6 +490,7 @@ export function createBatchInsertTool(
       "Insert multiple rows in a single statement. More efficient than individual inserts. Rows array must not be empty.",
     group: "core",
     inputSchema: BatchInsertSchemaBase, // Base schema for MCP visibility
+    outputSchema: WriteQueryOutputSchema,
     annotations: write("Batch Insert"),
     icons: getToolIcons("core", write("Batch Insert")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -592,6 +600,7 @@ export function createCountTool(adapter: PostgresAdapter): ToolDefinition {
       "Count rows in a table, optionally with a WHERE clause or specific column.",
     group: "core",
     inputSchema: CountSchemaBase, // Base schema for MCP visibility
+    outputSchema: CountOutputSchema,
     annotations: readOnly("Count"),
     icons: getToolIcons("core", readOnly("Count")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -626,6 +635,7 @@ export function createExistsTool(adapter: PostgresAdapter): ToolDefinition {
       "Check if rows exist in a table. WHERE clause is optional: with WHERE = checks matching rows; without WHERE = checks if table has any rows at all. For table *schema* existence, use pg_list_tables.",
     group: "core",
     inputSchema: ExistsSchemaBase, // Base schema for MCP visibility
+    outputSchema: ExistsOutputSchema,
     annotations: readOnly("Exists"),
     icons: getToolIcons("core", readOnly("Exists")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -666,6 +676,7 @@ export function createTruncateTool(adapter: PostgresAdapter): ToolDefinition {
       "Truncate a table, removing all rows quickly. Use cascade to truncate dependent tables.",
     group: "core",
     inputSchema: TruncateSchemaBase, // Base schema for MCP visibility
+    outputSchema: TruncateOutputSchema,
     annotations: write("Truncate"),
     icons: getToolIcons("core", write("Truncate")),
     handler: async (params: unknown, _context: RequestContext) => {

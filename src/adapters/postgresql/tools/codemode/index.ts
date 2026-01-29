@@ -35,6 +35,27 @@ export const ExecuteCodeSchema = z.object({
     .describe("If true, restricts to read-only operations"),
 });
 
+// Schema for pg_execute_code output
+export const ExecuteCodeOutputSchema = z.object({
+  success: z.boolean().describe("Whether the code executed successfully"),
+  result: z
+    .unknown()
+    .optional()
+    .describe("Return value from the executed code"),
+  error: z.string().optional().describe("Error message if execution failed"),
+  metrics: z
+    .object({
+      wallTimeMs: z
+        .number()
+        .describe("Wall clock execution time in milliseconds"),
+      cpuTimeMs: z.number().describe("CPU time used in milliseconds"),
+      memoryUsedMb: z.number().describe("Memory used in megabytes"),
+    })
+    .optional()
+    .describe("Execution performance metrics"),
+  hint: z.string().optional().describe("Helpful tip or additional information"),
+});
+
 // Singleton instances (initialized on first use)
 let sandboxPool: ISandboxPool | null = null;
 let securityManager: CodeModeSecurityManager | null = null;
@@ -105,6 +126,7 @@ return results;
     group: "codemode",
     tags: ["code", "execute", "sandbox", "script", "batch"],
     inputSchema: ExecuteCodeSchema,
+    outputSchema: ExecuteCodeOutputSchema,
     requiredScopes: ["admin"],
     annotations: {
       title: "Execute Code",
@@ -163,8 +185,25 @@ return results;
         };
       }
 
+      // Capture active transactions before execution for cleanup on error
+      const transactionsBefore = new Set(adapter.getActiveTransactionIds());
+
       // Execute in sandbox
       const result = await pool.execute(code, bindings);
+
+      // Cleanup orphaned transactions on failure
+      // Any transaction started during execution but not committed/rolled back is orphaned
+      if (!result.success) {
+        const transactionsAfter = adapter.getActiveTransactionIds();
+        const orphanedTransactions = transactionsAfter.filter(
+          (txId) => !transactionsBefore.has(txId),
+        );
+
+        // Best-effort cleanup of orphaned transactions
+        for (const txId of orphanedTransactions) {
+          await adapter.cleanupTransaction(txId);
+        }
+      }
 
       // Sanitize result
       if (result.success && result.result !== undefined) {

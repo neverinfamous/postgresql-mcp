@@ -466,7 +466,13 @@ describe("JSONB Validation and Error Paths", () => {
 
       await expect(
         tool.handler(
-          { table: "users", column: "metadata", path: "name", value: "test", where: "" },
+          {
+            table: "users",
+            column: "metadata",
+            path: "name",
+            value: "test",
+            where: "",
+          },
           mockContext,
         ),
       ).rejects.toThrow(/WHERE clause/);
@@ -488,7 +494,13 @@ describe("JSONB Validation and Error Paths", () => {
 
       const tool = tools.find((t) => t.name === "pg_jsonb_set")!;
       const result = (await tool.handler(
-        { table: "users", column: "metadata", path: [], value: { new: "data" }, where: "id = 1" },
+        {
+          table: "users",
+          column: "metadata",
+          path: [],
+          value: { new: "data" },
+          where: "id = 1",
+        },
         mockContext,
       )) as { rowsAffected: number; hint: string };
 
@@ -580,7 +592,13 @@ describe("JSONB Validation and Error Paths", () => {
 
       await expect(
         tool.handler(
-          { table: "users", column: "tags", path: ["tags", 0], value: "new", where: "" },
+          {
+            table: "users",
+            column: "tags",
+            path: ["tags", 0],
+            value: "new",
+            where: "",
+          },
           mockContext,
         ),
       ).rejects.toThrow(/WHERE clause/);
@@ -595,7 +613,13 @@ describe("JSONB Validation and Error Paths", () => {
 
       await expect(
         tool.handler(
-          { table: "users", column: "tags", path: [0], value: "new", where: "id = 1" },
+          {
+            table: "users",
+            column: "tags",
+            path: [0],
+            value: "new",
+            where: "id = 1",
+          },
           mockContext,
         ),
       ).rejects.toThrow(/NULL columns/);
@@ -639,10 +663,7 @@ describe("JSONB Validation and Error Paths", () => {
       const tool = tools.find((t) => t.name === "pg_jsonb_keys")!;
 
       await expect(
-        tool.handler(
-          { table: "users", column: "tags" },
-          mockContext,
-        ),
+        tool.handler({ table: "users", column: "tags" }, mockContext),
       ).rejects.toThrow(/array columns/);
     });
   });

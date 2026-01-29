@@ -10,6 +10,11 @@ import type {
 import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
+import {
+  PerformanceBaselineOutputSchema,
+  ConnectionPoolOptimizeOutputSchema,
+  PartitionStrategySuggestOutputSchema,
+} from "../../schemas/index.js";
 
 // Helper to handle undefined params (allows tools to be called without {})
 const defaultToEmpty = (val: unknown): unknown => val ?? {};
@@ -47,6 +52,7 @@ export function createPerformanceBaselineTool(
       "Capture current database performance metrics as a baseline for comparison.",
     group: "performance",
     inputSchema: PerformanceBaselineSchema,
+    outputSchema: PerformanceBaselineOutputSchema,
     annotations: readOnly("Performance Baseline"),
     icons: getToolIcons("performance", readOnly("Performance Baseline")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -129,6 +135,7 @@ export function createConnectionPoolOptimizeTool(
       "Analyze connection usage and provide pool optimization recommendations.",
     group: "performance",
     inputSchema: z.object({}),
+    outputSchema: ConnectionPoolOptimizeOutputSchema,
     annotations: readOnly("Connection Pool Optimize"),
     icons: getToolIcons("performance", readOnly("Connection Pool Optimize")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -257,6 +264,7 @@ export function createPartitionStrategySuggestTool(
     description: "Analyze a table and suggest optimal partitioning strategy.",
     group: "performance",
     inputSchema: PartitionStrategySchemaBase, // Base schema for MCP visibility
+    outputSchema: PartitionStrategySuggestOutputSchema,
     annotations: readOnly("Partition Strategy Suggest"),
     icons: getToolIcons("performance", readOnly("Partition Strategy Suggest")),
     handler: async (params: unknown, _context: RequestContext) => {

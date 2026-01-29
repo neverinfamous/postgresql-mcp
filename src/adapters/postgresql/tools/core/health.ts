@@ -16,6 +16,9 @@ import {
   AnalyzeWorkloadIndexesSchema,
   AnalyzeQueryIndexesSchema,
   AnalyzeQueryIndexesSchemaBase,
+  HealthAnalysisOutputSchema,
+  IndexRecommendationsOutputSchema,
+  QueryIndexAnalysisOutputSchema,
 } from "./schemas.js";
 
 /**
@@ -30,6 +33,7 @@ export function createAnalyzeDbHealthTool(
       "Comprehensive database health analysis including cache hit ratio, bloat, replication, and connection stats.",
     group: "core",
     inputSchema: AnalyzeDbHealthSchema,
+    outputSchema: HealthAnalysisOutputSchema,
     annotations: readOnly("Analyze Database Health"),
     icons: getToolIcons("core", readOnly("Analyze Database Health")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -235,6 +239,7 @@ export function createAnalyzeWorkloadIndexesTool(
       "Analyze database workload using pg_stat_statements to recommend missing indexes.",
     group: "core",
     inputSchema: AnalyzeWorkloadIndexesSchema,
+    outputSchema: IndexRecommendationsOutputSchema,
     annotations: readOnly("Analyze Workload Indexes"),
     icons: getToolIcons("core", readOnly("Analyze Workload Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -352,6 +357,7 @@ export function createAnalyzeQueryIndexesTool(
       "Analyze a specific query for index recommendations using EXPLAIN ANALYZE.",
     group: "core",
     inputSchema: AnalyzeQueryIndexesSchemaBase,
+    outputSchema: QueryIndexAnalysisOutputSchema,
     annotations: readOnly("Analyze Query Indexes"),
     icons: getToolIcons("core", readOnly("Analyze Query Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -374,6 +380,7 @@ export function createAnalyzeQueryIndexesTool(
 
       if (isWriteQuery) {
         return {
+          sql,
           error:
             "Write queries not allowed - EXPLAIN ANALYZE executes the query",
           hint: "Use pg_explain for write queries (no ANALYZE option) or wrap in a transaction and rollback",
@@ -385,7 +392,7 @@ export function createAnalyzeQueryIndexesTool(
       const result = await adapter.executeQuery(explainSql, queryParams);
 
       if (!result.rows || result.rows.length === 0) {
-        return { error: "No query plan returned" };
+        return { sql, error: "No query plan returned" };
       }
 
       const plan = (result.rows[0] as { "QUERY PLAN": unknown[] })[
@@ -482,6 +489,7 @@ export function createAnalyzeQueryIndexesTool(
 
       // Return based on verbosity
       const baseResult = {
+        sql,
         executionTime: plan["Execution Time"] as number,
         planningTime: plan["Planning Time"] as number,
         issues,

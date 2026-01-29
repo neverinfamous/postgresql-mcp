@@ -10,6 +10,11 @@ import type {
 import { z } from "zod";
 import { readOnly } from "../../../../utils/annotations.js";
 import { getToolIcons } from "../../../../utils/icons.js";
+import {
+  LocksOutputSchema,
+  BloatCheckOutputSchema,
+  CacheHitRatioOutputSchema,
+} from "../../schemas/index.js";
 
 // Helper to coerce string numbers to JavaScript numbers (PostgreSQL returns BIGINT as strings)
 const toNum = (val: unknown): number | null =>
@@ -23,6 +28,7 @@ export function createLocksTool(adapter: PostgresAdapter): ToolDefinition {
     inputSchema: z.object({
       showBlocked: z.boolean().optional(),
     }),
+    outputSchema: LocksOutputSchema,
     annotations: readOnly("Lock Information"),
     icons: getToolIcons("performance", readOnly("Lock Information")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -72,6 +78,7 @@ export function createBloatCheckTool(adapter: PostgresAdapter): ToolDefinition {
       "Check for table and index bloat. Returns tables with dead tuples.",
     group: "performance",
     inputSchema: BloatCheckSchema,
+    outputSchema: BloatCheckOutputSchema,
     annotations: readOnly("Bloat Check"),
     icons: getToolIcons("performance", readOnly("Bloat Check")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -119,6 +126,7 @@ export function createCacheHitRatioTool(
     description: "Get buffer cache hit ratio statistics.",
     group: "performance",
     inputSchema: z.object({}),
+    outputSchema: CacheHitRatioOutputSchema,
     annotations: readOnly("Cache Hit Ratio"),
     icons: getToolIcons("performance", readOnly("Cache Hit Ratio")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -132,14 +140,12 @@ export function createCacheHitRatioTool(
 
       const result = await adapter.executeQuery(sql);
       const row = result.rows?.[0];
-      // Coerce numeric fields to JavaScript numbers
-      return row
-        ? {
-            heap_read: toNum(row["heap_read"]),
-            heap_hit: toNum(row["heap_hit"]),
-            cache_hit_ratio: toNum(row["cache_hit_ratio"]),
-          }
-        : null;
+      // Always return an object with nullable fields (never return null)
+      return {
+        heap_read: row ? toNum(row["heap_read"]) : null,
+        heap_hit: row ? toNum(row["heap_hit"]) : null,
+        cache_hit_ratio: row ? toNum(row["cache_hit_ratio"]) : null,
+      };
     },
   };
 }

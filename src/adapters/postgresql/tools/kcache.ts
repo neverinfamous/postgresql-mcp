@@ -21,6 +21,14 @@ import {
   KcacheQueryStatsSchema,
   KcacheDatabaseStatsSchema,
   KcacheResourceAnalysisSchema,
+  // Output schemas
+  KcacheCreateExtensionOutputSchema,
+  KcacheQueryStatsOutputSchema,
+  KcacheTopCpuOutputSchema,
+  KcacheTopIoOutputSchema,
+  KcacheDatabaseStatsOutputSchema,
+  KcacheResourceAnalysisOutputSchema,
+  KcacheResetOutputSchema,
 } from "../schemas/index.js";
 
 // Helper to handle undefined params (allows tools to be called without {})
@@ -98,6 +106,7 @@ function createKcacheExtensionTool(adapter: PostgresAdapter): ToolDefinition {
 Requires pg_stat_statements to be installed first. Both extensions must be in shared_preload_libraries.`,
     group: "kcache",
     inputSchema: z.object({}),
+    outputSchema: KcacheCreateExtensionOutputSchema,
     annotations: write("Create Kcache Extension"),
     icons: getToolIcons("kcache", write("Create Kcache Extension")),
     handler: async (_params: unknown, _context: RequestContext) => {
@@ -141,6 +150,7 @@ Joins pg_stat_statements with pg_stat_kcache to show what SQL did AND what syste
 orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minCalls parameter to filter by call count.`,
     group: "kcache",
     inputSchema: KcacheQueryStatsSchema,
+    outputSchema: KcacheQueryStatsOutputSchema,
     annotations: readOnly("Kcache Query Stats"),
     icons: getToolIcons("kcache", readOnly("Kcache Query Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -251,6 +261,7 @@ in user CPU (application code) vs system CPU (kernel operations).`,
           .describe("Number of top queries to return (default: 10)"),
       }),
     ),
+    outputSchema: KcacheTopCpuOutputSchema,
     annotations: readOnly("Kcache Top CPU"),
     icons: getToolIcons("kcache", readOnly("Kcache Top CPU")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -354,6 +365,7 @@ which represent actual disk access (not just shared buffer hits).`,
           .describe("Number of top queries to return (default: 10)"),
       }),
     ),
+    outputSchema: KcacheTopIoOutputSchema,
     annotations: readOnly("Kcache Top IO"),
     icons: getToolIcons("kcache", readOnly("Kcache Top IO")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -448,6 +460,7 @@ function createKcacheDatabaseStatsTool(
 Shows total CPU time, I/O, and page faults across all queries.`,
     group: "kcache",
     inputSchema: KcacheDatabaseStatsSchema,
+    outputSchema: KcacheDatabaseStatsOutputSchema,
     annotations: readOnly("Kcache Database Stats"),
     icons: getToolIcons("kcache", readOnly("Kcache Database Stats")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -519,6 +532,7 @@ function createKcacheResourceAnalysisTool(
 Helps identify the root cause of performance issues - is the query computation-heavy or disk-heavy?`,
     group: "kcache",
     inputSchema: KcacheResourceAnalysisSchema,
+    outputSchema: KcacheResourceAnalysisOutputSchema,
     annotations: readOnly("Kcache Resource Analysis"),
     icons: getToolIcons("kcache", readOnly("Kcache Resource Analysis")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -668,6 +682,7 @@ function createKcacheResetTool(adapter: PostgresAdapter): ToolDefinition {
 Note: This also resets pg_stat_statements statistics.`,
     group: "kcache",
     inputSchema: z.object({}),
+    outputSchema: KcacheResetOutputSchema,
     annotations: destructive("Reset Kcache Stats"),
     icons: getToolIcons("kcache", destructive("Reset Kcache Stats")),
     handler: async (_params: unknown, _context: RequestContext) => {

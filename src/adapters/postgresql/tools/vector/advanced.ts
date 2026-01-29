@@ -15,6 +15,14 @@ import {
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
 import { truncateVector } from "./basic.js";
+import {
+  VectorClusterOutputSchema,
+  VectorIndexOptimizeOutputSchema,
+  HybridSearchOutputSchema,
+  VectorPerformanceOutputSchema,
+  VectorDimensionReduceOutputSchema,
+  VectorEmbedOutputSchema,
+} from "../../schemas/index.js";
 
 /**
  * Parse a PostgreSQL vector string to a number array.
@@ -65,6 +73,7 @@ export function createVectorClusterTool(
       "Perform K-means clustering on vectors. Returns cluster centroids only (not row assignments). To assign rows to clusters, compare row vectors to centroids using pg_vector_distance.",
     group: "vector",
     inputSchema: ClusterSchemaBase,
+    outputSchema: VectorClusterOutputSchema,
     annotations: readOnly("Vector Cluster"),
     icons: getToolIcons("vector", readOnly("Vector Cluster")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -196,6 +205,7 @@ export function createVectorIndexOptimizeTool(
       "Analyze vector column and recommend optimal index parameters for IVFFlat/HNSW.",
     group: "vector",
     inputSchema: IndexOptimizeSchemaBase,
+    outputSchema: VectorIndexOptimizeOutputSchema,
     annotations: readOnly("Vector Index Optimize"),
     icons: getToolIcons("vector", readOnly("Vector Index Optimize")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -216,8 +226,9 @@ export function createVectorIndexOptimizeTool(
         parsed.table,
         schemaName,
       ]);
+      // PostgreSQL returns bigint as string, cast as needed
       const stats = (statsResult.rows?.[0] ?? {}) as {
-        estimated_rows: number;
+        estimated_rows: string | number;
         table_size: string;
       };
 
@@ -269,7 +280,8 @@ export function createVectorIndexOptimizeTool(
         schemaName,
       ]);
 
-      const rows = stats.estimated_rows ?? 0;
+      // Convert PostgreSQL bigint string to number for output schema compliance
+      const rows = Number(stats.estimated_rows ?? 0);
       const recommendations = [];
 
       if (rows < 10000) {
@@ -350,6 +362,7 @@ export function createHybridSearchTool(
       "Combined vector similarity and full-text search with weighted scoring.",
     group: "vector",
     inputSchema: HybridSearchSchemaBase,
+    outputSchema: HybridSearchOutputSchema,
     annotations: readOnly("Hybrid Search"),
     icons: getToolIcons("vector", readOnly("Hybrid Search")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -600,6 +613,7 @@ export function createVectorPerformanceTool(
       "Analyze vector search performance and index effectiveness. Provide testVector for benchmarking (recommended).",
     group: "vector",
     inputSchema: PerformanceSchemaBase,
+    outputSchema: VectorPerformanceOutputSchema,
     annotations: readOnly("Vector Performance"),
     icons: getToolIcons("vector", readOnly("Vector Performance")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -673,8 +687,9 @@ export function createVectorPerformanceTool(
         parsed.table,
         schemaName,
       ]);
+      // PostgreSQL returns bigint as string, cast as needed
       const stats = (statsResult.rows?.[0] ?? {}) as {
-        estimated_rows?: number;
+        estimated_rows?: string | number;
         table_size?: string;
       };
 
@@ -733,14 +748,25 @@ export function createVectorPerformanceTool(
         benchmark = truncatedRows;
       }
 
+      // Convert PostgreSQL bigint strings to numbers for output schema compliance
+      const estimatedRows = Number(stats.estimated_rows ?? 0);
+      // Map indexes to convert bigint stats to numbers (idx_scan, idx_tup_read)
+      const indexes = (indexResult.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          idx_scan: row["idx_scan"] != null ? Number(row["idx_scan"]) : null,
+          idx_tup_read:
+            row["idx_tup_read"] != null ? Number(row["idx_tup_read"]) : null,
+        }),
+      );
+
       const response: Record<string, unknown> = {
         table: parsed.table,
         column: parsed.column,
         tableSize: stats.table_size,
         // PostgreSQL returns -1 for tables that haven't been analyzed; normalize to 0
-        estimatedRows:
-          (stats.estimated_rows ?? 0) < 0 ? 0 : (stats.estimated_rows ?? 0),
-        indexes: indexResult.rows,
+        estimatedRows: estimatedRows < 0 ? 0 : estimatedRows,
+        indexes,
         benchmark,
         recommendations:
           (indexResult.rows?.length ?? 0) === 0
@@ -850,6 +876,7 @@ export function createVectorDimensionReduceTool(
     group: "vector",
     // Use base schema for MCP so properties are properly exposed in tool schema
     inputSchema: VectorDimensionReduceSchemaBase,
+    outputSchema: VectorDimensionReduceOutputSchema,
     annotations: readOnly("Vector Dimension Reduce"),
     icons: getToolIcons("vector", readOnly("Vector Dimension Reduce")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -1003,6 +1030,7 @@ export function createVectorEmbedTool(): ToolDefinition {
       "Generate text embeddings. Returns a simple hash-based embedding for demos (use external APIs for production).",
     group: "vector",
     inputSchema: EmbedSchema,
+    outputSchema: VectorEmbedOutputSchema,
     annotations: readOnly("Vector Embed"),
     icons: getToolIcons("vector", readOnly("Vector Embed")),
     // eslint-disable-next-line @typescript-eslint/require-await
@@ -1034,10 +1062,16 @@ export function createVectorEmbedTool(): ToolDefinition {
       const magnitude = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
       const normalized = vector.map((x) => x / magnitude);
 
-      // Summarize embedding if requested (default) to reduce LLM context size
+      // Always return object format for output schema compliance
+      // When summarized: use truncateVector helper
+      // When not summarized: wrap full vector in object format with truncated: false
       const embeddingOutput = shouldSummarize
         ? truncateVector(normalized)
-        : normalized;
+        : {
+            preview: normalized,
+            dimensions: dims,
+            truncated: false,
+          };
 
       return {
         embedding: embeddingOutput,

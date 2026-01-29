@@ -17,6 +17,12 @@ import {
   PartmanPartitionDataSchema,
   PartmanRetentionSchema,
   PartmanUndoPartitionSchema,
+  // Output schemas
+  PartmanCheckDefaultOutputSchema,
+  PartmanPartitionDataOutputSchema,
+  PartmanSetRetentionOutputSchema,
+  PartmanUndoPartitionOutputSchema,
+  PartmanAnalyzeHealthOutputSchema,
 } from "../../schemas/index.js";
 
 /**
@@ -45,6 +51,7 @@ export function createPartmanCheckDefaultTool(
 Data in default indicates partitions may be missing for certain time/value ranges.`,
     group: "partman",
     inputSchema: PartmanCheckDefaultSchema,
+    outputSchema: PartmanCheckDefaultOutputSchema,
     annotations: readOnly("Check Partman Default"),
     icons: getToolIcons("partman", readOnly("Check Partman Default")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -201,6 +208,7 @@ export function createPartmanPartitionDataTool(
 Creates new partitions if needed for the data being moved.`,
     group: "partman",
     inputSchema: PartmanPartitionDataSchema,
+    outputSchema: PartmanPartitionDataOutputSchema,
     annotations: write("Partition Data"),
     icons: getToolIcons("partman", write("Partition Data")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -306,6 +314,7 @@ export function createPartmanSetRetentionTool(
 Partitions older than the retention period will be dropped or detached during maintenance.`,
     group: "partman",
     inputSchema: PartmanRetentionSchema,
+    outputSchema: PartmanSetRetentionOutputSchema,
     annotations: write("Set Partition Retention"),
     icons: getToolIcons("partman", write("Set Partition Retention")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -442,6 +451,7 @@ You must first create an empty table with the same structure as the parent, then
 Example: undoPartition({ parentTable: "public.events", targetTable: "public.events_consolidated" })`,
     group: "partman",
     inputSchema: PartmanUndoPartitionSchema,
+    outputSchema: PartmanUndoPartitionOutputSchema,
     annotations: destructive("Undo Partitioning"),
     icons: getToolIcons("partman", destructive("Undo Partitioning")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -578,6 +588,7 @@ stale maintenance, and retention configuration.`,
         }),
       )
       .default({}),
+    outputSchema: PartmanAnalyzeHealthOutputSchema,
     annotations: readOnly("Analyze Partition Health"),
     icons: getToolIcons("partman", readOnly("Analyze Partition Health")),
     handler: async (params: unknown, _context: RequestContext) => {

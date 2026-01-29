@@ -693,3 +693,492 @@ export const PgcryptoCryptSchema = z.object({
     .string()
     .describe("Salt from gen_salt() or stored hash for verification"),
 });
+
+// ============================================================================
+// OUTPUT SCHEMAS - pg_stat_kcache tools
+// ============================================================================
+
+/**
+ * Output schema for pg_kcache_create_extension
+ */
+export const KcacheCreateExtensionOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether extension was enabled"),
+    message: z.string().optional().describe("Status message"),
+    note: z.string().optional().describe("Additional note"),
+    error: z.string().optional().describe("Error message"),
+    hint: z.string().optional().describe("Helpful hint"),
+  })
+  .describe("pg_stat_kcache extension creation result");
+
+/**
+ * Output schema for pg_kcache_query_stats
+ */
+export const KcacheQueryStatsOutputSchema = z
+  .object({
+    queries: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Query statistics with CPU/IO metrics"),
+    count: z.number().describe("Number of queries returned"),
+    orderBy: z.string().describe("Order by metric"),
+    truncated: z.boolean().describe("Results were truncated"),
+    totalCount: z.number().describe("Total available count"),
+  })
+  .describe("Query statistics with OS-level metrics");
+
+/**
+ * Output schema for pg_kcache_top_cpu
+ */
+export const KcacheTopCpuOutputSchema = z
+  .object({
+    topCpuQueries: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Top CPU-consuming queries"),
+    count: z.number().describe("Number of queries returned"),
+    description: z.string().describe("Result description"),
+    truncated: z.boolean().describe("Results were truncated"),
+    totalCount: z.number().describe("Total available count"),
+  })
+  .describe("Top CPU-consuming queries result");
+
+/**
+ * Output schema for pg_kcache_top_io
+ */
+export const KcacheTopIoOutputSchema = z
+  .object({
+    topIoQueries: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Top I/O-consuming queries"),
+    count: z.number().describe("Number of queries returned"),
+    ioType: z.enum(["reads", "writes", "both"]).describe("I/O type ranked by"),
+    description: z.string().describe("Result description"),
+    truncated: z.boolean().describe("Results were truncated"),
+    totalCount: z.number().describe("Total available count"),
+  })
+  .describe("Top I/O-consuming queries result");
+
+/**
+ * Output schema for pg_kcache_database_stats
+ */
+export const KcacheDatabaseStatsOutputSchema = z
+  .object({
+    databaseStats: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Database-level statistics"),
+    count: z.number().describe("Number of databases"),
+  })
+  .describe("Database-level aggregated statistics");
+
+/**
+ * Output schema for pg_kcache_resource_analysis
+ */
+export const KcacheResourceAnalysisOutputSchema = z
+  .object({
+    queries: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Analyzed queries with resource classification"),
+    count: z.number().describe("Number of queries analyzed"),
+    summary: z
+      .object({
+        cpuBound: z.number().describe("CPU-bound query count"),
+        ioBound: z.number().describe("I/O-bound query count"),
+        balanced: z.number().describe("Balanced query count"),
+        threshold: z.number().describe("Classification threshold"),
+      })
+      .describe("Resource classification summary"),
+    recommendations: z.array(z.string()).describe("Recommendations"),
+    truncated: z.boolean().describe("Results were truncated"),
+    totalCount: z.number().describe("Total available count"),
+  })
+  .describe("Resource classification analysis result");
+
+/**
+ * Output schema for pg_kcache_reset
+ */
+export const KcacheResetOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether reset succeeded"),
+    message: z.string().describe("Status message"),
+    note: z.string().describe("Additional note"),
+  })
+  .describe("pg_stat_kcache reset result");
+
+// ============================================================================
+// OUTPUT SCHEMAS - citext tools
+// ============================================================================
+
+/**
+ * Output schema for pg_citext_create_extension
+ */
+export const CitextCreateExtensionOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether extension was enabled"),
+    message: z.string().describe("Status message"),
+    usage: z.string().describe("Usage information"),
+  })
+  .describe("citext extension creation result");
+
+/**
+ * Output schema for pg_citext_convert_column
+ */
+export const CitextConvertColumnOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether conversion succeeded"),
+    message: z.string().optional().describe("Status message"),
+    table: z.string().optional().describe("Qualified table name"),
+    previousType: z.string().optional().describe("Previous column type"),
+    wasAlreadyCitext: z
+      .boolean()
+      .optional()
+      .describe("Column was already citext"),
+    error: z.string().optional().describe("Error message"),
+    currentType: z.string().optional().describe("Current column type"),
+    allowedTypes: z
+      .array(z.string())
+      .optional()
+      .describe("Allowed source types"),
+    suggestion: z.string().optional().describe("Suggestion for resolution"),
+    dependentViews: z
+      .array(z.string())
+      .optional()
+      .describe("Views that depend on this column"),
+    hint: z.string().optional().describe("Helpful hint"),
+    affectedViews: z
+      .array(z.string())
+      .optional()
+      .describe("Views affected by conversion"),
+  })
+  .describe("Column conversion result");
+
+/**
+ * Output schema for pg_citext_list_columns
+ */
+export const CitextListColumnsOutputSchema = z
+  .object({
+    columns: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("citext columns"),
+    count: z.number().describe("Number of columns returned"),
+    totalCount: z.number().describe("Total available count"),
+    truncated: z.boolean().describe("Results were truncated"),
+    limit: z.number().optional().describe("Limit applied"),
+    schema: z.string().optional().describe("Schema filter applied"),
+  })
+  .describe("List of citext columns");
+
+/**
+ * Output schema for pg_citext_analyze_candidates
+ */
+export const CitextAnalyzeCandidatesOutputSchema = z
+  .object({
+    candidates: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Candidate columns"),
+    count: z.number().describe("Number of candidates returned"),
+    totalCount: z.number().describe("Total available count"),
+    truncated: z.boolean().describe("Results were truncated"),
+    limit: z.number().optional().describe("Limit applied"),
+    table: z.string().optional().describe("Table filter applied"),
+    schema: z.string().optional().describe("Schema filter applied"),
+    summary: z
+      .object({
+        highConfidence: z.number().describe("High confidence count"),
+        mediumConfidence: z.number().describe("Medium confidence count"),
+      })
+      .describe("Confidence summary"),
+    recommendation: z.string().describe("Recommendation"),
+    excludedSchemas: z
+      .array(z.string())
+      .optional()
+      .describe("Excluded schemas"),
+    patternsUsed: z.array(z.string()).describe("Search patterns used"),
+  })
+  .describe("Candidate analysis result");
+
+/**
+ * Output schema for pg_citext_compare
+ */
+export const CitextCompareOutputSchema = z
+  .object({
+    value1: z.string().describe("First value"),
+    value2: z.string().describe("Second value"),
+    citextEqual: z.boolean().optional().describe("citext equality result"),
+    textEqual: z.boolean().describe("Text equality result"),
+    lowerEqual: z.boolean().describe("Lowercase equality result"),
+    extensionInstalled: z.boolean().describe("Whether citext is installed"),
+    hint: z.string().optional().describe("Helpful hint"),
+  })
+  .describe("Comparison result");
+
+/**
+ * Output schema for pg_citext_schema_advisor
+ */
+export const CitextSchemaAdvisorOutputSchema = z
+  .object({
+    table: z.string().describe("Analyzed table"),
+    recommendations: z
+      .array(
+        z.object({
+          column: z.string().describe("Column name"),
+          currentType: z.string().describe("Current data type"),
+          previousType: z.string().optional().describe("Previous type"),
+          recommendation: z
+            .enum(["convert", "keep", "already_citext"])
+            .describe("Recommendation"),
+          confidence: z.enum(["high", "medium", "low"]).describe("Confidence"),
+          reason: z.string().describe("Reason for recommendation"),
+        }),
+      )
+      .describe("Column recommendations"),
+    summary: z
+      .object({
+        totalTextColumns: z.number().describe("Total text columns"),
+        recommendConvert: z.number().describe("Columns to convert"),
+        highConfidence: z.number().describe("High confidence count"),
+        alreadyCitext: z.number().describe("Already citext count"),
+      })
+      .describe("Summary statistics"),
+    nextSteps: z.array(z.string()).describe("Suggested next steps"),
+  })
+  .describe("Schema advisor result");
+
+// ============================================================================
+// OUTPUT SCHEMAS - ltree tools
+// ============================================================================
+
+/**
+ * Output schema for pg_ltree_create_extension
+ */
+export const LtreeCreateExtensionOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether extension was enabled"),
+    message: z.string().describe("Status message"),
+  })
+  .describe("ltree extension creation result");
+
+/**
+ * Output schema for pg_ltree_query
+ */
+export const LtreeQueryOutputSchema = z
+  .object({
+    path: z.string().optional().describe("Query path"),
+    mode: z.string().optional().describe("Query mode"),
+    isPattern: z.boolean().optional().describe("Whether query uses patterns"),
+    results: z
+      .array(z.record(z.string(), z.unknown()))
+      .optional()
+      .describe("Query results"),
+    count: z.number().optional().describe("Number of results"),
+    truncated: z.boolean().optional().describe("Results were truncated"),
+    totalCount: z.number().optional().describe("Total available count"),
+    success: z.boolean().optional().describe("Whether query succeeded"),
+    error: z.string().optional().describe("Error message"),
+  })
+  .describe("Ltree query result");
+
+/**
+ * Output schema for pg_ltree_subpath
+ */
+export const LtreeSubpathOutputSchema = z
+  .object({
+    originalPath: z.string().describe("Original path"),
+    offset: z.number().optional().describe("Offset used"),
+    length: z
+      .union([z.number(), z.string()])
+      .optional()
+      .describe("Length used"),
+    subpath: z.string().optional().describe("Extracted subpath"),
+    originalDepth: z.number().optional().describe("Original path depth"),
+    pathDepth: z.number().optional().describe("Path depth for error"),
+    success: z.boolean().optional().describe("Whether extraction succeeded"),
+    error: z.string().optional().describe("Error message"),
+  })
+  .describe("Subpath extraction result");
+
+/**
+ * Output schema for pg_ltree_lca
+ */
+export const LtreeLcaOutputSchema = z
+  .object({
+    paths: z.array(z.string()).describe("Input paths"),
+    longestCommonAncestor: z.string().describe("LCA path"),
+    hasCommonAncestor: z.boolean().describe("Whether LCA exists"),
+  })
+  .describe("Longest common ancestor result");
+
+/**
+ * Output schema for pg_ltree_match
+ */
+export const LtreeMatchOutputSchema = z
+  .object({
+    pattern: z.string().describe("Query pattern"),
+    results: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Matching results"),
+    count: z.number().describe("Number of results"),
+    truncated: z.boolean().optional().describe("Results were truncated"),
+    totalCount: z.number().optional().describe("Total available count"),
+  })
+  .describe("Pattern match result");
+
+/**
+ * Output schema for pg_ltree_list_columns
+ */
+export const LtreeListColumnsOutputSchema = z
+  .object({
+    columns: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("ltree columns"),
+    count: z.number().describe("Number of columns"),
+  })
+  .describe("List of ltree columns");
+
+/**
+ * Output schema for pg_ltree_convert_column
+ */
+export const LtreeConvertColumnOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether conversion succeeded"),
+    message: z.string().optional().describe("Status message"),
+    table: z.string().optional().describe("Qualified table name"),
+    previousType: z.string().optional().describe("Previous column type"),
+    wasAlreadyLtree: z
+      .boolean()
+      .optional()
+      .describe("Column was already ltree"),
+    error: z.string().optional().describe("Error message"),
+    currentType: z.string().optional().describe("Current column type"),
+    allowedTypes: z
+      .array(z.string())
+      .optional()
+      .describe("Allowed source types"),
+    suggestion: z.string().optional().describe("Suggestion for resolution"),
+    dependentViews: z
+      .array(z.string())
+      .optional()
+      .describe("Views that depend on this column"),
+    hint: z.string().optional().describe("Helpful hint"),
+  })
+  .describe("Column conversion result");
+
+/**
+ * Output schema for pg_ltree_create_index
+ */
+export const LtreeCreateIndexOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether index was created"),
+    message: z.string().describe("Status message"),
+    indexName: z.string().describe("Index name"),
+    alreadyExists: z.boolean().optional().describe("Index already existed"),
+    table: z.string().optional().describe("Qualified table name"),
+    column: z.string().optional().describe("Column name"),
+    indexType: z.string().optional().describe("Index type (gist)"),
+  })
+  .describe("Index creation result");
+
+// ============================================================================
+// OUTPUT SCHEMAS - pgcrypto tools
+// ============================================================================
+
+/**
+ * Output schema for pg_pgcrypto_create_extension
+ */
+export const PgcryptoCreateExtensionOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether extension was enabled"),
+    message: z.string().describe("Status message"),
+  })
+  .describe("pgcrypto extension creation result");
+
+/**
+ * Output schema for pg_pgcrypto_hash
+ */
+export const PgcryptoHashOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether hash succeeded"),
+    algorithm: z.string().describe("Hash algorithm used"),
+    encoding: z.string().describe("Output encoding"),
+    hash: z.string().describe("Hash result"),
+    inputLength: z.number().describe("Input data length"),
+  })
+  .describe("Hash result");
+
+/**
+ * Output schema for pg_pgcrypto_hmac
+ */
+export const PgcryptoHmacOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether HMAC succeeded"),
+    algorithm: z.string().describe("HMAC algorithm used"),
+    encoding: z.string().describe("Output encoding"),
+    hmac: z.string().describe("HMAC result"),
+  })
+  .describe("HMAC result");
+
+/**
+ * Output schema for pg_pgcrypto_encrypt
+ */
+export const PgcryptoEncryptOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether encryption succeeded"),
+    encrypted: z.string().describe("Encrypted data"),
+    encoding: z.string().describe("Output encoding"),
+  })
+  .describe("Encryption result");
+
+/**
+ * Output schema for pg_pgcrypto_decrypt
+ */
+export const PgcryptoDecryptOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether decryption succeeded"),
+    decrypted: z.string().describe("Decrypted data"),
+    verified: z.boolean().describe("Whether decryption verified"),
+  })
+  .describe("Decryption result");
+
+/**
+ * Output schema for pg_pgcrypto_gen_random_uuid
+ */
+export const PgcryptoGenRandomUuidOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether generation succeeded"),
+    uuids: z.array(z.string()).describe("Generated UUIDs"),
+    count: z.number().describe("Number of UUIDs generated"),
+    uuid: z.string().optional().describe("First UUID (for single requests)"),
+  })
+  .describe("UUID generation result");
+
+/**
+ * Output schema for pg_pgcrypto_gen_random_bytes
+ */
+export const PgcryptoGenRandomBytesOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether generation succeeded"),
+    randomBytes: z.string().describe("Random bytes"),
+    length: z.number().describe("Number of bytes"),
+    encoding: z.string().describe("Output encoding"),
+  })
+  .describe("Random bytes generation result");
+
+/**
+ * Output schema for pg_pgcrypto_gen_salt
+ */
+export const PgcryptoGenSaltOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether salt generation succeeded"),
+    salt: z.string().describe("Generated salt"),
+    type: z.string().describe("Salt type"),
+  })
+  .describe("Salt generation result");
+
+/**
+ * Output schema for pg_pgcrypto_crypt
+ */
+export const PgcryptoCryptOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether password hashing succeeded"),
+    hash: z.string().describe("Password hash"),
+    algorithm: z.string().describe("Detected algorithm"),
+  })
+  .describe("Password crypt result");

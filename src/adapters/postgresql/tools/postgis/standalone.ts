@@ -19,6 +19,10 @@ import {
   GeometryIntersectionSchema,
   GeometryTransformSchemaBase,
   GeometryTransformSchema,
+  // Output schemas
+  GeometryBufferOutputSchema,
+  GeometryIntersectionOutputSchema,
+  GeometryTransformOutputSchema,
 } from "../../schemas/index.js";
 
 /**
@@ -64,6 +68,7 @@ export function createGeometryBufferTool(
       "Create a buffer zone around a WKT or GeoJSON geometry. Returns the buffered geometry as GeoJSON and WKT.",
     group: "postgis",
     inputSchema: GeometryBufferSchemaBase, // Base schema for MCP visibility
+    outputSchema: GeometryBufferOutputSchema,
     annotations: readOnly("Geometry Buffer"),
     icons: getToolIcons("postgis", readOnly("Geometry Buffer")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -126,6 +131,7 @@ export function createGeometryIntersectionTool(
       "Compute the intersection of two WKT or GeoJSON geometries. Returns the intersection geometry and whether they intersect.",
     group: "postgis",
     inputSchema: GeometryIntersectionSchemaBase, // Base schema for MCP visibility
+    outputSchema: GeometryIntersectionOutputSchema,
     annotations: readOnly("Geometry Intersection"),
     icons: getToolIcons("postgis", readOnly("Geometry Intersection")),
     handler: async (params: unknown, _context: RequestContext) => {
@@ -172,6 +178,7 @@ export function createGeometryTransformTool(
       "Transform a WKT or GeoJSON geometry from one SRID to another. Common SRIDs: 4326 (WGS84/GPS), 3857 (Web Mercator).",
     group: "postgis",
     inputSchema: GeometryTransformSchemaBase, // Base schema for MCP visibility
+    outputSchema: GeometryTransformOutputSchema,
     annotations: readOnly("Geometry Transform"),
     icons: getToolIcons("postgis", readOnly("Geometry Transform")),
     handler: async (params: unknown, _context: RequestContext) => {

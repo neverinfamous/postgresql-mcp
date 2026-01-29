@@ -553,3 +553,94 @@ export const PartitionInfoSchema = z.preprocess(
   preprocessListInfoParams,
   PartitionInfoSchemaBase,
 );
+
+// ============================================================================
+// Output Schemas
+// ============================================================================
+
+/**
+ * pg_list_partitions output
+ */
+export const ListPartitionsOutputSchema = z
+  .object({
+    partitions: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Partition list with name, bounds, size"),
+    count: z.number().describe("Number of partitions returned"),
+    truncated: z.boolean().describe("Whether results were truncated"),
+    totalCount: z.number().optional().describe("Total count when truncated"),
+    warning: z
+      .string()
+      .optional()
+      .describe("Warning message if table not partitioned"),
+  })
+  .loose();
+
+/**
+ * pg_create_partitioned_table output
+ */
+export const CreatePartitionedTableOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether the operation succeeded"),
+    table: z.string().describe("Table name (schema.name)"),
+    partitionBy: z.string().describe("Partition strategy used"),
+    partitionKey: z.string().describe("Partition key column(s)"),
+    primaryKey: z
+      .array(z.string())
+      .optional()
+      .describe("Primary key columns if set"),
+  })
+  .loose();
+
+/**
+ * pg_create_partition output
+ */
+export const CreatePartitionOutputSchema = z
+  .object({
+    success: z.boolean().describe("Whether the operation succeeded"),
+    partition: z.string().describe("Partition name (schema.name)"),
+    parent: z.string().describe("Parent table name"),
+    bounds: z.string().describe("Partition bounds description"),
+    subpartitionBy: z.string().optional().describe("Sub-partition strategy"),
+    subpartitionKey: z.string().optional().describe("Sub-partition key"),
+  })
+  .loose();
+
+/**
+ * pg_attach_partition output
+ */
+export const AttachPartitionOutputSchema = z.object({
+  success: z.boolean().describe("Whether the operation succeeded"),
+  parent: z.string().describe("Parent table name"),
+  partition: z.string().describe("Attached partition name"),
+  bounds: z.string().describe("Partition bounds description"),
+});
+
+/**
+ * pg_detach_partition output
+ */
+export const DetachPartitionOutputSchema = z.object({
+  success: z.boolean().describe("Whether the operation succeeded"),
+  parent: z.string().describe("Parent table name"),
+  detached: z.string().describe("Detached partition name"),
+});
+
+/**
+ * pg_partition_info output
+ */
+export const PartitionInfoOutputSchema = z
+  .object({
+    tableInfo: z
+      .record(z.string(), z.unknown())
+      .nullable()
+      .describe("Table partitioning info"),
+    partitions: z
+      .array(z.record(z.string(), z.unknown()))
+      .describe("Partition details with size and row counts"),
+    totalSizeBytes: z.number().describe("Total size of all partitions"),
+    warning: z
+      .string()
+      .optional()
+      .describe("Warning message if table not partitioned"),
+  })
+  .loose();

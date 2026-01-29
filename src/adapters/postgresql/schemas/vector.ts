@@ -282,7 +282,7 @@ export const VectorAggregateOutputSchema = z
     table: z.string().optional().describe("Table name"),
     column: z.string().optional().describe("Column name"),
     count: z.number().optional().describe("Number of vectors aggregated"),
-    average: z
+    average_vector: z
       .object({
         preview: z.array(z.number()).nullable().describe("Vector preview"),
         dimensions: z.number().describe("Vector dimensions"),
@@ -293,9 +293,9 @@ export const VectorAggregateOutputSchema = z
     groups: z
       .array(
         z.object({
-          groupKey: z.unknown().describe("Group key value"),
+          group_key: z.unknown().describe("Group key value"),
           count: z.number().describe("Count in group"),
-          average: z.object({
+          average_vector: z.object({
             preview: z.array(z.number()).nullable().describe("Vector preview"),
             dimensions: z.number().describe("Vector dimensions"),
             truncated: z.boolean().describe("Whether vector is truncated"),

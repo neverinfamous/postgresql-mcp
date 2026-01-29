@@ -1062,10 +1062,16 @@ export function createVectorEmbedTool(): ToolDefinition {
       const magnitude = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
       const normalized = vector.map((x) => x / magnitude);
 
-      // Summarize embedding if requested (default) to reduce LLM context size
+      // Always return object format for output schema compliance
+      // When summarized: use truncateVector helper
+      // When not summarized: wrap full vector in object format with truncated: false
       const embeddingOutput = shouldSummarize
         ? truncateVector(normalized)
-        : normalized;
+        : {
+            preview: normalized,
+            dimensions: dims,
+            truncated: false,
+          };
 
       return {
         embedding: embeddingOutput,

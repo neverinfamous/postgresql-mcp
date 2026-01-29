@@ -672,10 +672,20 @@ describe("Vector Tools", () => {
           summarize: false,
         },
         mockContext,
-      )) as { dimensions: number; embedding: number[] };
+      )) as {
+        dimensions: number;
+        embedding: {
+          preview: number[];
+          dimensions: number;
+          truncated: boolean;
+        };
+      };
 
       expect(result.dimensions).toBe(384);
-      expect(result.embedding).toHaveLength(384);
+      // When summarize: false, embedding is still object format but with full vector
+      expect(result.embedding.dimensions).toBe(384);
+      expect(result.embedding.truncated).toBe(false);
+      expect(result.embedding.preview).toHaveLength(384);
     });
   });
 

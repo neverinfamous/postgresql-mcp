@@ -304,7 +304,7 @@ export const CronCreateExtensionOutputSchema = z
 export const CronScheduleOutputSchema = z
   .object({
     success: z.boolean().describe("Whether job was scheduled"),
-    jobId: z.number().nullable().describe("Assigned job ID"),
+    jobId: z.string().nullable().describe("Assigned job ID"),
     jobName: z.string().nullable().describe("Job name if provided"),
     schedule: z.string().describe("Cron schedule expression"),
     command: z.string().describe("SQL command to execute"),
@@ -319,7 +319,7 @@ export const CronScheduleOutputSchema = z
 export const CronScheduleInDatabaseOutputSchema = z
   .object({
     success: z.boolean().describe("Whether job was scheduled"),
-    jobId: z.number().nullable().describe("Assigned job ID"),
+    jobId: z.string().nullable().describe("Assigned job ID"),
     jobName: z.string().describe("Job name"),
     schedule: z.string().describe("Cron schedule expression"),
     command: z.string().describe("SQL command to execute"),

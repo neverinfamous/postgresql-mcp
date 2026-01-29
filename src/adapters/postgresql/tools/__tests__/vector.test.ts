@@ -689,7 +689,7 @@ describe("Vector Tools", () => {
     });
   });
 
-  it("should export all 14 vector tools", () => {
+  it("should export all 15 vector tools", () => {
     expect(tools).toHaveLength(16);
     const toolNames = tools.map((t) => t.name);
     // Basic

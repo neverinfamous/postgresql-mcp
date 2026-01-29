@@ -470,7 +470,7 @@ This server provides **20 resources** for structured data access:
 | `pg_trgm`            | Text similarity                | `pg_trigram_similarity`    |
 | `fuzzystrmatch`      | Fuzzy matching                 | `pg_fuzzy_match`           |
 | `hypopg`             | Hypothetical indexes           | `pg_index_recommendations` |
-| `pgvector`           | Vector similarity search       | 14 vector tools            |
+| `pgvector`           | Vector similarity search       | 15 vector tools            |
 | `PostGIS`            | Geospatial operations          | 15 postgis tools           |
 | `pg_cron`            | Job scheduling                 | 8 cron tools               |
 | `pg_partman`         | Automated partition management | 10 partman tools           |

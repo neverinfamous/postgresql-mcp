@@ -23,7 +23,7 @@ describe("getVectorTools", () => {
     tools = getVectorTools(adapter);
   });
 
-  it("should return 14 vector tools", () => {
+  it("should return 15 vector tools", () => {
     expect(tools).toHaveLength(16);
   });
 

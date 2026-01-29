@@ -203,14 +203,14 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 | `essential`    | 46     | Minimal footprint        | Core, trans, JSONB, codemode                             |
 | `dev-power`    | 53     | Power Developer          | Core, trans, schema, stats, part, codemode               |
 | `ai-data`      | 59     | AI Data Analyst          | Core, JSONB, text, trans, codemode                       |
-| `ai-vector`    | 47     | AI/ML with pgvector      | Core, vector, trans, part, codemode                      |
+| `ai-vector`    | 48     | AI/ML with pgvector      | Core, vector, trans, part, codemode                      |
 | `dba-monitor`  | 58     | DBA Monitoring           | Core, monitoring, perf, trans, codemode                  |
 | `dba-manage`   | 57     | DBA Management           | Core, admin, backup, part, schema, codemode              |
 | `dba-stats`    | 56     | DBA Stats/Security       | Core, admin, monitoring, trans, stats, codemode          |
 | `geo`          | 42     | Geospatial Workloads     | Core, PostGIS, trans, codemode                           |
 | `base-core`    | 58     | Base Building Block      | Core, JSONB, trans, schema, codemode                     |
 | `base-ops`     | 51     | Operations Block         | Admin, monitoring, backup, part, stats, citext, codemode |
-| `ext-ai`       | 24     | Extension: AI/Security   | pgvector, pgcrypto, codemode                             |
+| `ext-ai`       | 25     | Extension: AI/Security   | pgvector, pgcrypto, codemode                             |
 | `ext-geo`      | 24     | Extension: Spatial       | PostGIS, ltree, codemode                                 |
 | `ext-schedule` | 19     | Extension: Scheduling    | pg_cron, pg_partman, codemode                            |
 | `ext-perf`     | 28     | Extension: Perf/Analysis | pg_stat_kcache, performance, codemode                    |
@@ -274,7 +274,7 @@ Add one of these configurations to your IDE's MCP settings file:
 }
 ```
 
-#### Option 2: AI Vector (47 Tools + pgvector)
+#### Option 2: AI Vector (48 Tools + pgvector)
 
 **Best for:** AI/ML workloads with semantic search and vector similarity.
 

@@ -213,6 +213,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies
 
+- Bump `@types/node` from 25.0.10 to 25.1.0
+- Bump `globals` from 17.1.0 to 17.2.0
+- Bump `typescript-eslint` from 8.53.1 to 8.54.0
 - Bump `hono` from 4.11.5 to 4.11.7
 
 ## [1.0.0] - 2026-01-24

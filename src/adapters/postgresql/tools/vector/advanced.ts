@@ -226,8 +226,9 @@ export function createVectorIndexOptimizeTool(
         parsed.table,
         schemaName,
       ]);
+      // PostgreSQL returns bigint as string, cast as needed
       const stats = (statsResult.rows?.[0] ?? {}) as {
-        estimated_rows: number;
+        estimated_rows: string | number;
         table_size: string;
       };
 
@@ -279,7 +280,8 @@ export function createVectorIndexOptimizeTool(
         schemaName,
       ]);
 
-      const rows = stats.estimated_rows ?? 0;
+      // Convert PostgreSQL bigint string to number for output schema compliance
+      const rows = Number(stats.estimated_rows ?? 0);
       const recommendations = [];
 
       if (rows < 10000) {
@@ -685,8 +687,9 @@ export function createVectorPerformanceTool(
         parsed.table,
         schemaName,
       ]);
+      // PostgreSQL returns bigint as string, cast as needed
       const stats = (statsResult.rows?.[0] ?? {}) as {
-        estimated_rows?: number;
+        estimated_rows?: string | number;
         table_size?: string;
       };
 
@@ -745,14 +748,25 @@ export function createVectorPerformanceTool(
         benchmark = truncatedRows;
       }
 
+      // Convert PostgreSQL bigint strings to numbers for output schema compliance
+      const estimatedRows = Number(stats.estimated_rows ?? 0);
+      // Map indexes to convert bigint stats to numbers (idx_scan, idx_tup_read)
+      const indexes = (indexResult.rows ?? []).map(
+        (row: Record<string, unknown>) => ({
+          ...row,
+          idx_scan: row["idx_scan"] != null ? Number(row["idx_scan"]) : null,
+          idx_tup_read:
+            row["idx_tup_read"] != null ? Number(row["idx_tup_read"]) : null,
+        }),
+      );
+
       const response: Record<string, unknown> = {
         table: parsed.table,
         column: parsed.column,
         tableSize: stats.table_size,
         // PostgreSQL returns -1 for tables that haven't been analyzed; normalize to 0
-        estimatedRows:
-          (stats.estimated_rows ?? 0) < 0 ? 0 : (stats.estimated_rows ?? 0),
-        indexes: indexResult.rows,
+        estimatedRows: estimatedRows < 0 ? 0 : estimatedRows,
+        indexes,
         benchmark,
         recommendations:
           (indexResult.rows?.length ?? 0) === 0

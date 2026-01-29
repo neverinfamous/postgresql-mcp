@@ -190,59 +190,69 @@ export function createVectorAddColumnTool(
 export function createVectorInsertTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
+  // Base schema for MCP visibility (Split Schema pattern)
+  const VectorInsertSchemaBase = z.object({
+    table: z.string().optional().describe("Table name"),
+    tableName: z.string().optional().describe("Alias for table"),
+    column: z.string().optional().describe("Column name"),
+    col: z.string().optional().describe("Alias for column"),
+    vector: z.array(z.number()),
+    additionalColumns: z.record(z.string(), z.unknown()).optional(),
+    schema: z.string().optional(),
+    updateExisting: z
+      .boolean()
+      .optional()
+      .describe(
+        "Update vector on existing row (requires conflictColumn and conflictValue)",
+      ),
+    conflictColumn: z
+      .string()
+      .optional()
+      .describe("Column to match for updates (e.g., id)"),
+    conflictValue: z
+      .union([z.string(), z.number()])
+      .optional()
+      .describe("Value of conflictColumn to match (e.g., 123)"),
+  });
+
+  // Transformed schema with alias resolution for handler
+  const VectorInsertSchema = VectorInsertSchemaBase.transform((data) => ({
+    table: data.table ?? data.tableName ?? "",
+    column: data.column ?? data.col ?? "",
+    vector: data.vector,
+    additionalColumns: data.additionalColumns,
+    schema: data.schema,
+    updateExisting: data.updateExisting,
+    conflictColumn: data.conflictColumn,
+    conflictValue: data.conflictValue,
+  }));
+
   return {
     name: "pg_vector_insert",
     description:
       "Insert a vector into a table, or update an existing row's vector. For upsert: use updateExisting + conflictColumn + conflictValue to UPDATE existing rows (avoids NOT NULL issues).",
     group: "vector",
-    inputSchema: z.object({
-      table: z.string(),
-      column: z.string(),
-      vector: z.array(z.number()),
-      additionalColumns: z.record(z.string(), z.unknown()).optional(),
-      schema: z.string().optional(),
-      updateExisting: z
-        .boolean()
-        .optional()
-        .describe(
-          "Update vector on existing row (requires conflictColumn and conflictValue)",
-        ),
-      conflictColumn: z
-        .string()
-        .optional()
-        .describe("Column to match for updates (e.g., id)"),
-      conflictValue: z
-        .union([z.string(), z.number()])
-        .optional()
-        .describe("Value of conflictColumn to match (e.g., 123)"),
-    }),
+    // Use base schema for MCP visibility
+    inputSchema: VectorInsertSchemaBase,
     outputSchema: VectorInsertOutputSchema,
     annotations: write("Insert Vector"),
     icons: getToolIcons("vector", write("Insert Vector")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        table: string;
-        column: string;
-        vector: number[];
-        additionalColumns?: Record<string, unknown>;
-        schema?: string;
-        updateExisting?: boolean;
-        conflictColumn?: string;
-        conflictValue?: string | number;
-      };
+      // Use transformed schema for alias resolution
+      const parsed = VectorInsertSchema.parse(params);
 
       // Validate required params with clear errors
-      if (parsed.table === undefined || parsed.table === "") {
+      if (parsed.table === "") {
         return {
           success: false,
-          error: "table parameter is required",
+          error: "table (or tableName) parameter is required",
           requiredParams: ["table", "column", "vector"],
         };
       }
-      if (parsed.column === undefined || parsed.column === "") {
+      if (parsed.column === "") {
         return {
           success: false,
-          error: "column parameter is required",
+          error: "column (or col) parameter is required",
           requiredParams: ["table", "column", "vector"],
         };
       }

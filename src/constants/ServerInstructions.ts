@@ -69,6 +69,8 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 ## Vector Tools
 
+⚠️ **Large Vectors**: Direct MCP tool calls may truncate vectors >256 dimensions due to JSON-RPC message size limits. For vectors ≥256 dimensions (e.g., OpenAI 1536-dim, local 384-dim), use Code Mode: \`await pg.vector.search({table, column, vector, limit})\`
+
 - \`pg_vector_search\`: Supports \`schema.table\` format (auto-parsed). Returns \`{results: [...], count, metric}\`. Use \`select: ["id", "name"]\` to include identifying columns. Without select, only returns distance. \`filter\` = \`where\`. ⚠️ Vectors read from DB are strings—parse before passing: \`vec.replace(/^\\[|\\]$/g, '').split(',').map(Number)\`
 - \`pg_vector_insert\`: Supports \`schema.table\` format (auto-parsed). Use \`updateExisting\` + \`conflictColumn\` + \`conflictValue\` for UPDATE mode. \`additionalColumns\` is applied in both INSERT and UPDATE modes
 - \`pg_vector_batch_insert\`: \`vectors\` expects \`[{vector: [...], data?: {...}}]\` objects, not raw arrays

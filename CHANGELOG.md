@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_vector_validate user-friendly error** — Fixed raw Zod validation error being returned when invalid input types are provided (e.g., string instead of number array for `vector` parameter). Now returns `{valid: false, error: \"Invalid vector: ...\", suggestion: \"Ensure vector is an array of numbers, e.g., [0.1, 0.2, 0.3]\"}` for type validation failures
 - **pg_vector_validate direct MCP tool exposure** — Fixed `pg_vector_validate` not appearing as a direct MCP tool. The tool was missing an `outputSchema` property, which is required for MCP tool visibility. Added `VectorValidateOutputSchema` to `schemas/vector.ts` and updated tool definition in `basic.ts`
 
+### Documentation
+
+- **Large vector limitations** — Updated `ServerInstructions.ts` Vector Tools section to document that direct MCP tool calls may truncate vectors >256 dimensions due to JSON-RPC message size limits. Recommends Code Mode (`await pg.vector.search({...})`) for vectors ≥256 dimensions (e.g., OpenAI 1536-dim, local 384-dim embeddings)
+
 - **JSONB Split Schema Pattern** — Implemented Split Schema pattern for 6 JSONB tools to support parameter aliases in direct MCP tool calls:
   - Added `tableName` (alias for `table`), `col` (alias for `column`), and `filter` (alias for `where`) support
   - Added `preprocessJsonbParams()` function for alias normalization and `schema.table` parsing

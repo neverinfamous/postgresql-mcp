@@ -725,6 +725,7 @@ export const StatsHypothesisSchema = z.preprocess(
       populationStdDev: data.populationStdDev ?? data.sigma,
       schema: data.schema,
       where: data.where,
+      params: data.params, // Preserve params for parameterized WHERE clauses
       groupBy: data.groupBy,
     }))
     .refine(

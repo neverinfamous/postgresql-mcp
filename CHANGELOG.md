@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_vector_validate direct MCP tool exposure** — Fixed `pg_vector_validate` not appearing as a direct MCP tool. The tool was missing from the `vector` tool group in `ToolConstants.ts` (registry entry). Added `pg_vector_validate` to the vector array, increasing total vector tools from 14 to 15
 - **Cron schedule output schema jobId type** — Fixed `pg_cron_schedule` and `pg_cron_schedule_in_database` direct MCP tool calls failing with output validation error. PostgreSQL BIGINT values are returned as strings due to JavaScript number precision limits, but the output schema expected `z.number()`. Changed `jobId` type to `z.string()` in both `CronScheduleOutputSchema` and `CronScheduleInDatabaseOutputSchema`
 
+### Performance
+
+- **pg_cron_job_run_details default limit reduced** — Reduced default limit from 100 to 50 rows to match AI-optimized payload patterns used by other tools (e.g., `pg_cron_list_jobs`, `pg_table_stats`). Reduces typical response payload size by ~50%. Use `limit: 100` or higher to restore previous behavior, or `limit: 0` for all records
+
 ### Documentation
 
 - **Large vector limitations** — Updated `ServerInstructions.ts` Vector Tools section to document that direct MCP tool calls may truncate vectors >256 dimensions due to JSON-RPC message size limits. Recommends Code Mode (`await pg.vector.search({...})`) for vectors ≥256 dimensions (e.g., OpenAI 1536-dim, local 384-dim embeddings)

@@ -263,7 +263,7 @@ export const CronJobRunDetailsSchema = z
     limit: z
       .number()
       .optional()
-      .describe("Maximum records to return (default: 100)"),
+      .describe("Maximum records to return (default: 50)"),
   })
   .default({});
 

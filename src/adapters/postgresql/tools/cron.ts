@@ -426,7 +426,7 @@ Useful for monitoring and debugging scheduled jobs.`,
         conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
       // Handle limit: 0 as "no limit" (return all rows), consistent with other AI-optimized tools
-      const limitVal = limit === 0 ? null : (limit ?? 100);
+      const limitVal = limit === 0 ? null : (limit ?? 50);
 
       // Get total count for truncation indicator (only needed when limiting)
       let totalCount: number | undefined;

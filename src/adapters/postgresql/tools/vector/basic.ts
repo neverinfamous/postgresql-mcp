@@ -72,6 +72,42 @@ export function truncateVector(
   return { preview, dimensions: vec.length, truncated: true };
 }
 
+/**
+ * Two-step existence check: table first, then column.
+ * Returns null if both exist, or {error, suggestion} if either is missing.
+ */
+export async function checkTableAndColumn(
+  adapter: PostgresAdapter,
+  table: string,
+  column: string,
+  schema: string,
+): Promise<{ error: string; suggestion: string } | null> {
+  // Step 1: check column existence (fast path — covers the common success case)
+  const colSql = `
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+  `;
+  const colResult = await adapter.executeQuery(colSql, [schema, table, column]);
+  if ((colResult.rows?.length ?? 0) > 0) return null; // both exist
+
+  // Step 2: disambiguate — is it the table or the column?
+  const tblSql = `
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = $1 AND table_name = $2
+  `;
+  const tblResult = await adapter.executeQuery(tblSql, [schema, table]);
+  if ((tblResult.rows?.length ?? 0) === 0) {
+    return {
+      error: `Table '${table}' does not exist in schema '${schema}'`,
+      suggestion: "Use pg_list_tables to find available tables",
+    };
+  }
+  return {
+    error: `Column '${column}' does not exist in table '${table}'`,
+    suggestion: "Use pg_describe_table to find available columns",
+  };
+}
+
 export function createVectorExtensionTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
@@ -147,16 +183,33 @@ export function createVectorAddColumnTool(
         };
       }
 
+      const schemaName = parsed.schema ?? "public";
       const tableName = sanitizeTableName(parsed.table, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
 
+      // Verify table exists before ALTER TABLE
+      const tblCheckSql = `
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = $1 AND table_name = $2
+      `;
+      const tblCheckResult = await adapter.executeQuery(tblCheckSql, [
+        schemaName,
+        parsed.table,
+      ]);
+      if ((tblCheckResult.rows?.length ?? 0) === 0) {
+        return {
+          success: false,
+          error: `Table '${parsed.table}' does not exist in schema '${schemaName}'`,
+          suggestion: "Use pg_list_tables to find available tables",
+        };
+      }
+
       // Check if column exists when ifNotExists is true
       if (parsed.ifNotExists) {
-        const schemaName = parsed.schema ?? "public";
         const checkSql = `
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-                `;
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+        `;
         const checkResult = await adapter.executeQuery(checkSql, [
           schemaName,
           parsed.table,
@@ -297,9 +350,21 @@ export function createVectorInsertTool(
         resolvedTable = parts[1] ?? parsed.table;
       }
 
+      const insertSchemaName = resolvedSchema ?? "public";
       const tableName = sanitizeTableName(resolvedTable, resolvedSchema);
       const columnName = sanitizeIdentifier(parsed.column);
       const vectorStr = `[${parsed.vector.join(",")}]`;
+
+      // Pre-validate table and column exist
+      const missing = await checkTableAndColumn(
+        adapter,
+        resolvedTable,
+        parsed.column,
+        insertSchemaName,
+      );
+      if (missing) {
+        return { success: false, ...missing };
+      }
 
       // Use direct UPDATE for updateExisting mode (avoids NOT NULL constraint issues)
       if (
@@ -392,6 +457,15 @@ export function createVectorInsertTool(
                 "Table has NOT NULL columns that require values. Use additionalColumns param or updateExisting mode to update existing rows.",
             };
           }
+          // Catch relation/column not found from UPDATE path
+          if (error.message.includes("does not exist")) {
+            return {
+              success: false,
+              error: error.message,
+              suggestion:
+                "Verify the table and column names using pg_list_tables and pg_describe_table",
+            };
+          }
         }
         throw error;
       }
@@ -438,23 +512,27 @@ export function createVectorSearchTool(
       const columnName = sanitizeIdentifier(column);
       const schemaName = schema ?? "public";
 
+      // Two-step existence check: table first, then column
+      const existenceCheck = await checkTableAndColumn(
+        adapter,
+        table,
+        column,
+        schemaName,
+      );
+      if (existenceCheck) {
+        return { success: false, ...existenceCheck };
+      }
+
       // Validate column is actually a vector type
       const typeCheckSql = `
-                SELECT udt_name FROM information_schema.columns 
-                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-            `;
+        SELECT udt_name FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+      `;
       const typeResult = await adapter.executeQuery(typeCheckSql, [
         schemaName,
         table,
         column,
       ]);
-      if ((typeResult.rows?.length ?? 0) === 0) {
-        return {
-          success: false,
-          error: `Column '${column}' does not exist in table '${table}'`,
-          suggestion: "Use pg_describe_table to find available columns",
-        };
-      }
       const udtName = typeResult.rows?.[0]?.["udt_name"] as string | undefined;
       if (udtName !== "vector") {
         return {
@@ -587,6 +665,17 @@ export function createVectorCreateIndexTool(
             "column (or col) parameter is required for the vector column name",
           requiredParams: ["table", "column", "type"],
         };
+      }
+
+      // P154: Verify table and column exist before attempting index creation
+      const existenceError = await checkTableAndColumn(
+        adapter,
+        table,
+        column,
+        schema ?? "public",
+      );
+      if (existenceError !== null) {
+        return { success: false, ...existenceError };
       }
 
       const tableName = sanitizeTableName(table, schema);
@@ -844,23 +933,27 @@ export function createVectorAggregateTool(
       }
       const schemaName = resolvedSchema ?? "public";
 
+      // Two-step existence check: table first, then column
+      const existenceCheck = await checkTableAndColumn(
+        adapter,
+        resolvedTable,
+        parsed.column,
+        schemaName,
+      );
+      if (existenceCheck) {
+        return { success: false, ...existenceCheck };
+      }
+
       // Validate column is actually a vector type
       const typeCheckSql = `
-                SELECT udt_name FROM information_schema.columns 
-                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-            `;
+        SELECT udt_name FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+      `;
       const typeResult = await adapter.executeQuery(typeCheckSql, [
         schemaName,
         resolvedTable,
         parsed.column,
       ]);
-      if ((typeResult.rows?.length ?? 0) === 0) {
-        return {
-          success: false,
-          error: `Column '${parsed.column}' does not exist in table '${parsed.table}'`,
-          suggestion: "Use pg_describe_table to find available columns",
-        };
-      }
       const udtName = typeResult.rows?.[0]?.["udt_name"] as string | undefined;
       if (udtName !== "vector") {
         return {
@@ -1252,16 +1345,16 @@ export function createVectorValidateTool(
         columnDimensions,
         expectedDimensions,
         ...(parsed.vector !== undefined &&
-        expectedDimensions !== undefined &&
-        vectorDimensions !== undefined &&
-        vectorDimensions !== expectedDimensions
+          expectedDimensions !== undefined &&
+          vectorDimensions !== undefined &&
+          vectorDimensions !== expectedDimensions
           ? {
-              error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
-              suggestion:
-                vectorDimensions > expectedDimensions
-                  ? "Use pg_vector_dimension_reduce to reduce dimensions"
-                  : "Ensure your embedding model outputs the correct dimensions",
-            }
+            error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
+            suggestion:
+              vectorDimensions > expectedDimensions
+                ? "Use pg_vector_dimension_reduce to reduce dimensions"
+                : "Ensure your embedding model outputs the correct dimensions",
+          }
           : {}),
       };
     },

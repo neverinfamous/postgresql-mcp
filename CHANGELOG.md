@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`pg_hybrid_search` tsvector `textColumn` support** — `textColumn` now auto-detects column type: uses tsvector columns directly (no wrapping), wraps plain text columns with `to_tsvector('english', ...)`. Previously, tsvector columns caused SQL errors due to unconditional `to_tsvector()` wrapping. Added 2 unit tests and updated 4 existing test mocks
 
+- **Vector tool object existence checks (P154)** — `pg_vector_search`, `pg_vector_aggregate`, `pg_vector_insert`, `pg_vector_add_column`, `pg_vector_cluster`, `pg_vector_index_optimize`, `pg_vector_performance`, `pg_vector_create_index`, and `pg_vector_dimension_reduce` now perform two-step existence verification (table first, then column) before executing main operations. Returns structured `{success: false, error: "...", suggestion: "..."}` with actionable messages distinguishing missing tables from missing columns. Extracted reusable `checkTableAndColumn` helper. Added 19 unit tests covering all error paths
+
 ### Documentation
 
 - **`pg_list_functions` exclude example expanded** — Updated `ServerInstructions.ts` exclude example from `['postgis', 'citext', 'fuzzystrmatch']` to include 9 common extensions (`postgis`, `pg_trgm`, `ltree`, `citext`, `fuzzystrmatch`, `pg_stat_statements`, `hypopg`, `unaccent`, `pg_stat_kcache`). Added caveat that the `language` filter does NOT exclude extension functions—agents should use `exclude` alongside `language` for clean results

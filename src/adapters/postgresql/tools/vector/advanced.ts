@@ -14,7 +14,7 @@ import {
   sanitizeIdentifier,
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
-import { truncateVector } from "./basic.js";
+import { checkTableAndColumn, truncateVector } from "./basic.js";
 import {
   VectorClusterOutputSchema,
   VectorIndexOptimizeOutputSchema,
@@ -92,8 +92,20 @@ export function createVectorClusterTool(
       }
       const maxIter = parsed.iterations ?? 10;
       const sample = parsed.sampleSize ?? 10000;
+      const schemaName = parsed.schema ?? "public";
       const tableName = sanitizeTableName(parsed.table, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
+
+      // Two-step existence check: table first, then column
+      const existenceCheck = await checkTableAndColumn(
+        adapter,
+        parsed.table,
+        parsed.column,
+        schemaName,
+      );
+      if (existenceCheck) {
+        return { success: false, ...existenceCheck };
+      }
 
       const sampleSql = `
                 SELECT ${columnName} as vec 
@@ -214,6 +226,17 @@ export function createVectorIndexOptimizeTool(
       const columnName = sanitizeIdentifier(parsed.column);
       const schemaName = parsed.schema ?? "public";
 
+      // Two-step existence check: table first, then column (must run before stats query)
+      const existenceCheck = await checkTableAndColumn(
+        adapter,
+        parsed.table,
+        parsed.column,
+        schemaName,
+      );
+      if (existenceCheck) {
+        return { success: false, ...existenceCheck };
+      }
+
       const statsSql = `
                 SELECT 
                     reltuples::bigint as estimated_rows,
@@ -232,23 +255,16 @@ export function createVectorIndexOptimizeTool(
         table_size: string;
       };
 
-      // Validate column is actually a vector type before calling vector_dims
+      // Validate column is actually a vector type
       const typeCheckSql = `
-                SELECT udt_name FROM information_schema.columns 
-                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-            `;
+        SELECT udt_name FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+      `;
       const typeResult = await adapter.executeQuery(typeCheckSql, [
         schemaName,
         parsed.table,
         parsed.column,
       ]);
-      if ((typeResult.rows?.length ?? 0) === 0) {
-        return {
-          success: false,
-          error: `Column '${parsed.column}' does not exist in table '${parsed.table}'`,
-          suggestion: "Use pg_describe_table to find available columns",
-        };
-      }
       const udtName = typeResult.rows?.[0]?.["udt_name"] as string | undefined;
       if (udtName !== "vector") {
         return {
@@ -658,22 +674,15 @@ export function createVectorPerformanceTool(
       const columnName = sanitizeIdentifier(parsed.column);
       const schemaName = parsed.schema ?? "public";
 
-      // Check if column exists
-      const colCheckSql = `
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-            `;
-      const colCheckResult = await adapter.executeQuery(colCheckSql, [
-        schemaName,
+      // Two-step existence check: table first, then column
+      const existenceCheck = await checkTableAndColumn(
+        adapter,
         parsed.table,
         parsed.column,
-      ]);
-      if ((colCheckResult.rows?.length ?? 0) === 0) {
-        return {
-          success: false,
-          error: `Column '${parsed.column}' does not exist in table '${parsed.table}'`,
-          suggestion: "Verify the column name using pg_describe_table",
-        };
+        schemaName,
+      );
+      if (existenceCheck) {
+        return { success: false, ...existenceCheck };
       }
 
       const indexSql = `
@@ -789,8 +798,8 @@ export function createVectorPerformanceTool(
         recommendations:
           (indexResult.rows?.length ?? 0) === 0
             ? [
-                "No vector index found - consider creating one for better performance",
-              ]
+              "No vector index found - consider creating one for better performance",
+            ]
             : [],
       };
 
@@ -932,6 +941,17 @@ export function createVectorDimensionReduceTool(
 
       // Table-based mode
       if (parsed.table !== undefined && parsed.column !== undefined) {
+        // P154: Verify table and column exist before querying
+        const existenceError = await checkTableAndColumn(
+          adapter,
+          parsed.table,
+          parsed.column,
+          "public",
+        );
+        if (existenceError !== null) {
+          return { success: false, ...existenceError };
+        }
+
         const idCol = parsed.idColumn ?? "id";
         const limitVal = parsed.limit ?? 100;
 
@@ -960,12 +980,12 @@ export function createVectorDimensionReduceTool(
           id: unknown;
           original_dimensions: number;
           reduced:
-            | number[]
-            | {
-                preview: number[] | null;
-                dimensions: number;
-                truncated: boolean;
-              };
+          | number[]
+          | {
+            preview: number[] | null;
+            dimensions: number;
+            truncated: boolean;
+          };
         }[] = [];
         let originalDim = 0;
 
@@ -1085,10 +1105,10 @@ export function createVectorEmbedTool(): ToolDefinition {
       const embeddingOutput = shouldSummarize
         ? truncateVector(normalized)
         : {
-            preview: normalized,
-            dimensions: dims,
-            truncated: false,
-          };
+          preview: normalized,
+          dimensions: dims,
+          truncated: false,
+        };
 
       return Promise.resolve({
         embedding: embeddingOutput,

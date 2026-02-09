@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Partitioning write tools structured error handling** — `pg_create_partition`, `pg_attach_partition`, and `pg_detach_partition` now return structured `{success: false, error: "..."}` responses instead of raw PostgreSQL errors when parent tables don't exist, aren't partitioned, or partition tables don't exist. Uses `checkTablePartitionStatus` pre-checks consistent with read tools (`pg_list_partitions`, `pg_partition_info`). Updated output schemas to make non-success fields optional and added `error` field. Added 6 unit tests covering all error paths
+
 - **`pg_drop_schema` response key consistency** — Renamed response key `dropped` → `schema` to align with sibling drop tools (`pg_drop_sequence` → `sequence`, `pg_drop_view` → `view`). The `schema` field now always returns the schema name; use `existed` boolean to determine if the schema was present before drop. Updated output schema and 2 unit tests
 
 - **`pg_list_functions` fuzzystrmatch alias mapping for `exclude`** — `pg_list_functions({ exclude: ['fuzzymatch'] })` and `exclude: ['fuzzy']` now correctly filter out fuzzystrmatch functions. The fuzzystrmatch extension registers functions in the `public` schema, so passing the full `'fuzzystrmatch'` name was required. Added `fuzzymatch` → `fuzzystrmatch` and `fuzzy` → `fuzzystrmatch` aliases to `EXTENSION_ALIASES`, matching the existing `pgvector` → `vector` and `partman` → `pg_partman` patterns. Added 2 unit tests

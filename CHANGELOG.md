@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`runningQueries` Code Mode alias mapping** — `pg.performance.runningQueries()` now correctly routes to `longRunningQueries()` (returning `{longRunningQueries, count, threshold}`) instead of `statActivity()` (which returns `{connections, count}`). The `METHOD_ALIASES` map in `api.ts` incorrectly pointed `runningQueries` to `statActivity` instead of `longRunningQueries`
 
+- **`pg_stat_statements` missing `count` field** — Response now includes `count` (number of statements returned), consistent with all other paginated performance tools (`pg_index_stats`, `pg_table_stats`, `pg_unused_indexes`, etc.). Output schema updated to use shared `PaginatedBase` pattern
+
 ### Documentation
 
 - **`pg_write_query` DDL response clarification** — Updated `ServerInstructions.ts` response structures table to note that DDL statements return `rowsAffected: 0`

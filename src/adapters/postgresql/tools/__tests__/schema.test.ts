@@ -1038,6 +1038,17 @@ describe("Parameter Smoothing", () => {
     expect(sql).toContain("n.nspname NOT IN ('pgvector', 'vector')");
   });
 
+  it("pg_list_functions should expand partman alias in exclude", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_functions")!;
+    await tool.handler({ exclude: ["partman"] }, mockContext);
+
+    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("e.extname IN ('partman', 'pg_partman')");
+    expect(sql).toContain("n.nspname NOT IN ('partman', 'pg_partman')");
+  });
+
   it("pg_create_view should accept definition as alias for query", async () => {
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 

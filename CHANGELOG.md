@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`pg_list_functions` extension alias mapping for `exclude`** — `pg_list_functions({ exclude: ["pgvector"] })` now correctly filters out pgvector functions. The pgvector extension registers as `vector` in PostgreSQL's `pg_extension` catalog, so passing `"pgvector"` in the `exclude` array previously failed to match. Added `EXTENSION_ALIASES` mapping that expands well-known names (e.g., `pgvector` → `vector`) before building the exclude query. Both the schema-name filter (`nspname NOT IN`) and the `pg_depend`/`pg_extension` ownership filter now use the expanded list. Added unit test
 
+- **`pg_list_functions` partman alias for `exclude`** — `exclude: ["partman"]` now correctly filters out pg_partman functions. pg_partman installs functions in the `public` schema, so the schema-name exclusion filter alone doesn't catch them. Added `partman` → `pg_partman` alias to `EXTENSION_ALIASES`, matching the existing `pgvector` → `vector` pattern. Added unit test
+
 - **`pg_list_tables` / `pg_describe_table` `rowCount` consistency** — `rowCount` now returns `0` for empty or freshly created tables instead of being silently omitted from the response. Previously, `listTables()` used `effectiveRowCount > 0 ? effectiveRowCount : undefined` which converted zero to `undefined`, and `describeTable()` used raw `c.reltuples::bigint` which returned `-1` for never-analyzed tables. Both methods now use the same `CASE WHEN reltuples = -1 THEN NULL` SQL guard with `live_row_estimate` fallback. Added 2 unit tests
 
 - **`runningQueries` Code Mode alias mapping** — `pg.performance.runningQueries()` now correctly routes to `longRunningQueries()` (returning `{longRunningQueries, count, threshold}`) instead of `statActivity()` (which returns `{connections, count}`). The `METHOD_ALIASES` map in `api.ts` incorrectly pointed `runningQueries` to `statActivity` instead of `longRunningQueries`
@@ -57,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`pg_write_query` DDL response clarification** — Updated `ServerInstructions.ts` response structures table to note that DDL statements return `rowsAffected: 0`
 - **`pg_describe_table` response structure completeness** — Updated `ServerInstructions.ts` to list the full top-level envelope fields (`name`, `schema`, `type`, `owner`, `rowCount`, `primaryKey`) alongside the previously documented array fields
+- **`pg_list_functions` response structure** — Removed undocumented `note?` field from `listFunctions` response structure in `ServerInstructions.ts`
+- **`createView` `alreadyExisted` clarification** — Clarified that `alreadyExisted` is only present when `ifNotExists`/`orReplace` is set, not unconditionally
 
 ## [1.1.0] - 2026-01-29
 

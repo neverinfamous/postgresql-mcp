@@ -46,6 +46,7 @@ import {
  */
 const EXTENSION_ALIASES: Record<string, string> = {
   pgvector: "vector",
+  partman: "pg_partman",
 };
 
 /**

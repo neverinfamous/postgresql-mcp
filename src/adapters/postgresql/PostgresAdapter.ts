@@ -634,6 +634,10 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async listTables(): Promise<TableInfo[]> {
+    // Performance optimization: return cached result if within TTL
+    const cached = this.getCached("list_tables") as TableInfo[] | undefined;
+    if (cached) return cached;
+
     const result = await this.executeQuery(`
             SELECT 
                 c.relname as name,
@@ -661,7 +665,7 @@ export class PostgresAdapter extends DatabaseAdapter {
             ORDER BY n.nspname, c.relname
         `);
 
-    return (result.rows ?? []).map((row) => {
+    const tables = (result.rows ?? []).map((row) => {
       const rowCount = row["row_count"];
       const liveRowEstimate = Number(row["live_row_estimate"]) || 0;
       const statsStale = row["stats_stale"] === true;
@@ -682,12 +686,20 @@ export class PostgresAdapter extends DatabaseAdapter {
         statsStale,
       };
     });
+
+    this.setCache("list_tables", tables);
+    return tables;
   }
 
   async describeTable(
     tableName: string,
     schemaName = "public",
   ): Promise<TableInfo> {
+    // Performance optimization: return cached result if within TTL
+    const cacheKey = `describe:${schemaName}.${tableName}`;
+    const cached = this.getCached(cacheKey) as TableInfo | undefined;
+    if (cached) return cached;
+
     // Get column information including foreign key references
     const columnsResult = await this.executeQuery(
       `
@@ -929,7 +941,7 @@ export class PostgresAdapter extends DatabaseAdapter {
     const pkConstraint = constraints.find((c) => c.type === "primary_key");
     const primaryKey = pkConstraint?.columns ?? null;
 
-    return {
+    const tableInfo: TableInfo = {
       name: tableName,
       schema: schemaName,
       type: (tableRow?.["type"] as TableInfo["type"]) ?? "table",
@@ -944,6 +956,9 @@ export class PostgresAdapter extends DatabaseAdapter {
       constraints: [...constraints, ...notNullConstraints],
       foreignKeys,
     };
+
+    this.setCache(cacheKey, tableInfo);
+    return tableInfo;
   }
 
   async listSchemas(): Promise<string[]> {

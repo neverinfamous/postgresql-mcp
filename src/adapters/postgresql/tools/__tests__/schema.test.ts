@@ -1069,4 +1069,26 @@ describe("Parameter Smoothing", () => {
     );
     expect(result.success).toBe(true);
   });
+
+  it("pg_list_functions should expand fuzzymatch alias in exclude", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_functions")!;
+    await tool.handler({ exclude: ["fuzzymatch"] }, mockContext);
+
+    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("e.extname IN ('fuzzymatch', 'fuzzystrmatch')");
+    expect(sql).toContain("n.nspname NOT IN ('fuzzymatch', 'fuzzystrmatch')");
+  });
+
+  it("pg_list_functions should expand fuzzy alias in exclude", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_functions")!;
+    await tool.handler({ exclude: ["fuzzy"] }, mockContext);
+
+    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("e.extname IN ('fuzzy', 'fuzzystrmatch')");
+    expect(sql).toContain("n.nspname NOT IN ('fuzzy', 'fuzzystrmatch')");
+  });
 });

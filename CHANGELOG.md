@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`pg_list_functions` fuzzystrmatch alias mapping for `exclude`** — `pg_list_functions({ exclude: ['fuzzymatch'] })` and `exclude: ['fuzzy']` now correctly filter out fuzzystrmatch functions. The fuzzystrmatch extension registers functions in the `public` schema, so passing the full `'fuzzystrmatch'` name was required. Added `fuzzymatch` → `fuzzystrmatch` and `fuzzy` → `fuzzystrmatch` aliases to `EXTENSION_ALIASES`, matching the existing `pgvector` → `vector` and `partman` → `pg_partman` patterns. Added 2 unit tests
+
+### Documentation
+
+- **`pg_list_functions` exclude example expanded** — Updated `ServerInstructions.ts` exclude example from `['postgis']` to `['postgis', 'citext', 'fuzzystrmatch']` to help agents include commonly-needed extensions in their exclude lists
+
 ### Dependencies
 
 - Bump `@modelcontextprotocol/sdk` from 1.25.3 to 1.26.0

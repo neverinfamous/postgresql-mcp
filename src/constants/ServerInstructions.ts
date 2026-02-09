@@ -121,7 +121,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 Core (20 methods): \`explain()\`, \`explainAnalyze()\`, \`explainBuffers()\`, \`indexStats()\`, \`tableStats()\`, \`statStatements()\`, \`statActivity()\`, \`locks()\`, \`bloatCheck()\`, \`cacheHitRatio()\`, \`seqScanTables()\`, \`indexRecommendations()\`, \`queryPlanCompare()\`, \`baseline()\`, \`connectionPoolOptimize()\`, \`partitionStrategySuggest()\`, \`unusedIndexes()\`, \`duplicateIndexes()\`, \`vacuumStats()\`, \`queryPlanStats()\`
 
-Wrappers (3): \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQueries({ seconds | minDuration }?)\` filters by duration (returns \`statActivity\` format), \`analyzeTable({ table })\` runs ANALYZE (accepts \`schema.table\` format)
+Wrappers (3): \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQueries({ seconds | minDuration }?)\` filters by duration (returns \`{longRunningQueries, count, threshold}\`), \`analyzeTable({ table })\` runs ANALYZE (accepts \`schema.table\` format)
 
 - \`explain({ sql, format?, params? })\`: Supports \`format: 'text'|'json'|'yaml'|'xml'\`. Default: text. Use \`params: [value]\` for \`$1, $2\` placeholders
 - \`explainAnalyze({ sql, format?, params? })\`: Same format/params options as explain

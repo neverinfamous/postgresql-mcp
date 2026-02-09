@@ -701,7 +701,7 @@ function createGroupApi(
       };
     }
 
-    // pg.performance.longRunningQueries(seconds?) → statActivity filtered by duration
+    // pg.performance.longRunningQueries(seconds?) → {longRunningQueries, count, threshold}
     if (statActivityFn !== undefined) {
       api["longRunningQueries"] = async (...args: unknown[]) => {
         // Support both: longRunningQueries(10) and longRunningQueries({seconds: 10})

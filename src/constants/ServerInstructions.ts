@@ -48,6 +48,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |
 | \`pg_jsonb_agg groupBy\` | \`{result: [{group_key, items}], count, grouped: true}\` | Without groupBy: \`{result: [...], count, grouped: false}\` |
 | \`pg_vector_aggregate\` | \`{average_vector, count}\` or \`{groups: [{group_key, average_vector, count}]}\` | Without/with \`groupBy\` |
+| \`pg_query_plan_stats\` | \`{queryPlanStats, count, truncated?, totalCount?}\` | Default 20 rows. \`truncateQuery: 0\` for full text |
 
 ## API Mapping
 
@@ -184,6 +185,8 @@ Core: \`vacuum()\`, \`vacuumAnalyze()\`, \`analyze()\`, \`reindex()\`, \`cluster
 Aliases: \`tableName\`→\`table\`, \`indexName\`→\`index\`, \`param\`/\`setting\`→\`name\`, \`processId\`→\`pid\`
 
 **Top-Level Aliases**: \`pg.vacuum()\`, \`pg.vacuumAnalyze()\`, \`pg.analyze()\`, \`pg.reindex()\`, \`pg.cluster()\`, \`pg.setConfig()\`, \`pg.reloadConf()\`, \`pg.resetStats()\`, \`pg.cancelBackend()\`, \`pg.terminateBackend()\`
+
+**Discovery**: \`pg.admin.help()\` returns \`{methods, methodAliases, examples}\` object
 
 ## Backup Tools
 

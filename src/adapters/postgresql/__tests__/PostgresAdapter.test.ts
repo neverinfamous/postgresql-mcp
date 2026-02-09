@@ -475,6 +475,32 @@ describe("PostgresAdapter", () => {
       expect(publicResult).not.toBe(customResult);
     });
 
+    it("listTables should return rowCount: 0 for empty tables (not omit field)", async () => {
+      const mockTablesResult: QueryResult = {
+        rows: [
+          {
+            name: "empty_table",
+            schema: "public",
+            type: "table",
+            owner: "admin",
+            row_count: 0,
+            live_row_estimate: 0,
+            stats_stale: false,
+            size_bytes: 0,
+            total_size_bytes: 0,
+            comment: null,
+          },
+        ],
+      };
+      mockPoolMethods.query.mockResolvedValueOnce(mockTablesResult);
+
+      const result = await adapter.listTables();
+      expect(result).toHaveLength(1);
+      expect(result[0]?.rowCount).toBe(0);
+      // Verify the field exists (not undefined/omitted)
+      expect("rowCount" in (result[0] ?? {})).toBe(true);
+    });
+
     it("clearMetadataCache should force re-query for listTables", async () => {
       const mockTablesResult: QueryResult = {
         rows: [

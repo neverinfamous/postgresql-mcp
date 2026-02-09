@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Dependencies
+
+- Bump `@modelcontextprotocol/sdk` from 1.25.3 to 1.26.0
+- Bump `@types/node` from 25.1.0 to 25.2.2
+- Bump `commander` from 14.0.2 to 14.0.3
+- Bump `globals` from 17.2.0 to 17.3.0
+- Bump `pg` from 8.17.2 to 8.18.0
+- Skipped `eslint` 10.0.0 and `@eslint/js` 10.0.1 — major version upgrade blocked by `typescript-eslint` v8.54 which only supports `eslint ^8.57.0 || ^9.0.0`
+
 ## [1.1.0] - 2026-01-29
 
 ### Fixed

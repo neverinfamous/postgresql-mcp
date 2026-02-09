@@ -22,7 +22,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 7. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`
 8. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint (supports: table, view, materialized_view, partitioned_table, function, sequence, index)
 9. **pg_exists optional WHERE**: \`where\`/\`condition\`/\`filter\` is optional. Without it, checks if table has any rows
-10. **pg_describe_table**: Returns columns, foreignKeys, primaryKey—use \`pg_get_indexes\` separately for index details
+10. **pg_describe_table**: Returns columns, foreignKeys, primaryKey, indexes, constraints. For listing ALL database indexes (not table-specific), use \`pg_get_indexes\` without \`table\` param
 11. **pg_vector_insert updateExisting**: Uses direct UPDATE (avoids NOT NULL constraint issues vs INSERT mode)
 12. **pg_get_indexes without table**: Returns ALL database indexes (potentially large). Use \`table\` param for specific table
 13. **pg_upsert/pg_batch_insert RETURNING**: \`returning\` param must be array of column names: \`["id", "name"]\`. ⛔ \`"*"\` wildcard not supported

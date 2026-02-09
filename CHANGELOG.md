@@ -15,9 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`pg_list_functions` fuzzystrmatch alias mapping for `exclude`** — `pg_list_functions({ exclude: ['fuzzymatch'] })` and `exclude: ['fuzzy']` now correctly filter out fuzzystrmatch functions. The fuzzystrmatch extension registers functions in the `public` schema, so passing the full `'fuzzystrmatch'` name was required. Added `fuzzymatch` → `fuzzystrmatch` and `fuzzy` → `fuzzystrmatch` aliases to `EXTENSION_ALIASES`, matching the existing `pgvector` → `vector` and `partman` → `pg_partman` patterns. Added 2 unit tests
 
+- **`pg_hybrid_search` tsvector `textColumn` support** — `textColumn` now auto-detects column type: uses tsvector columns directly (no wrapping), wraps plain text columns with `to_tsvector('english', ...)`. Previously, tsvector columns caused SQL errors due to unconditional `to_tsvector()` wrapping. Added 2 unit tests and updated 4 existing test mocks
+
 ### Documentation
 
 - **`pg_list_functions` exclude example expanded** — Updated `ServerInstructions.ts` exclude example from `['postgis', 'citext', 'fuzzystrmatch']` to include 9 common extensions (`postgis`, `pg_trgm`, `ltree`, `citext`, `fuzzystrmatch`, `pg_stat_statements`, `hypopg`, `unaccent`, `pg_stat_kcache`). Added caveat that the `language` filter does NOT exclude extension functions—agents should use `exclude` alongside `language` for clean results
+
+- **`pg_vector_performance` `testVectorSource` documentation** — Fixed documented values from `'auto-generated'|'user-provided'` to `'auto-generated from first row'|'user-provided'` to match actual handler output
+
+- **`pg_hybrid_search` tsvector support documented** — Added note in `ServerInstructions.ts` that `textColumn` auto-detects type
 
 ### Dependencies
 

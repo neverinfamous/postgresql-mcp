@@ -442,6 +442,24 @@ export function createHybridSearchTool(
         };
       }
 
+      // Check textColumn type to determine if we need to_tsvector() wrapping
+      const textColTypeResult = await adapter.executeQuery(colTypeSql, [
+        schemaName,
+        resolvedTable,
+        parsed.textColumn,
+      ]);
+      const textColType = textColTypeResult.rows?.[0] as
+        | { data_type?: string; udt_name?: string }
+        | undefined;
+      const isTextColumnTsvector =
+        textColType?.udt_name === "tsvector" ||
+        textColType?.data_type === "tsvector";
+
+      // Use tsvector column directly, otherwise wrap with to_tsvector()
+      const textExpr = isTextColumnTsvector
+        ? `"${parsed.textColumn}"`
+        : `to_tsvector('english', "${parsed.textColumn}")`;
+
       const vectorWeight = parsed.vectorWeight ?? 0.5;
       // Fix floating point precision (e.g., 0.30000000000000004 -> 0.3)
       const textWeight = Math.round((1 - vectorWeight) * 1000) / 1000;
@@ -486,9 +504,9 @@ export function createHybridSearchTool(
                 text_scores AS (
                     SELECT 
                         ctid,
-                        ts_rank(to_tsvector('english', "${parsed.textColumn}"), plainto_tsquery($1)) as text_score
+                        ts_rank(${textExpr}, plainto_tsquery($1)) as text_score
                     FROM ${tableName}
-                    WHERE to_tsvector('english', "${parsed.textColumn}") @@ plainto_tsquery($1)
+                    WHERE ${textExpr} @@ plainto_tsquery($1)
                 )
                 SELECT 
                     ${selectCols},

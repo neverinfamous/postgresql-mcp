@@ -463,10 +463,13 @@ describe("Vector Tools", () => {
 
   describe("pg_hybrid_search", () => {
     it("should combine vector and text search", async () => {
-      // Mock column type check, column list query, and main query
+      // Mock column type check (vectorColumn), textColumn type check, column list query, and main query
       mockAdapter.executeQuery
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "text", udt_name: "text" }],
         })
         .mockResolvedValueOnce({
           rows: [{ column_name: "id" }, { column_name: "content" }],
@@ -499,10 +502,13 @@ describe("Vector Tools", () => {
     });
 
     it("should use custom weights", async () => {
-      // Mock column type check, column list query, and main query
+      // Mock column type check (vectorColumn), textColumn type check, column list query, and main query
       mockAdapter.executeQuery
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "text", udt_name: "text" }],
         })
         .mockResolvedValueOnce({ rows: [{ column_name: "id" }] })
         .mockResolvedValueOnce({ rows: [] });
@@ -522,6 +528,71 @@ describe("Vector Tools", () => {
 
       expect(result.vectorWeight).toBe(0.8);
       expect(result.textWeight).toBeCloseTo(0.2, 5);
+    });
+
+    it("should use tsvector column directly without to_tsvector wrapping", async () => {
+      // Mock: vectorColumn type check (vector), textColumn type check (tsvector), column list, main query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "tsvector", udt_name: "tsvector" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "id" }, { column_name: "content" }],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const tool = findTool("pg_hybrid_search");
+      await tool!.handler(
+        {
+          table: "documents",
+          vectorColumn: "embedding",
+          textColumn: "search_vector",
+          vector: [0.1, 0.2, 0.3],
+          textQuery: "machine learning",
+        },
+        mockContext,
+      );
+
+      // The main SQL query should use the tsvector column directly
+      const mainQueryCall = mockAdapter.executeQuery.mock.calls[3];
+      const sql = mainQueryCall?.[0] as string;
+      expect(sql).toContain('ts_rank("search_vector"');
+      expect(sql).not.toContain("to_tsvector('english'");
+    });
+
+    it("should wrap plain text column with to_tsvector", async () => {
+      // Mock: vectorColumn type check (vector), textColumn type check (text), column list, main query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "text", udt_name: "text" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "id" }, { column_name: "content" }],
+        })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const tool = findTool("pg_hybrid_search");
+      await tool!.handler(
+        {
+          table: "documents",
+          vectorColumn: "embedding",
+          textColumn: "content",
+          vector: [0.1, 0.2, 0.3],
+          textQuery: "test query",
+        },
+        mockContext,
+      );
+
+      // The main SQL query should wrap the text column with to_tsvector
+      const mainQueryCall = mockAdapter.executeQuery.mock.calls[3];
+      const sql = mainQueryCall?.[0] as string;
+      expect(sql).toContain("to_tsvector('english', \"content\")");
     });
   });
 

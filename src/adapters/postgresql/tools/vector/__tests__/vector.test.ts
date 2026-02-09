@@ -357,11 +357,14 @@ describe("Bug Fixes", () => {
 
   describe("pg_hybrid_search select parameter", () => {
     it("should respect select parameter to limit columns", async () => {
-      // Mock: column type check, then main query (select specified, no column list needed)
+      // Mock: vectorColumn type check, textColumn type check, then main query (select specified, no column list needed)
       mockAdapter.executeQuery
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
-        }) // type check
+        }) // vectorColumn type check
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "text", udt_name: "text" }],
+        }) // textColumn type check
         .mockResolvedValueOnce({
           rows: [{ id: 1, title: "test", combined_score: 0.9 }],
         }); // main query
@@ -379,19 +382,22 @@ describe("Bug Fixes", () => {
         mockContext,
       );
 
-      // Main query is the second call (after type check)
-      const mainQueryCall = mockAdapter.executeQuery.mock.calls[1][0] as string;
+      // Main query is the third call (after vectorColumn type check and textColumn type check)
+      const mainQueryCall = mockAdapter.executeQuery.mock.calls[2][0] as string;
       expect(mainQueryCall).toContain('t."id"');
       expect(mainQueryCall).toContain('t."title"');
       expect(mainQueryCall).not.toContain("t.*");
     });
 
     it("should exclude vector columns when select is not provided", async () => {
-      // Mock: column type check, column list query, then main query
+      // Mock: vectorColumn type check, textColumn type check, column list query, then main query
       mockAdapter.executeQuery
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
-        }) // type check
+        }) // vectorColumn type check
+        .mockResolvedValueOnce({
+          rows: [{ data_type: "text", udt_name: "text" }],
+        }) // textColumn type check
         .mockResolvedValueOnce({
           rows: [{ column_name: "id" }, { column_name: "content" }],
         }) // column list
@@ -409,8 +415,8 @@ describe("Bug Fixes", () => {
         mockContext,
       );
 
-      // Main query is the third call
-      const mainQueryCall = mockAdapter.executeQuery.mock.calls[2][0] as string;
+      // Main query is the fourth call
+      const mainQueryCall = mockAdapter.executeQuery.mock.calls[3][0] as string;
       expect(mainQueryCall).toContain('t."id"');
       expect(mainQueryCall).toContain('t."content"');
       // Should NOT use t.* since we now dynamically get non-vector columns

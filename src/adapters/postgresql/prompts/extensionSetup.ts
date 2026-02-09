@@ -87,8 +87,7 @@ export function createExtensionSetupPrompt(): PromptDefinition {
         required: true,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -283,7 +282,7 @@ Extension-specific configuration may vary. Check the official documentation.
 
 **Pro Tip:** PostgreSQL's extension ecosystem is one of its greatest strengths!`;
 
-      return content;
+      return Promise.resolve(content);
     },
   };
 }

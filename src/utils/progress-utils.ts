@@ -14,7 +14,7 @@ export type ProgressToken = string | number;
 /** Context required to send progress notifications */
 export interface ProgressContext {
   /** MCP Server instance for sending notifications */
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- Server class is required for sendLoggingMessage(); no non-deprecated alternative exists in SDK
   server: Server;
   /** Progress token from request _meta (if client requested progress) */
   progressToken?: ProgressToken;
@@ -31,7 +31,7 @@ export function buildProgressContext(
     return undefined;
   }
   return {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- Server class is required for progress notifications; no non-deprecated alternative exists in SDK
     server: ctx.server as Server,
     progressToken: ctx.progressToken,
   };

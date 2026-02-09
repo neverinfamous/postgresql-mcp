@@ -77,14 +77,13 @@ function createQueryBuilderPrompt(): PromptDefinition {
         required: true,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
       const tables = args["tables"] ?? "";
       const operation = args["operation"] ?? "";
-      return `Please construct a PostgreSQL query for the following requirements:
+      return Promise.resolve(`Please construct a PostgreSQL query for the following requirements:
 
 **Tables:** ${tables}
 **Operation:** ${operation}
@@ -97,7 +96,7 @@ Consider these PostgreSQL best practices:
 5. Add LIMIT for SELECT queries when full results aren't needed
 6. Use proper index hints if performance is critical
 
-Please provide the SQL query with explanations for each part.`;
+Please provide the SQL query with explanations for each part.`);
     },
   };
 }
@@ -118,14 +117,13 @@ function createSchemaDesignPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
       const useCase = args["useCase"] ?? "";
       const requirements = args["requirements"] ?? "";
-      return `Please design a PostgreSQL database schema for the following use case:
+      return Promise.resolve(`Please design a PostgreSQL database schema for the following use case:
 
 **Use Case:** ${useCase}
 ${requirements ? `**Requirements:** ${requirements}` : ""}
@@ -143,7 +141,7 @@ Please provide:
 - CREATE TABLE statements
 - Index recommendations
 - Constraint definitions
-- Any relevant views or functions`;
+- Any relevant views or functions`);
     },
   };
 }
@@ -164,14 +162,13 @@ function createPerformanceAnalysisPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
       const query = args["query"] ?? "";
       const context = args["context"] ?? "";
-      return `Please analyze this PostgreSQL query for performance issues:
+      return Promise.resolve(`Please analyze this PostgreSQL query for performance issues:
 
 \`\`\`sql
 ${query}
@@ -189,7 +186,7 @@ Please analyze and recommend:
 - Missing indexes
 - Query rewrites
 - Configuration changes
-- Maintenance operations (VACUUM, ANALYZE)`;
+- Maintenance operations (VACUUM, ANALYZE)`);
     },
   };
 }
@@ -206,14 +203,13 @@ function createMigrationPrompt(): PromptDefinition {
       },
       { name: "table", description: "Target table name", required: false },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
       const change = args["change"] ?? "";
       const table = args["table"] ?? "";
-      return `Please create a PostgreSQL migration plan for:
+      return Promise.resolve(`Please create a PostgreSQL migration plan for:
 
 **Change:** ${change}
 ${table ? `**Table:** ${table}` : ""}
@@ -231,7 +227,7 @@ Provide:
 Use PostgreSQL-specific features like:
 - ALTER TABLE ... ADD COLUMN ... (with DEFAULT for non-nullable)
 - CREATE INDEX CONCURRENTLY
-- Transaction wrappers where appropriate`;
+- Transaction wrappers where appropriate`);
     },
   };
 }
@@ -242,8 +238,7 @@ function createToolIndexPrompt(tools: ToolDefinition[]): PromptDefinition {
     description:
       "Get a compact index of all available PostgreSQL tools for discovery.",
     arguments: [],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       _args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -276,7 +271,7 @@ function createToolIndexPrompt(tools: ToolDefinition[]): PromptDefinition {
         lines.push("");
       }
 
-      return lines.join("\n");
+      return Promise.resolve(lines.join("\n"));
     },
   };
 }
@@ -292,13 +287,12 @@ function createQuickQueryPrompt(): PromptDefinition {
         required: true,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
       const action = args["action"] ?? "";
-      return `To "${action}" in PostgreSQL, use:
+      return Promise.resolve(`To "${action}" in PostgreSQL, use:
 
 **Tool:** \`pg_read_query\` for SELECT, \`pg_write_query\` for INSERT/UPDATE/DELETE
 
@@ -313,7 +307,7 @@ UPDATE table_name SET col1 = $1 WHERE condition = $2 RETURNING *;
 DELETE FROM table_name WHERE condition = $1 RETURNING *;
 \`\`\`
 
-Provide your specific requirements and I'll help construct the exact query.`;
+Provide your specific requirements and I'll help construct the exact query.`);
     },
   };
 }
@@ -323,12 +317,11 @@ function createQuickSchemaPrompt(): PromptDefinition {
     name: "pg_quick_schema",
     description: "Quick reference for exploring database schema.",
     arguments: [],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       _args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
-      return `# Quick Schema Exploration
+      return Promise.resolve(`# Quick Schema Exploration
 
 **List all tables:**
 \`pg_list_tables\`
@@ -348,7 +341,7 @@ Access resource: \`postgres://schema\`
 **Schema statistics:**
 Access resource: \`postgres://stats\`
 
-What would you like to explore?`;
+What would you like to explore?`);
     },
   };
 }

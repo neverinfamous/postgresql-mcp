@@ -18,8 +18,7 @@ export function createSetupPgcronPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -233,7 +232,7 @@ SELECT cron.schedule_in_database(
 
 **Pro Tip:** Combine pg_cron with pg_partman for automatic partition maintenance!`;
 
-      return content;
+      return Promise.resolve(content);
     },
   };
 }

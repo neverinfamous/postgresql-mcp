@@ -656,8 +656,7 @@ function createTextSentimentTool(_adapter: PostgresAdapter): ToolDefinition {
     outputSchema: TextSentimentOutputSchema,
     annotations: readOnly("Text Sentiment"),
     icons: getToolIcons("text", readOnly("Text Sentiment")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: (params: unknown, _context: RequestContext) => {
       const parsed = SentimentSchema.parse(params ?? {});
       const text = parsed.text.toLowerCase();
 
@@ -758,7 +757,7 @@ function createTextSentimentTool(_adapter: PostgresAdapter): ToolDefinition {
         result.matchedNegative = matchedNegative;
       }
 
-      return result;
+      return Promise.resolve(result);
     },
   };
 }

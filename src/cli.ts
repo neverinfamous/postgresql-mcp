@@ -12,6 +12,7 @@ import { PostgresMcpServer } from "./server/McpServer.js";
 import { parseToolFilter, getFilterSummary } from "./filtering/ToolFilter.js";
 import { logger } from "./utils/logger.js";
 import { HttpTransport, type HttpTransportConfig } from "./transports/http.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   OAuthResourceServer,
   TokenValidator,
@@ -374,8 +375,7 @@ async function startHttpServer(
   // Create HTTP transport with OAuth
   const httpTransport = new HttpTransport(transportConfig, (transport) => {
     // Connect MCP server to the transport when client connects
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    void mcpServer.getMcpServer().connect(transport as any);
+    void mcpServer.getMcpServer().connect(transport as Transport);
   });
 
   // Handle shutdown
@@ -411,8 +411,7 @@ program
   .description("List all available tools")
   .option("--filter <filter>", "Apply tool filter")
   .option("--group <group>", "Filter by tool group")
-  // eslint-disable-next-line @typescript-eslint/require-await
-  .action(async (options: ListToolsOptions) => {
+  .action((options: ListToolsOptions) => {
     const adapter = new PostgresAdapter();
     const tools = adapter.getToolDefinitions();
 
@@ -454,8 +453,7 @@ program
 program
   .command("info")
   .description("Show server information")
-  // eslint-disable-next-line @typescript-eslint/require-await
-  .action(async () => {
+  .action(() => {
     const adapter = new PostgresAdapter();
     const tools = adapter.getToolDefinitions();
     const resources = adapter.getResourceDefinitions();

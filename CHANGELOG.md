@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump `pg` from 8.17.2 to 8.18.0
 - Skipped `eslint` 10.0.0 and `@eslint/js` 10.0.1 — major version upgrade blocked by `typescript-eslint` v8.54 which only supports `eslint ^8.57.0 || ^9.0.0`
 
+### Code Quality
+
+- **Systematic `eslint-disable` elimination** — Removed ~43 `eslint-disable` comments across the codebase. Only 7 justified suppressions remain (5 `no-deprecated` for SDK limitations, 2 `no-control-regex` for security patterns), all with inline justification comments
+  - `require-await` (~30 occurrences) — Removed `async` keyword from prompt/tool handlers and test adapter methods that don't `await`; wrapped returns in `Promise.resolve()` or `Promise.resolve().then()` to maintain `Promise<unknown>` signatures
+  - `no-misused-promises` (2 occurrences) — Added type casts in mock files (`adapter.ts`, `pool.ts`) to match `mockImplementation` signatures
+  - `no-unused-vars` (2 occurrences) — Replaced `_xmax` destructuring with `Object.fromEntries` filter in `convenience.ts`; added `varsIgnorePattern: "^_"` to ESLint config for intentionally unused `_`-prefixed variables
+  - `no-unsafe-argument` / `no-explicit-any` (1 occurrence) — Replaced `as any` with `as Transport` type import in `cli.ts` for SDK `exactOptionalPropertyTypes` incompatibility
+
 ## [1.1.0] - 2026-01-29
 
 ### Fixed

@@ -248,8 +248,9 @@ export function configureMockAdapterQuery(
     }
     return Promise.resolve(createMockQueryResult());
   };
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-  adapter.executeQuery.mockImplementation(impl);
+  adapter.executeQuery.mockImplementation(
+    impl as (...args: unknown[]) => unknown,
+  );
 }
 
 /**

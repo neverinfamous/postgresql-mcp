@@ -831,8 +831,7 @@ function createAlertThresholdSetTool(
     outputSchema: AlertThresholdOutputSchema,
     annotations: readOnly("Get Alert Thresholds"),
     icons: getToolIcons("monitoring", readOnly("Get Alert Thresholds")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: (params: unknown, _context: RequestContext) => {
       // Schema with validated enum for metric
       const AlertThresholdSchema = z.object({
         metric: z
@@ -889,16 +888,16 @@ function createAlertThresholdSetTool(
       };
 
       if (parsed.metric && thresholds[parsed.metric]) {
-        return {
+        return Promise.resolve({
           metric: parsed.metric,
           threshold: thresholds[parsed.metric],
-        };
+        });
       }
 
-      return {
+      return Promise.resolve({
         thresholds,
         note: "These are recommended starting thresholds. Adjust based on your specific workload and requirements.",
-      };
+      });
     },
   };
 }

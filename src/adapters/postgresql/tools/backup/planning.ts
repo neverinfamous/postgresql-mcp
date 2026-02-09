@@ -132,58 +132,59 @@ export function createRestoreCommandTool(
     outputSchema: RestoreCommandOutputSchema,
     annotations: readOnly("Restore Command"),
     icons: getToolIcons("backup", readOnly("Restore Command")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
-      const parsed = params as {
-        backupFile?: string;
-        database?: string;
-        schema?: string;
-        table?: string;
-        dataOnly?: boolean;
-        schemaOnly?: boolean;
-      };
+    handler: (params: unknown, _context: RequestContext) => {
+      return Promise.resolve().then(() => {
+        const parsed = params as {
+          backupFile?: string;
+          database?: string;
+          schema?: string;
+          table?: string;
+          dataOnly?: boolean;
+          schemaOnly?: boolean;
+        };
 
-      // Validate required param
-      if (parsed.backupFile === undefined || parsed.backupFile === "") {
-        throw new Error("backupFile parameter is required");
-      }
+        // Validate required param
+        if (parsed.backupFile === undefined || parsed.backupFile === "") {
+          throw new Error("backupFile parameter is required");
+        }
 
-      // Validate mutually exclusive options
-      if (parsed.dataOnly === true && parsed.schemaOnly === true) {
-        throw new Error(
-          "dataOnly and schemaOnly cannot both be true - pg_restore only supports one at a time",
-        );
-      }
+        // Validate mutually exclusive options
+        if (parsed.dataOnly === true && parsed.schemaOnly === true) {
+          throw new Error(
+            "dataOnly and schemaOnly cannot both be true - pg_restore only supports one at a time",
+          );
+        }
 
-      let command = "pg_restore --verbose";
-      const warnings: string[] = [];
+        let command = "pg_restore --verbose";
+        const warnings: string[] = [];
 
-      if (parsed.database !== undefined) {
-        command += ` --dbname="${parsed.database}"`;
-      } else {
-        warnings.push(
-          "No database specified - add --dbname=DBNAME to run this command",
-        );
-      }
-      if (parsed.schema !== undefined)
-        command += ` --schema="${parsed.schema}"`;
-      if (parsed.table !== undefined) command += ` --table="${parsed.table}"`;
-      if (parsed.dataOnly === true) command += " --data-only";
-      if (parsed.schemaOnly === true) command += " --schema-only";
+        if (parsed.database !== undefined) {
+          command += ` --dbname="${parsed.database}"`;
+        } else {
+          warnings.push(
+            "No database specified - add --dbname=DBNAME to run this command",
+          );
+        }
+        if (parsed.schema !== undefined)
+          command += ` --schema="${parsed.schema}"`;
+        if (parsed.table !== undefined) command += ` --table="${parsed.table}"`;
+        if (parsed.dataOnly === true) command += " --data-only";
+        if (parsed.schemaOnly === true) command += " --schema-only";
 
-      command += ` "${parsed.backupFile}"`;
+        command += ` "${parsed.backupFile}"`;
 
-      return {
-        command,
-        ...(warnings.length > 0 && { warnings }),
-        notes: [
-          "Add --clean to drop database objects before recreating",
-          "Add --if-exists to avoid errors on drop",
-          "Add --no-owner to skip ownership commands",
-          "Use -j N for parallel restore (N workers)",
-          "For remote restores, add -h HOST -p PORT -U USER to the command",
-        ],
-      };
+        return {
+          command,
+          ...(warnings.length > 0 && { warnings }),
+          notes: [
+            "Add --clean to drop database objects before recreating",
+            "Add --if-exists to avoid errors on drop",
+            "Add --no-owner to skip ownership commands",
+            "Use -j N for parallel restore (N workers)",
+            "For remote restores, add -h HOST -p PORT -U USER to the command",
+          ],
+        };
+      });
     },
   };
 }
@@ -210,70 +211,71 @@ export function createPhysicalBackupTool(
     outputSchema: PhysicalBackupOutputSchema,
     annotations: readOnly("Physical Backup"),
     icons: getToolIcons("backup", readOnly("Physical Backup")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
-      // Parse params through schema to validate enum values
-      const schema = z.object({
-        targetDir: z.string().optional(),
-        format: z.enum(["plain", "tar"]).optional(),
-        checkpoint: z.enum(["fast", "spread"]).optional(),
-        compress: z.number().optional(),
+    handler: (params: unknown, _context: RequestContext) => {
+      return Promise.resolve().then(() => {
+        // Parse params through schema to validate enum values
+        const schema = z.object({
+          targetDir: z.string().optional(),
+          format: z.enum(["plain", "tar"]).optional(),
+          checkpoint: z.enum(["fast", "spread"]).optional(),
+          compress: z.number().optional(),
+        });
+        const parsed = schema.parse(params);
+
+        // Validate required param
+        if (parsed.targetDir === undefined || parsed.targetDir === "") {
+          throw new Error("targetDir parameter is required");
+        }
+
+        // Validate compress range
+        if (
+          parsed.compress !== undefined &&
+          (parsed.compress < 0 || parsed.compress > 9)
+        ) {
+          throw new Error("compress must be between 0 and 9");
+        }
+
+        let command = "pg_basebackup";
+        command += ` -D "${parsed.targetDir}"`;
+        // Set format flag: plain (-Fp) if specified, otherwise tar (-Ft) as default
+        command += parsed.format === "plain" ? " -Fp" : " -Ft";
+        command += " -Xs";
+        command += " -P";
+
+        if (parsed.checkpoint === "fast") {
+          command += " -c fast";
+        } else if (parsed.checkpoint === "spread") {
+          command += " -c spread";
+        }
+
+        if (parsed.compress !== undefined && parsed.compress > 0) {
+          // Use only -Z (--compress) with level, not -z (which is redundant)
+          command += ` -Z ${String(parsed.compress)}`;
+        }
+
+        // Connection flags should be provided by user or via environment
+        command +=
+          " -h ${PGHOST:-localhost} -p ${PGPORT:-5432} -U ${PGUSER:-postgres}";
+
+        return {
+          command,
+          notes: [
+            "Set PGHOST, PGPORT, PGUSER environment variables or replace the placeholders directly",
+            "Requires replication connection permission",
+            "Modify -h/-U flags above to change connection target",
+            "Add --slot=NAME to use a replication slot",
+            "Physical backups capture the entire cluster",
+            parsed.format === "plain"
+              ? "Plain format (-Fp): Creates directory structure with individual data files"
+              : "Tar format (-Ft): Creates single compressed archive file",
+          ],
+          requirements: [
+            "wal_level = replica (or higher)",
+            "max_wal_senders > 0",
+            "pg_hba.conf must allow replication connections",
+          ],
+        };
       });
-      const parsed = schema.parse(params);
-
-      // Validate required param
-      if (parsed.targetDir === undefined || parsed.targetDir === "") {
-        throw new Error("targetDir parameter is required");
-      }
-
-      // Validate compress range
-      if (
-        parsed.compress !== undefined &&
-        (parsed.compress < 0 || parsed.compress > 9)
-      ) {
-        throw new Error("compress must be between 0 and 9");
-      }
-
-      let command = "pg_basebackup";
-      command += ` -D "${parsed.targetDir}"`;
-      // Set format flag: plain (-Fp) if specified, otherwise tar (-Ft) as default
-      command += parsed.format === "plain" ? " -Fp" : " -Ft";
-      command += " -Xs";
-      command += " -P";
-
-      if (parsed.checkpoint === "fast") {
-        command += " -c fast";
-      } else if (parsed.checkpoint === "spread") {
-        command += " -c spread";
-      }
-
-      if (parsed.compress !== undefined && parsed.compress > 0) {
-        // Use only -Z (--compress) with level, not -z (which is redundant)
-        command += ` -Z ${String(parsed.compress)}`;
-      }
-
-      // Connection flags should be provided by user or via environment
-      command +=
-        " -h ${PGHOST:-localhost} -p ${PGPORT:-5432} -U ${PGUSER:-postgres}";
-
-      return {
-        command,
-        notes: [
-          "Set PGHOST, PGPORT, PGUSER environment variables or replace the placeholders directly",
-          "Requires replication connection permission",
-          "Modify -h/-U flags above to change connection target",
-          "Add --slot=NAME to use a replication slot",
-          "Physical backups capture the entire cluster",
-          parsed.format === "plain"
-            ? "Plain format (-Fp): Creates directory structure with individual data files"
-            : "Tar format (-Ft): Creates single compressed archive file",
-        ],
-        requirements: [
-          "wal_level = replica (or higher)",
-          "max_wal_senders > 0",
-          "pg_hba.conf must allow replication connections",
-        ],
-      };
     },
   };
 }
@@ -296,87 +298,88 @@ export function createRestoreValidateTool(
     outputSchema: RestoreValidateOutputSchema,
     annotations: readOnly("Restore Validate"),
     icons: getToolIcons("backup", readOnly("Restore Validate")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
-      // Parse params through schema to validate enum values
-      const schema = z.object({
-        backupFile: z.string().optional(),
-        backupType: z.enum(["pg_dump", "pg_basebackup"]).optional(),
+    handler: (params: unknown, _context: RequestContext) => {
+      return Promise.resolve().then(() => {
+        // Parse params through schema to validate enum values
+        const schema = z.object({
+          backupFile: z.string().optional(),
+          backupType: z.enum(["pg_dump", "pg_basebackup"]).optional(),
+        });
+        const parsed = schema.parse(params);
+
+        // Validate required param
+        if (parsed.backupFile === undefined || parsed.backupFile === "") {
+          throw new Error("backupFile parameter is required");
+        }
+
+        const backupType = parsed.backupType ?? "pg_dump";
+        const defaultUsed = parsed.backupType === undefined;
+
+        if (backupType === "pg_dump") {
+          return {
+            ...(defaultUsed && {
+              note: "No backupType specified - defaulting to pg_dump validation steps",
+            }),
+            validationSteps: [
+              {
+                step: 1,
+                name: "Check backup file integrity",
+                command: `pg_restore --list "${parsed.backupFile}"`,
+              },
+              {
+                step: 2,
+                name: "Test restore to temporary database",
+                commands: [
+                  "createdb test_restore",
+                  `pg_restore --dbname=test_restore "${parsed.backupFile}"`,
+                  "-- Run validation queries",
+                  "dropdb test_restore",
+                ],
+              },
+              {
+                step: 3,
+                name: "Verify table counts match",
+                note: "Compare pg_class counts between source and restored database",
+              },
+            ],
+            recommendations: [
+              "Automate validation as part of backup workflow",
+              "Keep validation logs for compliance",
+              "Test restores regularly, not just during incidents",
+            ],
+          };
+        } else {
+          return {
+            validationSteps: [
+              {
+                step: 1,
+                name: "Verify backup with pg_verifybackup (PostgreSQL 13+)",
+                command: `pg_verifybackup "${parsed.backupFile}"`,
+              },
+              {
+                step: 2,
+                name: "Verify base backup files",
+                command: `ls -la "${parsed.backupFile}"/`,
+              },
+              {
+                step: 3,
+                name: "Check backup_label file",
+                command: `cat "${parsed.backupFile}"/backup_label`,
+              },
+              {
+                step: 4,
+                name: "Test recovery in isolated environment",
+                note: "Configure recovery.conf/recovery.signal and start standby",
+              },
+            ],
+            recommendations: [
+              "pg_verifybackup validates checksums (requires data checksums enabled)",
+              "Maintain WAL archives for point-in-time recovery testing",
+              "Document recovery procedures and test quarterly",
+            ],
+          };
+        }
       });
-      const parsed = schema.parse(params);
-
-      // Validate required param
-      if (parsed.backupFile === undefined || parsed.backupFile === "") {
-        throw new Error("backupFile parameter is required");
-      }
-
-      const backupType = parsed.backupType ?? "pg_dump";
-      const defaultUsed = parsed.backupType === undefined;
-
-      if (backupType === "pg_dump") {
-        return {
-          ...(defaultUsed && {
-            note: "No backupType specified - defaulting to pg_dump validation steps",
-          }),
-          validationSteps: [
-            {
-              step: 1,
-              name: "Check backup file integrity",
-              command: `pg_restore --list "${parsed.backupFile}"`,
-            },
-            {
-              step: 2,
-              name: "Test restore to temporary database",
-              commands: [
-                "createdb test_restore",
-                `pg_restore --dbname=test_restore "${parsed.backupFile}"`,
-                "-- Run validation queries",
-                "dropdb test_restore",
-              ],
-            },
-            {
-              step: 3,
-              name: "Verify table counts match",
-              note: "Compare pg_class counts between source and restored database",
-            },
-          ],
-          recommendations: [
-            "Automate validation as part of backup workflow",
-            "Keep validation logs for compliance",
-            "Test restores regularly, not just during incidents",
-          ],
-        };
-      } else {
-        return {
-          validationSteps: [
-            {
-              step: 1,
-              name: "Verify backup with pg_verifybackup (PostgreSQL 13+)",
-              command: `pg_verifybackup "${parsed.backupFile}"`,
-            },
-            {
-              step: 2,
-              name: "Verify base backup files",
-              command: `ls -la "${parsed.backupFile}"/`,
-            },
-            {
-              step: 3,
-              name: "Check backup_label file",
-              command: `cat "${parsed.backupFile}"/backup_label`,
-            },
-            {
-              step: 4,
-              name: "Test recovery in isolated environment",
-              note: "Configure recovery.conf/recovery.signal and start standby",
-            },
-          ],
-          recommendations: [
-            "pg_verifybackup validates checksums (requires data checksums enabled)",
-            "Maintain WAL archives for point-in-time recovery testing",
-            "Document recovery procedures and test quarterly",
-          ],
-        };
-      }
     },
   };
 }

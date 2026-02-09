@@ -23,8 +23,7 @@ export function createBackupStrategyPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -134,7 +133,7 @@ pg_restore -d dbname /backup/latest.dump
 
 **Pro Tip:** The best backup is the one you've successfully restored - test your backups regularly!`;
 
-      return content;
+      return Promise.resolve(content);
     },
   };
 }

@@ -444,9 +444,9 @@ export function createUpsertTool(adapter: PostgresAdapter): ToolDefinition {
 
         // Remove _xmax from returned rows if not explicitly requested
         const cleanedRows = result.rows?.map((row) => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { _xmax, ...rest } = row;
-          return rest;
+          return Object.fromEntries(
+            Object.entries(row).filter(([key]) => key !== "_xmax"),
+          );
         });
 
         return {
@@ -527,7 +527,6 @@ export function createBatchInsertTool(
         // Execute individual DEFAULT VALUES inserts for each row
         let totalAffected = 0;
         const allRows: Record<string, unknown>[] = [];
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for (const _row of parsed.rows) {
           const sql = `INSERT INTO ${qualifiedTable} DEFAULT VALUES${returningClause}`;
           const result = await adapter.executeQuery(sql);

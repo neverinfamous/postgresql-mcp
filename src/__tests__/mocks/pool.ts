@@ -99,6 +99,5 @@ export function configureMockPoolQuery(
     }
     return Promise.resolve({ rows: [], rowCount: 0 });
   };
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-  pool.query.mockImplementation(impl);
+  pool.query.mockImplementation(impl as (...args: unknown[]) => unknown);
 }

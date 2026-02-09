@@ -19,8 +19,7 @@ export function createDatabaseHealthCheckPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -127,7 +126,7 @@ After running checks, I'll provide:
 
 **Pro Tip:** Run health checks during low-traffic periods for accurate baselines!`;
 
-      return content;
+      return Promise.resolve(content);
     },
   };
 }

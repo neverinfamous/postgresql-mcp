@@ -748,8 +748,7 @@ export function createVectorNormalizeTool(): ToolDefinition {
     outputSchema: VectorNormalizeOutputSchema,
     annotations: readOnly("Normalize Vector"),
     icons: getToolIcons("vector", readOnly("Normalize Vector")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: (params: unknown, _context: RequestContext) => {
       const parsed = NormalizeSchema.parse(params ?? {});
 
       const magnitude = Math.sqrt(
@@ -758,17 +757,17 @@ export function createVectorNormalizeTool(): ToolDefinition {
 
       // Check for zero vector
       if (magnitude === 0) {
-        return {
+        return Promise.resolve({
           success: false,
           error: "Cannot normalize a zero vector (all values are 0)",
           suggestion: "Provide a vector with at least one non-zero value",
           magnitude: 0,
-        };
+        });
       }
 
       const normalized = parsed.vector.map((x) => x / magnitude);
 
-      return { normalized, magnitude };
+      return Promise.resolve({ normalized, magnitude });
     },
   };
 }

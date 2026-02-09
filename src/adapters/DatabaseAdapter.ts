@@ -354,7 +354,7 @@ export abstract class DatabaseAdapter {
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- Server.prompt() is the only API for registering prompts; no non-deprecated alternative exists in SDK
     server.prompt(
       prompt.name,
       prompt.description,

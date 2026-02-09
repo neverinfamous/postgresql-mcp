@@ -1033,17 +1033,16 @@ export function createVectorEmbedTool(): ToolDefinition {
     outputSchema: VectorEmbedOutputSchema,
     annotations: readOnly("Vector Embed"),
     icons: getToolIcons("vector", readOnly("Vector Embed")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: (params: unknown, _context: RequestContext) => {
       const parsed = EmbedSchema.parse(params ?? {});
 
       // Validate non-empty text
       if (parsed.text === undefined || parsed.text === "") {
-        return {
+        return Promise.resolve({
           success: false,
           error: "text parameter is required and must be non-empty",
           suggestion: "Provide text content to generate an embedding",
-        };
+        });
       }
 
       const dims = parsed.dimensions ?? 384;
@@ -1073,13 +1072,13 @@ export function createVectorEmbedTool(): ToolDefinition {
             truncated: false,
           };
 
-      return {
+      return Promise.resolve({
         embedding: embeddingOutput,
         dimensions: dims,
         textLength: parsed.text.length,
         warning:
           "This is a demo embedding using hash functions. For production, use OpenAI, Cohere, or other embedding APIs.",
-      };
+      });
     },
   };
 }

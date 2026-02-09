@@ -310,6 +310,25 @@ describe("Handler Execution", () => {
 
       expect(result.rows).toEqual([{ id: 1, name: "test" }]);
     });
+
+    it("should default rowsAffected to 0 for DDL statements", async () => {
+      mockAdapter.executeWriteQuery.mockResolvedValue({
+        rows: [],
+        rowsAffected: undefined,
+        command: "CREATE",
+        executionTimeMs: 8,
+      });
+
+      const tool = tools.find((t) => t.name === "pg_write_query")!;
+      const result = (await tool.handler(
+        { sql: "CREATE TABLE temp_ddl (id SERIAL)" },
+        mockContext,
+      )) as { rowsAffected: number; affectedRows: number; command: string };
+
+      expect(result.rowsAffected).toBe(0);
+      expect(result.affectedRows).toBe(0);
+      expect(result.command).toBe("CREATE");
+    });
   });
 
   describe("pg_list_tables", () => {

@@ -33,7 +33,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | Tool | Returns | Notes |
 |------|---------|-------|
 | \`pg_read_query\` | \`{rows, rowCount, fields?}\` | \`fields\` contains column metadata (name, dataTypeID) |
-| \`pg_write_query\` | \`{rowsAffected, affectedRows, rows?}\` | \`rows\` only with RETURNING clause. ⛔ Throws for SELECT |
+| \`pg_write_query\` | \`{rowsAffected, affectedRows, rows?}\` | \`rows\` only with RETURNING clause. DDL statements return \`rowsAffected: 0\`. ⛔ Throws for SELECT |
 | \`pg_upsert\` | \`{success, operation, rowsAffected, rowCount, rows?}\` | \`operation: 'insert'|'update'\`. \`rows\` only with RETURNING clause |
 | \`pg_batch_insert\` | \`{rowsAffected, affectedRows, insertedCount, rows?}\` | Empty objects use DEFAULT VALUES. ⚠️ BIGINT > 2^53 loses precision |
 | \`pg_count\` | \`{count: N}\` | Use \`params\` for placeholders: \`where: 'id=$1', params: [5]\`. DISTINCT: use \`pg_read_query\` |
@@ -42,7 +42,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | \`pg_list_objects\` | \`{objects, count, totalCount, byType}\` | Use \`limit\` to cap results, \`type\`/\`types\` to filter |
 | \`pg_object_details\` | \`{name, schema, type, returnType?, ...}\` | Functions: \`returnType\` alias. Views/Mat. views: \`definition\` |
 | \`pg_analyze_db_health\` | \`{cacheHitRatio: {ratio, heap, index, status}}\` | \`ratio\` = primary numeric %. \`bloat\` available |
-| \`pg_describe_table\` | \`{columns, indexes, constraints, foreignKeys}\` | Columns include \`notNull\` (alias for \`!nullable\`), \`foreignKey\`. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL. ⚠️ \`rowCount: -1\` = stale/missing statistics (run ANALYZE on the table). Small tables (<~50 rows) may show -1 until first ANALYZE |
+| \`pg_describe_table\` | \`{name, schema, type, owner, rowCount, columns, primaryKey, indexes, constraints, foreignKeys}\` | Columns include \`notNull\` (alias for \`!nullable\`), \`foreignKey\`. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL. ⚠️ \`rowCount: -1\` = stale/missing statistics (run ANALYZE on the table). Small tables (<~50 rows) may show -1 until first ANALYZE |
 | \`pg_analyze_query_indexes\` | \`{plan, issues, recommendations}\` | \`verbosity\`: 'summary' (default) or 'full'. Summary mode returns condensed plan |
 | \`pg_list_tables\` | \`{tables, count}\` | Use \`schema\` to filter, \`limit\` to cap results, \`exclude\` to hide extension schemas (e.g., \`['cron', 'topology', 'partman']\`) |
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |

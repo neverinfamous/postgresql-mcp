@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `no-unused-vars` (2 occurrences) — Replaced `_xmax` destructuring with `Object.fromEntries` filter in `convenience.ts`; added `varsIgnorePattern: "^_"` to ESLint config for intentionally unused `_`-prefixed variables
   - `no-unsafe-argument` / `no-explicit-any` (1 occurrence) — Replaced `as any` with `as Transport` type import in `cli.ts` for SDK `exactOptionalPropertyTypes` incompatibility
 
+### Added
+
+- **P154 Object Existence Verification** — Convenience tools (`pg_count`, `pg_exists`, `pg_upsert`, `pg_batch_insert`, `pg_truncate`) now perform a pre-flight table existence check before executing their main query. When a table does not exist, these tools return a high-signal error message (e.g., `Table "public.nonexistent" does not exist`) instead of raw PostgreSQL errors like `relation "nonexistent" does not exist`. Implemented via a shared `validateTableExists()` helper that queries `information_schema.tables`. Added 12 dedicated unit tests in `convenience.test.ts`
+
 ## [1.1.0] - 2026-01-29
 
 ### Fixed

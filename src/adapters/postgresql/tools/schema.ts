@@ -40,6 +40,15 @@ import {
 } from "../schemas/index.js";
 
 /**
+ * Well-known aliases for PostgreSQL extension names.
+ * Users naturally write "pgvector" but the extension registers as "vector".
+ * This map normalizes user input so exclude filters work correctly.
+ */
+const EXTENSION_ALIASES: Record<string, string> = {
+  pgvector: "vector",
+};
+
+/**
  * Get all schema management tools
  */
 export function getSchemaTools(adapter: PostgresAdapter): ToolDefinition[] {
@@ -510,7 +519,12 @@ function createListFunctionsTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       if (parsed.exclude !== undefined && parsed.exclude.length > 0) {
-        const excludeList = parsed.exclude.map((s) => `'${s}'`).join(", ");
+        // Expand well-known aliases (e.g. "pgvector" -> ["pgvector", "vector"])
+        const normalizedExclude = parsed.exclude.flatMap((s) => {
+          const alias = EXTENSION_ALIASES[s];
+          return alias ? [s, alias] : [s];
+        });
+        const excludeList = normalizedExclude.map((s) => `'${s}'`).join(", ");
         // Exclude by schema name
         conditions.push(`n.nspname NOT IN (${excludeList})`);
         // Also exclude extension-owned functions (e.g., ltree functions in public schema)

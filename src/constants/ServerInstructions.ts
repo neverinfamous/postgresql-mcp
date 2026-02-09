@@ -198,7 +198,7 @@ Response Structures:
 - \`copyImport\`: \`{command, stdinCommand, notes}\` — Both file and stdin COPY commands
 - \`createBackupPlan\`: \`{strategy: {fullBackup, walArchiving}, estimates}\`
 - \`restoreCommand\`: \`{command, warnings?, notes}\` — Warnings when \`database\` omitted
-- \`restoreValidate\`: \`{validationSteps: [{step, name, command?, commands?, note?}], recommendations}\` — Note: \`note\` field only for pg_dump default type
+- \`restoreValidate\`: \`{note?, validationSteps: [{step, name, command?, commands?, note?}], recommendations}\` — Top-level \`note\` when \`backupType\` omitted (defaults to pg_dump). Step-level \`note\` for non-command steps
 - \`physical\`: \`{command, notes, requirements}\`
 - \`scheduleOptimize\`: \`{analysis, recommendation, commands}\`
 
@@ -210,7 +210,7 @@ Response Structures:
 - \`pg_copy_import\`: Generates COPY FROM command. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). \`columns\` array, \`filePath\`, \`format\`, \`header\`, \`delimiter\`
 - \`pg_restore_command\`: Include \`database\` parameter for complete command. Optional \`schemaOnly\`, \`dataOnly\`
 - \`pg_create_backup_plan\`: Generates backup strategy with cron schedule. \`frequency\`: 'hourly'|'daily'|'weekly', \`retention\` count
-- \`pg_backup_physical\`: Generates pg_basebackup command. \`format\`: 'plain'|'tar', \`checkpoint\`: 'fast'|'spread', \`compress\`: 0-9
+- \`pg_backup_physical\`: Generates pg_basebackup command. \`format\`: 'plain'|'tar' (default: 'tar'), \`checkpoint\`: 'fast'|'spread', \`compress\`: 0-9
 - \`pg_restore_validate\`: Generates validation commands. \`backupType\`: 'pg_dump' (default)|'pg_basebackup'
 - \`pg_backup_schedule_optimize\`: Analyzes database activity patterns and recommends optimal backup schedule
 

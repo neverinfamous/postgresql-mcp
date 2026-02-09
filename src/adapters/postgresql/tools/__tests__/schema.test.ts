@@ -1026,6 +1026,18 @@ describe("Parameter Smoothing", () => {
     expect(sql).toContain("e.extname IN ('ltree')");
   });
 
+  it("pg_list_functions should expand well-known extension aliases in exclude", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_functions")!;
+    await tool.handler({ exclude: ["pgvector"] }, mockContext);
+
+    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    // "pgvector" should be expanded to include the actual extension name "vector"
+    expect(sql).toContain("e.extname IN ('pgvector', 'vector')");
+    expect(sql).toContain("n.nspname NOT IN ('pgvector', 'vector')");
+  });
+
   it("pg_create_view should accept definition as alias for query", async () => {
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 

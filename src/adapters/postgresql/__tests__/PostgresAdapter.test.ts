@@ -501,6 +501,33 @@ describe("PostgresAdapter", () => {
       expect("rowCount" in (result[0] ?? {})).toBe(true);
     });
 
+    it("describeTable should use live_row_estimate when stats are stale", async () => {
+      const emptyResult: QueryResult = { rows: [] };
+      const mockTableResult: QueryResult = {
+        rows: [
+          {
+            type: "table",
+            owner: "admin",
+            row_count: null, // reltuples = -1 → NULL via CASE
+            live_row_estimate: 5,
+            stats_stale: true,
+            comment: null,
+            is_partitioned: false,
+            partition_key: null,
+          },
+        ],
+      };
+      mockPoolMethods.query
+        .mockResolvedValueOnce(emptyResult) // columns
+        .mockResolvedValueOnce(mockTableResult) // table info
+        .mockResolvedValueOnce(emptyResult) // indexes
+        .mockResolvedValueOnce(emptyResult) // constraints
+        .mockResolvedValueOnce(emptyResult); // foreign keys
+
+      const result = await adapter.describeTable("fresh_table", "public");
+      expect(result.rowCount).toBe(5); // Falls back to live_row_estimate
+    });
+
     it("clearMetadataCache should force re-query for listTables", async () => {
       const mockTablesResult: QueryResult = {
         rows: [

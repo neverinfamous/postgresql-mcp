@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **`pg_list_tables` / `pg_describe_table` `rowCount` omission** — `rowCount` now returns `0` for empty or freshly created tables instead of being silently omitted from the response. Previously, `effectiveRowCount > 0 ? effectiveRowCount : undefined` converted zero to `undefined`, causing JSON serialization to drop the field entirely. Added 1 unit test
+- **`pg_list_tables` / `pg_describe_table` `rowCount` consistency** — `rowCount` now returns `0` for empty or freshly created tables instead of being silently omitted from the response. Previously, `listTables()` used `effectiveRowCount > 0 ? effectiveRowCount : undefined` which converted zero to `undefined`, and `describeTable()` used raw `c.reltuples::bigint` which returned `-1` for never-analyzed tables. Both methods now use the same `CASE WHEN reltuples = -1 THEN NULL` SQL guard with `live_row_estimate` fallback. Added 2 unit tests
 
 ## [1.1.0] - 2026-01-29
 

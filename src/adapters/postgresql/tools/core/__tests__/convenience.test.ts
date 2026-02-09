@@ -31,7 +31,11 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
 
   describe("pg_count", () => {
     it("should throw high-signal error for nonexistent table", async () => {
-      // Mock: existence check returns empty (table not found)
+      // Mock 1: schema check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 2: table check returns empty (table not found)
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_count")!;
@@ -42,12 +46,28 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
       );
     });
 
+    it("should throw schema-specific error for nonexistent schema", async () => {
+      // Mock 1: schema check returns empty (schema not found)
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+      const tool = tools.find((t) => t.name === "pg_count")!;
+      await expect(
+        tool.handler({ table: "orders", schema: "fake_schema" }, mockContext),
+      ).rejects.toThrow(
+        "Schema 'fake_schema' does not exist. Use pg_list_objects with type 'table' to see available schemas.",
+      );
+    });
+
     it("should execute normally when table exists", async () => {
-      // Mock 1: existence check passes
+      // Mock 1: schema check passes
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ "?column?": 1 }],
       });
-      // Mock 2: actual COUNT query
+      // Mock 2: table check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 3: actual COUNT query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ count: 42 }],
       });
@@ -58,10 +78,15 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
       };
 
       expect(result.count).toBe(42);
-      expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(2);
+      expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(3);
     });
 
     it("should use custom schema in existence check", async () => {
+      // Mock 1: schema check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 2: table check returns empty
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_count")!;
@@ -77,6 +102,11 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
 
   describe("pg_exists", () => {
     it("should throw high-signal error for nonexistent table", async () => {
+      // Mock 1: schema check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 2: table check returns empty
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_exists")!;
@@ -87,12 +117,27 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
       );
     });
 
+    it("should throw schema-specific error for nonexistent schema", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+      const tool = tools.find((t) => t.name === "pg_exists")!;
+      await expect(
+        tool.handler({ table: "users", schema: "fake_schema" }, mockContext),
+      ).rejects.toThrow(
+        "Schema 'fake_schema' does not exist. Use pg_list_objects with type 'table' to see available schemas.",
+      );
+    });
+
     it("should execute normally when table exists", async () => {
-      // Mock 1: existence check passes
+      // Mock 1: schema check passes
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ "?column?": 1 }],
       });
-      // Mock 2: actual EXISTS query
+      // Mock 2: table check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 3: actual EXISTS query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ exists: true }],
       });
@@ -114,6 +159,11 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
 
   describe("pg_upsert", () => {
     it("should throw high-signal error for nonexistent table", async () => {
+      // Mock 1: schema check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 2: table check returns empty
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_upsert")!;
@@ -131,12 +181,35 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
       );
     });
 
+    it("should throw schema-specific error for nonexistent schema", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+      const tool = tools.find((t) => t.name === "pg_upsert")!;
+      await expect(
+        tool.handler(
+          {
+            table: "users",
+            schema: "fake_schema",
+            data: { name: "test" },
+            conflictColumns: ["id"],
+          },
+          mockContext,
+        ),
+      ).rejects.toThrow(
+        "Schema 'fake_schema' does not exist. Use pg_list_objects with type 'table' to see available schemas.",
+      );
+    });
+
     it("should execute normally when table exists", async () => {
-      // Mock 1: existence check passes
+      // Mock 1: schema check passes
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ "?column?": 1 }],
       });
-      // Mock 2: actual UPSERT query
+      // Mock 2: table check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 3: actual UPSERT query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ _xmax: 0 }],
         rowsAffected: 1,
@@ -163,6 +236,11 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
 
   describe("pg_batch_insert", () => {
     it("should throw high-signal error for nonexistent table", async () => {
+      // Mock 1: schema check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 2: table check returns empty
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_batch_insert")!;
@@ -179,12 +257,34 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
       );
     });
 
+    it("should throw schema-specific error for nonexistent schema", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+      const tool = tools.find((t) => t.name === "pg_batch_insert")!;
+      await expect(
+        tool.handler(
+          {
+            table: "users",
+            schema: "fake_schema",
+            rows: [{ name: "test" }],
+          },
+          mockContext,
+        ),
+      ).rejects.toThrow(
+        "Schema 'fake_schema' does not exist. Use pg_list_objects with type 'table' to see available schemas.",
+      );
+    });
+
     it("should execute normally when table exists", async () => {
-      // Mock 1: existence check passes
+      // Mock 1: schema check passes
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ "?column?": 1 }],
       });
-      // Mock 2: actual INSERT query
+      // Mock 2: table check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 3: actual INSERT query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [],
         rowsAffected: 2,
@@ -210,6 +310,11 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
 
   describe("pg_truncate", () => {
     it("should throw high-signal error for nonexistent table", async () => {
+      // Mock 1: schema check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 2: table check returns empty
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_truncate")!;
@@ -220,12 +325,27 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
       );
     });
 
+    it("should throw schema-specific error for nonexistent schema", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+      const tool = tools.find((t) => t.name === "pg_truncate")!;
+      await expect(
+        tool.handler({ table: "events", schema: "fake_schema" }, mockContext),
+      ).rejects.toThrow(
+        "Schema 'fake_schema' does not exist. Use pg_list_objects with type 'table' to see available schemas.",
+      );
+    });
+
     it("should execute normally when table exists", async () => {
-      // Mock 1: existence check passes
+      // Mock 1: schema check passes
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [{ "?column?": 1 }],
       });
-      // Mock 2: actual TRUNCATE query
+      // Mock 2: table check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 3: actual TRUNCATE query
       mockAdapter.executeQuery.mockResolvedValueOnce({
         rows: [],
         rowsAffected: 0,
@@ -242,6 +362,11 @@ describe("Convenience Tools - Table Existence Pre-checks", () => {
     });
 
     it("should use custom schema in existence check", async () => {
+      // Mock 1: schema check passes
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
+      // Mock 2: table check returns empty
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_truncate")!;

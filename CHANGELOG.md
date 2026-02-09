@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **pg_list_tables `exclude` parameter** — `pg_list_tables` now accepts an optional `exclude` array of schema names to filter out extension/system schemas (e.g., `exclude: ['cron', 'topology', 'partman']`). Reduces noisy output by hiding extension-owned tables and views. Added 3 unit tests
 - **`--server-host` CLI argument** — New `--server-host <host>` flag and `MCP_HOST` environment variable for configuring the server bind address (default: `localhost`). Enables containerized deployments by allowing the server to bind to `0.0.0.0`. Precedence: CLI flag → `MCP_HOST` → `HOST` → `localhost`. Dockerfile now defaults to `HOST=0.0.0.0` for container use
 
+### Improved
+
+- **`pg_upsert` response cleanup** — Removed the `sql` field from the default response to prevent leaking generated SQL and reduce context token usage
+- **P154 schema-vs-table error granularity** — `validateTableExists()` now performs a schema-existence check before the table check, producing distinct error messages: `Schema 'X' does not exist` vs `Table 'X.Y' not found`. Updated 30 existing tests and added 5 new schema-specific tests
+- **`pg_analyze_workload_indexes` `queryPreviewLength` parameter** — Added configurable maximum characters for query preview (default: 200). Truncated queries now end with `…` instead of silently cutting off
+- **`pg_describe_table` documentation** — Clarified `rowCount: -1` meaning in `ServerInstructions.ts` to distinguish stale/missing statistics from small table optimization
+
 ### Performance
 
 - **Metadata caching for `listTables` and `describeTable`** — These high-frequency schema introspection methods now use the existing TTL-based metadata cache (default 30s, configurable via `METADATA_CACHE_TTL_MS`), matching the caching already applied to `getAllIndexes`. Reduces database load for repeated schema queries within the TTL window. Cache is automatically invalidated via `clearMetadataCache()`. Added 4 dedicated unit tests

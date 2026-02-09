@@ -216,6 +216,12 @@ export const AnalyzeWorkloadIndexesSchema = z.preprocess(
       .optional()
       .describe("Number of top queries to analyze (default: 20)"),
     minCalls: z.number().optional().describe("Minimum call count threshold"),
+    queryPreviewLength: z
+      .number()
+      .optional()
+      .describe(
+        "Maximum characters for query preview (default: 200). Truncated queries end with '…'",
+      ),
   }),
 );
 

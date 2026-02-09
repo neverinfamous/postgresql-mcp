@@ -194,7 +194,7 @@ describe("pg_drop_schema", () => {
     const tool = tools.find((t) => t.name === "pg_drop_schema")!;
     const result = (await tool.handler({ name: "old_app" }, mockContext)) as {
       success: boolean;
-      dropped: string | null;
+      schema: string;
       existed: boolean;
     };
 
@@ -203,7 +203,7 @@ describe("pg_drop_schema", () => {
       'DROP SCHEMA "old_app"',
     );
     expect(result.success).toBe(true);
-    expect(result.dropped).toBe("old_app");
+    expect(result.schema).toBe("old_app");
     expect(result.existed).toBe(true);
   });
 
@@ -248,13 +248,13 @@ describe("pg_drop_schema", () => {
       mockContext,
     )) as {
       success: boolean;
-      dropped: string | null;
+      schema: string;
       existed: boolean;
       note: string;
     };
 
     expect(result.success).toBe(true);
-    expect(result.dropped).toBeNull();
+    expect(result.schema).toBe("nonexistent_schema");
     expect(result.existed).toBe(false);
     expect(result.note).toContain("did not exist");
   });

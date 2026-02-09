@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`pg_drop_schema` response key consistency** — Renamed response key `dropped` → `schema` to align with sibling drop tools (`pg_drop_sequence` → `sequence`, `pg_drop_view` → `view`). The `schema` field now always returns the schema name; use `existed` boolean to determine if the schema was present before drop. Updated output schema and 2 unit tests
+
 - **`pg_list_functions` fuzzystrmatch alias mapping for `exclude`** — `pg_list_functions({ exclude: ['fuzzymatch'] })` and `exclude: ['fuzzy']` now correctly filter out fuzzystrmatch functions. The fuzzystrmatch extension registers functions in the `public` schema, so passing the full `'fuzzystrmatch'` name was required. Added `fuzzymatch` → `fuzzystrmatch` and `fuzzy` → `fuzzystrmatch` aliases to `EXTENSION_ALIASES`, matching the existing `pgvector` → `vector` and `partman` → `pg_partman` patterns. Added 2 unit tests
 
 ### Documentation
 
-- **`pg_list_functions` exclude example expanded** — Updated `ServerInstructions.ts` exclude example from `['postgis']` to `['postgis', 'citext', 'fuzzystrmatch']` to help agents include commonly-needed extensions in their exclude lists
+- **`pg_list_functions` exclude example expanded** — Updated `ServerInstructions.ts` exclude example from `['postgis', 'citext', 'fuzzystrmatch']` to include 9 common extensions (`postgis`, `pg_trgm`, `ltree`, `citext`, `fuzzystrmatch`, `pg_stat_statements`, `hypopg`, `unaccent`, `pg_stat_kcache`). Added caveat that the `language` filter does NOT exclude extension functions—agents should use `exclude` alongside `language` for clean results
 
 ### Dependencies
 

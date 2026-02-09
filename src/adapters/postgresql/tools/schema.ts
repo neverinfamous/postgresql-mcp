@@ -153,7 +153,7 @@ function createDropSchemaTool(adapter: PostgresAdapter): ToolDefinition {
       await adapter.executeQuery(sql);
       return {
         success: true,
-        dropped: existed ? name : null,
+        schema: name,
         existed,
         note: existed
           ? undefined

@@ -315,7 +315,7 @@ export const CreateSchemaOutputSchema = z
 export const DropSchemaOutputSchema = z
   .object({
     success: z.boolean().describe("Whether the operation succeeded"),
-    dropped: z.string().nullable().describe("Dropped schema name or null"),
+    schema: z.string().describe("Schema name"),
     existed: z.boolean().describe("Whether the schema existed before drop"),
     note: z.string().optional().describe("Note when schema did not exist"),
   })

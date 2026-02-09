@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **P154 Object Existence Verification** — Convenience tools (`pg_count`, `pg_exists`, `pg_upsert`, `pg_batch_insert`, `pg_truncate`) now perform a pre-flight table existence check before executing their main query. When a table does not exist, these tools return a high-signal error message (e.g., `Table "public.nonexistent" does not exist`) instead of raw PostgreSQL errors like `relation "nonexistent" does not exist`. Implemented via a shared `validateTableExists()` helper that queries `information_schema.tables`. Added 12 dedicated unit tests in `convenience.test.ts`
+- **pg_list_tables `exclude` parameter** — `pg_list_tables` now accepts an optional `exclude` array of schema names to filter out extension/system schemas (e.g., `exclude: ['cron', 'topology', 'partman']`). Reduces noisy output by hiding extension-owned tables and views. Added 3 unit tests
 
 ### Performance
 

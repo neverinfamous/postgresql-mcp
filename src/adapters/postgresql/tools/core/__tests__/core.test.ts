@@ -377,6 +377,57 @@ describe("Handler Execution", () => {
       expect(result.count).toBe(10);
       expect(result.truncated).toBe(true);
     });
+
+    it("should filter out excluded schemas", async () => {
+      mockAdapter.listTables.mockResolvedValue([
+        { name: "users", schema: "public" },
+        { name: "orders", schema: "public" },
+        { name: "job", schema: "cron" },
+        { name: "job_run_details", schema: "cron" },
+        { name: "layer", schema: "topology" },
+      ]);
+
+      const tool = tools.find((t) => t.name === "pg_list_tables")!;
+      const result = (await tool.handler(
+        { exclude: ["cron", "topology"] },
+        mockContext,
+      )) as { tables: Array<{ name: string; schema: string }>; count: number };
+
+      expect(result.count).toBe(2);
+      expect(result.tables.every((t) => t.schema === "public")).toBe(true);
+    });
+
+    it("should combine schema and exclude filters", async () => {
+      mockAdapter.listTables.mockResolvedValue([
+        { name: "users", schema: "public" },
+        { name: "orders", schema: "sales" },
+        { name: "job", schema: "cron" },
+      ]);
+
+      const tool = tools.find((t) => t.name === "pg_list_tables")!;
+      const result = (await tool.handler(
+        { schema: "public", exclude: ["cron"] },
+        mockContext,
+      )) as { tables: Array<{ name: string; schema: string }>; count: number };
+
+      expect(result.count).toBe(1);
+      expect(result.tables[0]?.name).toBe("users");
+    });
+
+    it("should not filter when exclude is empty array", async () => {
+      mockAdapter.listTables.mockResolvedValue([
+        { name: "users", schema: "public" },
+        { name: "job", schema: "cron" },
+      ]);
+
+      const tool = tools.find((t) => t.name === "pg_list_tables")!;
+      const result = (await tool.handler({ exclude: [] }, mockContext)) as {
+        tables: Array<{ name: string; schema: string }>;
+        count: number;
+      };
+
+      expect(result.count).toBe(2);
+    });
   });
 
   describe("pg_read_query - query alias", () => {

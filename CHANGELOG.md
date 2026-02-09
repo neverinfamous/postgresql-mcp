@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`pg_list_tables` / `pg_describe_table` `rowCount` consistency** — `rowCount` now returns `0` for empty or freshly created tables instead of being silently omitted from the response. Previously, `listTables()` used `effectiveRowCount > 0 ? effectiveRowCount : undefined` which converted zero to `undefined`, and `describeTable()` used raw `c.reltuples::bigint` which returned `-1` for never-analyzed tables. Both methods now use the same `CASE WHEN reltuples = -1 THEN NULL` SQL guard with `live_row_estimate` fallback. Added 2 unit tests
 
+- **`runningQueries` Code Mode alias mapping** — `pg.performance.runningQueries()` now correctly routes to `longRunningQueries()` (returning `{longRunningQueries, count, threshold}`) instead of `statActivity()` (which returns `{connections, count}`). The `METHOD_ALIASES` map in `api.ts` incorrectly pointed `runningQueries` to `statActivity` instead of `longRunningQueries`
+
 ### Documentation
 
 - **`pg_write_query` DDL response clarification** — Updated `ServerInstructions.ts` response structures table to note that DDL statements return `rowsAffected: 0`

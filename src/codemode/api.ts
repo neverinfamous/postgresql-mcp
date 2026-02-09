@@ -91,7 +91,7 @@ const METHOD_ALIASES: Record<string, Record<string, string>> = {
     queryStats: "statStatements", // pg_query_stats → statStatements()
     // Activity-related aliases
     activity: "statActivity", // activity() → statActivity()
-    runningQueries: "statActivity", // runningQueries() → statActivity()
+
     // Index analysis aliases
     indexUsage: "indexStats", // indexUsage() → indexStats()
     // Vacuum alias
@@ -747,6 +747,8 @@ function createGroupApi(
           threshold: `${String(threshold)} seconds`,
         };
       };
+      // Add alias: runningQueries → longRunningQueries
+      api["runningQueries"] = api["longRunningQueries"];
     }
 
     // pg.performance.analyzeTable() → Actually runs ANALYZE (cross-group bridge to admin)

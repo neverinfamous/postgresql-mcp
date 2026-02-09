@@ -48,6 +48,7 @@ interface CliOptions {
     | "emergency";
   transport?: TransportType;
   port?: number;
+  serverHost?: string;
   oauthEnabled?: boolean;
   oauthIssuer?: string;
   oauthAudience?: string;
@@ -95,6 +96,10 @@ program
     "--port, -p <port>",
     "HTTP port for http/sse transports (default: 3000)",
     parseInt,
+  )
+  .option(
+    "--server-host <host>",
+    "Server bind host for http/sse transports (default: localhost)",
   )
   .option(
     "--tool-filter <filter>",
@@ -329,7 +334,11 @@ async function startHttpServer(
   options: CliOptions,
 ): Promise<void> {
   const port = options.port ?? parseInt(process.env["PORT"] ?? "3000", 10);
-  const host = process.env["HOST"] ?? "localhost";
+  const host =
+    options.serverHost ??
+    process.env["MCP_HOST"] ??
+    process.env["HOST"] ??
+    "localhost";
 
   // Create OAuth components if enabled
   let resourceServer: OAuthResourceServer | undefined;

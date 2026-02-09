@@ -396,10 +396,11 @@ The server exposes metadata at `/.well-known/oauth-protected-resource`.
 
 ## ⚡ Performance Tuning
 
-| Variable                | Default | Description                                        |
-| ----------------------- | ------- | -------------------------------------------------- |
-| `METADATA_CACHE_TTL_MS` | `30000` | Cache TTL for schema metadata (milliseconds)       |
-| `LOG_LEVEL`             | `info`  | Log verbosity: `debug`, `info`, `warning`, `error` |
+| Variable                | Default     | Description                                        |
+| ----------------------- | ----------- | -------------------------------------------------- |
+| `MCP_HOST`              | `localhost` | Server bind host (`0.0.0.0` for containers)        |
+| `METADATA_CACHE_TTL_MS` | `30000`     | Cache TTL for schema metadata (milliseconds)       |
+| `LOG_LEVEL`             | `info`      | Log verbosity: `debug`, `info`, `warning`, `error` |
 
 > **Tip:** Lower `METADATA_CACHE_TTL_MS` for development (e.g., `5000`), or increase it for production with stable schemas (e.g., `300000` = 5 min).
 

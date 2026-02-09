@@ -20,6 +20,9 @@ export interface ParsedArgs {
   /** HTTP port (for http/sse transports) */
   port?: number;
 
+  /** Server bind host (for http/sse transports) */
+  serverHost?: string;
+
   /** Database configuration */
   database?: DatabaseConfig;
 
@@ -90,6 +93,13 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
       case "-p":
         if (nextArg && !nextArg.startsWith("-")) {
           result.port = parseInt(nextArg, 10);
+          i++;
+        }
+        break;
+
+      case "--server-host":
+        if (nextArg && !nextArg.startsWith("-")) {
+          result.serverHost = nextArg;
           i++;
         }
         break;
@@ -290,6 +300,14 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): ParsedArgs {
       | "emergency";
   }
 
+  // Check for server host in environment
+  if (!result.serverHost) {
+    const envHost = process.env["MCP_HOST"] ?? process.env["HOST"];
+    if (envHost) {
+      result.serverHost = envHost;
+    }
+  }
+
   // Check OAuth environment variables
   if (!oauthEnabled && process.env["OAUTH_ENABLED"] === "true") {
     oauthEnabled = true;
@@ -378,6 +396,7 @@ Connection Options:
 Server Options:
   --transport, -t <type>    Transport type: stdio, http, sse (default: stdio)
   --port, -p <port>         HTTP port for http/sse transports (default: 3000)
+  --server-host <host>      Server bind host for http/sse transports (default: localhost)
   --tool-filter, -f <str>   Tool filter string (e.g., "-base,-extensions,+starter")
   --log-level <level>       Log level: debug, info, notice, warning, error, critical, alert, emergency
 
@@ -398,6 +417,7 @@ Environment Variables:
   PGUSER, POSTGRES_USER     PostgreSQL username
   PGPASSWORD, POSTGRES_PASSWORD  PostgreSQL password
   PGDATABASE, POSTGRES_DATABASE  PostgreSQL database
+  MCP_HOST, HOST            Server bind host (default: localhost)
   POSTGRES_TOOL_FILTER      Tool filter string
   LOG_LEVEL                 Log level (debug, info, notice, warning, error, critical, alert, emergency)
   OAUTH_ENABLED             Enable OAuth (true/false)

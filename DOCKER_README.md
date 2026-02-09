@@ -179,10 +179,11 @@ Click the button below to install directly into Cursor:
 
 **Performance (optional):**
 
-| Variable                | Default | Description                 |
-| ----------------------- | ------- | --------------------------- |
-| `METADATA_CACHE_TTL_MS` | `30000` | Schema cache TTL (ms)       |
-| `LOG_LEVEL`             | `info`  | debug, info, warning, error |
+| Variable                | Default     | Description                                 |
+| ----------------------- | ----------- | ------------------------------------------- |
+| `MCP_HOST`              | `localhost` | Server bind host (`0.0.0.0` for containers) |
+| `METADATA_CACHE_TTL_MS` | `30000`     | Schema cache TTL (ms)                       |
+| `LOG_LEVEL`             | `info`      | debug, info, warning, error                 |
 
 ## 🛠️ Tool Filtering
 

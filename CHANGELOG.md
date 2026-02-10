@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`pg_buffer` and `pg_geo_transform` truncation indicators for explicit limits** — Both tools now correctly return `truncated: true` + `totalCount` when an explicit `limit` parameter truncates results. Previously, `truncated` and `totalCount` were only returned when the default limit (50) was applied, contradicting the documented behavior in `ServerInstructions.ts`. The truncation check condition was broadened from `parsed.limit === undefined && effectiveLimit > 0` to `effectiveLimit > 0`. Added 3 unit tests
+
+- **`pg_geo_transform` SRID auto-detection from column metadata** — `fromSrid` is now optional. When not provided, the tool auto-detects the source SRID from `geometry_columns`/`geography_columns` catalog tables, matching the pattern used by `pg_intersection`. Returns `autoDetectedSrid: true` in the response when auto-detected. Returns structured `{success: false, error, suggestion}` with actionable message when SRID cannot be determined. Removed `fromSrid > 0` schema refine. Added 3 unit tests, updated 1 existing schema test
+
 - **Partitioning write tools structured error handling** — `pg_create_partition`, `pg_attach_partition`, and `pg_detach_partition` now return structured `{success: false, error: "..."}` responses instead of raw PostgreSQL errors when parent tables don't exist, aren't partitioned, or partition tables don't exist. Uses `checkTablePartitionStatus` pre-checks consistent with read tools (`pg_list_partitions`, `pg_partition_info`). Updated output schemas to make non-success fields optional and added `error` field. Added 6 unit tests covering all error paths
 
 - **`pg_drop_schema` response key consistency** — Renamed response key `dropped` → `schema` to align with sibling drop tools (`pg_drop_sequence` → `sequence`, `pg_drop_view` → `view`). The `schema` field now always returns the schema name; use `existed` boolean to determine if the schema was present before drop. Updated output schema and 2 unit tests
@@ -22,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vector tool object existence checks (P154)** — `pg_vector_search`, `pg_vector_aggregate`, `pg_vector_insert`, `pg_vector_batch_insert`, `pg_vector_add_column`, `pg_vector_cluster`, `pg_vector_index_optimize`, `pg_vector_performance`, `pg_vector_create_index`, `pg_vector_dimension_reduce`, and `pg_hybrid_search` now perform two-step existence verification (table first, then column) before executing main operations. Returns structured `{success: false, error: "...", suggestion: "..."}` with actionable messages distinguishing missing tables from missing columns. `pg_hybrid_search` catch block error format also standardized to separate schema and table names. Extracted reusable `checkTableAndColumn` helper. Added 21 unit tests covering all error paths
 
 ### Documentation
+
+- **PostGIS code mode aliases in `ServerInstructions.ts`** — Added missing `pg.postgis.geoCluster()` → `pg_geo_cluster` and `pg.postgis.geoTransform()` → `pg_geo_transform` code mode method mappings. Updated `pg_geo_transform` docs to mention SRID auto-detection and `autoDetectedSrid` response field
 
 - **Updated tool counts in README.md and DOCKER_README.md** — Reflected `pg_vector_batch_insert` addition: total 204→205, `ai-vector` 48→49, `ext-ai` 25→26, pgvector 15→16 vector tools (12 changes across 2 files)
 

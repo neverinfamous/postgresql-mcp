@@ -328,7 +328,7 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 
 **Geometry Operations (Table-based):**
 - \`pg_buffer\`: Create buffer zone around table geometries. Default limit: 50 rows. Default simplify: 10m (set \`simplify: 0\` to disable). Returns \`truncated: true\` + \`totalCount\` when results are truncated. Use \`limit: 0\` for all rows
-- \`pg_geo_transform\`: Transform table geometries between SRIDs. Default limit: 50 rows. Returns \`truncated: true\` + \`totalCount\` when results are truncated. Use \`limit: 0\` for all rows. \`fromSrid\`/\`sourceSrid\` and \`toSrid\`/\`targetSrid\` aliases
+- \`pg_geo_transform\`: Transform table geometries between SRIDs. Default limit: 50 rows. Returns \`truncated: true\` + \`totalCount\` when results are truncated. Use \`limit: 0\` for all rows. Auto-detects \`fromSrid\` from column metadata if not provided (returns \`autoDetectedSrid: true\`). \`fromSrid\`/\`sourceSrid\` and \`toSrid\`/\`targetSrid\` aliases
 - \`pg_geo_cluster\`: Spatial clustering (DBSCAN/K-Means). K-Means: If \`numClusters\` exceeds row count, automatically clamps to available rows with \`warning\` field. DBSCAN: Returns contextual \`hints\` array explaining parameter effects (e.g., "All points formed single cluster—decrease eps") and \`parameterGuide\` explaining eps/minPoints trade-offs
 
 **Geometry Operations (Standalone WKT/GeoJSON):**
@@ -340,7 +340,7 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 - \`pg_postgis_create_extension\`: Enable PostGIS extension (idempotent)
 - \`pg_geo_index_optimize\`: Analyze spatial indexes. Without \`table\` param, analyzes all spatial indexes
 
-**Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`. Note: \`pg.{group}.help()\` returns \`{methods, aliases, examples}\`
+**Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`, \`pg.postgis.geoCluster()\` → \`pg_geo_cluster\`, \`pg.postgis.geoTransform()\` → \`pg_geo_transform\`. Note: \`pg.{group}.help()\` returns \`{methods, aliases, examples}\`
 
 ## Cron Tools (pg_cron)
 

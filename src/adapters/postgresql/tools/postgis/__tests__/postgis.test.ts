@@ -243,6 +243,188 @@ describe("Handler Execution", () => {
       expect(result).toBeDefined();
     });
   });
+
+  describe("pg_buffer truncation with explicit limit", () => {
+    it("should return truncated + totalCount when explicit limit truncates results", async () => {
+      // Call sequence: 1) column query, 2) buffer query, 3) count query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "id" }, { column_name: "name" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 1,
+              name: "A",
+              geometry_text: "POINT(0 0)",
+              buffer_geojson: "{}",
+            },
+            {
+              id: 2,
+              name: "B",
+              geometry_text: "POINT(1 1)",
+              buffer_geojson: "{}",
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ cnt: 5 }],
+        });
+
+      const tool = tools.find((t) => t.name === "pg_buffer")!;
+      const result = (await tool.handler(
+        { table: "locations", column: "geom", distance: 1000, limit: 2 },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result["truncated"]).toBe(true);
+      expect(result["totalCount"]).toBe(5);
+      expect(result["limit"]).toBe(2);
+    });
+
+    it("should not return truncated when explicit limit covers all rows", async () => {
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "id" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            { id: 1, geometry_text: "POINT(0 0)", buffer_geojson: "{}" },
+            { id: 2, geometry_text: "POINT(1 1)", buffer_geojson: "{}" },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ cnt: 2 }],
+        });
+
+      const tool = tools.find((t) => t.name === "pg_buffer")!;
+      const result = (await tool.handler(
+        { table: "locations", column: "geom", distance: 1000, limit: 2 },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result["truncated"]).toBeUndefined();
+    });
+  });
+
+  describe("pg_geo_transform truncation with explicit limit", () => {
+    it("should return truncated + totalCount when explicit limit truncates results", async () => {
+      // Call sequence: 1) SRID detect, 2) column query, 3) transform query, 4) count query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({
+          rows: [{ srid: 4326 }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "id" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 1,
+              transformed_geojson: "{}",
+              transformed_wkt: "POINT(0 0)",
+              output_srid: 3857,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ cnt: 10 }],
+        });
+
+      const tool = tools.find((t) => t.name === "pg_geo_transform")!;
+      const result = (await tool.handler(
+        { table: "locations", column: "geom", toSrid: 3857, limit: 1 },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result["truncated"]).toBe(true);
+      expect(result["totalCount"]).toBe(10);
+      expect(result["limit"]).toBe(1);
+      expect(result["autoDetectedSrid"]).toBe(true);
+    });
+  });
+
+  describe("pg_geo_transform SRID auto-detection", () => {
+    it("should auto-detect fromSrid from column metadata", async () => {
+      // Call sequence: 1) SRID detect, 2) column query, 3) transform query, 4) count query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({
+          rows: [{ srid: 4326 }],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "id" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 1,
+              transformed_geojson: "{}",
+              transformed_wkt: "POINT(0 0)",
+              output_srid: 3857,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ cnt: 1 }],
+        });
+
+      const tool = tools.find((t) => t.name === "pg_geo_transform")!;
+      const result = (await tool.handler(
+        { table: "locations", column: "geom", toSrid: 3857 },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result["fromSrid"]).toBe(4326);
+      expect(result["autoDetectedSrid"]).toBe(true);
+      expect(result["toSrid"]).toBe(3857);
+    });
+
+    it("should return structured error when SRID cannot be detected", async () => {
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [],
+      });
+
+      const tool = tools.find((t) => t.name === "pg_geo_transform")!;
+      const result = (await tool.handler(
+        { table: "locations", column: "geom", toSrid: 3857 },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result["success"]).toBe(false);
+      expect(result["error"]).toContain("Could not auto-detect SRID");
+      expect(result["suggestion"]).toContain("fromSrid: 4326");
+    });
+
+    it("should use explicit fromSrid when provided", async () => {
+      // Call sequence: 1) column query, 2) transform query, 3) count query
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({
+          rows: [{ column_name: "id" }],
+        })
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 1,
+              transformed_geojson: "{}",
+              transformed_wkt: "POINT(0 0)",
+              output_srid: 3857,
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          rows: [{ cnt: 1 }],
+        });
+
+      const tool = tools.find((t) => t.name === "pg_geo_transform")!;
+      const result = (await tool.handler(
+        { table: "locations", column: "geom", fromSrid: 4326, toSrid: 3857 },
+        mockContext,
+      )) as Record<string, unknown>;
+
+      expect(result["fromSrid"]).toBe(4326);
+      expect(result["autoDetectedSrid"]).toBeUndefined();
+    });
+  });
 });
 
 describe("Error Handling", () => {

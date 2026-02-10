@@ -90,6 +90,34 @@ export function createGeoTransformTool(
           : `"${parsed.table}"`;
       const columnName = `"${parsed.column}"`;
 
+      // Auto-detect fromSrid from column metadata if not provided
+      let fromSrid = parsed.fromSrid;
+      if (fromSrid === 0) {
+        const sridQuery = `
+          SELECT srid FROM geometry_columns 
+          WHERE f_table_schema = $1 AND f_table_name = $2 AND f_geometry_column = $3
+          UNION
+          SELECT srid FROM geography_columns 
+          WHERE f_table_schema = $1 AND f_table_name = $2 AND f_geography_column = $3
+          LIMIT 1
+        `;
+        const sridResult = await adapter.executeQuery(sridQuery, [
+          schemaName,
+          parsed.table,
+          parsed.column,
+        ]);
+        const sridValue = sridResult.rows?.[0]?.["srid"];
+        if (sridValue !== undefined && sridValue !== null) {
+          fromSrid = Number(sridValue);
+        } else {
+          return {
+            success: false,
+            error: `Could not auto-detect SRID for column "${parsed.column}" on table "${parsed.table}". Provide fromSrid (or sourceSrid) explicitly.`,
+            suggestion: `Use fromSrid: 4326 for WGS84/GPS coordinates, or fromSrid: 3857 for Web Mercator`,
+          };
+        }
+      }
+
       const whereClause =
         parsed.where !== undefined ? `WHERE ${parsed.where}` : "";
 
@@ -116,8 +144,8 @@ export function createGeoTransformTool(
       // Select non-geometry columns + transformed geometry representations
       const selectCols =
         nonGeomCols.length > 0
-          ? `${nonGeomCols}, ST_AsGeoJSON(ST_Transform(ST_SetSRID(${columnName}, ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_geojson, ST_AsText(ST_Transform(ST_SetSRID(${columnName}, ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_wkt, ${String(parsed.toSrid)} as output_srid`
-          : `ST_AsGeoJSON(ST_Transform(ST_SetSRID(${columnName}, ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_geojson, ST_AsText(ST_Transform(ST_SetSRID(${columnName}, ${String(parsed.fromSrid)}), ${String(parsed.toSrid)})) as transformed_wkt, ${String(parsed.toSrid)} as output_srid`;
+          ? `${nonGeomCols}, ST_AsGeoJSON(ST_Transform(ST_SetSRID(${columnName}, ${String(fromSrid)}), ${String(parsed.toSrid)})) as transformed_geojson, ST_AsText(ST_Transform(ST_SetSRID(${columnName}, ${String(fromSrid)}), ${String(parsed.toSrid)})) as transformed_wkt, ${String(parsed.toSrid)} as output_srid`
+          : `ST_AsGeoJSON(ST_Transform(ST_SetSRID(${columnName}, ${String(fromSrid)}), ${String(parsed.toSrid)})) as transformed_geojson, ST_AsText(ST_Transform(ST_SetSRID(${columnName}, ${String(fromSrid)}), ${String(parsed.toSrid)})) as transformed_wkt, ${String(parsed.toSrid)} as output_srid`;
 
       const sql = `SELECT ${selectCols} FROM ${qualifiedTable} ${whereClause} ${limitClause}`;
 
@@ -127,12 +155,13 @@ export function createGeoTransformTool(
       const response: Record<string, unknown> = {
         results: result.rows,
         count: result.rows?.length ?? 0,
-        fromSrid: parsed.fromSrid,
+        fromSrid: fromSrid,
         toSrid: parsed.toSrid,
+        ...(parsed.fromSrid === 0 && { autoDetectedSrid: true }),
       };
 
-      // When using default limit, check if more rows exist
-      if (parsed.limit === undefined && effectiveLimit > 0) {
+      // Check if results were truncated (works for both default and explicit limits)
+      if (effectiveLimit > 0) {
         const countSql = `SELECT COUNT(*) as cnt FROM ${qualifiedTable} ${whereClause}`;
         const countResult = await adapter.executeQuery(countSql);
         const totalCount = Number(countResult.rows?.[0]?.["cnt"] ?? 0);

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Stale `pg_similarity_search` reference in `ServerInstructions.ts`** — Removed non-existent tool reference and replaced with accurate documentation noting that `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, and `pg_like_search` all default to 100 results
 
+- **`pg_partman_show_config` schema-agnostic description** — Changed tool description from "partman.part_config table" to "part_config table" since the `part_config` table can reside in either the `partman` or `public` schema depending on how `pg_partman` was installed
+
+- **`pg_partman_undo_partition` cleanup guidance** — The `undo_partition` handler now always includes a `note` field explaining that the parent partitioned table remains after the operation and may require manual `DROP TABLE ... CASCADE` cleanup. When `keepTable` is true (default), an additional note explains that detached child partitions also remain as standalone tables. Updated `ServerInstructions.ts` with cleanup guidance
+
 - **Misleading `forValues` parameter description in partitioning schemas** — Updated `forValues` description in `CreatePartitionSchemaBase` and `AttachPartitionSchemaBase` to explicitly state it requires a raw SQL partition bounds string with concrete examples (e.g., `FROM ('2024-01-01') TO ('2024-07-01')`, `IN ('US', 'CA')`, `WITH (MODULUS 4, REMAINDER 0)`). The previous description ("Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH)") misled AI callers into passing JSON objects like `{"from": "...", "to": "..."}` instead of raw SQL strings
 
 ### Documentation

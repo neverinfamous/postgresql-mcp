@@ -594,7 +594,7 @@ export function createPartmanShowConfigTool(
   return {
     name: "pg_partman_show_config",
     description:
-      "View the configuration for a partition set from partman.part_config table.",
+      "View the configuration for a partition set from part_config table.",
     group: "partman",
     inputSchema,
     outputSchema: PartmanShowConfigOutputSchema,

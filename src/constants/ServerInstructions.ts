@@ -273,7 +273,7 @@ Response Structures:
 - \`pg_partman_show_partitions\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
 - \`pg_partman_check_default\`/\`partition_data\`: \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
 - \`pg_partman_set_retention\`: ⚠️ **CAUTION: Default is DROP** — \`retentionKeepTable: false\` (default) = DROP partitions, \`true\` = detach only (safer). Pass \`retention: null\` to disable retention
-- \`pg_partman_undo_partition\`: \`targetTable\` MUST exist before calling. Requires both \`parentTable\` and \`targetTable\`/\`target\`
+- \`pg_partman_undo_partition\`: \`targetTable\` MUST exist before calling. Requires both \`parentTable\` and \`targetTable\`/\`target\`. ⚠️ Parent table and child partitions remain after undo—use \`DROP TABLE parent CASCADE\` to clean up
 - \`pg_partman_analyze_partition_health\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`summary.overallHealth\`: 'healthy'|'warnings'|'issues_found'
 - 📝 **Schema Resolution**: All partman tools auto-prefix \`public.\` when no schema specified in \`parentTable\`
 - 📝 **Aliases**: \`parentTable\` accepts \`table\`, \`parent\`, \`name\`. \`controlColumn\` accepts \`control\`, \`column\`. \`targetTable\` accepts \`target\`

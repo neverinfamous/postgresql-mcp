@@ -531,9 +531,9 @@ Example: undoPartition({ parentTable: "public.events", targetTable: "public.even
         targetTable: validatedTargetTable,
         message: `Partition set removed for ${validatedParentTable}. Data consolidated to ${validatedTargetTable}.`,
         note: keepTableValue
-          ? "Child partitions were detached and now exist as standalone tables. " +
-            "To clean up, drop them manually: DROP TABLE <partition_name>;"
-          : undefined,
+          ? "The parent table and detached child partitions still exist. " +
+            `To clean up: DROP TABLE ${validatedParentTable} CASCADE;`
+          : `The parent table still exists. To clean up: DROP TABLE ${validatedParentTable} CASCADE;`,
       };
     },
   };

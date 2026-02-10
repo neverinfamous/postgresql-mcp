@@ -368,6 +368,8 @@ function createLtreeConvertColumnTool(
         return {
           success: true,
           message: `Column ${column} is already ltree`,
+          table: qualifiedTable,
+          previousType: "ltree",
           wasAlreadyLtree: true,
         };
       }
@@ -470,6 +472,9 @@ function createLtreeCreateIndexTool(adapter: PostgresAdapter): ToolDefinition {
           success: true,
           message: `Index ${idxName} already exists`,
           indexName: idxName,
+          table: qualifiedTable,
+          column,
+          indexType: "gist",
           alreadyExists: true,
         };
       await adapter.executeQuery(

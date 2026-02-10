@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`pg_ltree_convert_column` already-ltree response consistency** — When the target column is already of `ltree` type, the response now includes `table` and `previousType: "ltree"` fields, matching the response shape of a successful conversion. Previously returned only `{success, message, wasAlreadyLtree}` without the `table` or `previousType` fields documented in `ServerInstructions.ts`
+
+- **`pg_ltree_create_index` already-exists response consistency** — When the target index already exists, the response now includes `table`, `column`, and `indexType: "gist"` fields, matching the response shape of a fresh index creation. Previously returned only `{success, message, indexName, alreadyExists}` without the additional context fields
+
 - **`pg_kcache_top_io` type-specific WHERE filter** — `pg_kcache_top_io` now filters by the type-specific I/O column when `ioType` (or `type`) is `reads` or `writes`. Previously, the WHERE clause always used `(reads + writes) > 0` regardless of `ioType`, meaning `ioType: 'reads'` included queries with zero reads but nonzero writes (sorted to the bottom). Now: `reads` filters by `reads > 0`, `writes` filters by `writes > 0`, `both` (default) filters by `reads + writes > 0`
 
 - **`pg_kcache_query_stats` and `pg_kcache_resource_analysis` schema default description** — Fixed `limit` parameter description in `KcacheQueryStatsSchema` and `KcacheResourceAnalysisSchema` from `(default: 50)` to `(default: 20)` to match handler `DEFAULT_LIMIT = 20`. Previously, the schema documentation misled callers into expecting 50 results when only 20 were returned by default

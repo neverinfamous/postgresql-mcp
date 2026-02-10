@@ -7,19 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Documentation
+### Added
 
-- **Code Mode token efficiency guidance** — Added actionable tips to `README.md`, `DOCKER_README.md`, and `Code-Mode.md` wiki page recommending users instruct their AI agents to prefer `pg_execute_code` (Code Mode) for multi-step database operations. Includes example prompt rule for agent configuration. Links to the Code Mode wiki for full API documentation
+- **P154 Object Existence Verification** — Convenience tools (`pg_count`, `pg_exists`, `pg_upsert`, `pg_batch_insert`, `pg_truncate`) now perform a pre-flight table existence check before executing their main query. When a table does not exist, these tools return a high-signal error message (e.g., `Table "public.nonexistent" does not exist`) instead of raw PostgreSQL errors like `relation "nonexistent" does not exist`. Implemented via a shared `validateTableExists()` helper that queries `information_schema.tables`. Added 12 dedicated unit tests in `convenience.test.ts`
+- **pg_list_tables `exclude` parameter** — `pg_list_tables` now accepts an optional `exclude` array of schema names to filter out extension/system schemas (e.g., `exclude: ['cron', 'topology', 'partman']`). Reduces noisy output by hiding extension-owned tables and views. Added 3 unit tests
+- **`--server-host` CLI argument** — New `--server-host <host>` flag and `MCP_HOST` environment variable for configuring the server bind address (default: `localhost`). Enables containerized deployments by allowing the server to bind to `0.0.0.0`. Precedence: CLI flag → `MCP_HOST` → `HOST` → `localhost`. Dockerfile now defaults to `HOST=0.0.0.0` for container use
 
-- **Tool count consistency across all documentation** — Synchronized tool counts across `ToolConstants.ts`, `README.md`, `DOCKER_README.md`, and 7 wiki pages. Fixed `core` group comment (19→20) in `ToolConstants.ts` to match actual array length after `pg_drop_index` addition. Updated total tool count (205→206), `vector` group table entry (16→17), and all meta-group/shortcut counts that include `core` (+1 each: `starter` 58→59, `essential` 46→47, `ai-vector` 49→50, `geo` 42→43, etc.). Fixed stale capabilities table in `Home.md` (204→206). Fixed `ext-ai` count in `Tool-Filtering.md` wiki (25→26). Recalculated extension tool total in `Extension-Overview.md` (87→80→79→80). Fixed stale pgvector inline count in `Home.md` wiki nav (16→17). Updated `ToolConstants.ts` inline meta-group comments to match block comment sums
+### Improved
 
-- **DOCKER_README.md prompt names and resource URIs** — Fixed 6 incorrect prompt names missing the `pg_` prefix (e.g., `optimize_query` → `pg_performance_analysis`, `index_tuning` → `pg_index_tuning`). Replaced non-existent `performance_baseline` prompt with `pg_tool_index`. Fixed non-existent resource URI `postgres://connections` → `postgres://activity`. Updated prompt link anchor to match README.md
-
-- **DOCKER_README.md missing extensions** — Added `pg_trgm`, `fuzzystrmatch`, and `hypopg` to the extension support table, aligning with the full 12-extension list in `README.md`
-
-- **Troubleshooting wiki `pg_cancel_query` → `pg_cancel_backend`** — Fixed incorrect tool name reference. `pg_cancel_query` does not exist; the actual tool is `pg_cancel_backend` (admin group)
-
-- **Code-Mode wiki expanded API documentation** — Replaced minimal `pg.query()`/`pg.execute()` API section with comprehensive documentation covering all 19 API groups (`pg.{group}.{method}()` pattern), naming conventions, top-level aliases, format auto-resolution, and `pg.help()` discovery. Updated AntiGravity section to reference the full API surface
+- **`pg_upsert` response cleanup** — Removed the `sql` field from the default response to prevent leaking generated SQL and reduce context token usage
+- **P154 schema-vs-table error granularity** — `validateTableExists()` now performs a schema-existence check before the table check, producing distinct error messages: `Schema 'X' does not exist` vs `Table 'X.Y' not found`. Updated 30 existing tests and added 5 new schema-specific tests
+- **`pg_analyze_workload_indexes` `queryPreviewLength` parameter** — Added configurable maximum characters for query preview (default: 200). Truncated queries now end with `…` instead of silently cutting off
+- **`pg_describe_table` documentation** — Clarified `rowCount: -1` meaning in `ServerInstructions.ts` to distinguish stale/missing statistics from small table optimization
 
 ### Fixed
 
@@ -37,29 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`pg_kcache_query_stats` and `pg_kcache_resource_analysis` default limit reduced** — Default limit lowered from 50 to 20 for both tools, reducing typical response payload by ~60%. Consistent with `pg_stat_statements` (default 20) and `pg_unused_indexes` (default 20). Use `limit: 50` to restore previous behavior, or `limit: 0` for all rows
 
-### Documentation
-
-- **`pg_kcache_database_stats` optional `database` parameter in `ServerInstructions.ts`** — Documented that `pg_kcache_database_stats` accepts an optional `database` parameter to filter stats to a specific database. The parameter was already implemented in the handler but undocumented
-
-- **`pg_kcache_top_cpu` and `pg_kcache_top_io` truncation indicators in `ServerInstructions.ts`** — Added missing `truncated` + `totalCount` documentation for both tools. These fields were already returned by the handlers but undocumented, making it harder for agents to anticipate the response structure
-
-- **`pg_regexp_match` and `pg_like_search` default limit** — Both tools now default to `LIMIT 100` when no `limit` parameter is specified, preventing unbounded result sets on large tables. Consistent with `pg_trigram_similarity` and `pg_fuzzy_match` which already defaulted to 100. Updated schema descriptions and added 2 unit tests
-
-- **Stale `pg_similarity_search` reference in `ServerInstructions.ts`** — Removed non-existent tool reference and replaced with accurate documentation noting that `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, and `pg_like_search` all default to 100 results
-
-- **`pg_partman_show_config` schema-agnostic description** — Changed tool description from "partman.part_config table" to "part_config table" since the `part_config` table can reside in either the `partman` or `public` schema depending on how `pg_partman` was installed
-
-- **`pg_partman_undo_partition` cleanup guidance** — The `undo_partition` handler now always includes a `note` field explaining that the parent partitioned table remains after the operation and may require manual `DROP TABLE ... CASCADE` cleanup. When `keepTable` is true (default), an additional note explains that detached child partitions also remain as standalone tables. Updated `ServerInstructions.ts` with cleanup guidance
-
-- **Misleading `forValues` parameter description in partitioning schemas** — Updated `forValues` description in `CreatePartitionSchemaBase` and `AttachPartitionSchemaBase` to explicitly state it requires a raw SQL partition bounds string with concrete examples (e.g., `FROM ('2024-01-01') TO ('2024-07-01')`, `IN ('US', 'CA')`, `WITH (MODULUS 4, REMAINDER 0)`). The previous description ("Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH)") misled AI callers into passing JSON objects like `{"from": "...", "to": "..."}` instead of raw SQL strings
-
-### Documentation
-
-- **Performance tools response structures in `ServerInstructions.ts`** — Added missing Response Structures table entries for `pg_index_stats` (`{indexes, count, truncated?, totalCount?}`), `pg_table_stats` (`{tables, ...}`), `pg_vacuum_stats` (`{tables, ...}`), and `pg_stat_statements` (`{statements, ...}`). These tools return truncation-aware payloads but their response key names were undocumented, making it harder for agents to access the correct array keys (e.g., `indexes` not `indexStats`)
-
 - **`pg_pgcrypto_gen_random_uuid` `count` parameter MCP exposure** — The `count` parameter (1-100) is now visible to MCP clients for direct tool calls, enabling batch UUID generation (e.g., `pg_pgcrypto_gen_random_uuid({ count: 5 })`). Previously, the `.default({})` on the Zod schema collapsed the object during JSON Schema conversion, hiding `count` from MCP clients. Applied Split Schema pattern: `GenUuidSchemaBase` for MCP visibility, `GenUuidSchema` with `.default({})` for handler parsing
-
-- **`help()` documentation consistency in `ServerInstructions.ts`** — Fixed 5 `pg.{group}.help()` discovery lines to consistently document the `methodAliases` key. 4 lines (ltree, postgis, cron, pgcrypto) incorrectly said `aliases` instead of `methodAliases`, and 1 line (schema) omitted it entirely. Now all match the actual `help()` return structure `{methods, methodAliases, examples}` from `api.ts`
 
 - **`pg_buffer` and `pg_geo_transform` truncation indicators for explicit limits** — Both tools now correctly return `truncated: true` + `totalCount` when an explicit `limit` parameter truncates results. Previously, `truncated` and `totalCount` were only returned when the default limit (50) was applied, contradicting the documented behavior in `ServerInstructions.ts`. The truncation check condition was broadened from `parsed.limit === undefined && effectiveLimit > 0` to `effectiveLimit > 0`. Added 3 unit tests
 
@@ -77,7 +54,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Vector tool object existence checks (P154)** — `pg_vector_search`, `pg_vector_aggregate`, `pg_vector_insert`, `pg_vector_batch_insert`, `pg_vector_add_column`, `pg_vector_cluster`, `pg_vector_index_optimize`, `pg_vector_performance`, `pg_vector_create_index`, `pg_vector_dimension_reduce`, and `pg_hybrid_search` now perform two-step existence verification (table first, then column) before executing main operations. Returns structured `{success: false, error: "...", suggestion: "..."}` with actionable messages distinguishing missing tables from missing columns. `pg_hybrid_search` catch block error format also standardized to separate schema and table names. Extracted reusable `checkTableAndColumn` helper. Added 21 unit tests covering all error paths
 
+- **`pg_write_query` DDL outputSchema validation error** — DDL statements (`CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`) no longer fail output schema validation with `"expected number, received undefined"` on the `rowsAffected` field. The handler now defaults `rowsAffected` to `0` when the adapter returns `undefined` (DDL commands don't report affected rows). Added unit test
+
+- **`pg_list_functions` extension alias mapping for `exclude`** — `pg_list_functions({ exclude: ["pgvector"] })` now correctly filters out pgvector functions. The pgvector extension registers as `vector` in PostgreSQL's `pg_extension` catalog, so passing `"pgvector"` in the `exclude` array previously failed to match. Added `EXTENSION_ALIASES` mapping that expands well-known names (e.g., `pgvector` → `vector`) before building the exclude query. Both the schema-name filter (`nspname NOT IN`) and the `pg_depend`/`pg_extension` ownership filter now use the expanded list. Added unit test
+
+- **`pg_list_functions` partman alias for `exclude`** — `exclude: ["partman"]` now correctly filters out pg_partman functions. pg_partman installs functions in the `public` schema, so the schema-name exclusion filter alone doesn't catch them. Added `partman` → `pg_partman` alias to `EXTENSION_ALIASES`, matching the existing `pgvector` → `vector` pattern. Added unit test
+
+- **`pg_list_tables` / `pg_describe_table` `rowCount` consistency** — `rowCount` now returns `0` for empty or freshly created tables instead of being silently omitted from the response. Previously, `listTables()` used `effectiveRowCount > 0 ? effectiveRowCount : undefined` which converted zero to `undefined`, and `describeTable()` used raw `c.reltuples::bigint` which returned `-1` for never-analyzed tables. Both methods now use the same `CASE WHEN reltuples = -1 THEN NULL` SQL guard with `live_row_estimate` fallback. Added 2 unit tests
+
+- **`runningQueries` Code Mode alias mapping** — `pg.performance.runningQueries()` now correctly routes to `longRunningQueries()` (returning `{longRunningQueries, count, threshold}`) instead of `statActivity()` (which returns `{connections, count}`). The `METHOD_ALIASES` map in `api.ts` incorrectly pointed `runningQueries` to `statActivity` instead of `longRunningQueries`
+
+- **`pg_stat_statements` missing `count` field** — Response now includes `count` (number of statements returned), consistent with all other paginated performance tools (`pg_index_stats`, `pg_table_stats`, `pg_unused_indexes`, etc.). Output schema updated to use shared `PaginatedBase` pattern
+
+### Performance
+
+- **Metadata caching for `listTables` and `describeTable`** — These high-frequency schema introspection methods now use the existing TTL-based metadata cache (default 30s, configurable via `METADATA_CACHE_TTL_MS`), matching the caching already applied to `getAllIndexes`. Reduces database load for repeated schema queries within the TTL window. Cache is automatically invalidated via `clearMetadataCache()`. Added 4 dedicated unit tests
+
 ### Documentation
+
+- **Code Mode token efficiency guidance** — Added actionable tips to `README.md`, `DOCKER_README.md`, and `Code-Mode.md` wiki page recommending users instruct their AI agents to prefer `pg_execute_code` (Code Mode) for multi-step database operations. Includes example prompt rule for agent configuration. Links to the Code Mode wiki for full API documentation
+
+- **Tool count consistency across all documentation** — Synchronized tool counts across `ToolConstants.ts`, `README.md`, `DOCKER_README.md`, and 7 wiki pages. Fixed `core` group comment (19→20) in `ToolConstants.ts` to match actual array length after `pg_drop_index` addition. Updated total tool count (205→206), `vector` group table entry (16→17), and all meta-group/shortcut counts that include `core` (+1 each: `starter` 58→59, `essential` 46→47, `ai-vector` 49→50, `geo` 42→43, etc.). Fixed stale capabilities table in `Home.md` (204→206). Fixed `ext-ai` count in `Tool-Filtering.md` wiki (25→26). Recalculated extension tool total in `Extension-Overview.md` (87→80→79→80). Fixed stale pgvector inline count in `Home.md` wiki nav (16→17). Updated `ToolConstants.ts` inline meta-group comments to match block comment sums
+
+- **DOCKER_README.md prompt names and resource URIs** — Fixed 6 incorrect prompt names missing the `pg_` prefix (e.g., `optimize_query` → `pg_performance_analysis`, `index_tuning` → `pg_index_tuning`). Replaced non-existent `performance_baseline` prompt with `pg_tool_index`. Fixed non-existent resource URI `postgres://connections` → `postgres://activity`. Updated prompt link anchor to match README.md
+
+- **DOCKER_README.md missing extensions** — Added `pg_trgm`, `fuzzystrmatch`, and `hypopg` to the extension support table, aligning with the full 12-extension list in `README.md`
+
+- **Troubleshooting wiki `pg_cancel_query` → `pg_cancel_backend`** — Fixed incorrect tool name reference. `pg_cancel_query` does not exist; the actual tool is `pg_cancel_backend` (admin group)
+
+- **Code-Mode wiki expanded API documentation** — Replaced minimal `pg.query()`/`pg.execute()` API section with comprehensive documentation covering all 19 API groups (`pg.{group}.{method}()` pattern), naming conventions, top-level aliases, format auto-resolution, and `pg.help()` discovery. Updated AntiGravity section to reference the full API surface
+
+- **`pg_kcache_database_stats` optional `database` parameter in `ServerInstructions.ts`** — Documented that `pg_kcache_database_stats` accepts an optional `database` parameter to filter stats to a specific database. The parameter was already implemented in the handler but undocumented
+
+- **`pg_kcache_top_cpu` and `pg_kcache_top_io` truncation indicators in `ServerInstructions.ts`** — Added missing `truncated` + `totalCount` documentation for both tools. These fields were already returned by the handlers but undocumented, making it harder for agents to anticipate the response structure
+
+- **`pg_regexp_match` and `pg_like_search` default limit** — Both tools now default to `LIMIT 100` when no `limit` parameter is specified, preventing unbounded result sets on large tables. Consistent with `pg_trigram_similarity` and `pg_fuzzy_match` which already defaulted to 100. Updated schema descriptions and added 2 unit tests
+
+- **Stale `pg_similarity_search` reference in `ServerInstructions.ts`** — Removed non-existent tool reference and replaced with accurate documentation noting that `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, and `pg_like_search` all default to 100 results
+
+- **`pg_partman_show_config` schema-agnostic description** — Changed tool description from "partman.part_config table" to "part_config table" since the `part_config` table can reside in either the `partman` or `public` schema depending on how `pg_partman` was installed
+
+- **`pg_partman_undo_partition` cleanup guidance** — The `undo_partition` handler now always includes a `note` field explaining that the parent partitioned table remains after the operation and may require manual `DROP TABLE ... CASCADE` cleanup. When `keepTable` is true (default), an additional note explains that detached child partitions also remain as standalone tables. Updated `ServerInstructions.ts` with cleanup guidance
+
+- **Misleading `forValues` parameter description in partitioning schemas** — Updated `forValues` description in `CreatePartitionSchemaBase` and `AttachPartitionSchemaBase` to explicitly state it requires a raw SQL partition bounds string with concrete examples (e.g., `FROM ('2024-01-01') TO ('2024-07-01')`, `IN ('US', 'CA')`, `WITH (MODULUS 4, REMAINDER 0)`). The previous description ("Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH)") misled AI callers into passing JSON objects like `{"from": "...", "to": "..."}` instead of raw SQL strings
+
+- **Performance tools response structures in `ServerInstructions.ts`** — Added missing Response Structures table entries for `pg_index_stats` (`{indexes, count, truncated?, totalCount?}`), `pg_table_stats` (`{tables, ...}`), `pg_vacuum_stats` (`{tables, ...}`), and `pg_stat_statements` (`{statements, ...}`). These tools return truncation-aware payloads but their response key names were undocumented, making it harder for agents to access the correct array keys (e.g., `indexes` not `indexStats`)
+
+- **`help()` documentation consistency in `ServerInstructions.ts`** — Fixed 5 `pg.{group}.help()` discovery lines to consistently document the `methodAliases` key. 4 lines (ltree, postgis, cron, pgcrypto) incorrectly said `aliases` instead of `methodAliases`, and 1 line (schema) omitted it entirely. Now all match the actual `help()` return structure `{methods, methodAliases, examples}` from `api.ts`
 
 - **PostGIS code mode aliases in `ServerInstructions.ts`** — Added missing `pg.postgis.geoCluster()` → `pg_geo_cluster` and `pg.postgis.geoTransform()` → `pg_geo_transform` code mode method mappings. Updated `pg_geo_transform` docs to mention SRID auto-detection and `autoDetectedSrid` response field
 
@@ -88,6 +111,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`pg_vector_performance` `testVectorSource` documentation** — Fixed documented values from `'auto-generated'|'user-provided'` to `'auto-generated from first row'|'user-provided'` to match actual handler output
 
 - **`pg_hybrid_search` tsvector support documented** — Added note in `ServerInstructions.ts` that `textColumn` auto-detects type
+
+- **`pg_write_query` DDL response clarification** — Updated `ServerInstructions.ts` response structures table to note that DDL statements return `rowsAffected: 0`
+
+- **`pg_describe_table` response structure completeness** — Updated `ServerInstructions.ts` to list the full top-level envelope fields (`name`, `schema`, `type`, `owner`, `rowCount`, `primaryKey`) alongside the previously documented array fields
+
+- **`pg_list_functions` response structure** — Removed undocumented `note?` field from `listFunctions` response structure in `ServerInstructions.ts`
+
+- **`createView` `alreadyExisted` clarification** — Clarified that `alreadyExisted` is only present when `ifNotExists`/`orReplace` is set, not unconditionally
 
 ### Dependencies
 
@@ -106,44 +137,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `no-misused-promises` (2 occurrences) — Added type casts in mock files (`adapter.ts`, `pool.ts`) to match `mockImplementation` signatures
   - `no-unused-vars` (2 occurrences) — Replaced `_xmax` destructuring with `Object.fromEntries` filter in `convenience.ts`; added `varsIgnorePattern: "^_"` to ESLint config for intentionally unused `_`-prefixed variables
   - `no-unsafe-argument` / `no-explicit-any` (1 occurrence) — Replaced `as any` with `as Transport` type import in `cli.ts` for SDK `exactOptionalPropertyTypes` incompatibility
-
-### Added
-
-- **P154 Object Existence Verification** — Convenience tools (`pg_count`, `pg_exists`, `pg_upsert`, `pg_batch_insert`, `pg_truncate`) now perform a pre-flight table existence check before executing their main query. When a table does not exist, these tools return a high-signal error message (e.g., `Table "public.nonexistent" does not exist`) instead of raw PostgreSQL errors like `relation "nonexistent" does not exist`. Implemented via a shared `validateTableExists()` helper that queries `information_schema.tables`. Added 12 dedicated unit tests in `convenience.test.ts`
-- **pg_list_tables `exclude` parameter** — `pg_list_tables` now accepts an optional `exclude` array of schema names to filter out extension/system schemas (e.g., `exclude: ['cron', 'topology', 'partman']`). Reduces noisy output by hiding extension-owned tables and views. Added 3 unit tests
-- **`--server-host` CLI argument** — New `--server-host <host>` flag and `MCP_HOST` environment variable for configuring the server bind address (default: `localhost`). Enables containerized deployments by allowing the server to bind to `0.0.0.0`. Precedence: CLI flag → `MCP_HOST` → `HOST` → `localhost`. Dockerfile now defaults to `HOST=0.0.0.0` for container use
-
-### Improved
-
-- **`pg_upsert` response cleanup** — Removed the `sql` field from the default response to prevent leaking generated SQL and reduce context token usage
-- **P154 schema-vs-table error granularity** — `validateTableExists()` now performs a schema-existence check before the table check, producing distinct error messages: `Schema 'X' does not exist` vs `Table 'X.Y' not found`. Updated 30 existing tests and added 5 new schema-specific tests
-- **`pg_analyze_workload_indexes` `queryPreviewLength` parameter** — Added configurable maximum characters for query preview (default: 200). Truncated queries now end with `…` instead of silently cutting off
-- **`pg_describe_table` documentation** — Clarified `rowCount: -1` meaning in `ServerInstructions.ts` to distinguish stale/missing statistics from small table optimization
-
-### Performance
-
-- **Metadata caching for `listTables` and `describeTable`** — These high-frequency schema introspection methods now use the existing TTL-based metadata cache (default 30s, configurable via `METADATA_CACHE_TTL_MS`), matching the caching already applied to `getAllIndexes`. Reduces database load for repeated schema queries within the TTL window. Cache is automatically invalidated via `clearMetadataCache()`. Added 4 dedicated unit tests
-
-### Fixed
-
-- **`pg_write_query` DDL outputSchema validation error** — DDL statements (`CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`) no longer fail output schema validation with `"expected number, received undefined"` on the `rowsAffected` field. The handler now defaults `rowsAffected` to `0` when the adapter returns `undefined` (DDL commands don't report affected rows). Added unit test
-
-- **`pg_list_functions` extension alias mapping for `exclude`** — `pg_list_functions({ exclude: ["pgvector"] })` now correctly filters out pgvector functions. The pgvector extension registers as `vector` in PostgreSQL's `pg_extension` catalog, so passing `"pgvector"` in the `exclude` array previously failed to match. Added `EXTENSION_ALIASES` mapping that expands well-known names (e.g., `pgvector` → `vector`) before building the exclude query. Both the schema-name filter (`nspname NOT IN`) and the `pg_depend`/`pg_extension` ownership filter now use the expanded list. Added unit test
-
-- **`pg_list_functions` partman alias for `exclude`** — `exclude: ["partman"]` now correctly filters out pg_partman functions. pg_partman installs functions in the `public` schema, so the schema-name exclusion filter alone doesn't catch them. Added `partman` → `pg_partman` alias to `EXTENSION_ALIASES`, matching the existing `pgvector` → `vector` pattern. Added unit test
-
-- **`pg_list_tables` / `pg_describe_table` `rowCount` consistency** — `rowCount` now returns `0` for empty or freshly created tables instead of being silently omitted from the response. Previously, `listTables()` used `effectiveRowCount > 0 ? effectiveRowCount : undefined` which converted zero to `undefined`, and `describeTable()` used raw `c.reltuples::bigint` which returned `-1` for never-analyzed tables. Both methods now use the same `CASE WHEN reltuples = -1 THEN NULL` SQL guard with `live_row_estimate` fallback. Added 2 unit tests
-
-- **`runningQueries` Code Mode alias mapping** — `pg.performance.runningQueries()` now correctly routes to `longRunningQueries()` (returning `{longRunningQueries, count, threshold}`) instead of `statActivity()` (which returns `{connections, count}`). The `METHOD_ALIASES` map in `api.ts` incorrectly pointed `runningQueries` to `statActivity` instead of `longRunningQueries`
-
-- **`pg_stat_statements` missing `count` field** — Response now includes `count` (number of statements returned), consistent with all other paginated performance tools (`pg_index_stats`, `pg_table_stats`, `pg_unused_indexes`, etc.). Output schema updated to use shared `PaginatedBase` pattern
-
-### Documentation
-
-- **`pg_write_query` DDL response clarification** — Updated `ServerInstructions.ts` response structures table to note that DDL statements return `rowsAffected: 0`
-- **`pg_describe_table` response structure completeness** — Updated `ServerInstructions.ts` to list the full top-level envelope fields (`name`, `schema`, `type`, `owner`, `rowCount`, `primaryKey`) alongside the previously documented array fields
-- **`pg_list_functions` response structure** — Removed undocumented `note?` field from `listFunctions` response structure in `ServerInstructions.ts`
-- **`createView` `alreadyExisted` clarification** — Clarified that `alreadyExisted` is only present when `ifNotExists`/`orReplace` is set, not unconditionally
 
 ## [1.1.0] - 2026-01-29
 

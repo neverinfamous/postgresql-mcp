@@ -473,8 +473,9 @@ describe("Vector Tools", () => {
 
   describe("pg_hybrid_search", () => {
     it("should combine vector and text search", async () => {
-      // Mock column type check (vectorColumn), textColumn type check, column list query, and main query
+      // Mock: existence check, vectorColumn type check, textColumn type check, column list query, main query
       mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ "1": 1 }] }) // existence check (checkTableAndColumn)
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
         })
@@ -512,8 +513,9 @@ describe("Vector Tools", () => {
     });
 
     it("should use custom weights", async () => {
-      // Mock column type check (vectorColumn), textColumn type check, column list query, and main query
+      // Mock: existence check, vectorColumn type check, textColumn type check, column list query, main query
       mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ "1": 1 }] }) // existence check (checkTableAndColumn)
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
         })
@@ -541,8 +543,9 @@ describe("Vector Tools", () => {
     });
 
     it("should use tsvector column directly without to_tsvector wrapping", async () => {
-      // Mock: vectorColumn type check (vector), textColumn type check (tsvector), column list, main query
+      // Mock: existence check, vectorColumn type check (vector), textColumn type check (tsvector), column list, main query
       mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ "1": 1 }] }) // existence check (checkTableAndColumn)
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
         })
@@ -566,16 +569,17 @@ describe("Vector Tools", () => {
         mockContext,
       );
 
-      // The main SQL query should use the tsvector column directly
-      const mainQueryCall = mockAdapter.executeQuery.mock.calls[3];
+      // The main SQL query should use the tsvector column directly (5th call, index 4)
+      const mainQueryCall = mockAdapter.executeQuery.mock.calls[4];
       const sql = mainQueryCall?.[0] as string;
       expect(sql).toContain('ts_rank("search_vector"');
       expect(sql).not.toContain("to_tsvector('english'");
     });
 
     it("should wrap plain text column with to_tsvector", async () => {
-      // Mock: vectorColumn type check (vector), textColumn type check (text), column list, main query
+      // Mock: existence check, vectorColumn type check (vector), textColumn type check (text), column list, main query
       mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ "1": 1 }] }) // existence check (checkTableAndColumn)
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
         })
@@ -599,8 +603,8 @@ describe("Vector Tools", () => {
         mockContext,
       );
 
-      // The main SQL query should wrap the text column with to_tsvector
-      const mainQueryCall = mockAdapter.executeQuery.mock.calls[3];
+      // The main SQL query should wrap the text column with to_tsvector (5th call, index 4)
+      const mainQueryCall = mockAdapter.executeQuery.mock.calls[4];
       const sql = mainQueryCall?.[0] as string;
       expect(sql).toContain("to_tsvector('english', \"content\")");
     });

@@ -367,8 +367,9 @@ describe("Bug Fixes", () => {
 
   describe("pg_hybrid_search select parameter", () => {
     it("should respect select parameter to limit columns", async () => {
-      // Mock: vectorColumn type check, textColumn type check, then main query (select specified, no column list needed)
+      // Mock: existence check, vectorColumn type check, textColumn type check, then main query (select specified, no column list needed)
       mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ "1": 1 }] }) // existence check (checkTableAndColumn)
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
         }) // vectorColumn type check
@@ -392,16 +393,17 @@ describe("Bug Fixes", () => {
         mockContext,
       );
 
-      // Main query is the third call (after vectorColumn type check and textColumn type check)
-      const mainQueryCall = mockAdapter.executeQuery.mock.calls[2][0] as string;
+      // Main query is the fourth call (after existence check, vectorColumn type check, and textColumn type check)
+      const mainQueryCall = mockAdapter.executeQuery.mock.calls[3][0] as string;
       expect(mainQueryCall).toContain('t."id"');
       expect(mainQueryCall).toContain('t."title"');
       expect(mainQueryCall).not.toContain("t.*");
     });
 
     it("should exclude vector columns when select is not provided", async () => {
-      // Mock: vectorColumn type check, textColumn type check, column list query, then main query
+      // Mock: existence check, vectorColumn type check, textColumn type check, column list query, then main query
       mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ "1": 1 }] }) // existence check (checkTableAndColumn)
         .mockResolvedValueOnce({
           rows: [{ data_type: "USER-DEFINED", udt_name: "vector" }],
         }) // vectorColumn type check
@@ -425,8 +427,8 @@ describe("Bug Fixes", () => {
         mockContext,
       );
 
-      // Main query is the fourth call
-      const mainQueryCall = mockAdapter.executeQuery.mock.calls[3][0] as string;
+      // Main query is the fifth call (after existence check, vectorColumn type, textColumn type, column list)
+      const mainQueryCall = mockAdapter.executeQuery.mock.calls[4][0] as string;
       expect(mainQueryCall).toContain('t."id"');
       expect(mainQueryCall).toContain('t."content"');
       // Should NOT use t.* since we now dynamically get non-vector columns
@@ -1048,6 +1050,42 @@ describe("Object Existence Checks (P154)", () => {
           table: "embeddings",
           column: "bad_col",
           targetDimensions: 3,
+        },
+        mockContext,
+      )) as Record<string, unknown>;
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Column 'bad_col' does not exist");
+    });
+  });
+
+  describe("pg_hybrid_search", () => {
+    it("should return table-not-found error", async () => {
+      mockTableNotFound();
+      const tool = tools.find((t) => t.name === "pg_hybrid_search")!;
+      const result = (await tool.handler(
+        {
+          table: "nonexistent",
+          vectorColumn: "vec",
+          textColumn: "content",
+          vector: [0.1],
+          textQuery: "test",
+        },
+        mockContext,
+      )) as Record<string, unknown>;
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Table 'nonexistent' does not exist");
+    });
+
+    it("should return column-not-found error when table exists", async () => {
+      mockColumnNotFound();
+      const tool = tools.find((t) => t.name === "pg_hybrid_search")!;
+      const result = (await tool.handler(
+        {
+          table: "embeddings",
+          vectorColumn: "bad_col",
+          textColumn: "content",
+          vector: [0.1],
+          textQuery: "test",
         },
         mockContext,
       )) as Record<string, unknown>;

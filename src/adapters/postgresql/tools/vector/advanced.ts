@@ -423,6 +423,17 @@ export function createHybridSearchTool(
       const schemaName = resolvedSchema ?? "public";
       const tableName = sanitizeTableName(resolvedTable, schemaName);
 
+      // P154: Verify table and vectorColumn exist before querying
+      const existenceError = await checkTableAndColumn(
+        adapter,
+        resolvedTable,
+        parsed.vectorColumn,
+        schemaName,
+      );
+      if (existenceError !== null) {
+        return { success: false, ...existenceError };
+      }
+
       // Check column type - reject if it's a tsvector
       const colTypeSql = `
                 SELECT data_type, udt_name 
@@ -594,9 +605,8 @@ export function createHybridSearchTool(
             const missingRelation = relationMatch[1] ?? "";
             return {
               success: false,
-              error: `Table '${missingRelation}' does not exist`,
-              suggestion:
-                "Use pg_list_tables to find available tables, or check the schema name",
+              error: `Table '${missingRelation}' does not exist in schema '${schemaName}'`,
+              suggestion: "Use pg_list_tables to find available tables",
             };
           }
 
@@ -798,8 +808,8 @@ export function createVectorPerformanceTool(
         recommendations:
           (indexResult.rows?.length ?? 0) === 0
             ? [
-              "No vector index found - consider creating one for better performance",
-            ]
+                "No vector index found - consider creating one for better performance",
+              ]
             : [],
       };
 
@@ -980,12 +990,12 @@ export function createVectorDimensionReduceTool(
           id: unknown;
           original_dimensions: number;
           reduced:
-          | number[]
-          | {
-            preview: number[] | null;
-            dimensions: number;
-            truncated: boolean;
-          };
+            | number[]
+            | {
+                preview: number[] | null;
+                dimensions: number;
+                truncated: boolean;
+              };
         }[] = [];
         let originalDim = 0;
 
@@ -1105,10 +1115,10 @@ export function createVectorEmbedTool(): ToolDefinition {
       const embeddingOutput = shouldSummarize
         ? truncateVector(normalized)
         : {
-          preview: normalized,
-          dimensions: dims,
-          truncated: false,
-        };
+            preview: normalized,
+            dimensions: dims,
+            truncated: false,
+          };
 
       return Promise.resolve({
         embedding: embeddingOutput,

@@ -278,7 +278,7 @@ Add one of these configurations to your IDE's MCP settings file:
 }
 ```
 
-#### Option 2: AI Vector (49 Tools + pgvector)
+#### Option 2: AI Vector (50 Tools + pgvector)
 
 **Best for:** AI/ML workloads with semantic search and vector similarity.
 
@@ -509,7 +509,7 @@ This server provides **20 resources** for structured data access:
 ## 🏆 Why Choose postgres-mcp?
 
 ✅ **TypeScript Native** - Full type safety with strict mode  
-✅ **205 Specialized Tools** - Comprehensive PostgreSQL coverage  
+✅ **206 Specialized Tools** - Comprehensive PostgreSQL coverage  
 ✅ **Tool Annotations** - UX hints for read-only, destructive, and idempotent operations  
 ✅ **Connection Pooling** - Efficient PostgreSQL connection management  
 ✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements, pg_cron  

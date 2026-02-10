@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`pg_kcache_top_cpu` and `pg_kcache_top_io` `queryPreviewLength` parameter** — Both tools now accept `queryPreviewLength` (default: 100, max: 500, 0 for full query), consistent with `pg_kcache_query_stats` and `pg_kcache_resource_analysis` which already supported it. Previously hardcoded to `LEFT(s.query, 100)`. Updated `ServerInstructions.ts` and added 2 unit tests
+
+- **Kcache `count`/`totalCount` race condition guard** — All 4 kcache tools with count-then-query pattern (`queryStats`, `topCpu`, `topIo`, `resourceAnalysis`) now use `Math.max(totalCount, rowCount)` to prevent `totalCount < count` when kcache self-referential queries inflate the result set between the COUNT and main queries. Ensures `truncated` flag is never misleadingly `false`
+
 - **`pg_kcache_query_stats` and `pg_kcache_resource_analysis` default limit reduced** — Default limit lowered from 50 to 20 for both tools, reducing typical response payload by ~60%. Consistent with `pg_stat_statements` (default 20) and `pg_unused_indexes` (default 20). Use `limit: 50` to restore previous behavior, or `limit: 0` for all rows
 
 ### Documentation

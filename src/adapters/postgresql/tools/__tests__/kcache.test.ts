@@ -196,6 +196,22 @@ describe("Kcache Tools", () => {
         expect.stringContaining("LIMIT 5"),
       );
     });
+
+    it("should respect queryPreviewLength", async () => {
+      // First call: column detection
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+      // Second call: COUNT query
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ total: 0 }] });
+      // Third call: actual query
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+      const tool = findTool("pg_kcache_top_cpu");
+      await tool!.handler({ queryPreviewLength: 200 }, mockContext);
+
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+        expect.stringContaining("LEFT(s.query, 200)"),
+      );
+    });
   });
 
   describe("pg_kcache_top_io", () => {
@@ -272,6 +288,22 @@ describe("Kcache Tools", () => {
       expect(result.ioType).toBe("reads");
       expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
         expect.stringContaining("ORDER BY k.reads DESC"),
+      );
+    });
+
+    it("should respect queryPreviewLength", async () => {
+      // First call: column detection
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+      // Second call: COUNT query
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [{ total: 0 }] });
+      // Third call: actual query
+      mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+      const tool = findTool("pg_kcache_top_io");
+      await tool!.handler({ queryPreviewLength: 300 }, mockContext);
+
+      expect(mockAdapter.executeQuery).toHaveBeenLastCalledWith(
+        expect.stringContaining("LEFT(s.query, 300)"),
       );
     });
   });

@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`pg_hybrid_search` tsvector `textColumn` support** — `textColumn` now auto-detects column type: uses tsvector columns directly (no wrapping), wraps plain text columns with `to_tsvector('english', ...)`. Previously, tsvector columns caused SQL errors due to unconditional `to_tsvector()` wrapping. Added 2 unit tests and updated 4 existing test mocks
 
+- **`pg_vector_batch_insert` tool filtering registration** — Fixed `pg_vector_batch_insert` not appearing as a direct MCP tool. The tool was fully implemented and registered in the vector factory (`vector/index.ts`) but missing from the `vector` tool group in `ToolConstants.ts` (tool filtering registry). Added to vector array, increasing total vector tools from 15 to 16. Updated meta-group tool counts (`ai-vector` 48→49, `ext-ai` 25→26)
+
 - **Vector tool object existence checks (P154)** — `pg_vector_search`, `pg_vector_aggregate`, `pg_vector_insert`, `pg_vector_add_column`, `pg_vector_cluster`, `pg_vector_index_optimize`, `pg_vector_performance`, `pg_vector_create_index`, `pg_vector_dimension_reduce`, and `pg_hybrid_search` now perform two-step existence verification (table first, then column) before executing main operations. Returns structured `{success: false, error: "...", suggestion: "..."}` with actionable messages distinguishing missing tables from missing columns. `pg_hybrid_search` catch block error format also standardized to separate schema and table names. Extracted reusable `checkTableAndColumn` helper. Added 21 unit tests covering all error paths
 
 ### Documentation

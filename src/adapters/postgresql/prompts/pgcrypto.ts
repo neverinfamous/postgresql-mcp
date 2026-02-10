@@ -18,14 +18,13 @@ export function createSetupPgcryptoPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
       const useCase = args["useCase"] ?? "password_hashing";
 
-      return `# pgcrypto Setup Guide - ${useCase
+      return Promise.resolve(`# pgcrypto Setup Guide - ${useCase
         .split("_")
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(" ")}
@@ -302,7 +301,7 @@ SELECT encode(digest('data', 'md5'), 'hex');
 | Unique identifiers | \`gen_random_uuid()\` |
 | Session tokens | \`gen_random_bytes(32)\` |
 
-**Pro Tip:** pgcrypto + citext = secure authentication done right!`;
+**Pro Tip:** pgcrypto + citext = secure authentication done right!`);
     },
   };
 }

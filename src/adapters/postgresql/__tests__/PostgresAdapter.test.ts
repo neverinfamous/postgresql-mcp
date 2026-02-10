@@ -371,6 +371,194 @@ describe("PostgresAdapter", () => {
       // Clear cache - should not throw
       expect(() => adapter.clearMetadataCache()).not.toThrow();
     });
+
+    it("listTables should return cached results on second call", async () => {
+      const mockTablesResult: QueryResult = {
+        rows: [
+          {
+            name: "users",
+            schema: "public",
+            type: "table",
+            owner: "admin",
+            row_count: 50,
+            live_row_estimate: 50,
+            stats_stale: false,
+            size_bytes: 8192,
+            total_size_bytes: 16384,
+            comment: null,
+          },
+        ],
+      };
+      mockPoolMethods.query.mockResolvedValueOnce(mockTablesResult);
+
+      // First call — queries database
+      const result1 = await adapter.listTables();
+      expect(result1).toHaveLength(1);
+      expect(mockPoolMethods.query).toHaveBeenCalledTimes(1);
+
+      // Second call — returns from cache, no additional query
+      const result2 = await adapter.listTables();
+      expect(result2).toHaveLength(1);
+      expect(mockPoolMethods.query).toHaveBeenCalledTimes(1); // Still 1
+      expect(result1).toBe(result2); // Same reference (cached)
+    });
+
+    it("describeTable should return cached results for same table", async () => {
+      // describeTable runs 5 queries: columns, tableInfo, indexes, constraints, foreignKeys
+      const emptyResult: QueryResult = { rows: [] };
+      const mockTableResult: QueryResult = {
+        rows: [
+          {
+            type: "table",
+            owner: "admin",
+            row_count: 10,
+            comment: null,
+            is_partitioned: false,
+            partition_key: null,
+          },
+        ],
+      };
+      mockPoolMethods.query
+        .mockResolvedValueOnce(emptyResult) // columns
+        .mockResolvedValueOnce(mockTableResult) // table info
+        .mockResolvedValueOnce(emptyResult) // indexes
+        .mockResolvedValueOnce(emptyResult) // constraints
+        .mockResolvedValueOnce(emptyResult); // foreign keys
+
+      // First call — queries database
+      const result1 = await adapter.describeTable("users", "public");
+      expect(result1.name).toBe("users");
+      expect(mockPoolMethods.query).toHaveBeenCalledTimes(5);
+
+      // Second call — returns from cache, no additional queries
+      const result2 = await adapter.describeTable("users", "public");
+      expect(result2.name).toBe("users");
+      expect(mockPoolMethods.query).toHaveBeenCalledTimes(5); // Still 5
+      expect(result1).toBe(result2); // Same reference (cached)
+    });
+
+    it("describeTable should use schema-qualified cache keys", async () => {
+      const emptyResult: QueryResult = { rows: [] };
+      const mockTableResult: QueryResult = {
+        rows: [
+          {
+            type: "table",
+            owner: "admin",
+            row_count: 10,
+            comment: null,
+            is_partitioned: false,
+            partition_key: null,
+          },
+        ],
+      };
+
+      // Mock for public.users (5 queries)
+      for (let i = 0; i < 5; i++) {
+        mockPoolMethods.query.mockResolvedValueOnce(
+          i === 1 ? mockTableResult : emptyResult,
+        );
+      }
+      const publicResult = await adapter.describeTable("users", "public");
+
+      // Mock for custom.users (5 queries — different schema, different cache key)
+      for (let i = 0; i < 5; i++) {
+        mockPoolMethods.query.mockResolvedValueOnce(
+          i === 1 ? mockTableResult : emptyResult,
+        );
+      }
+      const customResult = await adapter.describeTable("users", "custom");
+
+      // Both should have queried (10 total), different cache entries
+      expect(mockPoolMethods.query).toHaveBeenCalledTimes(10);
+      expect(publicResult.schema).toBe("public");
+      expect(customResult.schema).toBe("custom");
+      expect(publicResult).not.toBe(customResult);
+    });
+
+    it("listTables should return rowCount: 0 for empty tables (not omit field)", async () => {
+      const mockTablesResult: QueryResult = {
+        rows: [
+          {
+            name: "empty_table",
+            schema: "public",
+            type: "table",
+            owner: "admin",
+            row_count: 0,
+            live_row_estimate: 0,
+            stats_stale: false,
+            size_bytes: 0,
+            total_size_bytes: 0,
+            comment: null,
+          },
+        ],
+      };
+      mockPoolMethods.query.mockResolvedValueOnce(mockTablesResult);
+
+      const result = await adapter.listTables();
+      expect(result).toHaveLength(1);
+      expect(result[0]?.rowCount).toBe(0);
+      // Verify the field exists (not undefined/omitted)
+      expect("rowCount" in (result[0] ?? {})).toBe(true);
+    });
+
+    it("describeTable should use live_row_estimate when stats are stale", async () => {
+      const emptyResult: QueryResult = { rows: [] };
+      const mockTableResult: QueryResult = {
+        rows: [
+          {
+            type: "table",
+            owner: "admin",
+            row_count: null, // reltuples = -1 → NULL via CASE
+            live_row_estimate: 5,
+            stats_stale: true,
+            comment: null,
+            is_partitioned: false,
+            partition_key: null,
+          },
+        ],
+      };
+      mockPoolMethods.query
+        .mockResolvedValueOnce(emptyResult) // columns
+        .mockResolvedValueOnce(mockTableResult) // table info
+        .mockResolvedValueOnce(emptyResult) // indexes
+        .mockResolvedValueOnce(emptyResult) // constraints
+        .mockResolvedValueOnce(emptyResult); // foreign keys
+
+      const result = await adapter.describeTable("fresh_table", "public");
+      expect(result.rowCount).toBe(5); // Falls back to live_row_estimate
+    });
+
+    it("clearMetadataCache should force re-query for listTables", async () => {
+      const mockTablesResult: QueryResult = {
+        rows: [
+          {
+            name: "users",
+            schema: "public",
+            type: "table",
+            owner: "admin",
+            row_count: 50,
+            live_row_estimate: 50,
+            stats_stale: false,
+            size_bytes: 8192,
+            total_size_bytes: 16384,
+            comment: null,
+          },
+        ],
+      };
+      mockPoolMethods.query
+        .mockResolvedValueOnce(mockTablesResult) // First listTables call
+        .mockResolvedValueOnce(mockTablesResult); // Second listTables call after cache clear
+
+      await adapter.listTables();
+      expect(mockPoolMethods.query).toHaveBeenCalledTimes(1);
+
+      // Clear cache
+      adapter.clearMetadataCache();
+
+      // Next call should re-query
+      await adapter.listTables();
+      expect(mockPoolMethods.query).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("Tool Registration", () => {
@@ -750,16 +938,21 @@ describe("PostgresAdapter", () => {
         cacheTtlMs: number;
       };
 
-      // Set an entry with an old timestamp to trigger expiration
+      // Set entries with old timestamps to trigger expiration
+      // Both list_tables and all_indexes must be expired so getSchema refetches both
       adapterAny.metadataCache.set("all_indexes", {
         data: [{ name: "old_idx" }],
         timestamp: Date.now() - 60000, // 60 seconds ago, past 30s TTL
       });
+      adapterAny.metadataCache.set("list_tables", {
+        data: [],
+        timestamp: Date.now() - 60000,
+      });
 
-      // Calling getSchema again should detect expired cache, delete it, and refetch
+      // Calling getSchema again should detect expired caches, delete them, and refetch
       await adapter.getSchema();
 
-      // Verify the old cache was cleared and new query was made
+      // Verify the old cache was cleared and new queries were made
       expect(mockPoolMethods.query).toHaveBeenCalled();
     });
   });

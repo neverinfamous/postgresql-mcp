@@ -342,8 +342,8 @@ export function createBufferTool(adapter: PostgresAdapter): ToolDefinition {
       // Build response with truncation indicators if default limit was applied
       const response: Record<string, unknown> = { results: result.rows };
 
-      // When using default limit, check if more rows exist
-      if (parsed.limit === undefined && effectiveLimit > 0) {
+      // Check if results were truncated (works for both default and explicit limits)
+      if (effectiveLimit > 0) {
         const countSql = `SELECT COUNT(*) as cnt FROM ${qualifiedTable}${whereClause}`;
         const countResult = await adapter.executeQuery(countSql);
         const totalCount = Number(countResult.rows?.[0]?.["cnt"] ?? 0);

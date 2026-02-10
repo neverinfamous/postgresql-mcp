@@ -465,7 +465,8 @@ describe("SandboxPool Cleanup Interval", () => {
     expect(pool.getStats().available).toBe(2);
 
     // Wait for cleanup interval to trigger (which trims to minInstances)
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Use generous timeout to avoid flakiness on slow CI runners
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // After cleanup, should be trimmed back to minInstances
     expect(pool.getStats().available).toBe(1);

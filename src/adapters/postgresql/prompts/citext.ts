@@ -18,14 +18,13 @@ export function createSetupCitextPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
       const useCase = args["useCase"] ?? "email";
 
-      return `# citext Setup Guide - ${useCase.charAt(0).toUpperCase() + useCase.slice(1)}s
+      return Promise.resolve(`# citext Setup Guide - ${useCase.charAt(0).toUpperCase() + useCase.slice(1)}s
 
 ## citext Overview
 
@@ -230,7 +229,7 @@ SELECT * FROM users WHERE email LIKE '%@example%';  -- Case-insensitive!
 - B-tree indexes work normally
 - Slightly slower than text for exact matches
 
-**Pro Tip:** citext eliminates an entire category of authentication bugs. Always use it for email and username columns!`;
+**Pro Tip:** citext eliminates an entire category of authentication bugs. Always use it for email and username columns!`);
     },
   };
 }

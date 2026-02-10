@@ -23,8 +23,7 @@ export function createIndexTuningPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -136,7 +135,7 @@ COMMIT; -- or ROLLBACK if issues
 
 **Pro Tip:** Use CONCURRENTLY when creating indexes on production databases!`;
 
-      return content;
+      return Promise.resolve(content);
     },
   };
 }

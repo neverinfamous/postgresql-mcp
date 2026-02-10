@@ -296,7 +296,7 @@ export const CreatePartitionSchemaBase = z
       .string()
       .optional()
       .describe(
-        "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
+        "Raw SQL partition bounds string (REQUIRED). Examples: \"FROM ('2024-01-01') TO ('2024-07-01')\", \"IN ('US', 'CA')\", \"WITH (MODULUS 4, REMAINDER 0)\". For DEFAULT partitions, use isDefault: true instead",
       ),
     isDefault: z
       .boolean()
@@ -363,7 +363,7 @@ export const AttachPartitionSchemaBase = z
       .string()
       .optional()
       .describe(
-        "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
+        "Raw SQL partition bounds string (REQUIRED). Examples: \"FROM ('2024-01-01') TO ('2024-07-01')\", \"IN ('US', 'CA')\", \"WITH (MODULUS 4, REMAINDER 0)\". For DEFAULT partitions, use isDefault: true instead",
       ),
     isDefault: z
       .boolean()
@@ -598,9 +598,10 @@ export const CreatePartitionedTableOutputSchema = z
 export const CreatePartitionOutputSchema = z
   .object({
     success: z.boolean().describe("Whether the operation succeeded"),
-    partition: z.string().describe("Partition name (schema.name)"),
-    parent: z.string().describe("Parent table name"),
-    bounds: z.string().describe("Partition bounds description"),
+    error: z.string().optional().describe("Error message if operation failed"),
+    partition: z.string().optional().describe("Partition name (schema.name)"),
+    parent: z.string().optional().describe("Parent table name"),
+    bounds: z.string().optional().describe("Partition bounds description"),
     subpartitionBy: z.string().optional().describe("Sub-partition strategy"),
     subpartitionKey: z.string().optional().describe("Sub-partition key"),
   })
@@ -611,9 +612,10 @@ export const CreatePartitionOutputSchema = z
  */
 export const AttachPartitionOutputSchema = z.object({
   success: z.boolean().describe("Whether the operation succeeded"),
-  parent: z.string().describe("Parent table name"),
-  partition: z.string().describe("Attached partition name"),
-  bounds: z.string().describe("Partition bounds description"),
+  error: z.string().optional().describe("Error message if operation failed"),
+  parent: z.string().optional().describe("Parent table name"),
+  partition: z.string().optional().describe("Attached partition name"),
+  bounds: z.string().optional().describe("Partition bounds description"),
 });
 
 /**
@@ -621,8 +623,9 @@ export const AttachPartitionOutputSchema = z.object({
  */
 export const DetachPartitionOutputSchema = z.object({
   success: z.boolean().describe("Whether the operation succeeded"),
-  parent: z.string().describe("Parent table name"),
-  detached: z.string().describe("Detached partition name"),
+  error: z.string().optional().describe("Error message if operation failed"),
+  parent: z.string().optional().describe("Parent table name"),
+  detached: z.string().optional().describe("Detached partition name"),
 });
 
 /**

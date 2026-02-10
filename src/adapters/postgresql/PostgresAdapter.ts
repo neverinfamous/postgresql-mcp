@@ -634,6 +634,10 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async listTables(): Promise<TableInfo[]> {
+    // Performance optimization: return cached result if within TTL
+    const cached = this.getCached("list_tables") as TableInfo[] | undefined;
+    if (cached) return cached;
+
     const result = await this.executeQuery(`
             SELECT 
                 c.relname as name,
@@ -661,7 +665,7 @@ export class PostgresAdapter extends DatabaseAdapter {
             ORDER BY n.nspname, c.relname
         `);
 
-    return (result.rows ?? []).map((row) => {
+    const tables = (result.rows ?? []).map((row) => {
       const rowCount = row["row_count"];
       const liveRowEstimate = Number(row["live_row_estimate"]) || 0;
       const statsStale = row["stats_stale"] === true;
@@ -675,19 +679,27 @@ export class PostgresAdapter extends DatabaseAdapter {
         schema: row["schema"] as string,
         type: row["type"] as TableInfo["type"],
         owner: row["owner"] as string,
-        rowCount: effectiveRowCount > 0 ? effectiveRowCount : undefined,
+        rowCount: effectiveRowCount,
         sizeBytes: Number(row["size_bytes"]) || undefined,
         totalSizeBytes: Number(row["total_size_bytes"]) || undefined,
         comment: row["comment"] as string | undefined,
         statsStale,
       };
     });
+
+    this.setCache("list_tables", tables);
+    return tables;
   }
 
   async describeTable(
     tableName: string,
     schemaName = "public",
   ): Promise<TableInfo> {
+    // Performance optimization: return cached result if within TTL
+    const cacheKey = `describe:${schemaName}.${tableName}`;
+    const cached = this.getCached(cacheKey) as TableInfo | undefined;
+    if (cached) return cached;
+
     // Get column information including foreign key references
     const columnsResult = await this.executeQuery(
       `
@@ -776,12 +788,15 @@ export class PostgresAdapter extends DatabaseAdapter {
                     WHEN 'p' THEN 'partitioned_table'
                 END as type,
                 pg_catalog.pg_get_userbyid(c.relowner) as owner,
-                c.reltuples::bigint as row_count,
+                CASE WHEN c.reltuples = -1 THEN NULL ELSE c.reltuples END::bigint as row_count,
+                COALESCE(s.n_live_tup, 0)::bigint as live_row_estimate,
+                (c.reltuples = -1) as stats_stale,
                 obj_description(c.oid, 'pg_class') as comment,
                 c.relkind = 'p' as is_partitioned,
                 pg_get_partkeydef(c.oid) as partition_key
             FROM pg_catalog.pg_class c
             LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
             WHERE c.relname = $1
               AND n.nspname = $2
         `,
@@ -929,12 +944,16 @@ export class PostgresAdapter extends DatabaseAdapter {
     const pkConstraint = constraints.find((c) => c.type === "primary_key");
     const primaryKey = pkConstraint?.columns ?? null;
 
-    return {
+    const tableInfo: TableInfo = {
       name: tableName,
       schema: schemaName,
       type: (tableRow?.["type"] as TableInfo["type"]) ?? "table",
       owner: tableRow?.["owner"] as string | undefined,
-      rowCount: Number(tableRow?.["row_count"]) || undefined,
+      rowCount: (() => {
+        const rc = tableRow?.["row_count"];
+        const liveEst = Number(tableRow?.["live_row_estimate"]) || 0;
+        return rc !== null && rc !== undefined ? Number(rc) : liveEst;
+      })(),
       comment: tableRow?.["comment"] as string | undefined,
       isPartitioned: tableRow?.["is_partitioned"] as boolean,
       partitionKey: tableRow?.["partition_key"] as string | undefined,
@@ -944,6 +963,9 @@ export class PostgresAdapter extends DatabaseAdapter {
       constraints: [...constraints, ...notNullConstraints],
       foreignKeys,
     };
+
+    this.setCache(cacheKey, tableInfo);
+    return tableInfo;
   }
 
   async listSchemas(): Promise<string[]> {

@@ -40,12 +40,17 @@ export function createListTablesTool(adapter: PostgresAdapter): ToolDefinition {
     annotations: readOnly("List Tables"),
     icons: getToolIcons("core", readOnly("List Tables")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { schema, limit } = ListTablesSchema.parse(params);
+      const { schema, limit, exclude } = ListTablesSchema.parse(params);
       let tables = await adapter.listTables();
       const totalCount = tables.length;
 
       if (schema) {
         tables = tables.filter((t) => t.schema === schema);
+      }
+
+      // Filter out excluded schemas/extensions
+      if (exclude !== undefined && exclude.length > 0) {
+        tables = tables.filter((t) => !exclude.includes(t.schema ?? ""));
       }
 
       // Apply default limit of 100 if not specified
@@ -61,7 +66,7 @@ export function createListTablesTool(adapter: PostgresAdapter): ToolDefinition {
         totalCount,
         ...(truncated && {
           truncated: true,
-          hint: `Showing ${String(effectiveLimit)} of ${String(totalCount)} tables. Use 'limit' to see more, or 'schema' to filter.`,
+          hint: `Showing ${String(effectiveLimit)} of ${String(totalCount)} tables. Use 'limit' to see more, 'schema' to filter, or 'exclude' to hide extension schemas.`,
         }),
       };
     },

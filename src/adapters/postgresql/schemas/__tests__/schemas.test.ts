@@ -498,14 +498,13 @@ describe("GeoTransformSchema", () => {
     expect(result.toSrid).toBe(3857);
   });
 
-  it("should require fromSrid", () => {
-    expect(() =>
-      GeoTransformSchema.parse({
-        table: "locations",
-        column: "geom",
-        toSrid: 3857,
-      }),
-    ).toThrow("fromSrid (or sourceSrid alias) is required");
+  it("should default fromSrid to 0 for auto-detection when not provided", () => {
+    const result = GeoTransformSchema.parse({
+      table: "locations",
+      column: "geom",
+      toSrid: 3857,
+    });
+    expect(result.fromSrid).toBe(0);
   });
 
   it("should require toSrid", () => {

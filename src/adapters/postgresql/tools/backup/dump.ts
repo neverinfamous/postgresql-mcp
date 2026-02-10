@@ -356,8 +356,7 @@ export function createDumpSchemaTool(
     outputSchema: DumpSchemaOutputSchema,
     annotations: readOnly("Dump Schema"),
     icons: getToolIcons("backup", readOnly("Dump Schema")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: (params: unknown, _context: RequestContext) => {
       const { table, schema, filename } = DumpSchemaSchema.parse(params);
 
       let command = "pg_dump";
@@ -380,7 +379,7 @@ export function createDumpSchemaTool(
       command += ` --file=${outputFilename}`;
       command += " $POSTGRES_CONNECTION_STRING";
 
-      return {
+      return Promise.resolve({
         command,
         ...(schema !== undefined &&
           table !== undefined && {
@@ -394,7 +393,7 @@ export function createDumpSchemaTool(
           "Add --data-only to exclude schema",
           "Add --schema-only to exclude data",
         ],
-      };
+      });
     },
   };
 }
@@ -606,71 +605,72 @@ export function createCopyImportTool(
     outputSchema: CopyImportOutputSchema,
     annotations: write("Copy Import"),
     icons: getToolIcons("backup", write("Copy Import")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
-      const rawParams = params as {
-        table?: string;
-        tableName?: string; // Alias for table
-        schema?: string;
-        filePath?: string;
-        format?: string;
-        header?: boolean;
-        delimiter?: string;
-        columns?: string[];
-      };
+    handler: (params: unknown, _context: RequestContext) => {
+      return Promise.resolve().then(() => {
+        const rawParams = params as {
+          table?: string;
+          tableName?: string; // Alias for table
+          schema?: string;
+          filePath?: string;
+          format?: string;
+          header?: boolean;
+          delimiter?: string;
+          columns?: string[];
+        };
 
-      // Resolve tableName alias to table
-      const tableValue = rawParams.table ?? rawParams.tableName;
-      if (!tableValue) {
-        throw new Error("table parameter is required");
-      }
-
-      const parsed = {
-        ...rawParams,
-        table: tableValue,
-      };
-
-      // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
-      // If table contains a dot, always parse it as schema.table (embedded schema takes priority)
-      let tableNamePart = parsed.table;
-      let schemaNamePart = parsed.schema;
-
-      if (parsed.table.includes(".")) {
-        const parts = parsed.table.split(".");
-        if (parts.length === 2 && parts[0] && parts[1]) {
-          schemaNamePart = parts[0];
-          tableNamePart = parts[1];
+        // Resolve tableName alias to table
+        const tableValue = rawParams.table ?? rawParams.tableName;
+        if (!tableValue) {
+          throw new Error("table parameter is required");
         }
-      }
 
-      const tableName = schemaNamePart
-        ? `"${schemaNamePart}"."${tableNamePart}"`
-        : `"${tableNamePart}"`;
+        const parsed = {
+          ...rawParams,
+          table: tableValue,
+        };
 
-      const columnClause =
-        parsed.columns !== undefined && parsed.columns.length > 0
-          ? ` (${parsed.columns.map((c) => `"${c}"`).join(", ")})`
-          : "";
+        // Parse schema.table format (e.g., 'public.users' -> schema='public', table='users')
+        // If table contains a dot, always parse it as schema.table (embedded schema takes priority)
+        let tableNamePart = parsed.table;
+        let schemaNamePart = parsed.schema;
 
-      const options: string[] = [];
-      options.push(`FORMAT ${parsed.format ?? "csv"}`);
-      if (parsed.header) options.push("HEADER");
-      if (parsed.delimiter) options.push(`DELIMITER '${parsed.delimiter}'`);
+        if (parsed.table.includes(".")) {
+          const parts = parsed.table.split(".");
+          if (parts.length === 2 && parts[0] && parts[1]) {
+            schemaNamePart = parts[0];
+            tableNamePart = parts[1];
+          }
+        }
 
-      // Use provided filePath or generate placeholder with appropriate extension
-      const ext =
-        parsed.format === "text"
-          ? "txt"
-          : parsed.format === "binary"
-            ? "bin"
-            : "csv";
-      const filePath = parsed.filePath ?? `/path/to/file.${ext}`;
+        const tableName = schemaNamePart
+          ? `"${schemaNamePart}"."${tableNamePart}"`
+          : `"${tableNamePart}"`;
 
-      return {
-        command: `COPY ${tableName}${columnClause} FROM '${filePath}' WITH (${options.join(", ")})`,
-        stdinCommand: `COPY ${tableName}${columnClause} FROM STDIN WITH (${options.join(", ")})`,
-        notes: "Use \\copy in psql for client-side files",
-      };
+        const columnClause =
+          parsed.columns !== undefined && parsed.columns.length > 0
+            ? ` (${parsed.columns.map((c) => `"${c}"`).join(", ")})`
+            : "";
+
+        const options: string[] = [];
+        options.push(`FORMAT ${parsed.format ?? "csv"}`);
+        if (parsed.header) options.push("HEADER");
+        if (parsed.delimiter) options.push(`DELIMITER '${parsed.delimiter}'`);
+
+        // Use provided filePath or generate placeholder with appropriate extension
+        const ext =
+          parsed.format === "text"
+            ? "txt"
+            : parsed.format === "binary"
+              ? "bin"
+              : "csv";
+        const filePath = parsed.filePath ?? `/path/to/file.${ext}`;
+
+        return {
+          command: `COPY ${tableName}${columnClause} FROM '${filePath}' WITH (${options.join(", ")})`,
+          stdinCommand: `COPY ${tableName}${columnClause} FROM STDIN WITH (${options.join(", ")})`,
+          notes: "Use \\copy in psql for client-side files",
+        };
+      });
     },
   };
 }

@@ -91,7 +91,7 @@ const METHOD_ALIASES: Record<string, Record<string, string>> = {
     queryStats: "statStatements", // pg_query_stats → statStatements()
     // Activity-related aliases
     activity: "statActivity", // activity() → statActivity()
-    runningQueries: "statActivity", // runningQueries() → statActivity()
+
     // Index analysis aliases
     indexUsage: "indexStats", // indexUsage() → indexStats()
     // Vacuum alias
@@ -701,7 +701,7 @@ function createGroupApi(
       };
     }
 
-    // pg.performance.longRunningQueries(seconds?) → statActivity filtered by duration
+    // pg.performance.longRunningQueries(seconds?) → {longRunningQueries, count, threshold}
     if (statActivityFn !== undefined) {
       api["longRunningQueries"] = async (...args: unknown[]) => {
         // Support both: longRunningQueries(10) and longRunningQueries({seconds: 10})
@@ -747,6 +747,8 @@ function createGroupApi(
           threshold: `${String(threshold)} seconds`,
         };
       };
+      // Add alias: runningQueries → longRunningQueries
+      api["runningQueries"] = api["longRunningQueries"];
     }
 
     // pg.performance.analyzeTable() → Actually runs ANALYZE (cross-group bridge to admin)

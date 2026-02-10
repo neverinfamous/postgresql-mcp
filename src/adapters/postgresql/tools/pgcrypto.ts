@@ -182,23 +182,24 @@ function createPgcryptoDecryptTool(adapter: PostgresAdapter): ToolDefinition {
 function createPgcryptoGenRandomUuidTool(
   adapter: PostgresAdapter,
 ): ToolDefinition {
-  // Schema with proper validation
-  const GenUuidSchema = z
-    .object({
-      count: z
-        .number()
-        .min(1)
-        .max(100)
-        .optional()
-        .describe("Number of UUIDs to generate (default: 1, max: 100)"),
-    })
-    .default({});
+  // Base schema for MCP visibility (count parameter exposed to clients)
+  const GenUuidSchemaBase = z.object({
+    count: z
+      .number()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Number of UUIDs to generate (default: 1, max: 100)"),
+  });
+
+  // Full schema with default for handler parsing
+  const GenUuidSchema = GenUuidSchemaBase.default({});
 
   return {
     name: "pg_pgcrypto_gen_random_uuid",
     description: "Generate a cryptographically secure UUID v4.",
     group: "pgcrypto",
-    inputSchema: GenUuidSchema,
+    inputSchema: GenUuidSchemaBase,
     outputSchema: PgcryptoGenRandomUuidOutputSchema,
     annotations: readOnly("Generate UUID"),
     icons: getToolIcons("pgcrypto", readOnly("Generate UUID")),

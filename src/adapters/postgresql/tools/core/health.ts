@@ -243,10 +243,11 @@ export function createAnalyzeWorkloadIndexesTool(
     annotations: readOnly("Analyze Workload Indexes"),
     icons: getToolIcons("core", readOnly("Analyze Workload Indexes")),
     handler: async (params: unknown, _context: RequestContext) => {
-      const { topQueries, minCalls } =
+      const { topQueries, minCalls, queryPreviewLength } =
         AnalyzeWorkloadIndexesSchema.parse(params);
       const limit = topQueries ?? 20;
       const minCallThreshold = minCalls ?? 10;
+      const previewLen = queryPreviewLength ?? 200;
 
       // Check if pg_stat_statements is available
       const extCheck = await adapter.executeQuery(
@@ -325,7 +326,10 @@ export function createAnalyzeWorkloadIndexesTool(
 
         if (rec) {
           recommendations.push({
-            query: queryRow.query.substring(0, 200),
+            query:
+              queryRow.query.length > previewLen
+                ? queryRow.query.substring(0, previewLen) + "\u2026"
+                : queryRow.query,
             avgTimeMs: queryRow.avg_time_ms,
             calls: queryRow.calls,
             recommendation: rec,

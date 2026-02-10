@@ -453,6 +453,11 @@ describe("pg_create_partition", () => {
   });
 
   it("should create a RANGE partition", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -469,7 +474,7 @@ describe("pg_create_partition", () => {
       bounds: string;
     };
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[1][0] as string;
     expect(call).toContain("PARTITION OF");
     expect(call).toContain("FOR VALUES");
     expect(result.success).toBe(true);
@@ -477,6 +482,11 @@ describe("pg_create_partition", () => {
   });
 
   it("should create a LIST partition", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -489,11 +499,16 @@ describe("pg_create_partition", () => {
       mockContext,
     );
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[1][0] as string;
     expect(call).toContain("IN ('US', 'CA')");
   });
 
   it("should create a DEFAULT partition", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -509,7 +524,7 @@ describe("pg_create_partition", () => {
       bounds: string;
     };
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[1][0] as string;
     expect(call).toContain("DEFAULT");
     expect(call).not.toContain("FOR VALUES");
     expect(result.success).toBe(true);
@@ -517,6 +532,11 @@ describe("pg_create_partition", () => {
   });
 
   it("should accept default: true as alias for isDefault", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -532,13 +552,18 @@ describe("pg_create_partition", () => {
       bounds: string;
     };
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[1][0] as string;
     expect(call).toContain("DEFAULT");
     expect(result.success).toBe(true);
     expect(result.bounds).toBe("DEFAULT");
   });
 
   it("should create a sub-partitionable partition", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -558,7 +583,7 @@ describe("pg_create_partition", () => {
       subpartitionKey: string;
     };
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[1][0] as string;
     expect(call).toContain("FOR VALUES");
     expect(call).toContain("PARTITION BY LIST (region)");
     expect(result.success).toBe(true);
@@ -585,6 +610,11 @@ describe("pg_create_partition", () => {
   });
 
   it("should support DEFAULT partition with sub-partitioning", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -603,7 +633,7 @@ describe("pg_create_partition", () => {
       subpartitionBy: string;
     };
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[1][0] as string;
     expect(call).toContain("DEFAULT");
     expect(call).not.toContain("FOR VALUES");
     expect(call).toContain("PARTITION BY HASH (id)");
@@ -612,6 +642,11 @@ describe("pg_create_partition", () => {
   });
 
   it("should normalize uppercase subpartitionBy values", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -630,9 +665,58 @@ describe("pg_create_partition", () => {
       subpartitionBy: string;
     };
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[1][0] as string;
     expect(call).toContain("PARTITION BY LIST (region)");
     expect(result.subpartitionBy).toBe("list"); // Normalized to lowercase
+  });
+
+  it("should return structured error for non-existent parent table", async () => {
+    // checkTablePartitionStatus - not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_create_partition")!;
+    const result = (await tool.handler(
+      {
+        parent: "nonexistent_table",
+        name: "part_1",
+        forValues: "FROM ('2024-01-01') TO ('2025-01-01')",
+      },
+      mockContext,
+    )) as {
+      success: boolean;
+      error: string;
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("does not exist");
+    expect(result.error).toContain("nonexistent_table");
+    // Should NOT attempt SQL execution
+    expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("should return structured error for non-partitioned parent table", async () => {
+    // checkTablePartitionStatus - regular table
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "r" }],
+    });
+
+    const tool = tools.find((t) => t.name === "pg_create_partition")!;
+    const result = (await tool.handler(
+      {
+        parent: "regular_table",
+        name: "part_1",
+        forValues: "FROM ('2024-01-01') TO ('2025-01-01')",
+      },
+      mockContext,
+    )) as {
+      success: boolean;
+      error: string;
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("not partitioned");
+    expect(result.error).toContain("regular_table");
+    expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -649,6 +733,15 @@ describe("pg_attach_partition", () => {
   });
 
   it("should attach a partition", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: partition existence check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ "?column?": 1 }],
+    });
+    // Third call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_attach_partition")!;
@@ -665,12 +758,62 @@ describe("pg_attach_partition", () => {
       partition: string;
     };
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[2][0] as string;
     expect(call).toContain("ALTER TABLE");
     expect(call).toContain("ATTACH PARTITION");
     expect(result.success).toBe(true);
     expect(result.parent).toBe("events");
     expect(result.partition).toBe("legacy_events");
+  });
+
+  it("should return structured error for non-existent parent table", async () => {
+    // checkTablePartitionStatus - not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_attach_partition")!;
+    const result = (await tool.handler(
+      {
+        parent: "nonexistent_table",
+        partition: "legacy_events",
+        forValues: "FROM ('2020-01-01') TO ('2021-01-01')",
+      },
+      mockContext,
+    )) as {
+      success: boolean;
+      error: string;
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("does not exist");
+    expect(result.error).toContain("nonexistent_table");
+    expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("should return structured error for non-existent partition table", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: partition existence check - not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_attach_partition")!;
+    const result = (await tool.handler(
+      {
+        parent: "events",
+        partition: "nonexistent_partition",
+        forValues: "FROM ('2020-01-01') TO ('2021-01-01')",
+      },
+      mockContext,
+    )) as {
+      success: boolean;
+      error: string;
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("does not exist");
+    expect(result.error).toContain("nonexistent_partition");
+    expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -687,6 +830,15 @@ describe("pg_detach_partition", () => {
   });
 
   it("should detach a partition", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: partition existence check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ "?column?": 1 }],
+    });
+    // Third call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_detach_partition")!;
@@ -702,13 +854,22 @@ describe("pg_detach_partition", () => {
       detached: string;
     };
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[2][0] as string;
     expect(call).toContain("DETACH PARTITION");
     expect(result.success).toBe(true);
     expect(result.detached).toBe("events_2020");
   });
 
   it("should detach concurrently when specified", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: partition existence check
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ "?column?": 1 }],
+    });
+    // Third call: SQL execution
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
     const tool = tools.find((t) => t.name === "pg_detach_partition")!;
@@ -721,8 +882,56 @@ describe("pg_detach_partition", () => {
       mockContext,
     );
 
-    const call = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    const call = mockAdapter.executeQuery.mock.calls[2][0] as string;
     expect(call).toContain("CONCURRENTLY");
+  });
+
+  it("should return structured error for non-existent parent table", async () => {
+    // checkTablePartitionStatus - not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_detach_partition")!;
+    const result = (await tool.handler(
+      {
+        parent: "nonexistent_table",
+        partition: "events_2020",
+      },
+      mockContext,
+    )) as {
+      success: boolean;
+      error: string;
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("does not exist");
+    expect(result.error).toContain("nonexistent_table");
+    expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it("should return structured error for non-existent partition", async () => {
+    // First call: checkTablePartitionStatus - partitioned parent
+    mockAdapter.executeQuery.mockResolvedValueOnce({
+      rows: [{ relkind: "p" }],
+    });
+    // Second call: partition existence check - not found
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_detach_partition")!;
+    const result = (await tool.handler(
+      {
+        parent: "events",
+        partition: "nonexistent_partition",
+      },
+      mockContext,
+    )) as {
+      success: boolean;
+      error: string;
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("does not exist");
+    expect(result.error).toContain("nonexistent_partition");
+    expect(mockAdapter.executeQuery).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -965,6 +1174,10 @@ describe("Parameter Smoothing", () => {
 
   describe("pg_create_partition - parameter aliasing", () => {
     it("should accept parentTable as alias for parent", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -982,6 +1195,10 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept partitionName as alias for name", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -999,6 +1216,10 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept from/to and build forValues", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -1017,6 +1238,10 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept parentTable with from/to combined", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -1037,6 +1262,14 @@ describe("Parameter Smoothing", () => {
 
   describe("pg_attach_partition - parameter aliasing", () => {
     it("should accept parentTable as alias for parent", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_attach_partition")!;
@@ -1054,6 +1287,14 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept from/to and build forValues", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_attach_partition")!;
@@ -1072,6 +1313,14 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept partitionTable as alias for partition", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_attach_partition")!;
@@ -1089,6 +1338,14 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept partitionName as alias for partition", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_attach_partition")!;
@@ -1106,6 +1363,14 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept values array for LIST partitions", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_attach_partition")!;
@@ -1123,6 +1388,14 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept modulus/remainder for HASH partitions", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_attach_partition")!;
@@ -1143,6 +1416,14 @@ describe("Parameter Smoothing", () => {
 
   describe("pg_detach_partition - parameter aliasing", () => {
     it("should accept parentTable as alias for parent", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_detach_partition")!;
@@ -1159,6 +1440,14 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept partitionTable as alias for partition", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_detach_partition")!;
@@ -1175,6 +1464,14 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept partitionName as alias for partition", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
+      // partition existence check
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ "?column?": 1 }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_detach_partition")!;
@@ -1193,6 +1490,10 @@ describe("Parameter Smoothing", () => {
 
   describe("pg_create_partition - LIST and HASH intuitive formats", () => {
     it("should accept values array for LIST partitions", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -1210,6 +1511,10 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept modulus/remainder for HASH partitions", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -1228,6 +1533,10 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept rangeFrom/rangeTo for RANGE partitions", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -1246,6 +1555,10 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept listValues for LIST partitions", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;
@@ -1263,6 +1576,10 @@ describe("Parameter Smoothing", () => {
     });
 
     it("should accept hashModulus/hashRemainder for HASH partitions", async () => {
+      // checkTablePartitionStatus - partitioned parent
+      mockAdapter.executeQuery.mockResolvedValueOnce({
+        rows: [{ relkind: "p" }],
+      });
       mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
       const tool = tools.find((t) => t.name === "pg_create_partition")!;

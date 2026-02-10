@@ -115,8 +115,7 @@ export const StatStatementsOutputSchema = z.object({
   statements: z
     .array(z.record(z.string(), z.unknown()))
     .describe("Query statistics"),
-  totalCount: z.number().optional().describe("Total count if truncated"),
-  truncated: z.boolean().optional().describe("Whether results were truncated"),
+  ...PaginatedBase,
 });
 
 // pg_stat_activity

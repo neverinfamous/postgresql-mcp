@@ -23,8 +23,7 @@ export function createSetupPartmanPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -214,7 +213,7 @@ DROP TABLE events_old;
 
 **Pro Tip:** pg_partman + pg_cron = fully automated partition lifecycle!`;
 
-      return content;
+      return Promise.resolve(content);
     },
   };
 }

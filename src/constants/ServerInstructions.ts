@@ -22,7 +22,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 7. **pg_list_objects type**: Use \`type\` (singular string) or \`types\` (array). Auto-converts: \`{type: 'table'}\` ≡ \`{types: ['table']}\`
 8. **pg_object_details**: Accepts: \`name\`, \`objectName\`, \`object\`, or \`table\`. Use \`type\`/\`objectType\` for type hint (supports: table, view, materialized_view, partitioned_table, function, sequence, index)
 9. **pg_exists optional WHERE**: \`where\`/\`condition\`/\`filter\` is optional. Without it, checks if table has any rows
-10. **pg_describe_table**: Returns columns, foreignKeys, primaryKey—use \`pg_get_indexes\` separately for index details
+10. **pg_describe_table**: Returns columns, foreignKeys, primaryKey, indexes, constraints. For listing ALL database indexes (not table-specific), use \`pg_get_indexes\` without \`table\` param
 11. **pg_vector_insert updateExisting**: Uses direct UPDATE (avoids NOT NULL constraint issues vs INSERT mode)
 12. **pg_get_indexes without table**: Returns ALL database indexes (potentially large). Use \`table\` param for specific table
 13. **pg_upsert/pg_batch_insert RETURNING**: \`returning\` param must be array of column names: \`["id", "name"]\`. ⛔ \`"*"\` wildcard not supported
@@ -33,8 +33,8 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | Tool | Returns | Notes |
 |------|---------|-------|
 | \`pg_read_query\` | \`{rows, rowCount, fields?}\` | \`fields\` contains column metadata (name, dataTypeID) |
-| \`pg_write_query\` | \`{rowsAffected, affectedRows, rows?}\` | \`rows\` only with RETURNING clause. ⛔ Throws for SELECT |
-| \`pg_upsert\` | \`{operation, rowsAffected, rowCount, rows?}\` | \`operation: 'insert'|'update'\`. \`rows\` only with RETURNING clause |
+| \`pg_write_query\` | \`{rowsAffected, affectedRows, rows?}\` | \`rows\` only with RETURNING clause. DDL statements return \`rowsAffected: 0\`. ⛔ Throws for SELECT |
+| \`pg_upsert\` | \`{success, operation, rowsAffected, rowCount, rows?}\` | \`operation: 'insert'|'update'\`. \`rows\` only with RETURNING clause |
 | \`pg_batch_insert\` | \`{rowsAffected, affectedRows, insertedCount, rows?}\` | Empty objects use DEFAULT VALUES. ⚠️ BIGINT > 2^53 loses precision |
 | \`pg_count\` | \`{count: N}\` | Use \`params\` for placeholders: \`where: 'id=$1', params: [5]\`. DISTINCT: use \`pg_read_query\` |
 | \`pg_exists\` | \`{exists: bool, mode, hint?}\` | \`params\` for placeholders. \`mode: 'filtered'|'any_rows'\` |
@@ -42,12 +42,17 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | \`pg_list_objects\` | \`{objects, count, totalCount, byType}\` | Use \`limit\` to cap results, \`type\`/\`types\` to filter |
 | \`pg_object_details\` | \`{name, schema, type, returnType?, ...}\` | Functions: \`returnType\` alias. Views/Mat. views: \`definition\` |
 | \`pg_analyze_db_health\` | \`{cacheHitRatio: {ratio, heap, index, status}}\` | \`ratio\` = primary numeric %. \`bloat\` available |
-| \`pg_describe_table\` | \`{columns, indexes, constraints, foreignKeys}\` | Columns include \`notNull\` (alias for \`!nullable\`), \`foreignKey\`. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL. ⚠️ \`rowCount: -1\` = no statistics (run ANALYZE) |
+| \`pg_describe_table\` | \`{name, schema, type, owner, rowCount, columns, primaryKey, indexes, constraints, foreignKeys}\` | Columns include \`notNull\` (alias for \`!nullable\`), \`foreignKey\`. \`constraints\` includes PK, UNIQUE, CHECK, NOT NULL. ⚠️ \`rowCount: -1\` = stale/missing statistics (run ANALYZE on the table). Small tables (<~50 rows) may show -1 until first ANALYZE |
 | \`pg_analyze_query_indexes\` | \`{plan, issues, recommendations}\` | \`verbosity\`: 'summary' (default) or 'full'. Summary mode returns condensed plan |
-| \`pg_list_tables\` | \`{tables, count}\` | Use \`schema\` to filter, \`limit\` to cap results |
+| \`pg_list_tables\` | \`{tables, count}\` | Use \`schema\` to filter, \`limit\` to cap results, \`exclude\` to hide extension schemas (e.g., \`['cron', 'topology', 'partman']\`) |
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |
 | \`pg_jsonb_agg groupBy\` | \`{result: [{group_key, items}], count, grouped: true}\` | Without groupBy: \`{result: [...], count, grouped: false}\` |
 | \`pg_vector_aggregate\` | \`{average_vector, count}\` or \`{groups: [{group_key, average_vector, count}]}\` | Without/with \`groupBy\` |
+| \`pg_index_stats\` | \`{indexes, count, truncated?, totalCount?}\` | Default 50 rows. Use \`limit: 0\` for all |
+| \`pg_table_stats\` | \`{tables, count, truncated?, totalCount?}\` | Default 50 rows. Use \`limit: 0\` for all |
+| \`pg_vacuum_stats\` | \`{tables, count, truncated?, totalCount?}\` | Default 50 rows. Use \`limit: 0\` for all |
+| \`pg_stat_statements\` | \`{statements, count, truncated?, totalCount?}\` | Default 20 rows. \`orderBy\` supported |
+| \`pg_query_plan_stats\` | \`{queryPlanStats, count, truncated?, totalCount?}\` | Default 20 rows. \`truncateQuery: 0\` for full text |
 
 ## API Mapping
 
@@ -80,10 +85,10 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 - \`pg_vector_distance\`: Calculate distance between two vectors. \`metric\`: 'l2' (default), 'cosine', 'inner_product'. Returns \`{distance, metric}\`
 - \`pg_vector_cluster\`: \`clusters\` = \`k\`. Returns centroids with \`{preview, dimensions, truncated}\` format for large vectors (>10 dims)—use \`pg_vector_distance\` to assign rows
 - \`pg_vector_create_index\`: Use \`type\` (or alias \`method\`) with values 'ivfflat' or 'hnsw'. IVFFlat: \`lists\` param. HNSW: \`m\`, \`efConstruction\` params
-- \`pg_vector_performance\`: Auto-generates testVector from first row if omitted. Returns \`testVectorSource: 'auto-generated'|'user-provided'\`
+- \`pg_vector_performance\`: Auto-generates testVector from first row if omitted. Returns \`testVectorSource: 'auto-generated from first row'|'user-provided'\`
 - \`pg_vector_validate\`: Returns \`{valid: bool, vectorDimensions}\`. Empty vector \`[]\` returns \`{valid: true, vectorDimensions: 0}\`
 - ⛔ \`pg_vector_embed\`: Demo only (hash-based). Use OpenAI/Cohere for production.
-- \`pg_hybrid_search\`: Supports \`schema.table\` format (auto-parsed). Combines vector similarity and full-text search with weighted scoring. Code mode alias: \`pg.hybridSearch()\` → \`pg.vector.hybridSearch()\`
+- \`pg_hybrid_search\`: Supports \`schema.table\` format (auto-parsed). Combines vector similarity and full-text search with weighted scoring. \`textColumn\` auto-detects type: uses tsvector columns directly, wraps text columns with \`to_tsvector()\`. Code mode alias: \`pg.hybridSearch()\` → \`pg.vector.hybridSearch()\`
 - 📝 **Error Handling**: Vector tools return \`{success: false, error: "...", suggestion: "..."}\` for validation/semantic errors (dimension mismatch, non-vector column, table not found). Check \`success\` field before processing results.
 
 ## JSONB Tools
@@ -101,7 +106,6 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 - 📝 \`normalize\` modes: \`pairs\`/\`keys\`/\`flatten\` for objects; \`array\` for arrays
 
 **Top-Level Aliases**: \`pg.jsonbExtract()\`, \`pg.jsonbSet()\`, \`pg.jsonbInsert()\`, \`pg.jsonbDelete()\`, \`pg.jsonbContains()\`, \`pg.jsonbPathQuery()\`, \`pg.jsonbAgg()\`, \`pg.jsonbObject()\`, \`pg.jsonbArray()\`, \`pg.jsonbKeys()\`, \`pg.jsonbStripNulls()\`, \`pg.jsonbTypeof()\`, \`pg.jsonbValidatePath()\`, \`pg.jsonbMerge()\`, \`pg.jsonbNormalize()\`, \`pg.jsonbDiff()\`, \`pg.jsonbIndexSuggest()\`, \`pg.jsonbSecurityScan()\`, \`pg.jsonbStats()\`
-
 
 ## Stats Tools
 
@@ -121,7 +125,7 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 Core (20 methods): \`explain()\`, \`explainAnalyze()\`, \`explainBuffers()\`, \`indexStats()\`, \`tableStats()\`, \`statStatements()\`, \`statActivity()\`, \`locks()\`, \`bloatCheck()\`, \`cacheHitRatio()\`, \`seqScanTables()\`, \`indexRecommendations()\`, \`queryPlanCompare()\`, \`baseline()\`, \`connectionPoolOptimize()\`, \`partitionStrategySuggest()\`, \`unusedIndexes()\`, \`duplicateIndexes()\`, \`vacuumStats()\`, \`queryPlanStats()\`
 
-Wrappers (3): \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQueries({ seconds | minDuration }?)\` filters by duration (returns \`statActivity\` format), \`analyzeTable({ table })\` runs ANALYZE (accepts \`schema.table\` format)
+Wrappers (3): \`blockingQueries()\`→\`locks({showBlocked:true})\`, \`longRunningQueries({ seconds | minDuration }?)\` filters by duration (returns \`{longRunningQueries, count, threshold}\`), \`analyzeTable({ table })\` runs ANALYZE (accepts \`schema.table\` format)
 
 - \`explain({ sql, format?, params? })\`: Supports \`format: 'text'|'json'|'yaml'|'xml'\`. Default: text. Use \`params: [value]\` for \`$1, $2\` placeholders
 - \`explainAnalyze({ sql, format?, params? })\`: Same format/params options as explain
@@ -185,6 +189,8 @@ Aliases: \`tableName\`→\`table\`, \`indexName\`→\`index\`, \`param\`/\`setti
 
 **Top-Level Aliases**: \`pg.vacuum()\`, \`pg.vacuumAnalyze()\`, \`pg.analyze()\`, \`pg.reindex()\`, \`pg.cluster()\`, \`pg.setConfig()\`, \`pg.reloadConf()\`, \`pg.resetStats()\`, \`pg.cancelBackend()\`, \`pg.terminateBackend()\`
 
+**Discovery**: \`pg.admin.help()\` returns \`{methods, methodAliases, examples}\` object
+
 ## Backup Tools
 
 Core: \`dumpTable()\`, \`dumpSchema()\`, \`copyExport()\`, \`copyImport()\`, \`createBackupPlan()\`, \`restoreCommand()\`, \`physical()\`, \`restoreValidate()\`, \`scheduleOptimize()\`
@@ -195,7 +201,7 @@ Response Structures:
 - \`copyImport\`: \`{command, stdinCommand, notes}\` — Both file and stdin COPY commands
 - \`createBackupPlan\`: \`{strategy: {fullBackup, walArchiving}, estimates}\`
 - \`restoreCommand\`: \`{command, warnings?, notes}\` — Warnings when \`database\` omitted
-- \`restoreValidate\`: \`{validationSteps: [{step, name, command?, commands?, note?}], recommendations}\` — Note: \`note\` field only for pg_dump default type
+- \`restoreValidate\`: \`{note?, validationSteps: [{step, name, command?, commands?, note?}], recommendations}\` — Top-level \`note\` when \`backupType\` omitted (defaults to pg_dump). Step-level \`note\` for non-command steps
 - \`physical\`: \`{command, notes, requirements}\`
 - \`scheduleOptimize\`: \`{analysis, recommendation, commands}\`
 
@@ -207,7 +213,7 @@ Response Structures:
 - \`pg_copy_import\`: Generates COPY FROM command. Supports \`schema.table\` format (auto-parsed, takes priority over \`schema\` param). \`columns\` array, \`filePath\`, \`format\`, \`header\`, \`delimiter\`
 - \`pg_restore_command\`: Include \`database\` parameter for complete command. Optional \`schemaOnly\`, \`dataOnly\`
 - \`pg_create_backup_plan\`: Generates backup strategy with cron schedule. \`frequency\`: 'hourly'|'daily'|'weekly', \`retention\` count
-- \`pg_backup_physical\`: Generates pg_basebackup command. \`format\`: 'plain'|'tar', \`checkpoint\`: 'fast'|'spread', \`compress\`: 0-9
+- \`pg_backup_physical\`: Generates pg_basebackup command. \`format\`: 'plain'|'tar' (default: 'tar'), \`checkpoint\`: 'fast'|'spread', \`compress\`: 0-9
 - \`pg_restore_validate\`: Generates validation commands. \`backupType\`: 'pg_dump' (default)|'pg_basebackup'
 - \`pg_backup_schedule_optimize\`: Analyzes database activity patterns and recommends optimal backup schedule
 
@@ -219,13 +225,12 @@ Defaults: \`threshold\`=0.3 (use 0.1-0.2 for partial), \`maxDistance\`=3 (use 5+
 
 - All text tools support \`schema.table\` format (auto-parsed, embedded schema takes priority over explicit \`schema\` param)
 - \`pg_text_search\`: Supports both \`column\` (singular string) and \`columns\` (array). Either is valid—\`column\` auto-converts to array
-- \`pg_trigram_similarity\` vs \`pg_similarity_search\`: Both use pg_trgm. First filters by threshold; second uses set_limit() with %
+- \`pg_trigram_similarity\`, \`pg_fuzzy_match\`, \`pg_regexp_match\`, \`pg_like_search\`: All default to 100 results to prevent large payloads. Use \`limit: 0\` for all rows
 - \`pg_fuzzy_match\`: Levenshtein returns distance (lower=better). Soundex/metaphone return phonetic codes (exact match only). ⛔ Invalid \`method\` values throw error with valid options
 - \`pg_text_normalize\`: Removes accents only (unaccent). Does NOT lowercase/trim
 - 📍 **Table vs Standalone**: \`normalize\`, \`sentiment\`, \`toVector\`, \`toQuery\`, \`searchConfig\` are standalone (text input only). For phonetic matching: use \`pg_fuzzy_match\` with \`method: 'soundex'|'metaphone'\` (direct MCP), or \`pg.text.soundex()\`/\`pg.text.metaphone()\` (Code Mode convenience wrappers that call fuzzyMatch internally)
 
 **Top-Level Aliases**: \`pg.textSearch()\`, \`pg.textRank()\`, \`pg.textHeadline()\`, \`pg.textNormalize()\`, \`pg.textSentiment()\`, \`pg.textToVector()\`, \`pg.textToQuery()\`, \`pg.textSearchConfig()\`, \`pg.textTrigramSimilarity()\`, \`pg.textFuzzyMatch()\`, \`pg.textLikeSearch()\`, \`pg.textRegexpMatch()\`, \`pg.textCreateFtsIndex()\`
-
 
 ## Schema Tools
 
@@ -235,18 +240,17 @@ Response Structures:
 - \`listSchemas()\`: \`{schemas: string[], count}\`
 - \`listViews({ includeMaterialized?, truncateDefinition?, limit? })\`: \`{views: [{schema, name, type, definition, definitionTruncated?}], count, hasMatViews, truncatedDefinitions?, truncated, note?}\`. Default \`limit: 50\` (use \`0\` for all). Default \`truncateDefinition: 500\` chars (use \`0\` for full definitions). \`truncated\` always included (\`true\`/\`false\`)
 - \`listSequences({ schema? })\`: \`{sequences: [{schema, name, owned_by}], count}\`. Note: \`owned_by\` omits \`public.\` prefix for sequences in public schema (e.g., \`users.id\` not \`public.users.id\`)
-- \`listFunctions({ schema?, limit?, exclude? })\`: \`{functions: [{schema, name, arguments, returns, language, volatility}], count, limit, note?}\`
+- \`listFunctions({ schema?, limit?, exclude? })\`: \`{functions: [{schema, name, arguments, returns, language, volatility}], count, limit}\`
 - \`listTriggers({ schema?, table? })\`: \`{triggers: [{schema, table_name, name, timing, events, function_name, enabled}], count}\`
 - \`listConstraints({ schema?, table?, type? })\`: \`{constraints: [{schema, table_name, name, type, definition}], count}\`. Type codes: \`p\`=primary_key, \`f\`=foreign_key, \`u\`=unique, \`c\`=check
 - \`dropSchema/dropView/dropSequence\`: All return \`{existed: true/false}\` to indicate if object existed before drop
-- \`createSchema/createSequence\` (with \`ifNotExists\`) and \`createView\` (with \`orReplace\`): Return \`{alreadyExisted: true/false}\` to indicate if object existed before creation
+- \`createSchema/createSequence\` (with \`ifNotExists\`) and \`createView\` (with \`orReplace\`): Return \`{alreadyExisted: true/false}\` when the flag is set. Without \`ifNotExists\`/\`orReplace\`, the field is omitted
 
 - \`pg_create_view\`: Supports \`schema.name\` format (auto-parsed). Use \`orReplace: true\` for CREATE OR REPLACE. \`checkOption\`: 'cascaded', 'local', 'none'. ⛔ OR REPLACE can add new columns but cannot rename/remove existing ones—PostgreSQL limitation
 - \`pg_create_sequence\`: Supports \`schema.name\` format. Parameters: \`start\`, \`increment\`, \`minValue\`, \`maxValue\`, \`cache\`, \`cycle\`, \`ownedBy\`, \`ifNotExists\`
-- \`pg_list_functions\`: Default limit=500. Use \`schema: 'public'\`, \`limit: 2000\`, or \`exclude: ['postgis']\` to filter. ⚠️ \`exclude\` filters by **schema name** AND extension-owned functions. Note: Aggressive \`exclude\` may return 0 results if all functions belong to excluded extensions
+- \`pg_list_functions\`: Default limit=500. Use \`schema: 'public'\`, \`limit: 2000\`, or \`exclude: ['postgis', 'pg_trgm', 'ltree', 'citext', 'fuzzystrmatch', 'pg_stat_statements', 'hypopg', 'unaccent', 'pg_stat_kcache', 'pgcrypto', 'partman']\` to filter. ⚠️ \`exclude\` filters by **schema name** AND extension-owned functions. The \`language\` filter does NOT exclude extension functions—use \`exclude\` alongside \`language\` for clean results. Note: Aggressive \`exclude\` may return 0 results if all functions belong to excluded extensions
 
-**Discovery**: \`pg.schema.help()\` returns \`{methods: string[], examples: string[]}\` object with available methods and usage examples
-
+**Discovery**: \`pg.schema.help()\` returns \`{methods, methodAliases, examples}\` object
 
 ## Partitioning Tools
 
@@ -266,7 +270,7 @@ Response Structures:
 - \`pg_partman_show_partitions\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
 - \`pg_partman_check_default\`/\`partition_data\`: \`parentTable\` required. Supports \`schema.table\` format (auto-parsed)
 - \`pg_partman_set_retention\`: ⚠️ **CAUTION: Default is DROP** — \`retentionKeepTable: false\` (default) = DROP partitions, \`true\` = detach only (safer). Pass \`retention: null\` to disable retention
-- \`pg_partman_undo_partition\`: \`targetTable\` MUST exist before calling. Requires both \`parentTable\` and \`targetTable\`/\`target\`
+- \`pg_partman_undo_partition\`: \`targetTable\` MUST exist before calling. Requires both \`parentTable\` and \`targetTable\`/\`target\`. ⚠️ Parent table and child partitions remain after undo—use \`DROP TABLE parent CASCADE\` to clean up
 - \`pg_partman_analyze_partition_health\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`summary.overallHealth\`: 'healthy'|'warnings'|'issues_found'
 - 📝 **Schema Resolution**: All partman tools auto-prefix \`public.\` when no schema specified in \`parentTable\`
 - 📝 **Aliases**: \`parentTable\` accepts \`table\`, \`parent\`, \`name\`. \`controlColumn\` accepts \`control\`, \`column\`. \`targetTable\` accepts \`target\`
@@ -275,11 +279,11 @@ Response Structures:
 
 Core: \`createExtension()\`, \`queryStats()\`, \`topCpu()\`, \`topIo()\`, \`databaseStats()\`, \`resourceAnalysis()\`, \`reset()\`
 
-- \`pg_kcache_query_stats\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`orderBy\`: 'total_time' (default), 'cpu_time', 'reads', 'writes'. \`queryPreviewLength\`: chars for query preview (default: 100, max: 500, 0 for full). ⛔ 'calls' NOT valid for orderBy—use \`minCalls\` param
-- \`pg_kcache_resource_analysis\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`minCalls\`, \`queryPreviewLength\` supported. Classifies queries as 'CPU-bound', 'I/O-bound', or 'Balanced'
-- \`pg_kcache_top_cpu\`: Top CPU-consuming queries. \`limit\` param (default: 10)
-- \`pg_kcache_top_io\`: \`type\`/\`ioType\` (alias): 'reads', 'writes', 'both' (default). \`limit\` param (default: 10)
-- \`pg_kcache_database_stats\`: Aggregated CPU/IO stats per database
+- \`pg_kcache_query_stats\`: Default \`limit: 20\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`orderBy\`: 'total_time' (default), 'cpu_time', 'reads', 'writes'. \`queryPreviewLength\`: chars for query preview (default: 100, max: 500, 0 for full). ⛔ 'calls' NOT valid for orderBy—use \`minCalls\` param
+- \`pg_kcache_resource_analysis\`: Default \`limit: 20\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`minCalls\`, \`queryPreviewLength\` supported. Classifies queries as 'CPU-bound', 'I/O-bound', or 'Balanced'
+- \`pg_kcache_top_cpu\`: Top CPU-consuming queries. \`limit\` param (default: 10). \`queryPreviewLength\`: chars for query preview (default: 100, max: 500, 0 for full). Returns \`truncated\` + \`totalCount\` when limited
+- \`pg_kcache_top_io\`: \`type\`/\`ioType\` (alias): 'reads', 'writes', 'both' (default). \`limit\` param (default: 10). \`queryPreviewLength\`: chars for query preview (default: 100, max: 500, 0 for full). Returns \`truncated\` + \`totalCount\` when limited
+- \`pg_kcache_database_stats\`: Aggregated CPU/IO stats per database. Optional \`database\` param to filter specific db
 - \`pg_kcache_reset\`: Resets pg_stat_kcache AND pg_stat_statements statistics
 
 ## citext Tools
@@ -308,7 +312,7 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 - \`pg_ltree_convert_column\`: Convert TEXT column to ltree. Supports \`schema.table\` format. \`col\` alias for \`column\`. Returns \`{previousType}\`. ⚠️ When views depend on column, returns \`{success: false, dependentViews, hint}\`—drop/recreate views manually
 - \`pg_ltree_create_index\`: Create GiST index on ltree column. Supports \`schema.table\` format. Auto-generates index name if \`indexName\` omitted. Returns \`{indexName, indexType: 'gist', alreadyExists?}\`
 
-**Discovery**: \`pg.ltree.help()\` returns \`{methods, aliases, examples}\` object. Top-level aliases available: \`pg.ltreeQuery()\`, \`pg.ltreeMatch()\`, etc.
+**Discovery**: \`pg.ltree.help()\` returns \`{methods, methodAliases, examples}\` object. Top-level aliases available: \`pg.ltreeQuery()\`, \`pg.ltreeMatch()\`, etc.
 
 ## PostGIS Tools
 
@@ -325,7 +329,7 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 
 **Geometry Operations (Table-based):**
 - \`pg_buffer\`: Create buffer zone around table geometries. Default limit: 50 rows. Default simplify: 10m (set \`simplify: 0\` to disable). Returns \`truncated: true\` + \`totalCount\` when results are truncated. Use \`limit: 0\` for all rows
-- \`pg_geo_transform\`: Transform table geometries between SRIDs. Default limit: 50 rows. Returns \`truncated: true\` + \`totalCount\` when results are truncated. Use \`limit: 0\` for all rows. \`fromSrid\`/\`sourceSrid\` and \`toSrid\`/\`targetSrid\` aliases
+- \`pg_geo_transform\`: Transform table geometries between SRIDs. Default limit: 50 rows. Returns \`truncated: true\` + \`totalCount\` when results are truncated. Use \`limit: 0\` for all rows. Auto-detects \`fromSrid\` from column metadata if not provided (returns \`autoDetectedSrid: true\`). \`fromSrid\`/\`sourceSrid\` and \`toSrid\`/\`targetSrid\` aliases
 - \`pg_geo_cluster\`: Spatial clustering (DBSCAN/K-Means). K-Means: If \`numClusters\` exceeds row count, automatically clamps to available rows with \`warning\` field. DBSCAN: Returns contextual \`hints\` array explaining parameter effects (e.g., "All points formed single cluster—decrease eps") and \`parameterGuide\` explaining eps/minPoints trade-offs
 
 **Geometry Operations (Standalone WKT/GeoJSON):**
@@ -337,7 +341,7 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 - \`pg_postgis_create_extension\`: Enable PostGIS extension (idempotent)
 - \`pg_geo_index_optimize\`: Analyze spatial indexes. Without \`table\` param, analyzes all spatial indexes
 
-**Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`. Note: \`pg.{group}.help()\` returns \`{methods, aliases, examples}\`
+**Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`, \`pg.postgis.geoCluster()\` → \`pg_geo_cluster\`, \`pg.postgis.geoTransform()\` → \`pg_geo_transform\`. Note: \`pg.{group}.help()\` returns \`{methods, methodAliases, examples}\`
 
 ## Cron Tools (pg_cron)
 
@@ -352,7 +356,7 @@ Core: \`createExtension()\`, \`schedule()\`, \`scheduleInDatabase()\`, \`unsched
 - \`pg_cron_cleanup_history\`: Delete old run records. \`olderThanDays\`/\`days\` param (default: 7). Optional \`jobId\` to target specific job
 - \`pg_cron_create_extension\`: Enable pg_cron extension (idempotent). Requires superuser
 
-**Discovery**: \`pg.cron.help()\` returns \`{methods, aliases, examples}\` object
+**Discovery**: \`pg.cron.help()\` returns \`{methods, methodAliases, examples}\` object
 
 ## pgcrypto Tools
 
@@ -372,7 +376,7 @@ Core: \`createExtension()\`, \`hash()\`, \`hmac()\`, \`encrypt()\`, \`decrypt()\
 
 **Top-Level Aliases**: \`pg.pgcryptoHash()\`, \`pg.pgcryptoEncrypt()\`, \`pg.pgcryptoDecrypt()\`, \`pg.pgcryptoGenRandomUuid()\`, etc.
 
-**Discovery**: \`pg.pgcrypto.help()\` returns \`{methods, aliases, examples}\` object
+**Discovery**: \`pg.pgcrypto.help()\` returns \`{methods, methodAliases, examples}\` object
 
 ## Code Mode Sandbox
 

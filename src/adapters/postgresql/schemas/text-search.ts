@@ -129,7 +129,10 @@ export const RegexpMatchSchemaBase = z
     pattern: z.string().describe("POSIX regex pattern"),
     flags: z.string().optional().describe("Regex flags (i, g, etc.)"),
     select: z.array(z.string()).optional().describe("Columns to return"),
-    limit: z.number().optional().describe("Max results"),
+    limit: z
+      .number()
+      .optional()
+      .describe("Max results (default: 100 to prevent large payloads)"),
     where: z.string().optional().describe("Additional WHERE clause filter"),
     schema: z.string().optional().describe("Schema name (default: public)"),
   })

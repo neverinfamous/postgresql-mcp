@@ -18,8 +18,7 @@ export function createSetupLtreePrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -95,7 +94,7 @@ export function createSetupLtreePrompt(): PromptDefinition {
 ('Cat', 'Felis catus', 'animalia.mammalia.carnivora.felis_catus');`;
       }
 
-      return `# ltree Setup Guide - ${useCase
+      return Promise.resolve(`# ltree Setup Guide - ${useCase
         .split("_")
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(" ")}
@@ -286,7 +285,7 @@ CREATE INDEX ON categories USING GIN (path);
 | Storage | Path in each row | Single integer |
 | Insert | Simple | Simple |
 
-**Pro Tip:** For ${useCase}, ltree queries are 10-100x faster than recursive CTEs for large hierarchies!`;
+**Pro Tip:** For ${useCase}, ltree queries are 10-100x faster than recursive CTEs for large hierarchies!`);
     },
   };
 }

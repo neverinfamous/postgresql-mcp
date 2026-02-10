@@ -83,7 +83,7 @@ interface LogEntry {
  */
 class Logger {
   private minLevel: LogLevel = "info";
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- Server class is required for sendLoggingMessage(); no non-deprecated alternative exists in SDK
   private mcpServer: Server | null = null;
   private loggerName = "postgres-mcp";
   private defaultModule: LogModule = "SERVER";
@@ -120,7 +120,7 @@ class Logger {
    * Set the MCP server for protocol logging
    * When set, logs will be sent to connected MCP clients
    */
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- Server class is required for sendLoggingMessage(); no non-deprecated alternative exists in SDK
   setMcpServer(server: Server): void {
     this.mcpServer = server;
   }

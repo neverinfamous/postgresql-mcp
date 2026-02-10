@@ -46,64 +46,55 @@ class TestAdapter extends DatabaseAdapter {
   private mockResources: ResourceDefinition[] = [];
   private mockPrompts: PromptDefinition[] = [];
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async connect(_config: DatabaseConfig): Promise<void> {
+  connect(_config: DatabaseConfig): Promise<void> {
     this.connected = true;
+    return Promise.resolve();
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async disconnect(): Promise<void> {
+  disconnect(): Promise<void> {
     this.connected = false;
+    return Promise.resolve();
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async getHealth(): Promise<HealthStatus> {
-    return {
+  getHealth(): Promise<HealthStatus> {
+    return Promise.resolve({
       connected: this.connected,
       latencyMs: 5,
       version: "16.1",
-    };
+    });
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async executeReadQuery(
-    _sql: string,
-    _params?: unknown[],
-  ): Promise<QueryResult> {
-    return { rows: [], rowsAffected: 0, executionTimeMs: 1 };
+  executeReadQuery(_sql: string, _params?: unknown[]): Promise<QueryResult> {
+    return Promise.resolve({ rows: [], rowsAffected: 0, executionTimeMs: 1 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async executeWriteQuery(
-    _sql: string,
-    _params?: unknown[],
-  ): Promise<QueryResult> {
-    return { rows: [], rowsAffected: 1, executionTimeMs: 1 };
+  executeWriteQuery(_sql: string, _params?: unknown[]): Promise<QueryResult> {
+    return Promise.resolve({ rows: [], rowsAffected: 1, executionTimeMs: 1 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async executeQuery(_sql: string, _params?: unknown[]): Promise<QueryResult> {
-    return { rows: [], rowsAffected: 0, executionTimeMs: 1 };
+  executeQuery(_sql: string, _params?: unknown[]): Promise<QueryResult> {
+    return Promise.resolve({ rows: [], rowsAffected: 0, executionTimeMs: 1 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async getSchema(): Promise<SchemaInfo> {
-    return { tables: [], views: [], indexes: [] };
+  getSchema(): Promise<SchemaInfo> {
+    return Promise.resolve({ tables: [], views: [], indexes: [] });
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async listTables(): Promise<TableInfo[]> {
-    return [];
+  listTables(): Promise<TableInfo[]> {
+    return Promise.resolve([]);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async describeTable(_tableName: string): Promise<TableInfo> {
-    return { name: "test", schema: "public", type: "table", columns: [] };
+  describeTable(_tableName: string): Promise<TableInfo> {
+    return Promise.resolve({
+      name: "test",
+      schema: "public",
+      type: "table",
+      columns: [],
+    });
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async listSchemas(): Promise<string[]> {
-    return ["public"];
+  listSchemas(): Promise<string[]> {
+    return Promise.resolve(["public"]);
   }
 
   getCapabilities(): AdapterCapabilities {

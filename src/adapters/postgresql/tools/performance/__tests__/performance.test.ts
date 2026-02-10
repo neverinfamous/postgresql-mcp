@@ -358,12 +358,14 @@ describe("pg_stat_statements", () => {
     const tool = tools.find((t) => t.name === "pg_stat_statements")!;
     const result = (await tool.handler({}, mockContext)) as {
       statements: unknown[];
+      count: number;
     };
 
     expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
       expect.stringContaining("pg_stat_statements"),
     );
     expect(result.statements).toHaveLength(1);
+    expect(result.count).toBe(1);
   });
 
   it("should order by calls when specified", async () => {

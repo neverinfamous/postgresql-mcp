@@ -80,6 +80,7 @@ RUN addgroup -g 1001 -S appgroup && \
 
 # Set environment variables
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 
 # Switch to non-root user
 USER appuser

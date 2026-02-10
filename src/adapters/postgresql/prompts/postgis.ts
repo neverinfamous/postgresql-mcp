@@ -19,8 +19,7 @@ export function createSetupPostgisPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -202,7 +201,7 @@ FROM locations;
 
 **Pro Tip:** PostGIS is PostgreSQL's GIS superpower - it's the industry standard for spatial databases!`;
 
-      return content;
+      return Promise.resolve(content);
     },
   };
 }

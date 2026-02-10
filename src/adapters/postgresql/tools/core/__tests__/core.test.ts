@@ -310,6 +310,25 @@ describe("Handler Execution", () => {
 
       expect(result.rows).toEqual([{ id: 1, name: "test" }]);
     });
+
+    it("should default rowsAffected to 0 for DDL statements", async () => {
+      mockAdapter.executeWriteQuery.mockResolvedValue({
+        rows: [],
+        rowsAffected: undefined,
+        command: "CREATE",
+        executionTimeMs: 8,
+      });
+
+      const tool = tools.find((t) => t.name === "pg_write_query")!;
+      const result = (await tool.handler(
+        { sql: "CREATE TABLE temp_ddl (id SERIAL)" },
+        mockContext,
+      )) as { rowsAffected: number; affectedRows: number; command: string };
+
+      expect(result.rowsAffected).toBe(0);
+      expect(result.affectedRows).toBe(0);
+      expect(result.command).toBe("CREATE");
+    });
   });
 
   describe("pg_list_tables", () => {
@@ -376,6 +395,57 @@ describe("Handler Execution", () => {
 
       expect(result.count).toBe(10);
       expect(result.truncated).toBe(true);
+    });
+
+    it("should filter out excluded schemas", async () => {
+      mockAdapter.listTables.mockResolvedValue([
+        { name: "users", schema: "public" },
+        { name: "orders", schema: "public" },
+        { name: "job", schema: "cron" },
+        { name: "job_run_details", schema: "cron" },
+        { name: "layer", schema: "topology" },
+      ]);
+
+      const tool = tools.find((t) => t.name === "pg_list_tables")!;
+      const result = (await tool.handler(
+        { exclude: ["cron", "topology"] },
+        mockContext,
+      )) as { tables: Array<{ name: string; schema: string }>; count: number };
+
+      expect(result.count).toBe(2);
+      expect(result.tables.every((t) => t.schema === "public")).toBe(true);
+    });
+
+    it("should combine schema and exclude filters", async () => {
+      mockAdapter.listTables.mockResolvedValue([
+        { name: "users", schema: "public" },
+        { name: "orders", schema: "sales" },
+        { name: "job", schema: "cron" },
+      ]);
+
+      const tool = tools.find((t) => t.name === "pg_list_tables")!;
+      const result = (await tool.handler(
+        { schema: "public", exclude: ["cron"] },
+        mockContext,
+      )) as { tables: Array<{ name: string; schema: string }>; count: number };
+
+      expect(result.count).toBe(1);
+      expect(result.tables[0]?.name).toBe("users");
+    });
+
+    it("should not filter when exclude is empty array", async () => {
+      mockAdapter.listTables.mockResolvedValue([
+        { name: "users", schema: "public" },
+        { name: "job", schema: "cron" },
+      ]);
+
+      const tool = tools.find((t) => t.name === "pg_list_tables")!;
+      const result = (await tool.handler({ exclude: [] }, mockContext)) as {
+        tables: Array<{ name: string; schema: string }>;
+        count: number;
+      };
+
+      expect(result.count).toBe(2);
     });
   });
 
@@ -1839,8 +1909,8 @@ describe("pg_exists optional WHERE clause", () => {
     expect(result.hint).toContain("any rows");
     expect(result.hint).toContain("where/condition/filter");
 
-    // Verify SQL doesn't have WHERE clause
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    // Verify SQL doesn't have WHERE clause (calls[2] = main query, calls[0] = schema check, calls[1] = table check)
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).not.toContain("WHERE");
   });
 
@@ -1861,8 +1931,8 @@ describe("pg_exists optional WHERE clause", () => {
     expect(result.exists).toBe(false);
     expect(result.hint).toBeUndefined();
 
-    // Verify SQL has WHERE clause
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    // Verify SQL has WHERE clause (calls[2] = main query, calls[0] = schema check, calls[1] = table check)
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("WHERE");
   });
 
@@ -1883,7 +1953,7 @@ describe("pg_exists optional WHERE clause", () => {
     expect(result.exists).toBe(true);
     expect(result.hint).toBeUndefined();
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("WHERE");
     expect(sql).toContain("pending");
   });
@@ -1905,7 +1975,7 @@ describe("pg_exists optional WHERE clause", () => {
     expect(result.exists).toBe(true);
     expect(result.hint).toBeUndefined();
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("WHERE");
     expect(sql).toContain("stock");
   });
@@ -1940,7 +2010,7 @@ describe("pg_exists optional WHERE clause", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"archive"."events"');
   });
 });
@@ -1981,7 +2051,7 @@ describe("pg_upsert", () => {
     expect(result.operation).toBe("insert");
     expect(result.rowsAffected).toBe(1);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("INSERT INTO");
     expect(sql).toContain("ON CONFLICT");
     expect(sql).toContain("DO UPDATE SET");
@@ -2023,7 +2093,7 @@ describe("pg_upsert", () => {
     )) as { success: boolean };
 
     expect(result.success).toBe(true);
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("order_id");
   });
 
@@ -2043,7 +2113,7 @@ describe("pg_upsert", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"products"');
   });
 
@@ -2063,7 +2133,7 @@ describe("pg_upsert", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("DO NOTHING");
   });
 
@@ -2084,7 +2154,7 @@ describe("pg_upsert", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('DO UPDATE SET "name"');
     expect(sql).not.toContain('"email" = EXCLUDED');
     expect(sql).not.toContain('"active" = EXCLUDED');
@@ -2127,14 +2197,18 @@ describe("pg_upsert", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"archive"."events"');
   });
 
   it("should throw helpful error for missing unique constraint", async () => {
-    mockAdapter.executeQuery.mockRejectedValue(
-      new Error("there is no unique or exclusion constraint"),
-    );
+    // Schema check passes, table check passes, then the actual upsert throws
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockRejectedValueOnce(
+        new Error("there is no unique or exclusion constraint"),
+      );
 
     const tool = tools.find((t) => t.name === "pg_upsert")!;
 
@@ -2183,10 +2257,10 @@ describe("pg_batch_insert", () => {
   });
 
   it("should insert multiple rows in single statement", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({
-      rows: [],
-      rowsAffected: 3,
-    });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [], rowsAffected: 3 }); // INSERT
 
     const tool = tools.find((t) => t.name === "pg_batch_insert")!;
     const result = (await tool.handler(
@@ -2205,7 +2279,7 @@ describe("pg_batch_insert", () => {
     expect(result.rowsAffected).toBe(3);
     expect(result.insertedCount).toBe(3);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("INSERT INTO");
     expect(sql).toContain("VALUES");
     // Should have 3 value groups
@@ -2213,10 +2287,10 @@ describe("pg_batch_insert", () => {
   });
 
   it("should handle rows with different columns", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({
-      rows: [],
-      rowsAffected: 2,
-    });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [], rowsAffected: 2 }); // INSERT
 
     const tool = tools.find((t) => t.name === "pg_batch_insert")!;
     await tool.handler(
@@ -2230,16 +2304,16 @@ describe("pg_batch_insert", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"name"');
     expect(sql).toContain('"email"');
   });
 
   it("should serialize objects to JSON for JSONB columns", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({
-      rows: [],
-      rowsAffected: 1,
-    });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [], rowsAffected: 1 }); // INSERT
 
     const tool = tools.find((t) => t.name === "pg_batch_insert")!;
     await tool.handler(
@@ -2250,7 +2324,7 @@ describe("pg_batch_insert", () => {
       mockContext,
     );
 
-    const params = mockAdapter.executeQuery.mock.calls[0]?.[1] as unknown[];
+    const params = mockAdapter.executeQuery.mock.calls[2]?.[1] as unknown[];
     expect(params).toContainEqual('{"tags":["a","b"]}');
   });
 
@@ -2272,12 +2346,14 @@ describe("pg_batch_insert", () => {
 
     expect(result.rows).toHaveLength(2);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('RETURNING "id"');
   });
 
   it("should handle SERIAL-only tables with empty objects", async () => {
     mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
       .mockResolvedValueOnce({ rows: [{ id: 1 }], rowsAffected: 1 })
       .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 1 });
 
@@ -2311,10 +2387,10 @@ describe("pg_batch_insert", () => {
   });
 
   it("should accept tableName as alias for table", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({
-      rows: [],
-      rowsAffected: 1,
-    });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [], rowsAffected: 1 }); // INSERT
 
     const tool = tools.find((t) => t.name === "pg_batch_insert")!;
     await tool.handler(
@@ -2325,15 +2401,15 @@ describe("pg_batch_insert", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"products"');
   });
 
   it("should parse schema.table format", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({
-      rows: [],
-      rowsAffected: 1,
-    });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [], rowsAffected: 1 }); // INSERT
 
     const tool = tools.find((t) => t.name === "pg_batch_insert")!;
     await tool.handler(
@@ -2344,7 +2420,7 @@ describe("pg_batch_insert", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"sales"."orders"');
   });
 });
@@ -2377,7 +2453,7 @@ describe("pg_count", () => {
 
     expect(result.count).toBe(42);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("COUNT(*)");
     expect(sql).not.toContain("WHERE");
   });
@@ -2398,7 +2474,7 @@ describe("pg_count", () => {
 
     expect(result.count).toBe(10);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("WHERE active = true");
   });
 
@@ -2417,7 +2493,7 @@ describe("pg_count", () => {
       mockContext,
     );
 
-    const params = mockAdapter.executeQuery.mock.calls[0]?.[1] as unknown[];
+    const params = mockAdapter.executeQuery.mock.calls[2]?.[1] as unknown[];
     expect(params).toEqual(["pending"]);
   });
 
@@ -2435,7 +2511,7 @@ describe("pg_count", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('COUNT("email")');
   });
 
@@ -2453,7 +2529,7 @@ describe("pg_count", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).not.toContain("WHERE");
   });
 
@@ -2478,7 +2554,7 @@ describe("pg_count", () => {
     const tool = tools.find((t) => t.name === "pg_count")!;
     await tool.handler({ tableName: "products" }, mockContext);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"products"');
   });
 });
@@ -2500,7 +2576,10 @@ describe("pg_truncate", () => {
   });
 
   it("should execute basic TRUNCATE", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [] }); // TRUNCATE
 
     const tool = tools.find((t) => t.name === "pg_truncate")!;
     const result = (await tool.handler({ table: "logs" }, mockContext)) as {
@@ -2511,14 +2590,17 @@ describe("pg_truncate", () => {
     expect(result.success).toBe(true);
     expect(result.table).toBe("public.logs");
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("TRUNCATE TABLE");
     expect(sql).not.toContain("CASCADE");
     expect(sql).not.toContain("RESTART IDENTITY");
   });
 
   it("should support CASCADE option", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [] }); // TRUNCATE
 
     const tool = tools.find((t) => t.name === "pg_truncate")!;
     const result = (await tool.handler(
@@ -2531,12 +2613,15 @@ describe("pg_truncate", () => {
 
     expect(result.cascade).toBe(true);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("CASCADE");
   });
 
   it("should support RESTART IDENTITY option", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [] }); // TRUNCATE
 
     const tool = tools.find((t) => t.name === "pg_truncate")!;
     const result = (await tool.handler(
@@ -2549,12 +2634,15 @@ describe("pg_truncate", () => {
 
     expect(result.restartIdentity).toBe(true);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("RESTART IDENTITY");
   });
 
   it("should combine CASCADE and RESTART IDENTITY", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [] }); // TRUNCATE
 
     const tool = tools.find((t) => t.name === "pg_truncate")!;
     await tool.handler(
@@ -2566,23 +2654,29 @@ describe("pg_truncate", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain("RESTART IDENTITY");
     expect(sql).toContain("CASCADE");
   });
 
   it("should accept tableName as alias for table", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [] }); // TRUNCATE
 
     const tool = tools.find((t) => t.name === "pg_truncate")!;
     await tool.handler({ tableName: "sessions" }, mockContext);
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"sessions"');
   });
 
   it("should parse schema.table format", async () => {
-    mockAdapter.executeQuery.mockResolvedValue({ rows: [] });
+    mockAdapter.executeQuery
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // schema check
+      .mockResolvedValueOnce({ rows: [{ "?column?": 1 }] }) // table check
+      .mockResolvedValueOnce({ rows: [] }); // TRUNCATE
 
     const tool = tools.find((t) => t.name === "pg_truncate")!;
     await tool.handler(
@@ -2592,7 +2686,7 @@ describe("pg_truncate", () => {
       mockContext,
     );
 
-    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    const sql = mockAdapter.executeQuery.mock.calls[2]?.[0] as string;
     expect(sql).toContain('"archive"."old_events"');
   });
 });

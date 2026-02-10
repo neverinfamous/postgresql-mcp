@@ -581,9 +581,6 @@ export const GeoTransformSchema = z
   .refine((data) => data.column !== "", {
     message: "column (or geom/geometryColumn alias) is required",
   })
-  .refine((data) => data.fromSrid > 0, {
-    message: "fromSrid (or sourceSrid alias) is required",
-  })
   .refine((data) => data.toSrid > 0, {
     message: "toSrid (or targetSrid alias) is required",
   });

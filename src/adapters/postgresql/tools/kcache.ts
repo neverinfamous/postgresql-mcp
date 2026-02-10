@@ -39,9 +39,9 @@ const defaultToEmpty = (val: unknown): unknown => val ?? {};
  * - Old (< 2.2): user_time, system_time, reads, writes
  * - New (>= 2.2): exec_user_time, exec_system_time, exec_reads, exec_writes
  *
- * IMPORTANT: The pg_stat_kcache() FUNCTION returns columns like exec_reads (bytes).
- * The pg_stat_kcache VIEW has different columns like exec_reads_blks.
- * This helper returns column names for the FUNCTION (used with queryid joins).
+ * These column names are shared between the pg_stat_kcache VIEW and
+ * the pg_stat_kcache() FUNCTION. The VIEW also has _blks variants,
+ * but the byte-based names work for both contexts.
  */
 interface KcacheColumns {
   userTime: string;
@@ -158,7 +158,7 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
         KcacheQueryStatsSchema.parse(params);
       const cols = await getKcacheColumnNames(adapter);
 
-      const DEFAULT_LIMIT = 50;
+      const DEFAULT_LIMIT = 20;
       // limit: 0 means "no limit" (return all rows), undefined means use default
       const limitVal = limit === 0 ? null : (limit ?? DEFAULT_LIMIT);
       // Bound queryPreviewLength: 0 = full query, default 100, max 500
@@ -228,14 +228,15 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
 
       const result = await adapter.executeQuery(sql, queryParams);
       const rowCount = result.rows?.length ?? 0;
-      const truncated = rowCount < totalCount;
+      const effectiveTotalCount = Math.max(totalCount, rowCount);
+      const truncated = rowCount < effectiveTotalCount;
 
       const response: Record<string, unknown> = {
         queries: result.rows ?? [],
         count: rowCount,
         orderBy: orderBy ?? "total_time",
         truncated,
-        totalCount,
+        totalCount: effectiveTotalCount,
       };
 
       return response;
@@ -259,6 +260,12 @@ in user CPU (application code) vs system CPU (kernel operations).`,
           .number()
           .optional()
           .describe("Number of top queries to return (default: 10)"),
+        queryPreviewLength: z
+          .number()
+          .optional()
+          .describe(
+            "Characters for query preview (default: 100, max: 500, 0 for full)",
+          ),
       }),
     ),
     outputSchema: KcacheTopCpuOutputSchema,
@@ -266,12 +273,20 @@ in user CPU (application code) vs system CPU (kernel operations).`,
     icons: getToolIcons("kcache", readOnly("Kcache Top CPU")),
     handler: async (params: unknown, _context: RequestContext) => {
       const parsed = z
-        .object({ limit: z.number().optional() })
+        .object({
+          limit: z.number().optional(),
+          queryPreviewLength: z.number().optional(),
+        })
         .parse(params ?? {});
       const DEFAULT_LIMIT = 10;
       // limit: 0 means "no limit" (return all rows), undefined means use default
       const limitVal =
         parsed.limit === 0 ? null : (parsed.limit ?? DEFAULT_LIMIT);
+      // Bound queryPreviewLength: 0 = full query, default 100, max 500
+      const previewLen =
+        parsed.queryPreviewLength === 0
+          ? 10000
+          : Math.min(parsed.queryPreviewLength ?? 100, 500);
       const cols = await getKcacheColumnNames(adapter);
 
       // Get total count first for truncation indicator
@@ -290,7 +305,7 @@ in user CPU (application code) vs system CPU (kernel operations).`,
       const sql = `
                 SELECT 
                     s.queryid,
-                    LEFT(s.query, 100) as query_preview,
+                    LEFT(s.query, ${String(previewLen)}) as query_preview,
                     s.calls,
                     k.${cols.userTime} as user_time,
                     k.${cols.systemTime} as system_time,
@@ -317,14 +332,15 @@ in user CPU (application code) vs system CPU (kernel operations).`,
 
       const result = await adapter.executeQuery(sql);
       const rowCount = result.rows?.length ?? 0;
-      const truncated = rowCount < totalCount;
+      const effectiveTotalCount = Math.max(totalCount, rowCount);
+      const truncated = rowCount < effectiveTotalCount;
 
       const response: Record<string, unknown> = {
         topCpuQueries: result.rows ?? [],
         count: rowCount,
         description: "Queries ranked by total CPU time (user + system)",
         truncated,
-        totalCount,
+        totalCount: effectiveTotalCount,
       };
 
       return response;
@@ -363,6 +379,12 @@ which represent actual disk access (not just shared buffer hits).`,
           .number()
           .optional()
           .describe("Number of top queries to return (default: 10)"),
+        queryPreviewLength: z
+          .number()
+          .optional()
+          .describe(
+            "Characters for query preview (default: 100, max: 500, 0 for full)",
+          ),
       }),
     ),
     outputSchema: KcacheTopIoOutputSchema,
@@ -381,6 +403,7 @@ which represent actual disk access (not just shared buffer hits).`,
         .object({
           type: z.enum(["reads", "writes", "both"]).optional(),
           limit: z.number().optional(),
+          queryPreviewLength: z.number().optional(),
         })
         .parse(preprocessed);
       const ioType = parsed.type ?? "both";
@@ -388,6 +411,11 @@ which represent actual disk access (not just shared buffer hits).`,
       // limit: 0 means "no limit" (return all rows), undefined means use default
       const limitVal =
         parsed.limit === 0 ? null : (parsed.limit ?? DEFAULT_LIMIT);
+      // Bound queryPreviewLength: 0 = full query, default 100, max 500
+      const previewLen =
+        parsed.queryPreviewLength === 0
+          ? 10000
+          : Math.min(parsed.queryPreviewLength ?? 100, 500);
       const cols = await getKcacheColumnNames(adapter);
 
       const orderColumn =
@@ -397,6 +425,14 @@ which represent actual disk access (not just shared buffer hits).`,
             ? `k.${cols.writes}`
             : `(k.${cols.reads} + k.${cols.writes})`;
 
+      // Filter by the type-specific IO column so 'reads' excludes write-only queries
+      const ioFilter =
+        ioType === "reads"
+          ? `k.${cols.reads} > 0`
+          : ioType === "writes"
+            ? `k.${cols.writes} > 0`
+            : `(k.${cols.reads} + k.${cols.writes}) > 0`;
+
       // Get total count first for truncation indicator
       const countSql = `
                 SELECT COUNT(*) as total
@@ -404,7 +440,7 @@ which represent actual disk access (not just shared buffer hits).`,
                 JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
                     AND s.userid = k.userid 
                     AND s.dbid = k.dbid
-                WHERE (k.${cols.reads} + k.${cols.writes}) > 0
+                WHERE ${ioFilter}
             `;
       const countResult = await adapter.executeQuery(countSql);
       const totalRaw = countResult.rows?.[0]?.["total"];
@@ -413,7 +449,7 @@ which represent actual disk access (not just shared buffer hits).`,
       const sql = `
                 SELECT 
                     s.queryid,
-                    LEFT(s.query, 100) as query_preview,
+                    LEFT(s.query, ${String(previewLen)}) as query_preview,
                     s.calls,
                     k.${cols.reads} as read_bytes,
                     k.${cols.writes} as write_bytes,
@@ -425,14 +461,15 @@ which represent actual disk access (not just shared buffer hits).`,
                 JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
                     AND s.userid = k.userid 
                     AND s.dbid = k.dbid
-                WHERE (k.${cols.reads} + k.${cols.writes}) > 0
+                WHERE ${ioFilter}
                 ORDER BY ${orderColumn} DESC
                 ${limitVal !== null ? `LIMIT ${String(limitVal)}` : ""}
             `;
 
       const result = await adapter.executeQuery(sql);
       const rowCount = result.rows?.length ?? 0;
-      const truncated = rowCount < totalCount;
+      const effectiveTotalCount = Math.max(totalCount, rowCount);
+      const truncated = rowCount < effectiveTotalCount;
 
       const response: Record<string, unknown> = {
         topIoQueries: result.rows ?? [],
@@ -440,7 +477,7 @@ which represent actual disk access (not just shared buffer hits).`,
         ioType,
         description: `Queries ranked by ${ioType === "both" ? "total I/O" : ioType}`,
         truncated,
-        totalCount,
+        totalCount: effectiveTotalCount,
       };
 
       return response;
@@ -539,7 +576,7 @@ Helps identify the root cause of performance issues - is the query computation-h
       const { queryId, threshold, limit, minCalls, queryPreviewLength } =
         KcacheResourceAnalysisSchema.parse(params);
       const thresholdVal = threshold ?? 0.5;
-      const DEFAULT_LIMIT = 50;
+      const DEFAULT_LIMIT = 20;
       // limit: 0 means "no limit" (return all rows), undefined means use default
       const limitVal = limit === 0 ? null : (limit ?? DEFAULT_LIMIT);
       // Bound queryPreviewLength: 0 = full query, default 100, max 500
@@ -632,7 +669,8 @@ Helps identify the root cause of performance issues - is the query computation-h
 
       const result = await adapter.executeQuery(sql, queryParams);
       const rows = result.rows ?? [];
-      const truncated = rows.length < totalCount;
+      const effectiveTotalCount = Math.max(totalCount, rows.length);
+      const truncated = rows.length < effectiveTotalCount;
 
       const cpuBound = rows.filter(
         (r: Record<string, unknown>) =>
@@ -664,7 +702,7 @@ Helps identify the root cause of performance issues - is the query computation-h
               : "Resource usage is balanced between CPU and I/O.",
         ],
         truncated,
-        totalCount,
+        totalCount: effectiveTotalCount,
       };
 
       return response;

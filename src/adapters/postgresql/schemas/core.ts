@@ -142,6 +142,12 @@ export const ListTablesSchema = z.preprocess(
       .number()
       .optional()
       .describe("Maximum number of tables to return (default: 100)"),
+    exclude: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Schema/extension names to exclude (e.g., ['cron', 'topology', 'partman']). Filters by schema name.",
+      ),
   }),
 );
 

@@ -14,7 +14,7 @@ import {
   sanitizeIdentifier,
   sanitizeTableName,
 } from "../../../../utils/identifiers.js";
-import { truncateVector } from "./basic.js";
+import { checkTableAndColumn, truncateVector } from "./basic.js";
 import {
   VectorClusterOutputSchema,
   VectorIndexOptimizeOutputSchema,
@@ -92,8 +92,20 @@ export function createVectorClusterTool(
       }
       const maxIter = parsed.iterations ?? 10;
       const sample = parsed.sampleSize ?? 10000;
+      const schemaName = parsed.schema ?? "public";
       const tableName = sanitizeTableName(parsed.table, parsed.schema);
       const columnName = sanitizeIdentifier(parsed.column);
+
+      // Two-step existence check: table first, then column
+      const existenceCheck = await checkTableAndColumn(
+        adapter,
+        parsed.table,
+        parsed.column,
+        schemaName,
+      );
+      if (existenceCheck) {
+        return { success: false, ...existenceCheck };
+      }
 
       const sampleSql = `
                 SELECT ${columnName} as vec 
@@ -214,6 +226,17 @@ export function createVectorIndexOptimizeTool(
       const columnName = sanitizeIdentifier(parsed.column);
       const schemaName = parsed.schema ?? "public";
 
+      // Two-step existence check: table first, then column (must run before stats query)
+      const existenceCheck = await checkTableAndColumn(
+        adapter,
+        parsed.table,
+        parsed.column,
+        schemaName,
+      );
+      if (existenceCheck) {
+        return { success: false, ...existenceCheck };
+      }
+
       const statsSql = `
                 SELECT 
                     reltuples::bigint as estimated_rows,
@@ -232,23 +255,16 @@ export function createVectorIndexOptimizeTool(
         table_size: string;
       };
 
-      // Validate column is actually a vector type before calling vector_dims
+      // Validate column is actually a vector type
       const typeCheckSql = `
-                SELECT udt_name FROM information_schema.columns 
-                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-            `;
+        SELECT udt_name FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
+      `;
       const typeResult = await adapter.executeQuery(typeCheckSql, [
         schemaName,
         parsed.table,
         parsed.column,
       ]);
-      if ((typeResult.rows?.length ?? 0) === 0) {
-        return {
-          success: false,
-          error: `Column '${parsed.column}' does not exist in table '${parsed.table}'`,
-          suggestion: "Use pg_describe_table to find available columns",
-        };
-      }
       const udtName = typeResult.rows?.[0]?.["udt_name"] as string | undefined;
       if (udtName !== "vector") {
         return {
@@ -407,6 +423,17 @@ export function createHybridSearchTool(
       const schemaName = resolvedSchema ?? "public";
       const tableName = sanitizeTableName(resolvedTable, schemaName);
 
+      // P154: Verify table and vectorColumn exist before querying
+      const existenceError = await checkTableAndColumn(
+        adapter,
+        resolvedTable,
+        parsed.vectorColumn,
+        schemaName,
+      );
+      if (existenceError !== null) {
+        return { success: false, ...existenceError };
+      }
+
       // Check column type - reject if it's a tsvector
       const colTypeSql = `
                 SELECT data_type, udt_name 
@@ -441,6 +468,24 @@ export function createHybridSearchTool(
           columnType: actualType,
         };
       }
+
+      // Check textColumn type to determine if we need to_tsvector() wrapping
+      const textColTypeResult = await adapter.executeQuery(colTypeSql, [
+        schemaName,
+        resolvedTable,
+        parsed.textColumn,
+      ]);
+      const textColType = textColTypeResult.rows?.[0] as
+        | { data_type?: string; udt_name?: string }
+        | undefined;
+      const isTextColumnTsvector =
+        textColType?.udt_name === "tsvector" ||
+        textColType?.data_type === "tsvector";
+
+      // Use tsvector column directly, otherwise wrap with to_tsvector()
+      const textExpr = isTextColumnTsvector
+        ? `"${parsed.textColumn}"`
+        : `to_tsvector('english', "${parsed.textColumn}")`;
 
       const vectorWeight = parsed.vectorWeight ?? 0.5;
       // Fix floating point precision (e.g., 0.30000000000000004 -> 0.3)
@@ -486,9 +531,9 @@ export function createHybridSearchTool(
                 text_scores AS (
                     SELECT 
                         ctid,
-                        ts_rank(to_tsvector('english', "${parsed.textColumn}"), plainto_tsquery($1)) as text_score
+                        ts_rank(${textExpr}, plainto_tsquery($1)) as text_score
                     FROM ${tableName}
-                    WHERE to_tsvector('english', "${parsed.textColumn}") @@ plainto_tsquery($1)
+                    WHERE ${textExpr} @@ plainto_tsquery($1)
                 )
                 SELECT 
                     ${selectCols},
@@ -560,9 +605,8 @@ export function createHybridSearchTool(
             const missingRelation = relationMatch[1] ?? "";
             return {
               success: false,
-              error: `Table '${missingRelation}' does not exist`,
-              suggestion:
-                "Use pg_list_tables to find available tables, or check the schema name",
+              error: `Table '${missingRelation}' does not exist in schema '${schemaName}'`,
+              suggestion: "Use pg_list_tables to find available tables",
             };
           }
 
@@ -640,22 +684,15 @@ export function createVectorPerformanceTool(
       const columnName = sanitizeIdentifier(parsed.column);
       const schemaName = parsed.schema ?? "public";
 
-      // Check if column exists
-      const colCheckSql = `
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_schema = $1 AND table_name = $2 AND column_name = $3
-            `;
-      const colCheckResult = await adapter.executeQuery(colCheckSql, [
-        schemaName,
+      // Two-step existence check: table first, then column
+      const existenceCheck = await checkTableAndColumn(
+        adapter,
         parsed.table,
         parsed.column,
-      ]);
-      if ((colCheckResult.rows?.length ?? 0) === 0) {
-        return {
-          success: false,
-          error: `Column '${parsed.column}' does not exist in table '${parsed.table}'`,
-          suggestion: "Verify the column name using pg_describe_table",
-        };
+        schemaName,
+      );
+      if (existenceCheck) {
+        return { success: false, ...existenceCheck };
       }
 
       const indexSql = `
@@ -914,6 +951,17 @@ export function createVectorDimensionReduceTool(
 
       // Table-based mode
       if (parsed.table !== undefined && parsed.column !== undefined) {
+        // P154: Verify table and column exist before querying
+        const existenceError = await checkTableAndColumn(
+          adapter,
+          parsed.table,
+          parsed.column,
+          "public",
+        );
+        if (existenceError !== null) {
+          return { success: false, ...existenceError };
+        }
+
         const idCol = parsed.idColumn ?? "id";
         const limitVal = parsed.limit ?? 100;
 
@@ -1033,17 +1081,16 @@ export function createVectorEmbedTool(): ToolDefinition {
     outputSchema: VectorEmbedOutputSchema,
     annotations: readOnly("Vector Embed"),
     icons: getToolIcons("vector", readOnly("Vector Embed")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: (params: unknown, _context: RequestContext) => {
       const parsed = EmbedSchema.parse(params ?? {});
 
       // Validate non-empty text
       if (parsed.text === undefined || parsed.text === "") {
-        return {
+        return Promise.resolve({
           success: false,
           error: "text parameter is required and must be non-empty",
           suggestion: "Provide text content to generate an embedding",
-        };
+        });
       }
 
       const dims = parsed.dimensions ?? 384;
@@ -1073,13 +1120,13 @@ export function createVectorEmbedTool(): ToolDefinition {
             truncated: false,
           };
 
-      return {
+      return Promise.resolve({
         embedding: embeddingOutput,
         dimensions: dims,
         textLength: parsed.text.length,
         warning:
           "This is a demo embedding using hash functions. For production, use OpenAI, Cohere, or other embedding APIs.",
-      };
+      });
     },
   };
 }

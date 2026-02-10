@@ -24,7 +24,7 @@ export const KcacheQueryStatsSchema = z.preprocess(
     limit: z
       .number()
       .optional()
-      .describe("Maximum number of queries to return (default: 50)"),
+      .describe("Maximum number of queries to return (default: 20)"),
     orderBy: z
       .enum(["total_time", "cpu_time", "reads", "writes"])
       .optional()
@@ -82,7 +82,7 @@ export const KcacheResourceAnalysisSchema = z.preprocess(
     limit: z
       .number()
       .optional()
-      .describe("Maximum number of queries to return (default: 50)"),
+      .describe("Maximum number of queries to return (default: 20)"),
     minCalls: z.number().optional().describe("Minimum call count to include"),
     queryPreviewLength: z
       .number()

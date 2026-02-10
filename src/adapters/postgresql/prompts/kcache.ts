@@ -18,14 +18,13 @@ export function createSetupKcachePrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
       const focus = args["focus"] ?? "all";
 
-      return `# pg_stat_kcache Setup Guide - ${focus.toUpperCase()} Analysis
+      return Promise.resolve(`# pg_stat_kcache Setup Guide - ${focus.toUpperCase()} Analysis
 
 ## pg_stat_kcache Overview
 
@@ -234,7 +233,7 @@ GROUP BY 1;
 - ❌ Analyzing stale statistics
 - ❌ Ignoring the difference between user and system CPU
 
-**Pro Tip:** Combine pg_stat_kcache with EXPLAIN (ANALYZE, BUFFERS) for complete query diagnostics!`;
+**Pro Tip:** Combine pg_stat_kcache with EXPLAIN (ANALYZE, BUFFERS) for complete query diagnostics!`);
     },
   };
 }

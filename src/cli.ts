@@ -12,6 +12,7 @@ import { PostgresMcpServer } from "./server/McpServer.js";
 import { parseToolFilter, getFilterSummary } from "./filtering/ToolFilter.js";
 import { logger } from "./utils/logger.js";
 import { HttpTransport, type HttpTransportConfig } from "./transports/http.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   OAuthResourceServer,
   TokenValidator,
@@ -47,6 +48,7 @@ interface CliOptions {
     | "emergency";
   transport?: TransportType;
   port?: number;
+  serverHost?: string;
   oauthEnabled?: boolean;
   oauthIssuer?: string;
   oauthAudience?: string;
@@ -94,6 +96,10 @@ program
     "--port, -p <port>",
     "HTTP port for http/sse transports (default: 3000)",
     parseInt,
+  )
+  .option(
+    "--server-host <host>",
+    "Server bind host for http/sse transports (default: localhost)",
   )
   .option(
     "--tool-filter <filter>",
@@ -328,7 +334,11 @@ async function startHttpServer(
   options: CliOptions,
 ): Promise<void> {
   const port = options.port ?? parseInt(process.env["PORT"] ?? "3000", 10);
-  const host = process.env["HOST"] ?? "localhost";
+  const host =
+    options.serverHost ??
+    process.env["MCP_HOST"] ??
+    process.env["HOST"] ??
+    "localhost";
 
   // Create OAuth components if enabled
   let resourceServer: OAuthResourceServer | undefined;
@@ -374,8 +384,7 @@ async function startHttpServer(
   // Create HTTP transport with OAuth
   const httpTransport = new HttpTransport(transportConfig, (transport) => {
     // Connect MCP server to the transport when client connects
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    void mcpServer.getMcpServer().connect(transport as any);
+    void mcpServer.getMcpServer().connect(transport as Transport);
   });
 
   // Handle shutdown
@@ -411,8 +420,7 @@ program
   .description("List all available tools")
   .option("--filter <filter>", "Apply tool filter")
   .option("--group <group>", "Filter by tool group")
-  // eslint-disable-next-line @typescript-eslint/require-await
-  .action(async (options: ListToolsOptions) => {
+  .action((options: ListToolsOptions) => {
     const adapter = new PostgresAdapter();
     const tools = adapter.getToolDefinitions();
 
@@ -454,8 +462,7 @@ program
 program
   .command("info")
   .description("Show server information")
-  // eslint-disable-next-line @typescript-eslint/require-await
-  .action(async () => {
+  .action(() => {
     const adapter = new PostgresAdapter();
     const tools = adapter.getToolDefinitions();
     const resources = adapter.getResourceDefinitions();

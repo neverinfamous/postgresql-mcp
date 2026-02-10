@@ -31,7 +31,7 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-unused-vars": [
         "error",
-        { argsIgnorePattern: "^_" },
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
       "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/strict-boolean-expressions": [

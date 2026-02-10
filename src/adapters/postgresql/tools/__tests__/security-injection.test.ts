@@ -335,10 +335,10 @@ describe("Vector Tools WHERE Clause Injection", () => {
 
   describe("pg_vector_search WHERE injection", () => {
     it("should reject WHERE clause with injection", async () => {
-      // Mock column check to pass
-      mockAdapter.executeQuery.mockResolvedValueOnce({
-        rows: [{ udt_name: "vector", character_maximum_length: null }],
-      });
+      // Mock existence check and type check to pass so WHERE validation triggers
+      mockAdapter.executeQuery
+        .mockResolvedValueOnce({ rows: [{ "1": 1 }] }) // existence check (checkTableAndColumn)
+        .mockResolvedValueOnce({ rows: [{ udt_name: "vector" }] }); // type check
 
       const tool = vectorTools.find((t) => t.name === "pg_vector_search")!;
       await expect(

@@ -194,7 +194,7 @@ describe("pg_drop_schema", () => {
     const tool = tools.find((t) => t.name === "pg_drop_schema")!;
     const result = (await tool.handler({ name: "old_app" }, mockContext)) as {
       success: boolean;
-      dropped: string | null;
+      schema: string;
       existed: boolean;
     };
 
@@ -203,7 +203,7 @@ describe("pg_drop_schema", () => {
       'DROP SCHEMA "old_app"',
     );
     expect(result.success).toBe(true);
-    expect(result.dropped).toBe("old_app");
+    expect(result.schema).toBe("old_app");
     expect(result.existed).toBe(true);
   });
 
@@ -248,13 +248,13 @@ describe("pg_drop_schema", () => {
       mockContext,
     )) as {
       success: boolean;
-      dropped: string | null;
+      schema: string;
       existed: boolean;
       note: string;
     };
 
     expect(result.success).toBe(true);
-    expect(result.dropped).toBeNull();
+    expect(result.schema).toBe("nonexistent_schema");
     expect(result.existed).toBe(false);
     expect(result.note).toContain("did not exist");
   });
@@ -1026,6 +1026,29 @@ describe("Parameter Smoothing", () => {
     expect(sql).toContain("e.extname IN ('ltree')");
   });
 
+  it("pg_list_functions should expand well-known extension aliases in exclude", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_functions")!;
+    await tool.handler({ exclude: ["pgvector"] }, mockContext);
+
+    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    // "pgvector" should be expanded to include the actual extension name "vector"
+    expect(sql).toContain("e.extname IN ('pgvector', 'vector')");
+    expect(sql).toContain("n.nspname NOT IN ('pgvector', 'vector')");
+  });
+
+  it("pg_list_functions should expand partman alias in exclude", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_functions")!;
+    await tool.handler({ exclude: ["partman"] }, mockContext);
+
+    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("e.extname IN ('partman', 'pg_partman')");
+    expect(sql).toContain("n.nspname NOT IN ('partman', 'pg_partman')");
+  });
+
   it("pg_create_view should accept definition as alias for query", async () => {
     mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -1045,5 +1068,27 @@ describe("Parameter Smoothing", () => {
       'CREATE VIEW "def_alias_view" AS SELECT * FROM users WHERE active = true',
     );
     expect(result.success).toBe(true);
+  });
+
+  it("pg_list_functions should expand fuzzymatch alias in exclude", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_functions")!;
+    await tool.handler({ exclude: ["fuzzymatch"] }, mockContext);
+
+    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("e.extname IN ('fuzzymatch', 'fuzzystrmatch')");
+    expect(sql).toContain("n.nspname NOT IN ('fuzzymatch', 'fuzzystrmatch')");
+  });
+
+  it("pg_list_functions should expand fuzzy alias in exclude", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_list_functions")!;
+    await tool.handler({ exclude: ["fuzzy"] }, mockContext);
+
+    const sql = mockAdapter.executeQuery.mock.calls[0]?.[0] as string;
+    expect(sql).toContain("e.extname IN ('fuzzy', 'fuzzystrmatch')");
+    expect(sql).toContain("n.nspname NOT IN ('fuzzy', 'fuzzystrmatch')");
   });
 });

@@ -400,6 +400,26 @@ function createPartitionTool(adapter: PostgresAdapter): ToolDefinition {
         );
       }
 
+      // Check parent table existence and partition status before SQL execution
+      const parsedParentCheck = parseSchemaTable(parent, schema);
+      const parentStatus = await checkTablePartitionStatus(
+        adapter,
+        parsedParentCheck.table,
+        parsedParentCheck.schema,
+      );
+      if (parentStatus === "not_found") {
+        return {
+          success: false,
+          error: `Table '${parsedParentCheck.schema}.${parsedParentCheck.table}' does not exist.`,
+        };
+      }
+      if (parentStatus === "not_partitioned") {
+        return {
+          success: false,
+          error: `Table '${parsedParentCheck.schema}.${parsedParentCheck.table}' exists but is not partitioned. Use pg_create_partitioned_table to create a partitioned table first.`,
+        };
+      }
+
       // Parse schema.table format from parent (takes priority over explicit schema)
       const parsedParent = parseSchemaTable(parent, schema);
       const resolvedSchema = parsedParent.schema;
@@ -473,6 +493,40 @@ function createAttachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
           schema?: string;
         };
 
+      // Check parent table existence and partition status before SQL execution
+      const parsedParentCheck = parseSchemaTable(parent, schema);
+      const parentStatus = await checkTablePartitionStatus(
+        adapter,
+        parsedParentCheck.table,
+        parsedParentCheck.schema,
+      );
+      if (parentStatus === "not_found") {
+        return {
+          success: false,
+          error: `Parent table '${parsedParentCheck.schema}.${parsedParentCheck.table}' does not exist.`,
+        };
+      }
+      if (parentStatus === "not_partitioned") {
+        return {
+          success: false,
+          error: `Parent table '${parsedParentCheck.schema}.${parsedParentCheck.table}' exists but is not partitioned.`,
+        };
+      }
+
+      // Check partition table exists (it must exist as a standalone table to attach)
+      const parsedPartCheck = parseSchemaTable(partition, schema);
+      const partCheckSql = `SELECT 1 FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind IN ('r', 'p')`;
+      const partCheckResult = await adapter.executeQuery(partCheckSql, [
+        parsedPartCheck.table,
+        parsedPartCheck.schema,
+      ]);
+      if ((partCheckResult.rows ?? []).length === 0) {
+        return {
+          success: false,
+          error: `Partition table '${parsedPartCheck.schema}.${parsedPartCheck.table}' does not exist.`,
+        };
+      }
+
       // Parse schema.table format from parent and partition (takes priority over explicit schema)
       const parsedParent = parseSchemaTable(parent, schema);
       const parsedPartition = parseSchemaTable(partition, schema);
@@ -539,6 +593,40 @@ function createDetachPartitionTool(adapter: PostgresAdapter): ToolDefinition {
           finalize?: boolean;
           schema?: string;
         };
+
+      // Check parent table existence and partition status before SQL execution
+      const parsedParentCheck = parseSchemaTable(parent, schema);
+      const parentStatus = await checkTablePartitionStatus(
+        adapter,
+        parsedParentCheck.table,
+        parsedParentCheck.schema,
+      );
+      if (parentStatus === "not_found") {
+        return {
+          success: false,
+          error: `Parent table '${parsedParentCheck.schema}.${parsedParentCheck.table}' does not exist.`,
+        };
+      }
+      if (parentStatus === "not_partitioned") {
+        return {
+          success: false,
+          error: `Parent table '${parsedParentCheck.schema}.${parsedParentCheck.table}' exists but is not partitioned.`,
+        };
+      }
+
+      // Check partition table exists
+      const parsedPartCheck = parseSchemaTable(partition, schema);
+      const partCheckSql = `SELECT 1 FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid WHERE c.relname = $1 AND n.nspname = $2`;
+      const partCheckResult = await adapter.executeQuery(partCheckSql, [
+        parsedPartCheck.table,
+        parsedPartCheck.schema,
+      ]);
+      if ((partCheckResult.rows ?? []).length === 0) {
+        return {
+          success: false,
+          error: `Partition '${parsedPartCheck.schema}.${parsedPartCheck.table}' does not exist.`,
+        };
+      }
 
       // Parse schema.table format from parent and partition (takes priority over explicit schema)
       const parsedParent = parseSchemaTable(parent, schema);

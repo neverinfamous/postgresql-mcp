@@ -357,8 +357,10 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
       const additionalWhere = parsed.where
         ? ` AND (${sanitizeWhereClause(parsed.where)})`
         : "";
-      const limitClause =
-        parsed.limit !== undefined ? ` LIMIT ${String(parsed.limit)}` : "";
+      // Default limit to 100 to prevent large payloads
+      const limitVal =
+        parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
+      const limitClause = ` LIMIT ${String(limitVal)}`;
 
       const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${additionalWhere}${limitClause}`;
       const result = await adapter.executeQuery(sql, [parsed.pattern]);
@@ -380,7 +382,10 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
         .optional()
         .describe("Use case-sensitive LIKE (default: false, uses ILIKE)"),
       select: z.array(z.string()).optional(),
-      limit: z.number().optional(),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max results (default: 100 to prevent large payloads)"),
       where: z.string().optional().describe("Additional WHERE clause filter"),
       schema: z.string().optional().describe("Schema name (default: public)"),
     })
@@ -424,10 +429,10 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
       const additionalWhere = parsed.where
         ? ` AND (${sanitizeWhereClause(parsed.where)})`
         : "";
-      const limitClause =
-        parsed.limit !== undefined && parsed.limit > 0
-          ? ` LIMIT ${String(parsed.limit)}`
-          : "";
+      // Default limit to 100 to prevent large payloads
+      const limitVal =
+        parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
+      const limitClause = ` LIMIT ${String(limitVal)}`;
 
       const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${additionalWhere}${limitClause}`;
       const result = await adapter.executeQuery(sql, [parsed.pattern]);
@@ -656,8 +661,7 @@ function createTextSentimentTool(_adapter: PostgresAdapter): ToolDefinition {
     outputSchema: TextSentimentOutputSchema,
     annotations: readOnly("Text Sentiment"),
     icons: getToolIcons("text", readOnly("Text Sentiment")),
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (params: unknown, _context: RequestContext) => {
+    handler: (params: unknown, _context: RequestContext) => {
       const parsed = SentimentSchema.parse(params ?? {});
       const text = parsed.text.toLowerCase();
 
@@ -758,7 +762,7 @@ function createTextSentimentTool(_adapter: PostgresAdapter): ToolDefinition {
         result.matchedNegative = matchedNegative;
       }
 
-      return result;
+      return Promise.resolve(result);
     },
   };
 }

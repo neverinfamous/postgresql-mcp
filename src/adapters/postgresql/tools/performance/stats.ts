@@ -221,7 +221,10 @@ export function createStatStatementsTool(
         }),
       );
 
-      const response: Record<string, unknown> = { statements };
+      const response: Record<string, unknown> = {
+        statements,
+        count: statements.length,
+      };
 
       // Add totalCount if results were limited
       if (limit !== null && statements.length === limit) {

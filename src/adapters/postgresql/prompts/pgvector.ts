@@ -28,8 +28,7 @@ export function createSetupPgvectorPrompt(): PromptDefinition {
         required: false,
       },
     ],
-    // eslint-disable-next-line @typescript-eslint/require-await
-    handler: async (
+    handler: (
       args: Record<string, string>,
       _context: RequestContext,
     ): Promise<string> => {
@@ -37,7 +36,7 @@ export function createSetupPgvectorPrompt(): PromptDefinition {
       const dimensions = args["dimensions"] ?? "1536";
       const distanceMetric = args["distanceMetric"] ?? "cosine";
 
-      return `# pgVector Setup Guide - ${contentType.charAt(0).toUpperCase() + contentType.slice(1)}
+      return Promise.resolve(`# pgVector Setup Guide - ${contentType.charAt(0).toUpperCase() + contentType.slice(1)}
 
 **Configuration:**
 - Content Type: ${contentType}
@@ -149,7 +148,7 @@ Use \`pg_vector_performance\` to benchmark your configuration.
 3. Use HNSW indexes for production
 4. VACUUM ANALYZE after bulk inserts
 
-**Pro Tip:** pgvector is PostgreSQL's killer AI feature - no other database does vector search this well!`;
+**Pro Tip:** pgvector is PostgreSQL's killer AI feature - no other database does vector search this well!`);
     },
   };
 }

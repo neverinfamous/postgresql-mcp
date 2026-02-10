@@ -108,9 +108,9 @@ export function createWriteQueryTool(adapter: PostgresAdapter): ToolDefinition {
       }
 
       return {
-        rowsAffected: result.rowsAffected,
-        affectedRows: result.rowsAffected, // Alias for common API naming
-        rowCount: result.rowsAffected, // Alias for consistency
+        rowsAffected: result.rowsAffected ?? 0,
+        affectedRows: result.rowsAffected ?? 0, // Alias for common API naming
+        rowCount: result.rowsAffected ?? 0, // Alias for consistency
         command: result.command,
         executionTimeMs: result.executionTimeMs,
         // Include returned rows when using RETURNING clause

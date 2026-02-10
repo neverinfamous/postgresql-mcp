@@ -48,6 +48,10 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 | List operations | \`{items, count}\` | Access via \`result.tables\`, \`result.views\`, etc. |
 | \`pg_jsonb_agg groupBy\` | \`{result: [{group_key, items}], count, grouped: true}\` | Without groupBy: \`{result: [...], count, grouped: false}\` |
 | \`pg_vector_aggregate\` | \`{average_vector, count}\` or \`{groups: [{group_key, average_vector, count}]}\` | Without/with \`groupBy\` |
+| \`pg_index_stats\` | \`{indexes, count, truncated?, totalCount?}\` | Default 50 rows. Use \`limit: 0\` for all |
+| \`pg_table_stats\` | \`{tables, count, truncated?, totalCount?}\` | Default 50 rows. Use \`limit: 0\` for all |
+| \`pg_vacuum_stats\` | \`{tables, count, truncated?, totalCount?}\` | Default 50 rows. Use \`limit: 0\` for all |
+| \`pg_stat_statements\` | \`{statements, count, truncated?, totalCount?}\` | Default 20 rows. \`orderBy\` supported |
 | \`pg_query_plan_stats\` | \`{queryPlanStats, count, truncated?, totalCount?}\` | Default 20 rows. \`truncateQuery: 0\` for full text |
 
 ## API Mapping

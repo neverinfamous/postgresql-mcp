@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Stale `pg_similarity_search` reference in `ServerInstructions.ts`** — Removed non-existent tool reference and replaced with accurate documentation noting that `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, and `pg_like_search` all default to 100 results
 
+### Documentation
+
+- **Performance tools response structures in `ServerInstructions.ts`** — Added missing Response Structures table entries for `pg_index_stats` (`{indexes, count, truncated?, totalCount?}`), `pg_table_stats` (`{tables, ...}`), `pg_vacuum_stats` (`{tables, ...}`), and `pg_stat_statements` (`{statements, ...}`). These tools return truncation-aware payloads but their response key names were undocumented, making it harder for agents to access the correct array keys (e.g., `indexes` not `indexStats`)
+
 - **`pg_pgcrypto_gen_random_uuid` `count` parameter MCP exposure** — The `count` parameter (1-100) is now visible to MCP clients for direct tool calls, enabling batch UUID generation (e.g., `pg_pgcrypto_gen_random_uuid({ count: 5 })`). Previously, the `.default({})` on the Zod schema collapsed the object during JSON Schema conversion, hiding `count` from MCP clients. Applied Split Schema pattern: `GenUuidSchemaBase` for MCP visibility, `GenUuidSchema` with `.default({})` for handler parsing
 
 - **`help()` documentation consistency in `ServerInstructions.ts`** — Fixed 5 `pg.{group}.help()` discovery lines to consistently document the `methodAliases` key. 4 lines (ltree, postgis, cron, pgcrypto) incorrectly said `aliases` instead of `methodAliases`, and 1 line (schema) omitted it entirely. Now all match the actual `help()` return structure `{methods, methodAliases, examples}` from `api.ts`
@@ -387,6 +391,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Text tools `tableName` alias Split Schema fix** — 8 table-based text tools (`pg_text_search`, `pg_text_rank`, `pg_text_headline`, `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_like_search`, `pg_regexp_match`, `pg_create_fts_index`) now correctly accept `tableName` as an alias for `table` parameter in direct MCP tool calls. Previously, using `{ tableName: "articles" }` caused "Invalid input: expected string, received undefined" error because the base schemas marked `table` as required, hiding the alias from MCP clients. Uses the Split Schema pattern: base schema with both `table` and `tableName` optional plus `.refine()` validation, full schema with preprocess for handler parsing
 - **pg_jsonb_extract response consistency** — `pg_jsonb_extract` now always returns `{rows: [...], count}` response structure regardless of whether `select` columns are specified. Previously, the response inconsistently returned `{results: [...], count}` without select columns and `{rows: [...], count}` with select columns. Now both modes return `rows` containing objects with a `value` property for consistent parsing
 - **pg_describe_table `name` alias Split Schema fix** — `pg_describe_table` direct MCP tool calls now correctly accept `name` as an alias for `table` parameter, matching `pg_create_table`, `pg_drop_table`, and code mode behavior. Previously, using `{ name: "table_name" }` caused "table (or tableName alias) is required" error because the `name` alias was not exposed in the MCP schema (only handled in handler parsing)
+
 ### Documentation
 
 - **`pg_describe_table`** — Updated ServerInstructions.ts to reflect that `pg_describe_table` returns index information

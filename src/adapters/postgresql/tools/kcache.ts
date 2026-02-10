@@ -39,9 +39,9 @@ const defaultToEmpty = (val: unknown): unknown => val ?? {};
  * - Old (< 2.2): user_time, system_time, reads, writes
  * - New (>= 2.2): exec_user_time, exec_system_time, exec_reads, exec_writes
  *
- * IMPORTANT: The pg_stat_kcache() FUNCTION returns columns like exec_reads (bytes).
- * The pg_stat_kcache VIEW has different columns like exec_reads_blks.
- * This helper returns column names for the FUNCTION (used with queryid joins).
+ * These column names are shared between the pg_stat_kcache VIEW and
+ * the pg_stat_kcache() FUNCTION. The VIEW also has _blks variants,
+ * but the byte-based names work for both contexts.
  */
 interface KcacheColumns {
   userTime: string;
@@ -425,6 +425,14 @@ which represent actual disk access (not just shared buffer hits).`,
             ? `k.${cols.writes}`
             : `(k.${cols.reads} + k.${cols.writes})`;
 
+      // Filter by the type-specific IO column so 'reads' excludes write-only queries
+      const ioFilter =
+        ioType === "reads"
+          ? `k.${cols.reads} > 0`
+          : ioType === "writes"
+            ? `k.${cols.writes} > 0`
+            : `(k.${cols.reads} + k.${cols.writes}) > 0`;
+
       // Get total count first for truncation indicator
       const countSql = `
                 SELECT COUNT(*) as total
@@ -432,7 +440,7 @@ which represent actual disk access (not just shared buffer hits).`,
                 JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
                     AND s.userid = k.userid 
                     AND s.dbid = k.dbid
-                WHERE (k.${cols.reads} + k.${cols.writes}) > 0
+                WHERE ${ioFilter}
             `;
       const countResult = await adapter.executeQuery(countSql);
       const totalRaw = countResult.rows?.[0]?.["total"];
@@ -453,7 +461,7 @@ which represent actual disk access (not just shared buffer hits).`,
                 JOIN pg_stat_kcache() k ON s.queryid = k.queryid 
                     AND s.userid = k.userid 
                     AND s.dbid = k.dbid
-                WHERE (k.${cols.reads} + k.${cols.writes}) > 0
+                WHERE ${ioFilter}
                 ORDER BY ${orderColumn} DESC
                 ${limitVal !== null ? `LIMIT ${String(limitVal)}` : ""}
             `;

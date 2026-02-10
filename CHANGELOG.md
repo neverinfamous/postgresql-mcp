@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`pg_pgcrypto_gen_random_uuid` `count` parameter MCP exposure** — The `count` parameter (1-100) is now visible to MCP clients for direct tool calls, enabling batch UUID generation (e.g., `pg_pgcrypto_gen_random_uuid({ count: 5 })`). Previously, the `.default({})` on the Zod schema collapsed the object during JSON Schema conversion, hiding `count` from MCP clients. Applied Split Schema pattern: `GenUuidSchemaBase` for MCP visibility, `GenUuidSchema` with `.default({})` for handler parsing
+
+- **`help()` documentation consistency in `ServerInstructions.ts`** — Fixed 5 `pg.{group}.help()` discovery lines to consistently document the `methodAliases` key. 4 lines (ltree, postgis, cron, pgcrypto) incorrectly said `aliases` instead of `methodAliases`, and 1 line (schema) omitted it entirely. Now all match the actual `help()` return structure `{methods, methodAliases, examples}` from `api.ts`
+
 - **`pg_buffer` and `pg_geo_transform` truncation indicators for explicit limits** — Both tools now correctly return `truncated: true` + `totalCount` when an explicit `limit` parameter truncates results. Previously, `truncated` and `totalCount` were only returned when the default limit (50) was applied, contradicting the documented behavior in `ServerInstructions.ts`. The truncation check condition was broadened from `parsed.limit === undefined && effectiveLimit > 0` to `effectiveLimit > 0`. Added 3 unit tests
 
 - **`pg_geo_transform` SRID auto-detection from column metadata** — `fromSrid` is now optional. When not provided, the tool auto-detects the source SRID from `geometry_columns`/`geography_columns` catalog tables, matching the pattern used by `pg_intersection`. Returns `autoDetectedSrid: true` in the response when auto-detected. Returns structured `{success: false, error, suggestion}` with actionable message when SRID cannot be determined. Removed `fromSrid > 0` schema refine. Added 3 unit tests, updated 1 existing schema test

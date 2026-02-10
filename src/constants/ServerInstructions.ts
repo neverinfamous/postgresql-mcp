@@ -248,7 +248,7 @@ Response Structures:
 - \`pg_create_sequence\`: Supports \`schema.name\` format. Parameters: \`start\`, \`increment\`, \`minValue\`, \`maxValue\`, \`cache\`, \`cycle\`, \`ownedBy\`, \`ifNotExists\`
 - \`pg_list_functions\`: Default limit=500. Use \`schema: 'public'\`, \`limit: 2000\`, or \`exclude: ['postgis', 'pg_trgm', 'ltree', 'citext', 'fuzzystrmatch', 'pg_stat_statements', 'hypopg', 'unaccent', 'pg_stat_kcache', 'pgcrypto', 'partman']\` to filter. ⚠️ \`exclude\` filters by **schema name** AND extension-owned functions. The \`language\` filter does NOT exclude extension functions—use \`exclude\` alongside \`language\` for clean results. Note: Aggressive \`exclude\` may return 0 results if all functions belong to excluded extensions
 
-**Discovery**: \`pg.schema.help()\` returns \`{methods: string[], examples: string[]}\` object with available methods and usage examples
+**Discovery**: \`pg.schema.help()\` returns \`{methods, methodAliases, examples}\` object
 
 
 ## Partitioning Tools
@@ -311,7 +311,7 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 - \`pg_ltree_convert_column\`: Convert TEXT column to ltree. Supports \`schema.table\` format. \`col\` alias for \`column\`. Returns \`{previousType}\`. ⚠️ When views depend on column, returns \`{success: false, dependentViews, hint}\`—drop/recreate views manually
 - \`pg_ltree_create_index\`: Create GiST index on ltree column. Supports \`schema.table\` format. Auto-generates index name if \`indexName\` omitted. Returns \`{indexName, indexType: 'gist', alreadyExists?}\`
 
-**Discovery**: \`pg.ltree.help()\` returns \`{methods, aliases, examples}\` object. Top-level aliases available: \`pg.ltreeQuery()\`, \`pg.ltreeMatch()\`, etc.
+**Discovery**: \`pg.ltree.help()\` returns \`{methods, methodAliases, examples}\` object. Top-level aliases available: \`pg.ltreeQuery()\`, \`pg.ltreeMatch()\`, etc.
 
 ## PostGIS Tools
 
@@ -340,7 +340,7 @@ Core: \`createExtension()\`, \`query()\`, \`match()\`, \`subpath()\`, \`lca()\`,
 - \`pg_postgis_create_extension\`: Enable PostGIS extension (idempotent)
 - \`pg_geo_index_optimize\`: Analyze spatial indexes. Without \`table\` param, analyzes all spatial indexes
 
-**Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`, \`pg.postgis.geoCluster()\` → \`pg_geo_cluster\`, \`pg.postgis.geoTransform()\` → \`pg_geo_transform\`. Note: \`pg.{group}.help()\` returns \`{methods, aliases, examples}\`
+**Code Mode Aliases:** \`pg.postgis.addColumn()\` → \`geometryColumn\`, \`pg.postgis.indexOptimize()\` → \`geoIndexOptimize\`, \`pg.postgis.geoCluster()\` → \`pg_geo_cluster\`, \`pg.postgis.geoTransform()\` → \`pg_geo_transform\`. Note: \`pg.{group}.help()\` returns \`{methods, methodAliases, examples}\`
 
 ## Cron Tools (pg_cron)
 
@@ -355,7 +355,7 @@ Core: \`createExtension()\`, \`schedule()\`, \`scheduleInDatabase()\`, \`unsched
 - \`pg_cron_cleanup_history\`: Delete old run records. \`olderThanDays\`/\`days\` param (default: 7). Optional \`jobId\` to target specific job
 - \`pg_cron_create_extension\`: Enable pg_cron extension (idempotent). Requires superuser
 
-**Discovery**: \`pg.cron.help()\` returns \`{methods, aliases, examples}\` object
+**Discovery**: \`pg.cron.help()\` returns \`{methods, methodAliases, examples}\` object
 
 ## pgcrypto Tools
 
@@ -375,7 +375,7 @@ Core: \`createExtension()\`, \`hash()\`, \`hmac()\`, \`encrypt()\`, \`decrypt()\
 
 **Top-Level Aliases**: \`pg.pgcryptoHash()\`, \`pg.pgcryptoEncrypt()\`, \`pg.pgcryptoDecrypt()\`, \`pg.pgcryptoGenRandomUuid()\`, etc.
 
-**Discovery**: \`pg.pgcrypto.help()\` returns \`{methods, aliases, examples}\` object
+**Discovery**: \`pg.pgcrypto.help()\` returns \`{methods, methodAliases, examples}\` object
 
 ## Code Mode Sandbox
 

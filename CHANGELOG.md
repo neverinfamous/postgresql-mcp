@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **`pg_kcache_database_stats` optional `database` parameter in `ServerInstructions.ts`** — Documented that `pg_kcache_database_stats` accepts an optional `database` parameter to filter stats to a specific database. The parameter was already implemented in the handler but undocumented
+
 - **`pg_kcache_top_cpu` and `pg_kcache_top_io` truncation indicators in `ServerInstructions.ts`** — Added missing `truncated` + `totalCount` documentation for both tools. These fields were already returned by the handlers but undocumented, making it harder for agents to anticipate the response structure
 
 - **`pg_regexp_match` and `pg_like_search` default limit** — Both tools now default to `LIMIT 100` when no `limit` parameter is specified, preventing unbounded result sets on large tables. Consistent with `pg_trigram_similarity` and `pg_fuzzy_match` which already defaulted to 100. Updated schema descriptions and added 2 unit tests

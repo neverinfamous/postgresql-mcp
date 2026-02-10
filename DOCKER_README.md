@@ -42,6 +42,9 @@
 | Extension            | Purpose                        |
 | -------------------- | ------------------------------ |
 | `pg_stat_statements` | Query performance tracking     |
+| `pg_trgm`            | Text similarity                |
+| `fuzzystrmatch`      | Fuzzy matching                 |
+| `hypopg`             | Hypothetical indexes           |
 | `pgvector`           | Vector similarity search       |
 | `PostGIS`            | Geospatial operations          |
 | `pg_cron`            | Job scheduling                 |
@@ -62,7 +65,7 @@ Real-time database meta-awareness - AI accesses these automatically:
 | `postgres://performance`  | Query performance metrics                     |
 | `postgres://capabilities` | Server features and extensions                |
 | `postgres://indexes`      | Index usage statistics                        |
-| `postgres://connections`  | Active connections and pool status            |
+| `postgres://activity`     | Current connections and active queries        |
 
 **[Full resources list →](https://github.com/neverinfamous/postgresql-mcp#resources)**
 
@@ -70,16 +73,16 @@ Real-time database meta-awareness - AI accesses these automatically:
 
 Guided workflows for complex operations:
 
-| Prompt                  | Purpose                         |
-| ----------------------- | ------------------------------- |
-| `optimize_query`        | Step-by-step query optimization |
-| `index_tuning`          | Comprehensive index analysis    |
-| `database_health_check` | Full health assessment          |
-| `setup_pgvector`        | Complete pgvector setup guide   |
-| `performance_baseline`  | Establish performance baselines |
-| `backup_strategy`       | Design backup strategy          |
+| Prompt                     | Purpose                         |
+| -------------------------- | ------------------------------- |
+| `pg_performance_analysis`  | Step-by-step query optimization |
+| `pg_index_tuning`          | Comprehensive index analysis    |
+| `pg_database_health_check` | Full health assessment          |
+| `pg_setup_pgvector`        | Complete pgvector setup guide   |
+| `pg_backup_strategy`       | Design backup strategy          |
+| `pg_tool_index`            | Compact tool index reference    |
 
-**[Full prompts list →](https://github.com/neverinfamous/postgresql-mcp#prompts)**
+**[Full prompts list →](https://github.com/neverinfamous/postgresql-mcp#-ai-powered-prompts)**
 
 ---
 

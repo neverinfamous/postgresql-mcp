@@ -1138,6 +1138,17 @@ export function createVectorBatchInsertTool(
       const tableName = sanitizeTableName(resolvedTable, resolvedSchema);
       const columnName = sanitizeIdentifier(parsed.column);
 
+      // P154: Pre-validate table and column exist
+      const existenceError = await checkTableAndColumn(
+        adapter,
+        resolvedTable,
+        parsed.column,
+        resolvedSchema ?? "public",
+      );
+      if (existenceError !== null) {
+        return { success: false, ...existenceError };
+      }
+
       if (parsed.vectors.length === 0) {
         return {
           success: true,
@@ -1345,16 +1356,16 @@ export function createVectorValidateTool(
         columnDimensions,
         expectedDimensions,
         ...(parsed.vector !== undefined &&
-          expectedDimensions !== undefined &&
-          vectorDimensions !== undefined &&
-          vectorDimensions !== expectedDimensions
+        expectedDimensions !== undefined &&
+        vectorDimensions !== undefined &&
+        vectorDimensions !== expectedDimensions
           ? {
-            error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
-            suggestion:
-              vectorDimensions > expectedDimensions
-                ? "Use pg_vector_dimension_reduce to reduce dimensions"
-                : "Ensure your embedding model outputs the correct dimensions",
-          }
+              error: `Vector has ${String(vectorDimensions)} dimensions but column expects ${String(expectedDimensions)} `,
+              suggestion:
+                vectorDimensions > expectedDimensions
+                  ? "Use pg_vector_dimension_reduce to reduce dimensions"
+                  : "Ensure your embedding model outputs the correct dimensions",
+            }
           : {}),
       };
     },

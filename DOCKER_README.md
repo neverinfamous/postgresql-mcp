@@ -4,7 +4,7 @@
 
 **PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
-**205 specialized tools** · **20 resources** · **19 AI-powered prompts**
+**206 specialized tools** · **20 resources** · **19 AI-powered prompts**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgresql-mcp)
 ![GitHub Release](https://img.shields.io/github/v/release/neverinfamous/postgresql-mcp)
@@ -24,7 +24,7 @@
 
 ### Key Benefits
 
-- 🔧 **205 specialized tools** — Comprehensive PostgreSQL coverage
+- 🔧 **206 specialized tools** — Comprehensive PostgreSQL coverage
 - 📊 **20 resources** — Instant database state snapshots
 - 🤖 **19 AI-powered prompts** — Guided workflows for complex tasks
 - ⚡ **Code Mode** — 70-90% token reduction for multi-step operations
@@ -188,7 +188,7 @@ Click the button below to install directly into Cursor:
 ## 🛠️ Tool Filtering
 
 > [!IMPORTANT]
-> AI IDEs like Cursor have tool limits. With 205 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (58 tools) as a starting point. Code Mode is included in all presets by default for 70-90% token savings on multi-step operations.
+> AI IDEs like Cursor have tool limits. With 206 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (59 tools) as a starting point. Code Mode is included in all presets by default for 70-90% token savings on multi-step operations.
 
 ### What Can You Filter?
 
@@ -196,10 +196,10 @@ The `--tool-filter` argument accepts **shortcuts**, **groups**, or **tool names*
 
 | Filter Pattern   | Example                   | Tools | Description               |
 | ---------------- | ------------------------- | ----- | ------------------------- |
-| Shortcut only    | `starter`                 | 58    | Use a predefined bundle   |
-| Groups only      | `core,jsonb,transactions` | 45    | Combine individual groups |
-| Shortcut + Group | `starter,+text`           | 69    | Extend a shortcut         |
-| Shortcut - Tool  | `starter,-pg_drop_table`  | 57    | Remove specific tools     |
+| Shortcut only    | `starter`                 | 59    | Use a predefined bundle   |
+| Groups only      | `core,jsonb,transactions` | 47    | Combine individual groups |
+| Shortcut + Group | `starter,+text`           | 72    | Extend a shortcut         |
+| Shortcut - Tool  | `starter,-pg_drop_table`  | 58    | Remove specific tools     |
 
 All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by default for token-efficient operations. To exclude it, add `-codemode` to your filter: `--tool-filter cron,pgcrypto,-codemode`
 
@@ -209,16 +209,16 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 
 | Shortcut       | Tools  | Use Case                 | What's Included                                          |
 | -------------- | ------ | ------------------------ | -------------------------------------------------------- |
-| `starter`      | **58** | 🌟 **Recommended**       | Core, trans, JSONB, schema, codemode                     |
-| `essential`    | 46     | Minimal footprint        | Core, trans, JSONB, codemode                             |
-| `dev-power`    | 53     | Power Developer          | Core, trans, schema, stats, part, codemode               |
-| `ai-data`      | 59     | AI Data Analyst          | Core, JSONB, text, trans, codemode                       |
-| `ai-vector`    | 49     | AI/ML with pgvector      | Core, vector, trans, part, codemode                      |
-| `dba-monitor`  | 58     | DBA Monitoring           | Core, monitoring, perf, trans, codemode                  |
-| `dba-manage`   | 57     | DBA Management           | Core, admin, backup, part, schema, codemode              |
-| `dba-stats`    | 56     | DBA Stats/Security       | Core, admin, monitoring, trans, stats, codemode          |
-| `geo`          | 42     | Geospatial Workloads     | Core, PostGIS, trans, codemode                           |
-| `base-core`    | 58     | Base Building Block      | Core, JSONB, trans, schema, codemode                     |
+| `starter`      | **59** | 🌟 **Recommended**       | Core, trans, JSONB, schema, codemode                     |
+| `essential`    | 47     | Minimal footprint        | Core, trans, JSONB, codemode                             |
+| `dev-power`    | 54     | Power Developer          | Core, trans, schema, stats, part, codemode               |
+| `ai-data`      | 60     | AI Data Analyst          | Core, JSONB, text, trans, codemode                       |
+| `ai-vector`    | 50     | AI/ML with pgvector      | Core, vector, trans, part, codemode                      |
+| `dba-monitor`  | 59     | DBA Monitoring           | Core, monitoring, perf, trans, codemode                  |
+| `dba-manage`   | 58     | DBA Management           | Core, admin, backup, part, schema, codemode              |
+| `dba-stats`    | 57     | DBA Stats/Security       | Core, admin, monitoring, trans, stats, codemode          |
+| `geo`          | 43     | Geospatial Workloads     | Core, PostGIS, trans, codemode                           |
+| `base-core`    | 59     | Base Building Block      | Core, JSONB, trans, schema, codemode                     |
 | `base-ops`     | 51     | Operations Block         | Admin, monitoring, backup, part, stats, citext, codemode |
 | `ext-ai`       | 26     | Extension: AI/Security   | pgvector, pgcrypto, codemode                             |
 | `ext-geo`      | 24     | Extension: Spatial       | PostGIS, ltree, codemode                                 |
@@ -242,7 +242,7 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 | `schema`       | 13    | Schemas, views, sequences, functions, triggers              |
 | `partitioning` | 7     | Native partition management                                 |
 | `stats`        | 9     | Statistical analysis                                        |
-| `vector`       | 16    | pgvector (AI/ML similarity search)                          |
+| `vector`       | 17    | pgvector (AI/ML similarity search)                          |
 | `postgis`      | 16    | PostGIS (geospatial)                                        |
 | `cron`         | 9     | pg_cron (job scheduling)                                    |
 | `partman`      | 11    | pg_partman (auto-partitioning)                              |

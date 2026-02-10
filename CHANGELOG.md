@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Tool count consistency across all documentation** — Synchronized tool counts across `ToolConstants.ts`, `README.md`, `DOCKER_README.md`, and 7 wiki pages. Fixed `core` group comment (19→20) in `ToolConstants.ts` to match actual array length after `pg_drop_index` addition. Updated total tool count (205→206), `vector` group table entry (16→17), and all meta-group/shortcut counts that include `core` (+1 each: `starter` 58→59, `essential` 46→47, `ai-vector` 49→50, `geo` 42→43, etc.). Fixed stale capabilities table in `Home.md` (204→206). Fixed `ext-ai` count in `Tool-Filtering.md` wiki (25→26). Recalculated extension tool total in `Extension-Overview.md` (87→80). Updated `ToolConstants.ts` inline meta-group comments to match block comment sums
+
 ### Fixed
 
 - **`pg_ltree_convert_column` already-ltree response consistency** — When the target column is already of `ltree` type, the response now includes `table` and `previousType: "ltree"` fields, matching the response shape of a successful conversion. Previously returned only `{success, message, wasAlreadyLtree}` without the `table` or `previousType` fields documented in `ServerInstructions.ts`

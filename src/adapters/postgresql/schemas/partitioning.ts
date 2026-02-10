@@ -296,7 +296,7 @@ export const CreatePartitionSchemaBase = z
       .string()
       .optional()
       .describe(
-        "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
+        "Raw SQL partition bounds string (REQUIRED). Examples: \"FROM ('2024-01-01') TO ('2024-07-01')\", \"IN ('US', 'CA')\", \"WITH (MODULUS 4, REMAINDER 0)\". For DEFAULT partitions, use isDefault: true instead",
       ),
     isDefault: z
       .boolean()
@@ -363,7 +363,7 @@ export const AttachPartitionSchemaBase = z
       .string()
       .optional()
       .describe(
-        "Partition bounds (REQUIRED). Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH), or default: true (DEFAULT)",
+        "Raw SQL partition bounds string (REQUIRED). Examples: \"FROM ('2024-01-01') TO ('2024-07-01')\", \"IN ('US', 'CA')\", \"WITH (MODULUS 4, REMAINDER 0)\". For DEFAULT partitions, use isDefault: true instead",
       ),
     isDefault: z
       .boolean()

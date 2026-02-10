@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Stale `pg_similarity_search` reference in `ServerInstructions.ts`** — Removed non-existent tool reference and replaced with accurate documentation noting that `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_regexp_match`, and `pg_like_search` all default to 100 results
 
+- **Misleading `forValues` parameter description in partitioning schemas** — Updated `forValues` description in `CreatePartitionSchemaBase` and `AttachPartitionSchemaBase` to explicitly state it requires a raw SQL partition bounds string with concrete examples (e.g., `FROM ('2024-01-01') TO ('2024-07-01')`, `IN ('US', 'CA')`, `WITH (MODULUS 4, REMAINDER 0)`). The previous description ("Provide: from/to (RANGE), values (LIST), modulus/remainder (HASH)") misled AI callers into passing JSON objects like `{"from": "...", "to": "..."}` instead of raw SQL strings
+
 ### Documentation
 
 - **Performance tools response structures in `ServerInstructions.ts`** — Added missing Response Structures table entries for `pg_index_stats` (`{indexes, count, truncated?, totalCount?}`), `pg_table_stats` (`{tables, ...}`), `pg_vacuum_stats` (`{tables, ...}`), and `pg_stat_statements` (`{statements, ...}`). These tools return truncation-aware payloads but their response key names were undocumented, making it harder for agents to access the correct array keys (e.g., `indexes` not `indexStats`)

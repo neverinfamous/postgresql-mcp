@@ -303,6 +303,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Docker CVE-2026-25547 Remediation** — Manually updated npm's bundled `@isaacs/brace-expansion` from 5.0.0 to 5.0.1 in Dockerfile to fix Inefficient Regular Expression Complexity vulnerability (HIGH). Applied to both builder and production stages
 - **Docker CVE-2026-24842 Remediation** — Upgraded manual `tar` patch in Dockerfile from version 7.5.4 to 7.5.7 to fix Path Traversal vulnerability (CVSS 8.2). Applied to both builder and production stages. Docker Scout scan now reports 0 fixable critical/high CVEs
 - **Enhanced Log Sanitization** — Upgraded logger to match db-mcp security standards
   - Added `sanitizeStack()` function to replace newlines with safe arrow delimiters (`→`) in stack traces

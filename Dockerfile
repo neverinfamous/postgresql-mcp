@@ -19,6 +19,15 @@ RUN cd /usr/local/lib/node_modules/npm && \
     mv package node_modules/diff && \
     rm diff-8.0.3.tgz
 
+# Fix CVE-2026-25547: Manually update npm's bundled @isaacs/brace-expansion@5.0.0 to 5.0.1
+RUN cd /usr/local/lib/node_modules/npm && \
+    npm pack @isaacs/brace-expansion@5.0.1 && \
+    rm -rf node_modules/@isaacs/brace-expansion && \
+    mkdir -p node_modules/@isaacs/brace-expansion && \
+    tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
+    mv package/* node_modules/@isaacs/brace-expansion/ && \
+    rm -rf package isaacs-brace-expansion-5.0.1.tgz
+
 # Fix CVE-2026-23950, CVE-2026-24842: Manually update npm's bundled tar to 7.5.7
 RUN cd /usr/local/lib/node_modules/npm && \
     npm pack tar@7.5.7 && \
@@ -58,6 +67,15 @@ RUN cd /usr/local/lib/node_modules/npm && \
     tar -xzf diff-8.0.3.tgz && \
     mv package node_modules/diff && \
     rm diff-8.0.3.tgz
+
+# Fix CVE-2026-25547: Manually update npm's bundled @isaacs/brace-expansion@5.0.0 to 5.0.1
+RUN cd /usr/local/lib/node_modules/npm && \
+    npm pack @isaacs/brace-expansion@5.0.1 && \
+    rm -rf node_modules/@isaacs/brace-expansion && \
+    mkdir -p node_modules/@isaacs/brace-expansion && \
+    tar -xzf isaacs-brace-expansion-5.0.1.tgz && \
+    mv package/* node_modules/@isaacs/brace-expansion/ && \
+    rm -rf package isaacs-brace-expansion-5.0.1.tgz
 
 # Fix CVE-2026-23950, CVE-2026-24842: Manually update npm's bundled tar to 7.5.7
 RUN cd /usr/local/lib/node_modules/npm && \

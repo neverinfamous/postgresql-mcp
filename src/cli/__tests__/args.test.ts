@@ -2,7 +2,7 @@
  * postgres-mcp - CLI Arguments Parser Tests
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { parseArgs } from "../args.js";
 
 describe("parseArgs", () => {

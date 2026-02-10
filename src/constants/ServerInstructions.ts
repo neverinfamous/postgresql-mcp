@@ -222,7 +222,7 @@ Defaults: \`threshold\`=0.3 (use 0.1-0.2 for partial), \`maxDistance\`=3 (use 5+
 
 - All text tools support \`schema.table\` format (auto-parsed, embedded schema takes priority over explicit \`schema\` param)
 - \`pg_text_search\`: Supports both \`column\` (singular string) and \`columns\` (array). Either is valid—\`column\` auto-converts to array
-- \`pg_trigram_similarity\` vs \`pg_similarity_search\`: Both use pg_trgm. First filters by threshold; second uses set_limit() with %
+- \`pg_trigram_similarity\`, \`pg_fuzzy_match\`, \`pg_regexp_match\`, \`pg_like_search\`: All default to 100 results to prevent large payloads. Use \`limit: 0\` for all rows
 - \`pg_fuzzy_match\`: Levenshtein returns distance (lower=better). Soundex/metaphone return phonetic codes (exact match only). ⛔ Invalid \`method\` values throw error with valid options
 - \`pg_text_normalize\`: Removes accents only (unaccent). Does NOT lowercase/trim
 - 📍 **Table vs Standalone**: \`normalize\`, \`sentiment\`, \`toVector\`, \`toQuery\`, \`searchConfig\` are standalone (text input only). For phonetic matching: use \`pg_fuzzy_match\` with \`method: 'soundex'|'metaphone'\` (direct MCP), or \`pg.text.soundex()\`/\`pg.text.metaphone()\` (Code Mode convenience wrappers that call fuzzyMatch internally)

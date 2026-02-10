@@ -357,8 +357,10 @@ function createRegexpMatchTool(adapter: PostgresAdapter): ToolDefinition {
       const additionalWhere = parsed.where
         ? ` AND (${sanitizeWhereClause(parsed.where)})`
         : "";
-      const limitClause =
-        parsed.limit !== undefined ? ` LIMIT ${String(parsed.limit)}` : "";
+      // Default limit to 100 to prevent large payloads
+      const limitVal =
+        parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
+      const limitClause = ` LIMIT ${String(limitVal)}`;
 
       const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${additionalWhere}${limitClause}`;
       const result = await adapter.executeQuery(sql, [parsed.pattern]);
@@ -380,7 +382,10 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
         .optional()
         .describe("Use case-sensitive LIKE (default: false, uses ILIKE)"),
       select: z.array(z.string()).optional(),
-      limit: z.number().optional(),
+      limit: z
+        .number()
+        .optional()
+        .describe("Max results (default: 100 to prevent large payloads)"),
       where: z.string().optional().describe("Additional WHERE clause filter"),
       schema: z.string().optional().describe("Schema name (default: public)"),
     })
@@ -424,10 +429,10 @@ function createLikeSearchTool(adapter: PostgresAdapter): ToolDefinition {
       const additionalWhere = parsed.where
         ? ` AND (${sanitizeWhereClause(parsed.where)})`
         : "";
-      const limitClause =
-        parsed.limit !== undefined && parsed.limit > 0
-          ? ` LIMIT ${String(parsed.limit)}`
-          : "";
+      // Default limit to 100 to prevent large payloads
+      const limitVal =
+        parsed.limit !== undefined && parsed.limit > 0 ? parsed.limit : 100;
+      const limitClause = ` LIMIT ${String(limitVal)}`;
 
       const sql = `SELECT ${selectCols} FROM ${tableName} WHERE ${columnName} ${op} $1${additionalWhere}${limitClause}`;
       const result = await adapter.executeQuery(sql, [parsed.pattern]);

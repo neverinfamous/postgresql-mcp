@@ -396,7 +396,29 @@ describe("pg_regexp_match", () => {
       expect.stringContaining(" ~ $1"),
       ["^[a-z]+@"],
     );
+    // Should include default LIMIT 100
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("LIMIT 100"),
+      expect.any(Array),
+    );
     expect(result.count).toBe(1);
+  });
+
+  it("should default to LIMIT 100 when no limit specified", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_regexp_match")!;
+    await tool.handler(
+      {
+        table: "users",
+        column: "email",
+        pattern: "^test",
+      },
+      mockContext,
+    );
+
+    const sql = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("LIMIT 100");
   });
 
   it("should use case-insensitive match with i flag", async () => {
@@ -474,7 +496,29 @@ describe("pg_like_search", () => {
       expect.stringContaining("LIKE $1"),
       ["%PostgreSQL%"],
     );
+    // Should include default LIMIT 100
+    expect(mockAdapter.executeQuery).toHaveBeenCalledWith(
+      expect.stringContaining("LIMIT 100"),
+      expect.any(Array),
+    );
     expect(result.count).toBe(1);
+  });
+
+  it("should default to LIMIT 100 when no limit specified", async () => {
+    mockAdapter.executeQuery.mockResolvedValueOnce({ rows: [] });
+
+    const tool = tools.find((t) => t.name === "pg_like_search")!;
+    await tool.handler(
+      {
+        table: "articles",
+        column: "title",
+        pattern: "%test%",
+      },
+      mockContext,
+    );
+
+    const sql = mockAdapter.executeQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("LIMIT 100");
   });
 
   it("should use ILIKE when case-insensitive", async () => {

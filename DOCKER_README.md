@@ -1,6 +1,6 @@
 # postgres-mcp
 
-**Last Updated February 9, 2026**
+**Last Updated February 10, 2026**
 
 **PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
@@ -11,9 +11,9 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/writenotenow/postgres-mcp)](https://hub.docker.com/r/writenotenow/postgres-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/MCP-Registry-green.svg)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.neverinfamous/postgres-mcp)
-![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![npm](https://img.shields.io/npm/v/@neverinfamous/postgres-mcp)](https://www.npmjs.com/package/@neverinfamous/postgres-mcp)
 [![Security](https://img.shields.io/badge/Security-Enhanced-green.svg)](https://github.com/neverinfamous/postgresql-mcp/blob/master/SECURITY.md)
+![Status](https://img.shields.io/badge/status-Production%2FStable-brightgreen)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue.svg)](https://github.com/neverinfamous/postgresql-mcp)
 [![Tests](https://img.shields.io/badge/Tests-2108_passed-success.svg)](https://github.com/neverinfamous/postgresql-mcp)
 [![Coverage](https://img.shields.io/badge/Coverage-84.5%25-green.svg)](https://github.com/neverinfamous/postgresql-mcp)
@@ -57,12 +57,12 @@ Real-time database meta-awareness - AI accesses these automatically:
 
 | Resource                  | Purpose                                       |
 | ------------------------- | --------------------------------------------- |
-| `database://schema`       | Complete schema with tables, columns, indexes |
-| `database://health`       | Comprehensive health status                   |
-| `database://performance`  | Query performance metrics                     |
-| `database://capabilities` | Server features and extensions                |
-| `database://indexes`      | Index usage statistics                        |
-| `database://connections`  | Active connections and pool status            |
+| `postgres://schema`       | Complete schema with tables, columns, indexes |
+| `postgres://health`       | Comprehensive health status                   |
+| `postgres://performance`  | Query performance metrics                     |
+| `postgres://capabilities` | Server features and extensions                |
+| `postgres://indexes`      | Index usage statistics                        |
+| `postgres://connections`  | Active connections and pool status            |
 
 **[Full resources list →](https://github.com/neverinfamous/postgresql-mcp#resources)**
 
@@ -331,7 +331,7 @@ docker pull writenotenow/postgres-mcp@sha256:<manifest-digest>
 
 **Available Tags:**
 
-- `1.0.0` - Specific version (recommended for production)
+- `1.1.0` - Specific version (recommended for production)
 - `latest` - Always the newest version
 - `sha256-<digest>` - SHA-pinned for maximum security
 

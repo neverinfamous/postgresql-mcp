@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Updated tool counts in README.md and DOCKER_README.md** — Reflected `pg_vector_batch_insert` addition: total 204→205, `ai-vector` 48→49, `ext-ai` 25→26, pgvector 15→16 vector tools (12 changes across 2 files)
+
 - **`pg_list_functions` exclude example expanded** — Updated `ServerInstructions.ts` exclude example from `['postgis', 'citext', 'fuzzystrmatch']` to include 9 common extensions (`postgis`, `pg_trgm`, `ltree`, `citext`, `fuzzystrmatch`, `pg_stat_statements`, `hypopg`, `unaccent`, `pg_stat_kcache`). Added caveat that the `language` filter does NOT exclude extension functions—agents should use `exclude` alongside `language` for clean results
 
 - **`pg_vector_performance` `testVectorSource` documentation** — Fixed documented values from `'auto-generated'|'user-provided'` to `'auto-generated from first row'|'user-provided'` to match actual handler output
@@ -371,6 +373,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Text tools `tableName` alias Split Schema fix** — 8 table-based text tools (`pg_text_search`, `pg_text_rank`, `pg_text_headline`, `pg_trigram_similarity`, `pg_fuzzy_match`, `pg_like_search`, `pg_regexp_match`, `pg_create_fts_index`) now correctly accept `tableName` as an alias for `table` parameter in direct MCP tool calls. Previously, using `{ tableName: "articles" }` caused "Invalid input: expected string, received undefined" error because the base schemas marked `table` as required, hiding the alias from MCP clients. Uses the Split Schema pattern: base schema with both `table` and `tableName` optional plus `.refine()` validation, full schema with preprocess for handler parsing
 - **pg_jsonb_extract response consistency** — `pg_jsonb_extract` now always returns `{rows: [...], count}` response structure regardless of whether `select` columns are specified. Previously, the response inconsistently returned `{results: [...], count}` without select columns and `{rows: [...], count}` with select columns. Now both modes return `rows` containing objects with a `value` property for consistent parsing
 - **pg_describe_table `name` alias Split Schema fix** — `pg_describe_table` direct MCP tool calls now correctly accept `name` as an alias for `table` parameter, matching `pg_create_table`, `pg_drop_table`, and code mode behavior. Previously, using `{ name: "table_name" }` caused "table (or tableName alias) is required" error because the `name` alias was not exposed in the MCP schema (only handled in handler parsing)
+### Documentation
+
+- **`pg_describe_table`** — Updated ServerInstructions.ts to reflect that `pg_describe_table` returns index information
 - **pg.help() code mode documentation** — Updated `ServerInstructions.ts` to clarify that `pg.help()` returns `{group: methods[]}` mapping object (e.g., `{core: ['readQuery', ...], jsonb: [...]}`), not just "lists all groups". Prevents errors when trying to access non-existent `.groups` property
 - **pg_jsonb_agg response structure documentation** — Fixed documentation incorrectly stating `pg_jsonb_agg` with `groupBy` returns `{groups: [...]}`. Actual response uses `{result: [{group_key, items}], count, grouped: true}`. Updated `ServerInstructions.ts` response structures table and tool parameter description to match actual behavior
 

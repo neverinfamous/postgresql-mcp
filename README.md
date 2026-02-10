@@ -6,7 +6,7 @@
 
 **PostgreSQL MCP Server** enabling AI assistants (AntiGravity, Claude, Cursor, etc.) to interact with PostgreSQL databases through the Model Context Protocol. Features connection pooling, HTTP/SSE Transport, OAuth 2.1 authentication, Code Mode, tool filtering, and extension support for citext, ltree, pgcrypto, pg_cron, pg_stat_kcache, pgvector, PostGIS, and HypoPG.
 
-**204 specialized tools** · **20 resources** · **19 AI-powered prompts**
+**205 specialized tools** · **20 resources** · **19 AI-powered prompts**
 
 [![GitHub](https://img.shields.io/badge/GitHub-neverinfamous/postgres--mcp-blue?logo=github)](https://github.com/neverinfamous/postgresql-mcp)
 ![GitHub Release](https://img.shields.io/github/v/release/neverinfamous/postgresql-mcp)
@@ -180,7 +180,7 @@ The `vm` mode is fully functional and is the default. No configuration needed.
 ## 🛠️ Tool Filtering
 
 > [!IMPORTANT]
-> AI IDEs like Cursor have tool limits. With 204 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (58 tools) as a starting point. Code Mode is included in all presets by default for 70-90% token savings on multi-step operations.
+> AI IDEs like Cursor have tool limits. With 205 tools available, you MUST use tool filtering to stay within your IDE's limits. We recommend `starter` (58 tools) as a starting point. Code Mode is included in all presets by default for 70-90% token savings on multi-step operations.
 
 ### What Can You Filter?
 
@@ -205,14 +205,14 @@ All shortcuts and tool groups include **Code Mode** (`pg_execute_code`) by defau
 | `essential`    | 46     | Minimal footprint        | Core, trans, JSONB, codemode                             |
 | `dev-power`    | 53     | Power Developer          | Core, trans, schema, stats, part, codemode               |
 | `ai-data`      | 59     | AI Data Analyst          | Core, JSONB, text, trans, codemode                       |
-| `ai-vector`    | 48     | AI/ML with pgvector      | Core, vector, trans, part, codemode                      |
+| `ai-vector`    | 49     | AI/ML with pgvector      | Core, vector, trans, part, codemode                      |
 | `dba-monitor`  | 58     | DBA Monitoring           | Core, monitoring, perf, trans, codemode                  |
 | `dba-manage`   | 57     | DBA Management           | Core, admin, backup, part, schema, codemode              |
 | `dba-stats`    | 56     | DBA Stats/Security       | Core, admin, monitoring, trans, stats, codemode          |
 | `geo`          | 42     | Geospatial Workloads     | Core, PostGIS, trans, codemode                           |
 | `base-core`    | 58     | Base Building Block      | Core, JSONB, trans, schema, codemode                     |
 | `base-ops`     | 51     | Operations Block         | Admin, monitoring, backup, part, stats, citext, codemode |
-| `ext-ai`       | 25     | Extension: AI/Security   | pgvector, pgcrypto, codemode                             |
+| `ext-ai`       | 26     | Extension: AI/Security   | pgvector, pgcrypto, codemode                             |
 | `ext-geo`      | 24     | Extension: Spatial       | PostGIS, ltree, codemode                                 |
 | `ext-schedule` | 19     | Extension: Scheduling    | pg_cron, pg_partman, codemode                            |
 | `ext-perf`     | 28     | Extension: Perf/Analysis | pg_stat_kcache, performance, codemode                    |
@@ -278,7 +278,7 @@ Add one of these configurations to your IDE's MCP settings file:
 }
 ```
 
-#### Option 2: AI Vector (48 Tools + pgvector)
+#### Option 2: AI Vector (49 Tools + pgvector)
 
 **Best for:** AI/ML workloads with semantic search and vector similarity.
 
@@ -475,7 +475,7 @@ This server provides **20 resources** for structured data access:
 | `pg_trgm`            | Text similarity                | `pg_trigram_similarity`    |
 | `fuzzystrmatch`      | Fuzzy matching                 | `pg_fuzzy_match`           |
 | `hypopg`             | Hypothetical indexes           | `pg_index_recommendations` |
-| `pgvector`           | Vector similarity search       | 15 vector tools            |
+| `pgvector`           | Vector similarity search       | 16 vector tools            |
 | `PostGIS`            | Geospatial operations          | 15 postgis tools           |
 | `pg_cron`            | Job scheduling                 | 8 cron tools               |
 | `pg_partman`         | Automated partition management | 10 partman tools           |
@@ -509,7 +509,7 @@ This server provides **20 resources** for structured data access:
 ## 🏆 Why Choose postgres-mcp?
 
 ✅ **TypeScript Native** - Full type safety with strict mode  
-✅ **204 Specialized Tools** - Comprehensive PostgreSQL coverage  
+✅ **205 Specialized Tools** - Comprehensive PostgreSQL coverage  
 ✅ **Tool Annotations** - UX hints for read-only, destructive, and idempotent operations  
 ✅ **Connection Pooling** - Efficient PostgreSQL connection management  
 ✅ **Extension Support** - pgvector, PostGIS, pg_stat_statements, pg_cron  

@@ -107,7 +107,6 @@ export const SERVER_INSTRUCTIONS = `# postgres-mcp Code Mode
 
 **Top-Level Aliases**: \`pg.jsonbExtract()\`, \`pg.jsonbSet()\`, \`pg.jsonbInsert()\`, \`pg.jsonbDelete()\`, \`pg.jsonbContains()\`, \`pg.jsonbPathQuery()\`, \`pg.jsonbAgg()\`, \`pg.jsonbObject()\`, \`pg.jsonbArray()\`, \`pg.jsonbKeys()\`, \`pg.jsonbStripNulls()\`, \`pg.jsonbTypeof()\`, \`pg.jsonbValidatePath()\`, \`pg.jsonbMerge()\`, \`pg.jsonbNormalize()\`, \`pg.jsonbDiff()\`, \`pg.jsonbIndexSuggest()\`, \`pg.jsonbSecurityScan()\`, \`pg.jsonbStats()\`
 
-
 ## Stats Tools
 
 - All stats tools support \`schema.table\` format (auto-parsed, embedded schema takes priority over explicit \`schema\` param)
@@ -233,7 +232,6 @@ Defaults: \`threshold\`=0.3 (use 0.1-0.2 for partial), \`maxDistance\`=3 (use 5+
 
 **Top-Level Aliases**: \`pg.textSearch()\`, \`pg.textRank()\`, \`pg.textHeadline()\`, \`pg.textNormalize()\`, \`pg.textSentiment()\`, \`pg.textToVector()\`, \`pg.textToQuery()\`, \`pg.textSearchConfig()\`, \`pg.textTrigramSimilarity()\`, \`pg.textFuzzyMatch()\`, \`pg.textLikeSearch()\`, \`pg.textRegexpMatch()\`, \`pg.textCreateFtsIndex()\`
 
-
 ## Schema Tools
 
 Core: \`listSchemas()\`, \`createSchema()\`, \`dropSchema()\`, \`listViews()\`, \`createView()\`, \`dropView()\`, \`listSequences()\`, \`createSequence()\`, \`dropSequence()\`, \`listFunctions()\`, \`listTriggers()\`, \`listConstraints()\`
@@ -253,7 +251,6 @@ Response Structures:
 - \`pg_list_functions\`: Default limit=500. Use \`schema: 'public'\`, \`limit: 2000\`, or \`exclude: ['postgis', 'pg_trgm', 'ltree', 'citext', 'fuzzystrmatch', 'pg_stat_statements', 'hypopg', 'unaccent', 'pg_stat_kcache', 'pgcrypto', 'partman']\` to filter. ⚠️ \`exclude\` filters by **schema name** AND extension-owned functions. The \`language\` filter does NOT exclude extension functions—use \`exclude\` alongside \`language\` for clean results. Note: Aggressive \`exclude\` may return 0 results if all functions belong to excluded extensions
 
 **Discovery**: \`pg.schema.help()\` returns \`{methods, methodAliases, examples}\` object
-
 
 ## Partitioning Tools
 
@@ -282,10 +279,10 @@ Response Structures:
 
 Core: \`createExtension()\`, \`queryStats()\`, \`topCpu()\`, \`topIo()\`, \`databaseStats()\`, \`resourceAnalysis()\`, \`reset()\`
 
-- \`pg_kcache_query_stats\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`orderBy\`: 'total_time' (default), 'cpu_time', 'reads', 'writes'. \`queryPreviewLength\`: chars for query preview (default: 100, max: 500, 0 for full). ⛔ 'calls' NOT valid for orderBy—use \`minCalls\` param
-- \`pg_kcache_resource_analysis\`: Default \`limit: 50\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`minCalls\`, \`queryPreviewLength\` supported. Classifies queries as 'CPU-bound', 'I/O-bound', or 'Balanced'
-- \`pg_kcache_top_cpu\`: Top CPU-consuming queries. \`limit\` param (default: 10)
-- \`pg_kcache_top_io\`: \`type\`/\`ioType\` (alias): 'reads', 'writes', 'both' (default). \`limit\` param (default: 10)
+- \`pg_kcache_query_stats\`: Default \`limit: 20\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`orderBy\`: 'total_time' (default), 'cpu_time', 'reads', 'writes'. \`queryPreviewLength\`: chars for query preview (default: 100, max: 500, 0 for full). ⛔ 'calls' NOT valid for orderBy—use \`minCalls\` param
+- \`pg_kcache_resource_analysis\`: Default \`limit: 20\` (use \`0\` for all). Returns \`truncated\` + \`totalCount\` when limited. \`minCalls\`, \`queryPreviewLength\` supported. Classifies queries as 'CPU-bound', 'I/O-bound', or 'Balanced'
+- \`pg_kcache_top_cpu\`: Top CPU-consuming queries. \`limit\` param (default: 10). Returns \`truncated\` + \`totalCount\` when limited
+- \`pg_kcache_top_io\`: \`type\`/\`ioType\` (alias): 'reads', 'writes', 'both' (default). \`limit\` param (default: 10). Returns \`truncated\` + \`totalCount\` when limited
 - \`pg_kcache_database_stats\`: Aggregated CPU/IO stats per database
 - \`pg_kcache_reset\`: Resets pg_stat_kcache AND pg_stat_statements statistics
 

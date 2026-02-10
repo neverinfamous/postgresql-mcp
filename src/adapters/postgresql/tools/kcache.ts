@@ -158,7 +158,7 @@ orderBy options: 'total_time' (default), 'cpu_time', 'reads', 'writes'. Use minC
         KcacheQueryStatsSchema.parse(params);
       const cols = await getKcacheColumnNames(adapter);
 
-      const DEFAULT_LIMIT = 50;
+      const DEFAULT_LIMIT = 20;
       // limit: 0 means "no limit" (return all rows), undefined means use default
       const limitVal = limit === 0 ? null : (limit ?? DEFAULT_LIMIT);
       // Bound queryPreviewLength: 0 = full query, default 100, max 500
@@ -539,7 +539,7 @@ Helps identify the root cause of performance issues - is the query computation-h
       const { queryId, threshold, limit, minCalls, queryPreviewLength } =
         KcacheResourceAnalysisSchema.parse(params);
       const thresholdVal = threshold ?? 0.5;
-      const DEFAULT_LIMIT = 50;
+      const DEFAULT_LIMIT = 20;
       // limit: 0 means "no limit" (return all rows), undefined means use default
       const limitVal = limit === 0 ? null : (limit ?? DEFAULT_LIMIT);
       // Bound queryPreviewLength: 0 = full query, default 100, max 500
